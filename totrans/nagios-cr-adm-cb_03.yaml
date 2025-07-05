@@ -1,44 +1,64 @@
 - en: Chapter 3. Working with Checks and States
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第 3 章：与检查和状态的工作
 - en: 'In this chapter, we will cover the following recipes:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将涵盖以下内容：
 - en: Specifying how frequently to check a host or service
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 指定检查主机或服务的频率。
 - en: Changing thresholds for PING RTT and packet loss
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 更改 PING RTT 和数据包丢失的阈值。
 - en: Changing thresholds for disk usage
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 更改磁盘使用的阈值。
 - en: Scheduling downtime for a host or service
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 为主机或服务安排停机时间。
 - en: Managing brief outages with flapping
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过波动管理短期停机。
 - en: Adjusting flapping percentage thresholds for a service
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 调整服务的波动百分比阈值。
 - en: Introduction
+  id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 引言
 - en: Once hosts and services are configured in Nagios Core, its behavior is primarily
     dictated by the checks it makes to ensure that hosts and services are operating
     as expected, and the state it concludes these hosts and services must be in as
     a result of those checks.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦在 Nagios Core 中配置了主机和服务，它的行为主要由它所执行的检查决定，以确保主机和服务按预期运行，并且根据这些检查得出的结论，主机和服务必须处于的状态。
 - en: How often it's appropriate to check hosts and services, and on what basis it's
     appropriate to flag a host or service as having problems, depends very much on
     the nature of the service and the importance of it running all the time. If a
@@ -46,8 +66,11 @@
     periods its round trip time is over 100ms, then this may not actually be a cause
     for concern at all, and perhaps not something to even flag a `WARNING` state over,
     let alone a `CRITICAL` one.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 检查主机和服务的频率以及何时标记主机或服务为存在问题，取决于服务的性质及其始终运行的重要性。比如，若检查位于世界另一端的主机，且在繁忙时段它的往返时间超过
+    100 毫秒，那么这可能并不会引起任何关注，甚至可能不需要标记为 `WARNING` 状态，更不用说 `CRITICAL` 状态了。
 - en: However, if the same host were on the local network where it would be appropriate
     to expect round trip times of less than 10ms, then a round trip time of more than
     100ms could well be considered a grave cause for concern, signaling a packet storm
@@ -57,193 +80,281 @@
     shared web host for customers. But if the response time for the corporate website
     or a dedicated colocation customer was getting that bad, it might well be something
     to notify the web server administrator about.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，如果同一主机位于本地网络，期望往返时间小于 10 毫秒，那么超过 100 毫秒的往返时间可能就会被视为一个严重问题，可能是局部网络出现了数据包风暴或其他问题，并且我们需要立即通知相关管理员。同样，对于像
+    Web 服务器这样的主机，可能对于繁忙的共享网站主机上页面的响应时间超过一秒并不关心。但如果公司网站或专用托管客户的响应时间变得如此糟糕，可能就需要通知 Web
+    服务器管理员。
 - en: 'Hosts and services are therefore not all created equal. Nagios Core provides
     several ways to define behaviors with more precision, as follows:'
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，主机和服务并不是完全相同的。Nagios Core 提供了几种方式来更精确地定义行为，具体如下：
 - en: How often a host or service should be checked with its appropriate `check_command`
     plugin
+  id: totrans-13
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用适当的 `check_command` 插件，规定主机或服务应被检查的频率。
 - en: How bad a check's results have to be before a `WARNING` or `CRITICAL` problem
     is flagged, if at all
+  id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 检查结果必须达到多差，才会触发 `WARNING` 或 `CRITICAL` 问题，若有的话。
 - en: Defining a downtime period for a host or service, so that Nagios Core knows
     not to expect it to operate during a specified period of time, often for upgrades
     or other maintenance
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 为主机或服务定义一个停机时间段，使得 Nagios Core 知道在指定时间段内不需要期望它运行，通常用于升级或其他维护。
 - en: Whether to automatically tolerate flapping, or hosts and services seeming to
     go up and down a lot
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 是否自动容忍“波动”，即主机和服务看似频繁上下波动的情况。
 - en: This chapter will use some common instances of problems with the preceding behaviors
     to give examples showing how to configure them.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将使用一些常见的主机和服务行为问题实例，展示如何配置它们。
 - en: Specifying how frequently to check a host or service
+  id: totrans-18
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 指定检查主机或服务的频率。
 - en: In this recipe, we'll configure a very important host to be checked every three
     minutes, and if Nagios Core finds it is `DOWN` as a result of the check failing,
     it will check again after a minute before it sends a notification about the state
     to its defined contact. We'll do this by customizing the definition of an existing
     host.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们将配置一个非常重要的主机，每三分钟检查一次，如果 Nagios Core 发现该主机因检查失败而处于 `DOWN` 状态，它将在一分钟后重新检查该主机，然后再将状态通知其定义的联系人。我们将通过自定义现有主机的定义来完成这一操作。
 - en: Getting ready
+  id: totrans-20
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should have a Nagios Core 3.0 or newer server with at least one host configured
     already. We'll use the example of `sparta.naginet`, a host defined in its own
     file.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 您应该已经配置了至少一个主机的Nagios Core 3.0或更新版本的服务器。我们将以`sparta.naginet`为例，它是在其自己的文件中定义的主机。
 - en: You should also understand the basics of commands and plugins, in particular
     the meaning of the `check_command` directive. These are covered in the recipes
     in [Chapter 2](ch02.html "Chapter 2. Working with Commands and Plugins"), *Working
     with Commands and Plugins*.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 您还应该了解命令和插件的基础知识，特别是`check_command`指令的含义。相关内容在[第2章](ch02.html "Chapter 2. Working
+    with Commands and Plugins")中有讲解，*命令与插件的使用*。
 - en: How to do it...
+  id: totrans-23
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can customize the check frequency for a host as follows:'
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按如下方式自定义主机的检查频率：
 - en: 'Change to the `objects` configuration directory for Nagios Core. The default
     is `/usr/local/nagios/etc/objects`. If you''ve put the definition of your host
     in a different file, then move to its directory instead:'
+  id: totrans-25
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 转到Nagios Core的`objects`配置目录。默认路径是`/usr/local/nagios/etc/objects`。如果您将主机定义放在其他文件中，请转到该文件所在的目录：
 - en: '[PRE0]'
+  id: totrans-26
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Edit the file containing your host definition, and find the definition within
     the file:'
+  id: totrans-27
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑包含您主机定义的文件，并找到该文件中的主机定义：
 - en: '[PRE1]'
+  id: totrans-28
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'The host definition may look similar to the following:'
+  id: totrans-29
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 主机定义可能类似于以下内容：
 - en: '[PRE2]'
+  id: totrans-30
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Add or edit the value of the `check_interval` directive to `3`:'
+  id: totrans-31
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将`check_interval`指令的值设置或编辑为`3`：
 - en: '[PRE3]'
+  id: totrans-32
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'Add or edit the value of the `retry_interval` directive to `1`:'
+  id: totrans-33
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将`retry_interval`指令的值设置或编辑为`1`：
 - en: '[PRE4]'
+  id: totrans-34
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'Add or edit the value of `max_check_attempts` to `2`:'
+  id: totrans-35
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将`max_check_attempts`的值设置或编辑为`2`：
 - en: '[PRE5]'
+  id: totrans-36
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-37
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启Nagios Core服务器：
 - en: '[PRE6]'
+  id: totrans-38
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: With this done, Nagios Core will run the relevant `check_command` plugin (probably
     something like `check-host-alive`) against this host every three minutes; if it
     fails, it will flag the host as down, check again one minute later, and only then
     send a notification to its defined contact if the second check fails too.
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，Nagios Core将每三分钟对该主机运行相关的`check_command`插件（可能类似于`check-host-alive`）；如果失败，它将标记该主机为“停机”状态，并在一分钟后再次检查，只有当第二次检查也失败时，才会向定义的联系人发送通知。
 - en: How it works...
+  id: totrans-40
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何工作...
 - en: 'The preceding configuration changed three properties of the host object type
     to effect the changes we needed:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述配置更改了主机对象类型的三个属性，以实现我们所需的更改：
 - en: '`check_interval`: This defines how long to wait between successive checks of
     the host under normal conditions. We set this to `3`, or three minutes.'
+  id: totrans-42
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`check_interval`：这定义了在正常条件下，连续检查主机之间需要等待的时间。我们将其设置为`3`，即三分钟。'
 - en: '`retry_interval`: This defines how long to wait between follow-up checks of
     the host after first finding problems with it. We set this to `1`, or one minute.'
+  id: totrans-43
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`retry_interval`：这定义了在首次发现主机问题后，跟进检查之间的等待时间。我们将其设置为`1`，即一分钟。'
 - en: '`max_check_attempts`: This defines how many checks in total should be run before
     a notification is sent. We set this to `2` for two checks. This means that after
     the first failed check is run, Nagios Core will run another check a minute later,
     and will only send a notification if this check fails as well. If two checks have
     been run and the host is still in a problem state, it will go from a `SOFT` state
     to a `HARD` state.'
+  id: totrans-44
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`max_check_attempts`：这定义了在发送通知之前需要运行多少次检查。我们将其设置为`2`，即进行两次检查。这意味着在第一次检查失败后，Nagios
+    Core会在一分钟后再进行一次检查，只有当第二次检查也失败时，才会发送通知。如果进行了两次检查且主机仍然处于问题状态，它将从`SOFT`状态转换为`HARD`状态。'
 - en: Note that setting these directives in a host that derives from a template, as
     is the case with our example, will override any of the same directives in the
     template.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，在从模板派生的主机中设置这些指令（如我们示例中的情况）将覆盖模板中的相同指令。
 - en: There's more...
+  id: totrans-46
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: 'It''s important to note that we can also define the units used by the `check_interval`
     and `retry_interval` commands. They only use minutes by default, checking the
     `interval_length` setting that''s normally defined in the root configuration file
     for Nagios Core, by default `/usr/local/nagios/etc/nagios.cfg`:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要注意的是，我们还可以定义`check_interval`和`retry_interval`命令使用的单位。它们默认只使用分钟，检查通常在Nagios
+    Core的根配置文件中定义的`interval_length`设置，默认路径为`/usr/local/nagios/etc/nagios.cfg`：
 - en: '[PRE7]'
+  id: totrans-48
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'If we wanted to specify these periods in seconds instead, we could set this
     value to `1` instead of `60`:'
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们想要改为以秒为单位来指定这些时间段，我们可以将其值设置为`1`而不是`60`：
 - en: '[PRE8]'
+  id: totrans-50
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: This would allow us, for example, to set `check_interval` to `15`, to check
     a host every 15 seconds. Note that if we have a lot of hosts with such a tight
     checking schedule, it might overburden the Nagios Core process, particularly if
     the checks take a long time to complete.
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将使我们能够例如将`check_interval`设置为`15`，每隔15秒检查一次主机。请注意，如果我们有很多主机，并且检查时间很长，这样紧密的检查计划可能会过度负担Nagios
+    Core进程。
 - en: 'Don''t forget that changing these properties for a large number of hosts can
     be tedious, so if it''s necessary to set these directives to some common value
     for more than a few hosts, then it may be appropriate to set the values in a host
@@ -253,28 +364,40 @@
     same three directives also work for service declarations, and have the same meaning.
     We could define the same notification behavior for a service on `sparta.naginet`
     with a declaration similar to the following:'
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 不要忘记，更改大量主机的这些属性可能很繁琐，因此，如果有必要为多个主机设置这些指令的公共值，那么将这些值设置为主机模板中，并使这些主机从中继承可能是合适的做法。有关详细信息，请参阅《第9章》的*使用继承简化配置*配方，*配置管理*。请注意，同样的三个指令也适用于服务声明，并且具有相同的含义。我们可以定义与以下类似的声明来为`sparta.naginet`上的服务定义相同的通知行为：
 - en: '[PRE9]'
+  id: totrans-53
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: See also
+  id: totrans-54
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参见
 - en: The *Scheduling downtime for a host* recipe in this chapter
+  id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在本章的*Scheduling downtime for a host*配方中
 - en: The *Using inheritance to simplify configuration* recipe in [Chapter 9](ch09.html
     "Chapter 9. Managing Configuration"), *Configuration Management*
+  id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在《第9章》的*使用继承简化配置*配方中，*配置管理*，[Chapter 9](ch09.html "Chapter 9. Managing Configuration")。
 - en: Changing thresholds for PING RTT and packet loss
+  id: totrans-57
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 更改PING RTT和数据包丢失的阈值
 - en: In this recipe, we'll set up a service for a host that monitors PING, and take
     a look at how to adjust the thresholds for the `WARNING` and `CRITICAL` states,
     done using command arguments. We'll accomplish this by setting up a service for
@@ -282,257 +405,370 @@
     as `check-host-alive`. Our service will be used to monitor not whether the host
     is completely `DOWN`, but whether it's responding to PING requests within a reasonable
     period of time.
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本配方中，我们将为监视PING的主机设置一个服务，并查看如何调整`WARNING`和`CRITICAL`状态的阈值，使用命令参数完成。我们将通过为已经使用`check-host-alive`等插件检查的现有主机设置一个服务来实现这一点。我们的服务将用于监控主机是否完全`DOWN`，而是是否在合理时间内响应PING请求。
 - en: This could be useful to notify and assist in diagnosing problems with the actual
     connectivity of a service or host.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 这对于通知并帮助诊断服务或主机的实际连通性问题可能非常有用。
 - en: This recipe will therefore serve as a good demonstration of the concepts of
     supplying arguments to a command, and adjusting the `WARNING` and `CRITICAL` thresholds
     for a particular service.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，本配方将作为向命令提供参数以及调整特定服务的`WARNING`和`CRITICAL`阈值概念的良好示范。
 - en: Getting ready
+  id: totrans-61
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should have a Nagios Core 3.0 or newer server with at least one host configured
     already, and using a `check_command` plugin of `check-host-alive`. We'll use the
     example of `sparta.naginet`, a host defined in its own file.
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 您应该拥有一个Nagios Core 3.0或更新的服务器，至少已经配置了一个主机，并且正在使用`check_command`插件`check-host-alive`。我们将使用`sparta.naginet`的例子，这是在其自己的文件中定义的主机。
 - en: You should also understand the basics of how hosts and services fit together
     in a Nagios Core configuration, and be familiar with the use of commands and plugins
     via the `check_command` directive.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 您还应了解主机和服务在Nagios Core配置中如何配合，并熟悉通过`check_command`指令使用命令和插件的基础知识。
 - en: How to do it...
+  id: totrans-64
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做...
 - en: 'We can add our PING service to the existing host with custom round trip time
     and packet loss thresholds as follows:'
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按如下方式将我们的PING服务添加到现有主机，并设置自定义的往返时间和数据包丢失阈值：
 - en: 'Change to the objects configuration directory for Nagios Core. The default
     is `/usr/local/nagios/etc/objects`. If you''ve put the definition of your host
     in a different file, then move to its directory instead:'
+  id: totrans-66
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 更改到Nagios Core对象配置目录。默认值为`/usr/local/nagios/etc/objects`。如果您将主机的定义放在不同的文件中，则请转到其目录：
 - en: '[PRE10]'
+  id: totrans-67
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Edit the file containing your host definition:'
+  id: totrans-68
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑包含主机定义的文件：
 - en: '[PRE11]'
+  id: totrans-69
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'Add the following definition to the end of the file. Of most interest here
     is the value for the `check_command` directive:'
+  id: totrans-70
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在文件末尾添加以下定义。在这里最感兴趣的是`check_command`指令的值：
 - en: '[PRE12]'
+  id: totrans-71
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-72
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启 Nagios Core 服务器：
 - en: '[PRE13]'
+  id: totrans-73
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'With this done, Nagios Core will not only run a host check of `check-host-alive`
     against your original host to ensure that it''s up, but it will also run a more
     stringent check of the PING responses from the machine as a service to check that
     it''s adequately responsive:'
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，Nagios Core 不仅会对原始主机运行`check-host-alive`主机检查以确保其处于正常状态，还会作为服务运行更严格的PING响应检查，以确保机器有足够的响应能力：
 - en: If the **Round Trip Time** (**RTT**) of the PING response is greater than 100ms
     (but less than 200ms), Nagios Core will flag a `WARNING` state.
+  id: totrans-75
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果**往返时间**（**RTT**）大于100ms（但小于200ms），Nagios Core 将标记为`WARNING`状态。
 - en: If the RTT of the PING response is greater than 200ms, Nagios Core will flag
     a `CRITICAL` state.
+  id: totrans-76
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果PING响应的RTT大于200ms，Nagios Core 将标记为`CRITICAL`状态。
 - en: If more than 20 percent (but less than 40 percent) of the PING requests receive
     no response, Nagios Core will flag a `WARNING` state.
+  id: totrans-77
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果超过20%（但少于40%）的PING请求未收到响应，Nagios Core 将标记为`WARNING`状态。
 - en: If more than 40 percent of the PING requests receive no response, Nagios Core
     will flag a `CRITICAL` state.
+  id: totrans-78
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果超过40%的PING请求未收到响应，Nagios Core 将标记为`CRITICAL`状态。
 - en: In both cases, a notification will be sent to the service's defined contacts
     if configured to do so.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这两种情况下，如果已配置通知，则会将通知发送给服务定义的联系人。
 - en: Otherwise, this service works the same way as any other service, and appears
     in the web interface.
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 否则，该服务与其他服务的工作方式相同，并会出现在Web界面中。
 - en: How it works...
+  id: totrans-81
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 工作原理...
 - en: 'The configuration we added for our existing host creates a new service with
     a `service_description` of PING. For `check_command`, we use the `check_ping`
     command, which uses the plugin of the same name. The interesting part here is
     what follows the `check_command` definition: the string `!100,20%!200,40%`.'
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们为现有主机添加的配置创建了一个新服务，其`service_description`为PING。对于`check_command`，我们使用`check_ping`命令，该命令使用同名插件。这里有趣的部分是`check_command`定义后面跟着的内容：字符串`!100,20%!200,40%`。
 - en: In Nagios Core, a `!` character is used as a separator for arguments that should
     be passed to the command. In the case of `check_ping`, the first argument defines
     thresholds, or conditions that, if met, should make Nagios Core flag a `WARNING`
     state for the service. Similarly, the second argument defines the thresholds for
     a `CRITICAL` state.
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Nagios Core中，`!`字符用作分隔符，传递给命令的参数。在`check_ping`的情况下，第一个参数定义了阈值或条件，如果满足这些条件，Nagios
+    Core将为该服务标记为`WARNING`状态。同样，第二个参数定义了`CRITICAL`状态的阈值。
 - en: 'Each of the two arguments are comprised of two comma-separated terms: the first
     number is the threshold for the RTT of the PING request and its response that
     should trigger a state, and the second number is the percentage of packet loss
     that should be tolerated before raising the same state.'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两个参数的每个值都由两个以逗号分隔的术语组成：第一个数字是触发状态的PING请求及其响应的RTT阈值，第二个数字是应该容忍的丢包百分比，超过该值会触发相同的状态。
 - en: This pattern of arguments is specific to `check_ping`; they would not work for
     other commands such as `check_http`.
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种参数模式是`check_ping`特有的；它们不适用于其他命令，如`check_http`。
 - en: There's more...
+  id: totrans-86
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'If we want to look in a bit more detail at how these arguments are applied,
     we can inspect the command definition for `check_ping`. By default, this is in
     the `/usr/local/nagios/etc/objects/commands.cfg` file, and looks similar to the
     following:'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们想更详细地查看这些参数是如何应用的，可以检查`check_ping`的命令定义。默认情况下，这在`/usr/local/nagios/etc/objects/commands.cfg`文件中，内容类似于以下内容：
 - en: '[PRE14]'
+  id: totrans-88
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'In the value for `command_line`, four macros are used:'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`command_line`的值中，使用了四个宏：
 - en: '`$USER1$`: This expands to `/usr/local/nagios/libexec`, or the directory in
     which the Nagios Core plugins are normally kept, including `check_ping`.'
+  id: totrans-90
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$USER1$`：这会展开为`/usr/local/nagios/libexec`，即Nagios Core插件（包括`check_ping`）通常存放的目录。'
 - en: '`$HOSTADDRESS$`: This expands to the hostname for the host or service definition
     in which the command is used. In this case, it expands to `10.128.0.21`, the value
     of the `address` directive for the `sparta.naginet` host.'
+  id: totrans-91
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$HOSTADDRESS$`：这会展开为命令所用主机或服务定义的主机名。在此例中，它展开为`10.128.0.21`，即`sparta.naginet`主机的`address`指令的值。'
 - en: '`$ARG1$`: This expands to the value given for the first argument of the command,
     in our recipe''s case, the string `100,20%`.'
+  id: totrans-92
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$ARG1$`：这会展开为命令第一个参数的值，在我们本例中，是字符串`100,20%`。'
 - en: '`$ARG2$`: This expands to the value given for the second argument of the command;
     in our recipe''s case, the string `200,40%`.'
+  id: totrans-93
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$ARG2$`：此选项扩展为命令的第二个参数的值；在我们的配方中，字符串为`200,40%`。'
 - en: 'The complete command-line call for our specific check with all these substitutions
     made would therefore look similar to the following:'
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于我们特定检查的完整命令行调用，应用所有这些替换后，应该类似于以下内容：
 - en: '[PRE15]'
+  id: totrans-95
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'This command line makes use of four parameters of the `check_ping` program:'
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 此命令行利用了`check_ping`程序的四个参数：
 - en: '`-H`: This specifies the address of the host to check'
+  id: totrans-97
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-H`：此选项指定要检查的主机的地址'
 - en: '`-w`: This specifies the thresholds for raising a `WARNING` state'
+  id: totrans-98
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-w`：此选项指定提升为`WARNING`状态的阈值'
 - en: '`-c`: This specifies the thresholds for raising a `CRITICAL` state'
+  id: totrans-99
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-c`：此选项指定提升为`CRITICAL`状态的阈值'
 - en: '`-p`: This specifies the number of PING requests to send'
+  id: totrans-100
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-p`：此选项指定要发送的PING请求的数量'
 - en: 'We can run this directly from the command line on the Nagios Core server to
     see what the results of the check might be:'
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以直接从Nagios Core服务器的命令行运行此命令，以查看检查结果可能是什么：
 - en: '[PRE16]'
+  id: totrans-102
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'The preceding command yields an output including the `OK` result of the check,
     and also some performance data, as follows:'
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述命令输出包括检查的`OK`结果，还包括一些性能数据，具体如下：
 - en: '[PRE17]'
+  id: totrans-104
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: The arguments specified in the command are therefore used to customize the behavior
     of `check_command` for the particular host or service being edited.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 命令中指定的参数因此用于定制`check_command`的行为，以适应特定主机或服务的编辑。
 - en: See also
+  id: totrans-106
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Changing thresholds for disk usage* recipe in this chapter
+  id: totrans-107
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*磁盘使用阈值变化*配方
 - en: The *Creating a new service* recipe in [Chapter 1](ch01.html "Chapter 1. Understanding
     Hosts, Services, and Contacts"), *Understanding Hosts, Services, and Contacts*
+  id: totrans-108
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第1章](ch01.html "第1章. 理解主机、服务和联系人")中的*创建新服务*配方，*理解主机、服务和联系人*'
 - en: The *Customizing an existing command* and *Creating a new command* recipes in
     [Chapter 2](ch02.html "Chapter 2. Working with Commands and Plugins"), *Working
     with Commands and Plugins*
+  id: totrans-109
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第2章](ch02.html "第2章. 使用命令和插件")中的*自定义现有命令*和*创建新命令*配方，*使用命令和插件*'
 - en: The *Monitoring PING for any host* recipe in [Chapter 5](ch05.html "Chapter 5. Monitoring
     Methods"), *Monitoring Methods*
+  id: totrans-110
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*监控任何主机的PING*配方在[第5章](ch05.html "第5章. 监控方法")中，*监控方法*
 - en: Changing thresholds for disk usage
+  id: totrans-111
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 磁盘使用阈值变化
 - en: In this recipe, we'll configure the Nagios Core server to check its own disk
     usage, and to flag a `WARNING` or `CRITICAL` state depending on how little free
     space is left on the disk. We'll accomplish this by adding a new service to the
     already defined `localhost` called `DISK`, which will run the `check_local_disk`
     command to examine the state of mounted volumes on the server.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个配方中，我们将配置Nagios Core服务器来检查其自身的磁盘使用情况，并根据磁盘剩余的可用空间多少，标记为`WARNING`或`CRITICAL`状态。我们将通过向已定义的`localhost`添加一个名为`DISK`的新服务来实现这一点，该服务将运行`check_local_disk`命令来检查服务器上挂载卷的状态。
 - en: Because burgeoning disk usage can creep up on any system administrator, and
     because of the dire effect it can have when a disk suddenly fills completely without
     any warning, this is amongst the more important things to monitor in any given
     network.
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于不断增长的磁盘使用情况可能会悄然增加，对于任何系统管理员来说，如果磁盘在没有任何警告的情况下突然完全填满，这将产生严重的影响，因此这是任何网络中最重要的监控内容之一。
 - en: For simplicity, we'll demonstrate this only for the monitoring server itself,
     as a host called `localhost` on `127.0.0.1`. This is because the `check_disk`
     plugin can't directly check the disk usage of a remote server over a network.
@@ -540,371 +776,540 @@
     a remote server using `check_nrpe`. The use of NRPE is discussed in all the recipes
     in [Chapter 6](ch06.html "Chapter 6. Enabling Remote Execution"), *Enabling Remote
     Execution*.
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 为简便起见，我们仅在监控服务器本身上演示这一点，作为一个名为`localhost`的主机，IP地址为`127.0.0.1`。这是因为`check_disk`插件无法直接检查远程服务器的磁盘使用情况。然而，这里讨论的原则可以适应使用`check_nrpe`在远程服务器上运行检查。NRPE的使用在[第6章](ch06.html
+    "第6章. 启用远程执行")，*启用远程执行*中的所有配方中都有讨论。
 - en: Getting ready
+  id: totrans-115
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should have a Nagios Core 3.0 or newer server with a definition for `localhost`,
     so that the monitoring host is able to check itself. A host definition for `localhost`
     is included in the sample configuration in `/usr/local/nagios/etc/objects/localhost.cfg`.
     You should also understand the basics of how hosts and services fit together in
     a Nagios Core configuration, and be familiar with the use of commands and plugins
     via the `check_command` directive.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该拥有一个 Nagios Core 3.0 或更新版本的服务器，并且应有一个针对 `localhost` 的定义，这样监控主机才能对自身进行检查。`localhost`
+    的主机定义包含在 `/usr/local/nagios/etc/objects/localhost.cfg` 中的示例配置文件中。你还应该了解 Nagios
+    Core 配置中主机和服务的基本结构，并熟悉通过 `check_command` 指令使用命令和插件。
 - en: We'll use the example of `olympus.naginet` as our Nagios Core server checking
     itself, with one block device on one disk, with its device file at `/dev/sda1`.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将以 `olympus.naginet` 作为我们的 Nagios Core 服务器进行自检的例子，其中有一个磁盘的块设备，设备文件位于 `/dev/sda1`。
 - en: How to do it...
+  id: totrans-118
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何执行...
 - en: 'We can add our `DISK` service to the existing host with custom usage thresholds
     as follows:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过以下方式将 `DISK` 服务添加到现有主机中，并自定义使用阈值：
 - en: 'Change to the objects configuration directory for Nagios Core. The default
     is `/usr/local/nagios/etc/objects`. If you''ve put the definition for your host
     in a different file, move to its directory instead:'
+  id: totrans-120
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到 Nagios Core 的对象配置目录。默认目录是 `/usr/local/nagios/etc/objects`。如果你将主机定义放在了不同的文件中，请转到相应的目录：
 - en: '[PRE18]'
+  id: totrans-121
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'Edit the file containing your host definition:'
+  id: totrans-122
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑包含主机定义的文件：
 - en: '[PRE19]'
+  id: totrans-123
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'Add the following definition to the end of the file. Of most interest here
     is the value for the `check_command` directive:'
+  id: totrans-124
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将以下定义添加到文件的末尾。这里最重要的是 `check_command` 指令的值：
 - en: '[PRE20]'
+  id: totrans-125
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-126
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重新启动 Nagios Core 服务器：
 - en: '[PRE21]'
+  id: totrans-127
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: With this done, a new service is created for `localhost` that checks the disk
     usage on `/dev/sda1`, and flags a `WARNING` state for the service if the free
     space is below 10 percent, and a `CRITICAL` state if it is below 5 percent.
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成这些操作后，为 `localhost` 创建了一个新服务，检查 `/dev/sda1` 上的磁盘使用情况。如果可用空间低于 10%，该服务将标记为
+    `WARNING` 状态；如果低于 5%，则标记为 `CRITICAL` 状态。
 - en: In both cases, a notification will be sent to the service's defined contacts,
     if configured to do so.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这两种情况下，都会向服务的已定义联系人发送通知（如果已配置）。
 - en: How it works
+  id: totrans-130
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的
 - en: 'The configuration we added for our existing host creates a new service with
     a `service_description` of `DISK`. For `check_command`, we use the `check_local_disk`
     command, which in turn uses the `check_disk` plugin to check the local machine''s
     disks. The interesting part here is what follows the `check_local_disk` definition:
     the string `!10%!5%!/dev/sda1`.'
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们为现有主机添加的配置创建了一个新的服务，`service_description` 为 `DISK`。对于 `check_command`，我们使用了
+    `check_local_disk` 命令，该命令又使用了 `check_disk` 插件来检查本地机器的磁盘。这里的重点是 `check_local_disk`
+    定义后面的内容：字符串 `!10%!5%!/dev/sda1`。
 - en: In Nagios Core, a `!` character is used as a separator for arguments that should
     be passed to the command. In the case of `check_local_disk`, the first two arguments
     define thresholds, or conditions that, if met, should make Nagios Core flag a
     `WARNING` state (first argument, 10 percent) or a `CRITICAL` state (second argument,
     5 percent) for the service. The third argument defines the device name of the
     disk to check, `/dev/sda1`.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 Nagios Core 中，`!` 字符用作分隔符，用于分隔应传递给命令的参数。在 `check_local_disk` 的例子中，前两个参数定义了阈值或条件，当条件满足时，Nagios
+    Core 将标记服务为 `WARNING` 状态（第一个参数，10%）或 `CRITICAL` 状态（第二个参数，5%）。第三个参数定义了要检查的磁盘设备名，即
+    `/dev/sda1`。
 - en: There's more...
+  id: totrans-133
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: 'If we want to look in a bit more detail at how these arguments are applied,
     we can inspect the command definition for `check_local_disk`. By default, this
     is in the file `/usr/local/nagios/etc/objects/commands.cfg`, and looks similar
     to the following:'
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们想更详细地查看这些参数是如何应用的，可以检查 `check_local_disk` 的命令定义。默认情况下，该定义位于 `/usr/local/nagios/etc/objects/commands.cfg`
+    文件中，类似于以下内容：
 - en: '[PRE22]'
+  id: totrans-135
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: In this case, `command_name` and the name of the plugin used in the `command_line`
     are not the same.
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，`command_name` 和 `command_line` 中使用的插件名称不同。
 - en: 'In the value for `command_line`, four macros are used:'
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 `command_line` 的值中，使用了四个宏：
 - en: '`$USER1$`: This expands to `/usr/local/nagios/libexec`, or the directory in
     which the Nagios Core plugins are normally kept, including `check_disk`.'
+  id: totrans-138
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$USER1$`：该参数展开为 `/usr/local/nagios/libexec`，即通常存放 Nagios Core 插件的目录，包括 `check_disk`。'
 - en: '`$ARG1$`: This expands to the value given for the first argument of the command;
     in this case, the string `10%`.'
+  id: totrans-139
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$ARG1$`：该参数展开为命令的第一个参数的值；在此案例中，该值为字符串 `10%`。'
 - en: '`$ARG2$`: This expands to the value given for the second argument of the command;
     in this case, the string `5%`.'
+  id: totrans-140
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$ARG2$`：此参数展开为命令的第二个参数值；在此例中，字符串为 `5%`。'
 - en: '`$ARG3$`: This expands to the value given for the third argument of the command;
     in this case, the string `/dev/sda1`.'
+  id: totrans-141
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$ARG3$`：此参数展开为命令的第三个参数值；在此例中，字符串为 `/dev/sda1`。'
 - en: 'The complete command-line call for our specific check with all these substitutions
     made would therefore be as follows:'
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: 对我们特定检查的完整命令行调用，所有这些替换完成后，将如下所示：
 - en: '[PRE23]'
+  id: totrans-143
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'This command line makes use of three parameters of the `check_disk` program:'
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 该命令行使用了 `check_disk` 程序的三个参数：
 - en: '`-w`: This specifies the thresholds for raising a `WARNING` state'
+  id: totrans-145
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-w`：此参数指定触发 `WARNING` 状态的阈值'
 - en: '`-c`: This specifies the thresholds for raising a `CRITICAL` state'
+  id: totrans-146
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-c`：此参数指定触发 `CRITICAL` 状态的阈值'
 - en: '`-p`: This specifies the device file for the disk to check'
+  id: totrans-147
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-p`：此参数指定要检查的磁盘的设备文件'
 - en: 'We can run this directly from the command line on the Nagios Core server to
     see what the results of the check might be:'
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以直接从 Nagios Core 服务器的命令行运行这个命令，查看检查的结果是什么：
 - en: '[PRE24]'
+  id: totrans-149
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'The output includes both the `OK` result of the check, and also some performance
     data:'
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 输出包括检查的 `OK` 结果，以及一些性能数据：
 - en: '[PRE25]'
+  id: totrans-151
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: See also
+  id: totrans-152
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参阅
 - en: The *Changing thresholds for disk usage* recipe in this chapter
+  id: totrans-153
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*更改磁盘使用阈值*示例
 - en: The *Creating a new service* recipe in [Chapter 1](ch01.html "Chapter 1. Understanding
     Hosts, Services, and Contacts"), *Understanding Hosts, Services, and Contacts*
+  id: totrans-154
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第1章](ch01.html "第1章：理解主机、服务和联系人")中的*创建新服务*的示例，*理解主机、服务和联系人*'
 - en: The *Customizing an existing command* and *Creating a new command* recipes in
     [Chapter 2](ch02.html "Chapter 2. Working with Commands and Plugins"), *Working
     with Commands and Plugins*
+  id: totrans-155
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第2章](ch02.html "第2章：与命令和插件一起工作")中的*定制现有命令*和*创建新命令*的示例，*与命令和插件一起工作*'
 - en: The *Monitoring PING for any host* recipe in [Chapter 5](ch05.html "Chapter 5. Monitoring
     Methods"), *Monitoring Methods*
+  id: totrans-156
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第5章](ch05.html "第5章：监控方法")中的*监控主机的 PING*的示例，*监控方法*'
 - en: Scheduling downtime for a host or service
+  id: totrans-157
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 为主机或服务安排停机时间
 - en: In this recipe, we'll learn how to schedule downtime for a host or service in
     Nagios Core. This is useful for elegantly suppressing notifications for some predictable
     period of time; a very good example is when servers require downtime to be upgraded,
     or to have their hardware checked.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们将学习如何在 Nagios Core 中为主机或服务安排停机时间。这对于优雅地抑制某些可预测时间段的通知非常有用；一个很好的例子是当服务器需要停机进行升级或硬件检查时。
 - en: In this example, we'll demonstrate scheduling downtime for a host named `sparta.naginet`,
     and we'll examine the changes it makes in the web interface.
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此示例中，我们将演示如何为名为 `sparta.naginet` 的主机安排停机时间，并查看它在 Web 界面中的变化。
 - en: Getting ready
+  id: totrans-160
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should have a Nagios Core 3.0 or newer server with a definition for at least
     one host and at least one service, and some idea of when you would like your downtime
     to be scheduled. You should also have a working web interface, per the QuickStart
     installation of Nagios Core 3.0.
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该有一个 Nagios Core 3.0 或更新版本的服务器，并至少定义了一个主机和一个服务，并对你希望安排停机时间的时段有所了解。同时，你应该根据
+    Nagios Core 3.0 的快速入门安装指南拥有一个可用的 Web 界面。
 - en: 'You should also have Nagios Core configured to process external commands, and
     have given your web interface user the permissions to apply them. If you are logging
     in as the `nagiosadmin` user per the recommended quick start guide, then you can
     check this is the case with the following directive in `/usr/local/nagios/etc/nagios.cfg`:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还应该配置好 Nagios Core 来处理外部命令，并为你的 Web 界面用户授予应用这些命令的权限。如果你按照推荐的快速入门指南以 `nagiosadmin`
+    用户登录，那么你可以通过在 `/usr/local/nagios/etc/nagios.cfg` 中使用以下指令来检查是否已经配置好：
 - en: '[PRE26]'
+  id: totrans-163
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Permissions to submit external commands from the web interface are defined
     in `/usr/local/nagios/etc/cgi.cfg`; check that your username is included in these
     directives:'
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 从 Web 界面提交外部命令的权限定义在 `/usr/local/nagios/etc/cgi.cfg` 中；检查你的用户名是否被包含在这些指令中：
 - en: '[PRE27]'
+  id: totrans-165
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'If you have followed the Nagios Core QuickStart guides, then you will probably
     find this is already working: [http://nagios.sourceforge.net/docs/3_0/quickstart.html](http://nagios.sourceforge.net/docs/3_0/quickstart.html).'
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你按照 Nagios Core 快速入门指南操作，那么你可能会发现它已经正常工作：[http://nagios.sourceforge.net/docs/3_0/quickstart.html](http://nagios.sourceforge.net/docs/3_0/quickstart.html)。
 - en: How to do it...
+  id: totrans-167
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can set up a fixed period of scheduled downtime for our host and service
     as follows:'
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按照以下方式为我们的主机和服务设置一个固定的计划停机时间：
 - en: Log into the web interface for Nagios Core.
+  id: totrans-169
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 登录到 Nagios Core 的 Web 界面。
 - en: Click **Hosts** in the left menu:![How to do it...](img/5566_03_01.jpg)
+  id: totrans-170
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 点击左侧菜单中的**主机**：![如何操作...](img/5566_03_01.jpg)
 - en: Click on the host's name in the table that comes up, to view the details for
     that host:![How to do it...](img/5566_03_02.jpg)
+  id: totrans-171
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 点击弹出表格中主机名称，以查看该主机的详细信息：![如何操作...](img/5566_03_02.jpg)
 - en: Click on **Schedule downtime for this host** in the **Host Commands** menu:![How
     to do it...](img/5566_03_03.jpg)
+  id: totrans-172
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在**主机命令**菜单中点击**为此主机安排停机时间**：![如何操作...](img/5566_03_03.jpg)
 - en: 'Fill out the fields in the resulting form, including the following details:'
+  id: totrans-173
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在结果表单中填写相关字段，包括以下细节：
 - en: '**Host Name**: The name of the host for which you''re scheduling downtime.
     This should have been filled out for you.'
+  id: totrans-174
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**主机名称**：您为其安排停机时间的主机名称。此项应已为您填写。'
 - en: '**Author**: Your name, for records of who scheduled the downtime. This may
     be greyed out and just say **Nagios Admin**; that''s fine.'
+  id: totrans-175
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**作者**：您的姓名，用于记录是谁安排了停机时间。这项可能会显示为灰色，并显示**Nagios 管理员**；这没问题。'
 - en: '**Comment**: Some comment explaining the reason for the downtime.'
+  id: totrans-176
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**注释**：解释停机原因的注释。'
 - en: '**Start Time**: The time at which the scheduled downtime should begin, and
     when the state notifications end.'
+  id: totrans-177
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**开始时间**：安排的停机时间应开始的时间，届时状态通知将结束。'
 - en: '**End Time**: The time at which the scheduled downtime should end, and when
     the state notifications resume.'
+  id: totrans-178
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**结束时间**：安排的停机时间应结束的时间，届时状态通知将恢复。'
 - en: '![How to do it...](img/5566_03_04.jpg)'
+  id: totrans-179
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_03_04.jpg)'
 - en: In this case, our downtime will be from 8:00 PM to 9:00 PM on the 15th of June,
     2012\.
+  id: totrans-180
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在这种情况下，我们的停机时间将是 2012 年 6 月 15 日晚上 8:00 到 9:00。
 - en: Click on **Commit** to submit the downtime definition, and then **Done** in
     the screen that follows.
+  id: totrans-181
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 点击**提交**以提交停机时间定义，然后在接下来的屏幕中点击**完成**。
 - en: With this done, we can safely bring the `sparta.naginet` host down between the
     nominated times, and any notifications for the host and any of its services will
     be suppressed until the downtime is over.
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，我们可以在指定的时间内安全地将`sparta.naginet`主机下线，并且在停机时间结束之前，任何与该主机及其服务相关的通知都会被抑制。
 - en: Note that restarting Nagios Core is not required for this step, as it usually
     would be for changes made to Nagios Core's configuration files. The change is
     done "on the fly".
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，重启 Nagios Core 在此步骤中不是必需的，因为通常对于 Nagios Core 配置文件的更改，重启是必须的。此更改是“即时生效”的。
 - en: Note also that comments now appear in the detailed information for both the
     host and service, defining the downtime and including the reason specified for
     it.
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 还要注意，注释现在会出现在主机和服务的详细信息中，定义了停机时间，并包括为其指定的原因。
 - en: How it works...
+  id: totrans-185
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: 'The preceding steps nominate a period of downtime for both the `sparta.naginet`
     server and all of its services. This accomplishes two things:'
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述步骤为`sparta.naginet`服务器及其所有服务指定了一个停机时间段。这实现了两件事：
 - en: It suppresses all notifications (whether e-mails or anything else) for the host
     or service for the appropriate time period, including `RECOVERY` notifications.
     The only exceptions are the `DOWNTIMESTART` and `DOWNTIMEEND` notifications.
+  id: totrans-187
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它会抑制主机或服务在适当时间段内的所有通知（无论是电子邮件还是其他形式的通知），包括`恢复`通知。唯一的例外是`停机开始`和`停机结束`通知。
 - en: It adds a comment to the host or service showing the scheduled downtime, for
     the benefit of anyone else who might be using the web interface.
+  id: totrans-188
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它会在主机或服务上添加注释，显示已安排的停机时间，以便其他可能使用 Web 界面的用户参考。
 - en: Nagios Core keeps track of any downtime defined for all the hosts and services,
     and prevents the notifications it would normally send out during that time. Note
     that it will still run its checks and record the state of both the hosts and services
     even during downtime. All that is suppressed are the notifications, and not the
     actual checks.
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: Nagios Core 跟踪所有主机和服务的停机时间，并在此期间阻止它通常会发送的通知。请注意，它仍然会进行检查并记录主机和服务的状态，即使在停机期间也是如此。被抑制的只是通知，而不是实际的检查。
 - en: There's more...
+  id: totrans-190
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: Note that the downtime for individual services can be applied in much the same
     way, by clicking on **Schedule downtime for this service** in the web interface,
     under **Service Commands**.
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，单个服务的停机时间也可以通过类似的方式应用，方法是在 Web 界面中点击**为此服务安排停机时间**，位于**服务命令**下。
 - en: What was defined in this recipe was a method for defining fixed downtime, where
     we know ahead of time when the host or its services are likely to be unavailable.
     If we don't actually know what time the unavailability will start, but we do know
     how long it's likely to last, then we can define a period of flexible downtime.
     This means that the downtime can start any time within the nominated period, and
     will last for the length of time we specify from that point.
+  id: totrans-192
   prefs: []
   type: TYPE_NORMAL
+  zh: 本食谱中定义的是一种定义固定停机时间的方法，在这种方法中，我们提前知道主机或其服务何时可能不可用。如果我们实际上不知道停机开始的时间，但我们知道它可能持续多久，那么我们可以定义一个灵活的停机时间。这意味着停机可以在指定的时间段内的任何时间开始，并且从那时起会持续我们指定的时间。
 - en: 'A notification event is also fired when the host or service begins the downtime,
     called `DOWNTIMESTART`, and another when the downtime ends, called `DOWNTIMEEND`.
     This may be a useful notification to send to the relevant contact or contact group
@@ -912,35 +1317,49 @@
     that the host or service is configured to send these messages, by including the
     `s` flag in the `notification_options` directive for both hosts and services,
     and correspondingly in the contact definition:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 当主机或服务开始停机时，会触发一个通知事件，称为`DOWNTIMESTART`，停机结束时会触发另一个通知事件，称为`DOWNTIMEEND`。如果相关联系人或联系人组希望在这种情况下接收通知，这可能是一个有用的通知。可以通过确保主机或服务配置为发送这些消息来安排此操作，在主机和服务的`notification_options`指令中包括`s`标志，并相应地在联系人定义中进行配置：
 - en: '[PRE28]'
+  id: totrans-194
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: See also
+  id: totrans-195
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Managing brief outages with flapping* and *Adjusting flapping percentage
     thresholds for a service* recipes in this chapter
+  id: totrans-196
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*管理短暂的停机并处理波动*和*调整服务的波动百分比阈值*食谱
 - en: The *Specifying which states to be notified about* and *Tolerating a certain
     number of failed checks* recipes in [Chapter 4](ch04.html "Chapter 4. Configuring
     Notifications"), *Configuring Notifications*
+  id: totrans-197
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第4章](ch04.html "第4章 配置通知")中的*指定要通知的状态*和*容忍一定数量的失败检查*食谱，*配置通知*'
 - en: The *Adding comments on hosts or services in web interface* recipe in [Chapter
     7](ch07.html "Chapter 7. Using the Web Interface"), *Working with the Web Interface*
+  id: totrans-198
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第7章](ch07.html "第7章 使用Web界面")中的*在网页界面上添加主机或服务的评论*食谱，*使用Web界面*'
 - en: Managing brief outages with flapping
+  id: totrans-199
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 管理短暂的停机并处理波动
 - en: In this recipe, we'll learn how to use Nagios Core's state flapping detection
     and handling to avoid sending excessive notifications when a host or service changes
     its state too frequently. This is useful in circumstances where a host or service
@@ -948,167 +1367,238 @@
     the last 21 checks. If the percentage of state changes is too high, Nagios Core
     will suppress further notifications and add an icon and comment to the host or
     service showing that it is flapping.
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我们将学习如何使用Nagios Core的状态波动检测和处理功能，避免在主机或服务的状态变化过于频繁时发送过多的通知。这在主机或服务在最后21次检查中频繁地在`OK`、`WARNING`和`CRITICAL`状态之间变化时非常有用。如果状态变化的百分比过高，Nagios
+    Core将抑制进一步的通知，并在主机或服务上添加一个图标和注释，显示它正在波动。
 - en: Flap detection is normally enabled in the QuickStart configuration for Nagios
     Core, and is part of the sample `generic-host` host template and the `generic-service`
     service template. It's therefore likely that it's already enabled on most servers,
     and we only need to check that it's still working.
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: 波动检测通常在Nagios Core的快速启动配置中启用，并且是示例`generic-host`主机模板和`generic-service`服务模板的一部分。因此，大多数服务器上可能已经启用了该功能，我们只需要检查它是否仍然有效。
 - en: Getting ready
+  id: totrans-202
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should have a Nagios Core 3.0 or newer server with at least one host and
     one service configured already. You should also have access to a working web interface
     for the Nagios Core server. It would be helpful if you are monitoring a test service
     that you can bring up and down to trigger the flap detection to test it; an unused
     webserver might be good for this.
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该已经配置了一个Nagios Core 3.0或更高版本的服务器，并且至少有一个主机和一个服务已配置。你还应该能够访问Nagios Core服务器的工作网页界面。如果你正在监控一个可以启停的测试服务以触发波动检测来进行测试，那会很有帮助；一个未使用的Web服务器可能很适合这个目的。
 - en: You should be familiar with the way hosts and services change state as a result
     of their checks and the different states corresponding to hosts and services in
     order to understand the basics of how flap detection works.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该熟悉主机和服务因检查而改变状态的方式，并了解与主机和服务相对应的不同状态，以便理解波动检测的基本原理。
 - en: How to do it...
+  id: totrans-205
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can check whether or not flap detection is enabled for our Nagios Core server,
     our hosts, and our services as follows:'
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过以下方式检查是否已启用Nagios Core服务器、主机和服务的波动检测：
 - en: Change to the configuration directory for Nagios Core. The default is `/usr/local/nagios/etc`.
+  id: totrans-207
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到Nagios Core的配置目录。默认路径是`/usr/local/nagios/etc`。
 - en: '[PRE29]'
+  id: totrans-208
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: Edit the `nagios.cfg` file.
+  id: totrans-209
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`nagios.cfg`文件。
 - en: '[PRE30]'
+  id: totrans-210
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'Look for an existing definition for the `enable_flap_detection` directive,
     and check that it is set to `1`:'
+  id: totrans-211
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查找`enable_flap_detection`指令的现有定义，并检查其是否设置为`1`：
 - en: '[PRE31]'
+  id: totrans-212
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'If this was not set to `1`, then after we''ve changed it, we will probably
     also need to at least temporarily disable the `use_retained_program_state` directive
     in the same file:'
+  id: totrans-213
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果未将其设置为`1`，则在我们更改后，可能还需要暂时禁用同一文件中的`use_retained_program_state`指令：
 - en: '[PRE32]'
+  id: totrans-214
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'Edit the file for our particular hosts and or services. We should check that
     at least one of the following is the case:'
+  id: totrans-215
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑我们特定主机或服务的文件。我们应该检查至少满足以下之一的情况：
 - en: The host or service inherits from a template that has the `enable_flap_detection`
     directive set to `1`. For example, both the `generic-host` and `generic-service`
     templates defined by default in `/usr/local/nagios/etc/objects/templates.cfg`
     do this.
+  id: totrans-216
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 主机或服务继承自一个模板，该模板将`enable_flap_detection`指令设置为`1`。例如，默认在`/usr/local/nagios/etc/objects/templates.cfg`中定义的`generic-host`和`generic-service`模板都做到了这一点。
 - en: The host or service itself has the `enable_flap_detection` directive set to
     `1` in its own definition.
+  id: totrans-217
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 主机或服务本身在其定义中将`enable_flap_detection`指令设置为`1`。
 - en: 'In the latter case, the configuration for the host or service might look similar
     to the following code snippet:'
+  id: totrans-218
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在后一种情况下，主机或服务的配置可能类似于以下代码片段：
 - en: '[PRE33]'
+  id: totrans-219
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'If any of the preceding configuration was changed, validate the new configuration
     and restart the Nagios Core server:'
+  id: totrans-220
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果之前的配置有所更改，请验证新的配置并重新启动Nagios Core服务器：
 - en: '[PRE34]'
+  id: totrans-221
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: Check that for the hosts or services for which flap detection is wanted, the
     word **ENABLED** appears in the details for that host or service:![How to do it...](img/5566_03_09.jpg)
+  id: totrans-222
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 检查希望启用波动检测的主机或服务的详细信息中，是否出现了**ENABLED**字样：![如何操作...](img/5566_03_09.jpg)
 - en: 'With this done, if a host or service changes its state too frequently within
     21 checks, then it will be flagged as flapping, and will appear with a custom
     icon in views of that host or service:'
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，如果主机或服务在21次检查内频繁更改状态，则会被标记为波动，并在该主机或服务的视图中显示自定义图标：
 - en: '![How to do it...](img/5566_03_10.jpg)'
+  id: totrans-224
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_03_10.jpg)'
 - en: 'A comment is also placed on the host or service explaining what has happened
     for the benefit of anyone viewing the host or service in the web interface, who
     might perhaps be wondering why notifications have stopped:'
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 在主机或服务上也会有一条注释，解释发生了什么，以便任何在Web界面查看该主机或服务的人理解为什么通知停止：
 - en: '![How to do it...](img/5566_03_11.jpg)'
+  id: totrans-226
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_03_11.jpg)'
 - en: 'There will also be an indicator on the details for the host or service defining
     whether the host or service is flapping:'
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 主机或服务的详细信息中还会有一个指示器，定义主机或服务是否处于波动状态：
 - en: '![How to do it...](img/5566_03_12.jpg)'
+  id: totrans-228
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_03_12.jpg)'
 - en: For hosts or services that don't have flap detection enabled, this particular
     field simply reads **N/A**, and the **Flap Detection** field below it will show
     as **DISABLED**.
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于未启用波动检测的主机或服务，该字段将简单地显示**N/A**，并且下方的**Flap Detection**字段将显示为**DISABLED**。
 - en: How it works...
+  id: totrans-230
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The logic behind determining flap detection is actually quite complex. For our
     purposes, it suffices to explain flap detection as being based on whether a host
     or service has changed state within its last 21 checks too often—with the thresholds
     usually expressed as a percentage.
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 确定波动检测的逻辑实际上是相当复杂的。就我们的目的而言，足以将波动检测解释为基于主机或服务在其最后21次检查中是否过于频繁地更改状态——这些阈值通常以百分比表示。
 - en: 'This is discussed in great detail including the formulae that are used to determine
     flapping state in the Nagios Core 3.0 documentation, available online at the following
     URL:'
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: 这在Nagios Core 3.0文档中有详细讨论，包括用于确定波动状态的公式，文档可以在线查阅，网址如下：
 - en: '[http://nagios.sourceforge.net/docs/3_0/flapping.html](http://nagios.sourceforge.net/docs/3_0/flapping.html)'
+  id: totrans-233
   prefs: []
   type: TYPE_NORMAL
+  zh: '[http://nagios.sourceforge.net/docs/3_0/flapping.html](http://nagios.sourceforge.net/docs/3_0/flapping.html)'
 - en: There's more...
+  id: totrans-234
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: A common cause of flapping is that checks are too stringent. As an example,
     if you are checking a shared web server's response time is less than 50ms while
     the server is busy, checks might pass and fail without actually giving an accurate
@@ -1117,166 +1607,240 @@
     thresholds, so that it isn't quite so ready to flag a `WARNING` or `CRITICAL`
     state over things that aren't actually very worrisome. Flap detection can help
     diagnose these sorts of cases.
+  id: totrans-235
   prefs: []
   type: TYPE_NORMAL
+  zh: 振荡的常见原因是检查条件过于严格。举个例子，如果你检查一个共享 Web 服务器的响应时间是否小于 50ms，而服务器正在忙碌，那么检查可能会通过或失败，但并未准确反映服务是否正常工作。在这种情况下，适当放宽服务的阈值，通过提高其百分比阈值，使得它不那么容易因为一些其实并不令人担忧的问题就标记为`WARNING`或`CRITICAL`状态。振荡检测有助于诊断此类情况。
 - en: We can also enable or disable flap detection for a host via the web interface;
     in the details screen for both hosts and services, a menu item is available under
     **Host Commands** labeled **Enable/Disable flap detection for this host**, and
     under **Service Commands** there's another labeled **Enable/Disable flap detection
     for this service**.
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还可以通过 Web 界面为主机启用或禁用振荡检测；在主机和服务的详细信息屏幕中，**主机命令**下有一个菜单项，标记为**为此主机启用/禁用振荡检测**，在**服务命令**下还有一个标记为**为此服务启用/禁用振荡检测**。
 - en: These may be useful when we want to turn flap detection on or off for a particular
     host or service temporarily, perhaps because under certain circumstances it is
     or is not appropriate to use the feature. For permanent setup and for clarity,
     it would be best to include it explicitly in the configuration as shown in the
     recipe.
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们希望暂时启用或禁用特定主机或服务的振荡检测时，这些配置可能会很有用，可能因为在某些情况下使用该功能不合适或不必要。为了永久设置并保持清晰，最好按照配方中所示的方式在配置中显式包含它。
 - en: See also
+  id: totrans-238
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Adjusting flapping percentage thresholds for a service* recipe in this
     chapter
+  id: totrans-239
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*调整服务的振荡百分比阈值*配方
 - en: The *Tolerating a certain number of failed checks* recipe in [Chapter 4](ch04.html
     "Chapter 4. Configuring Notifications"), *Configuring* *Notifications*
+  id: totrans-240
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第4章](ch04.html "第4章. 配置通知")中的*容忍一定数量的失败检查*配方，*配置* *通知*'
 - en: The *Adding comments on hosts or services in web interface* recipe in [Chapter
     7](ch07.html "Chapter 7. Using the Web Interface"), *Working with the Web Interface*
+  id: totrans-241
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第7章](ch07.html "第7章. 使用 Web 界面")中的*在 Web 界面上添加主机或服务的注释*配方，*与 Web 界面协作*'
 - en: Adjusting flapping percentage thresholds for a service
+  id: totrans-242
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 调整服务的振荡百分比阈值
 - en: In this recipe, we'll learn how to adjust the percentage thresholds for host
     or service flap detection. This means that we can adjust how frequently a host
     or service has to change state within its last 21 checks, before Nagios Core will
     conclude that it is flapping, and suppress notifications until its state becomes
     stable again.
+  id: totrans-243
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个配方中，我们将学习如何调整主机或服务的振荡检测百分比阈值。这意味着我们可以调整主机或服务在其最后 21 次检查中必须发生多少次状态变化，才能让 Nagios
+    Core 认为它正在振荡，并抑制通知，直到它的状态再次变得稳定。
 - en: Getting ready
+  id: totrans-244
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should have a Nagios Core 3.0 or newer server with at least one host and
     one service configured already. You should also have access to a working web interface
     for the Nagios Core server.
+  id: totrans-245
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该已经配置了至少一台主机和一项服务的 Nagios Core 3.0 或更高版本的服务器。你还应该可以访问 Nagios Core 服务器的工作 Web
+    界面。
 - en: You should be familiar with the way hosts and services change state as a result
     of their checks and the different states corresponding to hosts and services,
     to understand the basics of how flap detection works. Flap detection should also
     already be enabled and working for the appropriate hosts and services.
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该熟悉主机和服务如何因其检查而改变状态，以及与主机和服务对应的不同状态，以理解振荡检测如何工作的基本原理。振荡检测也应该已经为适当的主机和服务启用并正常工作。
 - en: How to do it...
+  id: totrans-247
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 操作方法...
 - en: 'We can adjust the thresholds for flap detection for a specific host or service
     as follows:'
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按如下方式调整特定主机或服务的振荡检测阈值：
 - en: Change to the `objects` configuration directory for Nagios Core. The default
     is `/usr/local/nagios/etc/objects`.
+  id: totrans-249
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到 Nagios Core 的`objects`配置目录。默认路径是`/usr/local/nagios/etc/objects`。
 - en: '[PRE35]'
+  id: totrans-250
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'Edit the file containing the definition for the host or service for which we
     want to set the thresholds:'
+  id: totrans-251
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑包含我们要设置阈值的主机或服务定义的文件：
 - en: '[PRE36]'
+  id: totrans-252
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'Within the host or service definition, set the `low_flap_threshold` and/or
     `high_flap_threshold` values to appropriate percentages:'
+  id: totrans-253
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在主机或服务定义中，将`low_flap_threshold`和/或`high_flap_threshold`值设置为适当的百分比：
 - en: '[PRE37]'
+  id: totrans-254
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-255
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启Nagios Core服务器：
 - en: '[PRE38]'
+  id: totrans-256
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: With this done, the flapping thresholds for the host or service should be changed
     appropriately for future checks.
+  id: totrans-257
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，主机或服务的波动阈值应适当调整，以便进行未来的检查。
 - en: How it works...
+  id: totrans-258
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: 'The preceding configuration changes include the following directives:'
+  id: totrans-259
   prefs: []
   type: TYPE_NORMAL
+  zh: 前述的配置更改包括以下指令：
 - en: '`high_flap_threshold`: A host or service that is changing state by a certain
     percentage of the time must exceed this percentage threshold, before it is determined
     to be flapping.'
+  id: totrans-260
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`high_flap_threshold`：如果主机或服务在一定时间内发生状态变化的百分比，必须超过此百分比阈值，才会被确定为波动状态。'
 - en: '`low_flap_threshold`: If a host or service is already in the flapping state,
     then its state change percentage must fall below this threshold before the flapping
     state will end.'
+  id: totrans-261
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`low_flap_threshold`：如果主机或服务已经处于波动状态，则其状态变化百分比必须低于此阈值，波动状态才会结束。'
 - en: 'For a detailed breakdown of how the state change percentage is calculated,
     see the Nagios Core 3.0 documentation online at the following URL:'
+  id: totrans-262
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于状态变化百分比如何计算的详细信息，请参见Nagios Core 3.0的在线文档，网址如下：
 - en: '[http://nagios.sourceforge.net/docs/3_0/flapping.html](http://nagios.sourceforge.net/docs/3_0/flapping.html)'
+  id: totrans-263
   prefs: []
   type: TYPE_NORMAL
+  zh: '[http://nagios.sourceforge.net/docs/3_0/flapping.html](http://nagios.sourceforge.net/docs/3_0/flapping.html)'
 - en: There's more...
+  id: totrans-264
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'If appropriate, we can also set a global default for hosts and services'' flap
     thresholds with the following directives in `/usr/local/nagios/etc/nagios.cfg`.
     The following values are examples:'
+  id: totrans-265
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果合适，我们还可以通过在`/usr/local/nagios/etc/nagios.cfg`文件中添加以下指令，设置主机和服务的全局默认波动阈值。以下值为示例：
 - en: '[PRE39]'
+  id: totrans-266
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: These values correspond to the percentages of state change, in just the same
     way that the per-host and per-service configurations do.
+  id: totrans-267
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些值对应于状态变化的百分比，方式与每个主机和服务的配置相同。
 - en: Note that there are separate directives for hosts and services in this case.
     These values are also overridden if you specify thresholds for a particular service
     or host, as we did in the recipe.
+  id: totrans-268
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，在这种情况下，主机和服务有各自的指令。如果为特定服务或主机指定了阈值，如我们在示例中所做的，这些值也会被覆盖。
 - en: See also
+  id: totrans-269
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Managing brief outages with flapping* recipe in this chapter
+  id: totrans-270
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*管理短暂故障与波动*示例
