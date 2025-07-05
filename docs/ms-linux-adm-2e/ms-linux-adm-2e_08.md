@@ -1,6 +1,6 @@
-# 8
 
-# Linux Shell 脚本编写
+
+# 第八章：Linux Shell 脚本编写
 
 了解如何使用 Linux Shell 编程基础和**命令行界面**（**CLI**）对现代 Linux 专业人员至关重要。
 
