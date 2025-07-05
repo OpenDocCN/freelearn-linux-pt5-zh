@@ -1,78 +1,109 @@
 - en: '*Chapter 14*: Introduction to the Linux Device Model'
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '*第十四章*：Linux设备模型简介'
 - en: 'Until version 2.5, the Linux kernel had no way to describe and manage objects,
     and its code reusability was not as enhanced as it is now. In other words, there
     was no device topology, nor organization as we know it is in sysfs nowadays. There
     was no information on subsystem relationships, nor on how the system is put together.
     Then came the **Linux Device Model** (**LDM**), which introduced the following
     features:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 直到2.5版本之前，Linux内核没有办法描述和管理对象，代码的可重用性也不像现在这样强大。换句话说，当时没有设备拓扑，也没有像现在在sysfs中那样的组织结构。没有关于子系统关系的信息，也没有关于系统是如何组合在一起的信息。然后出现了**Linux设备模型**（**LDM**），它引入了以下功能：
 - en: The concept of classes. They are used to group devices of the same type or that
     expose the same functionalities (for example, mice and keyboards are both input
     devices).
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 类的概念。它们用于将相同类型或暴露相同功能的设备分组（例如，鼠标和键盘都是输入设备）。
 - en: Communication with the user space through a virtual filesystem, allowing you
     to manage and enumerate devices and the properties they expose from user space.
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过虚拟文件系统与用户空间进行通信，允许你管理和枚举设备以及它们从用户空间暴露的属性。
 - en: Object life cycle management using reference counting.
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用引用计数进行对象生命周期管理。
 - en: A power management facility, allowing you to handle the order in which devices
     should shut down.
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 电源管理功能，允许你管理设备关闭的顺序。
 - en: The reusability of the code. Classes and frameworks expose interfaces, behaving
     like a contract that any driver that registers with them must respect.
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 代码的可重用性。类和框架暴露接口，表现得像一种契约，任何注册它们的驱动程序都必须遵守。
 - en: An **object-oriented** (**OO**)-like programming style and encapsulation in
     the kernel.
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**面向对象**（**OO**）风格的编程和内核中的封装。'
 - en: 'In this chapter, we will take advantage of LDM and export some properties to
     the user space through the sysfs filesystem. To do this, we will cover the following
     topics:'
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将利用LDM，通过sysfs文件系统将一些属性导出到用户空间。为此，我们将覆盖以下主题：
 - en: Introduction to LDM data structures
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: LDM数据结构简介
 - en: Getting deeper inside LDM
+  id: totrans-10
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 深入了解LDM
 - en: Overview of the device model from sysfs
+  id: totrans-11
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 从sysfs看设备模型概述
 - en: Introduction to LDM data structures
+  id: totrans-12
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: LDM数据结构简介
 - en: The Linux device model introduced device hierarchy. It is built on top of a
     few data structures. Among these is the bus, which is represented in the kernel
     as an instance of `struct bus_type`; the device driver, which is represented by
     a `struct device_driver` structure; and the device, which is the last element
     and is represented as an instance of the `struct device` structure. In this section,
     we will introduce all those structures and learn how they interact each with other.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux设备模型引入了设备层次结构。它建立在一些数据结构之上。其中包括总线，它在内核中表示为`struct bus_type`的一个实例；设备驱动程序，它由`struct
+    device_driver`结构表示；以及设备，它是最后一个元素，表示为`struct device`结构的一个实例。在本节中，我们将介绍所有这些结构，并学习它们如何相互作用。
 - en: The bus data structure
+  id: totrans-14
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 总线数据结构
 - en: 'A bus is a channel link between devices and the processor. The hardware entity
     that manages the bus and exports its protocol to devices is called the bus controller.
     For example, the USB controller provides USB support, while the I2C controller
@@ -81,15 +112,22 @@
     need to sit on this bus. In other words, every device sitting on the bus must
     have its parent field pointing to the bus device. A bus is represented in the
     kernel by the `struct bus_type` structure, which has the following definition:'
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 总线是设备与处理器之间的通道链接。管理总线并向设备暴露协议的硬件实体被称为总线控制器。例如，USB控制器提供USB支持，而I2C控制器提供I2C总线支持。然而，总线控制器作为一个设备本身，必须像任何设备一样进行注册。它将是需要连接到此总线的设备的父设备。换句话说，坐在总线上的每个设备的父设备字段必须指向总线设备。总线在内核中由`struct
+    bus_type`结构表示，其定义如下：
 - en: '[PRE0]'
+  id: totrans-16
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Only the elements that are relevant to this book have been listed here; let''s
     take a look at them in more detail:'
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里只列出了与本书相关的元素；让我们更详细地了解它们：
 - en: '`match` is a callback that''s invoked whenever a new device or driver is added
     to this bus. The callback must be smart enough and should return a nonzero value
     when there is a match between a device and a driver, both given as parameters.
@@ -100,54 +138,78 @@
     property, and so on). For enumerated devices (PCI, USB), verification is done
     by comparing the device IDs that are supported by the driver with the device ID
     of the given device, without sacrificing bus-specific functionality.'
+  id: totrans-18
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`match` 是一个回调函数，每当新设备或驱动程序被添加到此总线时都会调用该回调。回调函数必须足够智能，当设备与驱动程序之间有匹配时，应返回一个非零值。`match`
+    回调的主要目的是让总线判断一个特定设备是否可以由给定的驱动程序处理，或者如果该驱动程序支持该设备的其他逻辑。大多数情况下，这种验证是通过简单的字符串比较完成的（设备和驱动程序名称，是否是表格和设备树兼容属性，等等）。对于枚举设备（如
+    PCI、USB），验证是通过比较驱动程序支持的设备ID与给定设备的设备ID来完成的，而不会牺牲总线特定的功能。'
 - en: '`probe` is a callback that''s invoked when a new device or driver is added
     to this bus after the match has occurred. This function is responsible for allocating
     the specific bus device structure and calling the given driver''s `probe` function,
     which is supposed to manage the device (allocated earlier).'
+  id: totrans-19
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`probe` 是一个回调函数，当新设备或驱动程序在匹配后被添加到该总线时调用。此函数负责分配特定的总线设备结构，并调用给定驱动程序的 `probe`
+    函数，该函数负责管理设备（先前分配的）。'
 - en: '`remove` is called when a device leaves this bus.'
+  id: totrans-20
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`remove` 在设备离开该总线时被调用。'
 - en: '`suspend` is a method that''s called when a device on the bus needs to be put
     into sleep mode.'
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`suspend` 是在总线上的设备需要进入睡眠模式时调用的方法。'
 - en: '`resume` is called when a device on the bus must be brought out of sleep mode.'
+  id: totrans-22
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`resume` 在总线上的设备必须从睡眠模式中恢复时调用。'
 - en: '`pm` is the set of power management operations for this bus, which may also
     call driver-specific power management operations.'
+  id: totrans-23
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`pm` 是此总线的电源管理操作集，也可能调用驱动程序特定的电源管理操作。'
 - en: '`drv_groups` is a pointer to a list (array) of `struct attribute_group` elements,
     each of which has a pointer to a list (array) of `struct attribute` elements.
     It represents the default attributes of the device drivers on the bus. The attributes
     that are passed to this field will be given to every driver that''s registered
     with the bus. Those attributes can be found in the driver'' directory in `/sys/bus/<bus-name>/drivers/<driver-name>`.'
+  id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`drv_groups` 是指向 `struct attribute_group` 元素列表（数组）的指针，每个元素都有一个指向 `struct attribute`
+    元素列表（数组）的指针。它表示总线上设备驱动程序的默认属性。传递到此字段的属性将会赋予每个注册到总线上的驱动程序。这些属性可以在驱动程序的目录 `/sys/bus/<bus-name>/drivers/<driver-name>`
+    中找到。'
 - en: '`dev_groups` represents the default attributes of the devices on the bus. Any
     attributes that are passed (through the list/array of `struct attribute_group`
     elements) to this field will be given to every device that''s registered with
     the bus. Those attributes can be found in the device''s directory in `/sys/bus/<bus-name>/devices/<device-name>`.'
+  id: totrans-25
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dev_groups` 表示总线上设备的默认属性。任何通过 `struct attribute_group` 元素的列表/数组传递到此字段的属性，将会赋予每个注册到总线上的设备。这些属性可以在设备的目录
+    `/sys/bus/<bus-name>/devices/<device-name>` 中找到。'
 - en: '`bus_group` holds the set (group) of default attributes that are added automatically
     when the bus is registered with the core.'
+  id: totrans-26
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`bus_group` 保持总线注册到核心时自动添加的默认属性集（组）。'
 - en: Apart from defining `bus_type`, the bus driver must define a bus-specific driver
     structure that extends the generic `struct device_driver`, as well as a bus-specific
     device structure that extends the generic `struct device` structure. Both are
@@ -157,8 +219,11 @@
     them with the LDM core. These fields must point to the `bus_type` and the `bus_device`
     structures that are defined in the bus driver The LDM core uses them to build
     device hierarchy and initialize other fields.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了定义`bus_type`外，总线驱动程序还必须定义一个特定于总线的驱动程序结构，它扩展了通用的`struct device_driver`结构，以及一个特定于总线的设备结构，它扩展了通用的`struct
+    device`结构。这两者都是设备模型核心的一部分。总线驱动程序还必须为每个在探测时发现的物理设备分配一个特定于总线的设备结构。它还负责设置设备的总线和父字段，并将其注册到LDM核心。这些字段必须指向总线驱动程序中定义的`bus_type`和`bus_device`结构，LDM核心将使用它们来构建设备层级结构并初始化其他字段。
 - en: 'Each bus internally manages two important lists: the list of devices that have
     been added and sitting on it, and the list of drivers that have been registered
     with it. Whenever you add/register or remove/unregister a device/driver with the
@@ -168,298 +233,428 @@
     sitting on the bus. These helper functions always wrap the generic functions that
     are provided by the LDM core, which are `driver_register()`, `device_register()`,
     `driver_unregister()`, and `device_unregister()`.'
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个总线内部管理着两个重要的列表：一个是已添加并挂载在其上的设备列表，另一个是已注册到该总线的驱动程序列表。每当你添加/注册或删除/注销设备/驱动程序时，相应的列表都会更新，加入新的条目。总线驱动程序必须提供辅助函数，以便注册/注销可以处理该总线上设备的驱动程序，以及注册/注销挂载在总线上的设备。这些辅助函数总是封装了LDM核心提供的通用函数，即`driver_register()`、`device_register()`、`driver_unregister()`和`device_unregister()`。
 - en: 'Now, let''s start writing a new bus infrastructure called `PACKT`. `PACKT`
     is going to be our bus; the devices that will be sitting on this bus will be `PACKT`
     devices, while their drivers will be `PACKT` drivers. Let''s start writing the
     helpers that will allow us to register the `PACKT` devices and drivers:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们开始编写一个新的总线基础设施，叫做`PACKT`。`PACKT`将成为我们的总线；挂载在这条总线上的设备将是`PACKT`设备，而它们的驱动程序将是`PACKT`驱动程序。让我们开始编写允许我们注册`PACKT`设备和驱动程序的助手函数：
 - en: '[PRE1]'
+  id: totrans-30
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Now that we''ve created the registration helpers, let''s write the only function
     that allows us to allocate a new `PACKT` device and register this device with
     the `PACKT` core:'
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经创建了注册助手函数，接下来编写唯一的函数，允许我们分配一个新的`PACKT`设备并将其注册到`PACKT`核心：
 - en: '[PRE2]'
+  id: totrans-32
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'The `packt_device_alloc()` function allocates a bus-specific device structure
     that must be used to register a `PACKT` device with the bus. At this stage, we
     should expose the helpers that allow us to allocate a `PACKT` controller device
     and register it – that is, register a new `PACKT` bus. To do this, we must define
     the `PACKT` controller data structure, like so:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: '`packt_device_alloc()`函数分配了一个与总线相关的设备结构，必须使用它来将`PACKT`设备注册到总线。此时，我们应该暴露一些助手函数，允许我们分配一个`PACKT`控制器设备并注册它——也就是说，注册一个新的`PACKT`总线。为此，我们必须定义`PACKT`控制器数据结构，如下所示：'
 - en: '[PRE3]'
+  id: totrans-34
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'In the preceding data structure, `name` represents the controller''s name,
     `dev` represents the underlying struct device associated with this controller,
     `list` is used to insert this controller into the system''s global list of `PACKT`
     controllers, and `send_msg` and `recv_msg` are hooks that must be provided by
     the controller to access the `PACKT` devices that are sitting on it:'
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的数据结构中，`name`表示控制器的名称，`dev`表示与该控制器关联的底层`struct device`，`list`用于将该控制器插入到系统的`PACKT`控制器全局列表中，而`send_msg`和`recv_msg`是控制器必须提供的钩子函数，用于访问挂载在其上的`PACKT`设备：
 - en: '[PRE4]'
+  id: totrans-36
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: In these two functions, we have demonstrated what the controller allocation
     and registration operations look like. The allocation method allocates memory
     and does some basic initialization, leaving room for the driver to do the rest.
     Note that after registering a controller, it will appear under `/sys/devices`
     in sysfs. Any devices that are added to this bus will appear under `/sys/devices/packt-0/`.
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这两个函数中，我们演示了控制器分配和注册操作的实现。分配方法分配内存并进行一些基本的初始化，为驱动程序留出空间以完成其余操作。请注意，在注册控制器之后，它会出现在sysfs中的`/sys/devices`下。任何添加到该总线的设备将会出现在`/sys/devices/packt-0/`下。
 - en: Bus registration
+  id: totrans-38
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 总线注册
 - en: 'The bus controller is a device itself, and in most cases, buses are memory-mapped
     platform devices (even buses are, which support device enumeration). For example,
     the PCI controller is a platform device and so is its respective driver. We should
     use the `bus_register(struct *bus_type)` function to register a bus with the kernel.
     The `PACKT` bus structure looks as follows:'
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 总线控制器本身就是一个设备，在大多数情况下，总线是内存映射的平台设备（即使是总线也支持设备枚举）。例如，PCI控制器就是一个平台设备，它的相应驱动程序也是。我们应该使用`bus_register(struct
+    *bus_type)`函数将总线注册到内核中。`PACKT`总线结构如下所示：
 - en: '[PRE5]'
+  id: totrans-40
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'Now that the basic bus operations have been defined, we need to register the
     `PACKT` bus framework and make it available for both the controller and slave
     drivers. The bus controller is a device itself; it must be registered with the
     kernel and will be used as the parent of the device that''s sitting on the bus.
     This is done in the bus controller''s probe or `init` function. In the case of
     the `PACKT` bus, the code would be as follows:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在基本的总线操作已经定义，我们需要注册`PACKT`总线框架并使其可供控制器和从属驱动程序使用。总线控制器本身就是一个设备；它必须注册到内核，并作为总线上设备的父设备。这个过程在总线控制器的探测或`init`函数中完成。对于`PACKT`总线，代码如下：
 - en: '[PRE6]'
+  id: totrans-42
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'When a device is registered by the bus controller driver, the `parent` member
     of the device must point to the bus controller device (this should be done by
     the device driver) and its `bus` property must point to the `PACKT` bus type (this
     is done by the core) to build the physical device tree. To register a `PACKT`
     device, you must call `packt_device_register()`, which should take as an argument
     a `PACKT` device allocated with `packt_device_alloc()`:'
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 当设备由总线控制器驱动程序注册时，设备的`parent`成员必须指向总线控制器设备（这应由设备驱动程序完成），并且其`bus`属性必须指向`PACKT`总线类型（这是由核心完成的），以构建物理设备树。要注册一个`PACKT`设备，必须调用`packt_device_register()`，该函数应接收一个使用`packt_device_alloc()`分配的`PACKT`设备作为参数：
 - en: '[PRE7]'
+  id: totrans-44
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: Now that we are done with bus registration, let's look at the driver's infrastructure
     and see how it is designed.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们完成了总线注册，让我们看看驱动程序的架构，看看它是如何设计的。
 - en: The driver data structure
+  id: totrans-46
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 驱动程序数据结构
 - en: A driver is a set of methods that allow us to drive a given device. A global
     device hierarchy allows all the system's devices to be represented in the same
     way. This makes it simple for the core to navigate the device tree and perform
     tasks such as properly ordered power management transitions.
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 驱动程序是一组允许我们驱动给定设备的方法。全局设备层次结构允许系统中所有设备以相同的方式表示。这使得核心能够简单地浏览设备树并执行诸如正确顺序的电源管理过渡等任务。
 - en: 'Each device driver is represented as an instance of `struct device_driver`,
     which is defined like so:'
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个设备驱动程序都表示为`struct device_driver`的一个实例，其定义如下：
 - en: '[PRE8]'
+  id: totrans-49
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'Let''s look at the elements in this data structure:'
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看这个数据结构中的元素：
 - en: '`name` represents the driver''s name. It can be used for matching, by comparing
     it with the device''s name.'
+  id: totrans-51
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`name`表示驱动程序的名称。它可以用于匹配，通过将其与设备的名称进行比较。'
 - en: '`bus` represents the bus where this driver sits on. The `bus` driver must fill
     this field.'
+  id: totrans-52
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`bus`表示该驱动程序所处的总线。`bus`驱动程序必须填写此字段。'
 - en: '`module` represents the module that owns this driver. In 99% of cases, you
     must set this field to `THIS_MODULE`.'
+  id: totrans-53
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`module`表示拥有此驱动程序的模块。在99%的情况下，您必须将此字段设置为`THIS_MODULE`。'
 - en: '`of_match_table` is a pointer to the array of `struct of_device_id`. The `struct
     of_device_id` structure is used to perform open firmware matches through a special
     file called the device tree, which is passed to the kernel during the boot process:'
+  id: totrans-54
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`of_match_table`是指向`struct of_device_id`数组的指针。`struct of_device_id`结构用于通过一个特殊的文件（称为设备树）执行开放固件匹配，该文件在启动过程中传递给内核：'
 - en: '[PRE9]'
+  id: totrans-55
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: '`suspend` and `resume` are power management callbacks that are invoked to put
     the device to sleep or wake it up from a sleep state, respectively. The `remove`
     callback is called when the device is physically removed from the system or when
     its reference count reaches `0`. The `remove` callback is also called during system
     reboot.'
+  id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`suspend` 和 `resume` 是电源管理回调，分别在设备进入睡眠状态或从睡眠状态唤醒时调用。`remove` 回调在设备被物理移除系统时，或者当其引用计数达到
+    `0` 时被调用。系统重启时也会调用 `remove` 回调。'
 - en: '`probe` is the probe callback that runs when you''re attempting to bind a driver
     to a device. The bus driver is in charge of calling the device driver''s probe
     function.'
+  id: totrans-57
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`probe` 是在尝试将驱动程序绑定到设备时运行的探测回调。总线驱动程序负责调用设备驱动程序的探测函数。'
 - en: '`group` is a pointer to a list (array) of `struct attribute_group` and is used
     as a default attribute for the driver. Prefer this method instead of creating
     an attribute separately.'
+  id: totrans-58
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`group` 是指向 `struct attribute_group` 列表（数组）的指针，用作驱动程序的默认属性。优先使用此方法，而不是单独创建属性。'
 - en: Now that we are familiar with the driver data structure and all its elements,
     let's learn what APIs the kernel provides so that we can register it.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经熟悉了驱动程序数据结构及其所有元素，让我们了解内核提供了哪些 API 供我们注册它。
 - en: Driver registration
+  id: totrans-60
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 驱动程序注册
 - en: The low-level `driver_register()` function is used to register a device driver
     with the bus and it is added to the bus's driver list. When a device driver registers
     with the bus, the core travels through the list of devices on this same bus and
     calls the bus's match callback for each device that does not have a driver. It
     does this to find out if there are any devices that the driver can handle.
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 低级 `driver_register()` 函数用于将设备驱动程序与总线注册，并将其添加到总线的驱动程序列表中。当设备驱动程序与总线注册时，核心会遍历该总线上所有设备的列表，并为每个没有驱动程序的设备调用总线的匹配回调。这样做是为了查找是否有设备是该驱动程序可以处理的。
 - en: 'The following is the declaration of our driver infrastructure:'
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是我们驱动程序基础设施的声明：
 - en: '[PRE10]'
+  id: totrans-63
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: In our example, there are two helper macros to get the `PACKT` device and the
     `PACKT` driver, given a generic `struct device` or `struct driver`.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的示例中，有两个辅助宏，用于根据通用的 `struct device` 或 `struct driver` 获取 `PACKT` 设备和 `PACKT`
+    驱动程序。
 - en: 'Then comes the structure that''s used to identify a `PACKT` device, which is
     defined as follows:'
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后是用于标识 `PACKT` 设备的结构，定义如下：
 - en: '[PRE11]'
+  id: totrans-66
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: The device and the device driver are bound together when they match. Binding
     is the process of associating a device with a device driver, and it is performed
     by the bus framework.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 设备和设备驱动程序在匹配时绑定在一起。绑定是将设备与设备驱动程序关联的过程，由总线框架执行。
 - en: 'Now, let''s get back to registering our drivers with our `PACKT` bus. The drivers
     must use `packt_register_driver(struct packt_driver *driver)`, which is a wrapper
     around `driver_register()`. The `driver` parameter must have been filled in before
     registering the `PACKT` driver. The LDM core provides helper functions for iterating
     over the list of drivers that have been registered with the bus:'
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们回到将驱动程序与 `PACKT` 总线注册的问题。驱动程序必须使用 `packt_register_driver(struct packt_driver
+    *driver)`，它是 `driver_register()` 的封装。`driver` 参数必须在注册 `PACKT` 驱动程序之前填写好。LDM 核心提供了辅助函数，用于遍历已注册到总线的驱动程序列表：
 - en: '[PRE12]'
+  id: totrans-69
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: This helper iterates over the bus's list of drivers and calls the `fn` callback
     for each driver in the list.
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个辅助函数遍历总线的驱动程序列表，并为列表中的每个驱动程序调用 `fn` 回调。
 - en: The device data structure
+  id: totrans-71
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 设备数据结构
 - en: '`struct device` is the generic data structure that''s used to describe and
     characterize each device on the system, whether it is physical or not. It contains
     details about the physical attributes of the device and provides proper linkage
     information to help build suitable device trees and reference counting:'
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: '`struct device` 是通用数据结构，用于描述和表征系统中的每个设备，无论其是否为物理设备。它包含关于设备物理属性的详细信息，并提供适当的链接信息，以帮助构建合适的设备树和引用计数：'
 - en: '[PRE13]'
+  id: totrans-73
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'The preceding data structure has been shortened for the sake of readability.
     That said, let''s take a look at the elements that have been provided:'
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了便于阅读，前面的数据结构已被简化。尽管如此，我们来看一下已提供的元素：
 - en: '`parent` represents the device''s parent and is used to build the device tree
     hierarchy. When registered with a bus, the bus driver is responsible for setting
     this field with the bus device.'
+  id: totrans-75
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`parent` 表示设备的父设备，用于构建设备树层次结构。当与总线注册时，总线驱动程序负责用总线设备设置此字段。'
 - en: '`bus` represents the bus where this device sits. The bus driver must fill this
     field.'
+  id: totrans-76
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`bus` 表示设备所在的总线。总线驱动程序必须填写此字段。'
 - en: '`type` identifies the device''s type.'
+  id: totrans-77
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`type`标识设备的类型。'
 - en: '`kobj` is the kobject and handles reference counting and device model support.'
+  id: totrans-78
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kobj`是kobject，用于处理引用计数和设备模型支持。'
 - en: '`of_node` is a pointer to the open firmware (device tree) node associated with
     the device. It is up to the bus driver to set this field.'
+  id: totrans-79
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`of_node`是指向与设备相关的开放固件（设备树）节点的指针。由总线驱动来设置此字段。'
 - en: '`platform_data` is a pointer to the platform data that''s specific to the device.
     It''s usually declared in a board-specific file during device provisioning.'
+  id: totrans-80
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`platform_data`是指向特定于设备的平臺数据的指针。它通常在设备配置期间在板级特定文件中声明。'
 - en: '`driver_data` is a pointer to private data for the driver.'
+  id: totrans-81
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`driver_data`是指向驱动程序私有数据的指针。'
 - en: '`class` is a pointer to the class that this device belongs to.'
+  id: totrans-82
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`class`是指向该设备所属类的指针。'
 - en: '`group` is a pointer to a list (array) of `struct attribute_group` and is used
     as the default attributes for the device. You should use this instead of creating
     the attributes separately.'
+  id: totrans-83
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`group`是指向`struct attribute_group`类型的列表（数组）的指针，并用作设备的默认属性。你应该使用这个，而不是单独创建属性。'
 - en: '`release` is a callback that''s called when the device reference count reaches
     zero. The bus has the responsibility of setting up this field. The `PACKT` bus
     driver shows you how to do that.'
+  id: totrans-84
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`release`是一个回调函数，当设备的引用计数降到零时被调用。总线有责任设置这个字段。`PACKT`总线驱动展示了如何执行此操作。'
 - en: Now that we have described the device's structure, let's learn how to make it
     part of the system by registering it.
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经描述了设备的结构，接下来让我们学习如何通过注册将它纳入系统。
 - en: Device registration
+  id: totrans-86
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 设备注册
 - en: '`device_register()` is a function that''s provided by the LDM core to register
     a device with the bus. After this call, the bus''s list of drivers is iterated
     over to find the driver that supports this device; then, this device is added
     to the bus''s device list. `device_register()` internally calls `device_add()`:'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: '`device_register()`是LDM核心提供的一个函数，用于将设备注册到总线。在这个调用之后，总线的驱动程序列表会被遍历，寻找支持该设备的驱动程序；然后，这个设备会被添加到总线的设备列表中。`device_register()`内部调用`device_add()`：'
 - en: '[PRE14]'
+  id: totrans-88
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'The helper function that''s provided by the kernel to iterate over the bus''s
     device list is `bus_for_each_dev`. It''s defined as follows:'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核提供的帮助函数，用于遍历总线的设备列表的是`bus_for_each_dev`。它的定义如下：
 - en: '[PRE15]'
+  id: totrans-90
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: Whenever a device is added, the core invokes the matching method of the bus
     driver (`bus_type->match`). If the matching function succeeds, the core will invoke
     the probing function of the bus driver (`bus_type->probe`), given that both the
@@ -468,194 +663,282 @@
     `PACKT` bus driver, the function that's used to register a device is `packt_device_register(struct
     packt_device *packt)`, which internally calls `device_register()`. Here, the parameter
     is a `PACKT` device that's been allocated with `packt_device_alloc()`.
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 每当一个设备被添加时，核心会调用总线驱动的匹配方法（`bus_type->match`）。如果匹配函数成功，核心会调用总线驱动的探测函数（`bus_type->probe`），前提是设备和驱动作为参数匹配。然后，由总线驱动来调用设备驱动的探测方法（即`driver->probe`）。对于我们的`PACKT`总线驱动，用于注册设备的函数是`packt_device_register(struct
+    packt_device *packt)`，该函数内部调用`device_register()`。这里的参数是一个通过`packt_device_alloc()`分配的`PACKT`设备。
 - en: 'The bus-specific device data structure is then defined as follows:'
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 总线特定的设备数据结构随后定义如下：
 - en: '[PRE16]'
+  id: totrans-93
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: In the preceding code, `dev` is the underlying `struct device` structure for
     the device model, while `name` is the name of the device.
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`dev`是设备模型的底层`struct device`结构，而`name`是设备的名称。
 - en: Now that we have defined the data structure, let's learn about the underlying
     mechanisms of LDM.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经定义了数据结构，让我们了解一下LDM的底层机制。
 - en: Getting deeper inside LDM
+  id: totrans-96
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 更深入了解LDM
 - en: So far, we have discussed buses, drivers, and devices, which were used to build
     the system device topology. While this is true, the previous topics were the tip
     of the iceberg. Under the hood, LDM relies on the three lowest level data structures,
     which are `kobject`, `kobj_type`, and `kset`. These are used to link the objects.
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们讨论了总线、驱动程序和设备，它们被用来构建系统的设备拓扑。虽然这是真的，但前面讨论的只是冰山一角。在内部，LDM依赖于三个最低级的数据结构，它们分别是`kobject`、`kobj_type`和`kset`。这些结构用于链接对象。
 - en: 'Before we go any further, let''s define some of the terms that will be used
     throughout this chapter:'
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们进一步讨论之前，让我们定义一下本章中将要使用的一些术语：
 - en: '`struct kobject`.'
+  id: totrans-99
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`struct kobject`。'
 - en: '**Attribute**: An attribute (or sysfs attribute) appears as a file in sysfs.
     From within the kernel, it can be mapped to anything: a variable, a device property,
     a buffer, or anything useful to the driver that may need to be exported to the
     world.'
+  id: totrans-100
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**属性**：一个属性（或 sysfs 属性）在 sysfs 中表现为一个文件。在内核中，它可以映射到任何事物：一个变量、一个设备属性、一个缓冲区，或者任何可能需要导出到外部的对驱动程序有用的东西。'
 - en: In this section, we will learn how each of these structures is involved in the
     device model.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们将了解这些结构如何参与设备模型。
 - en: Understanding the kobject structure
+  id: totrans-102
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 理解 kobject 结构
 - en: '`struct kobject`, which means kernel object (also abbreviated as `struct kobject`
     wandering around somewhere within the kernel. Additionally, a kobject can export
     one or more attributes, which appear in that Kobject''s sysfs directory as files.
     Now, let''s get back to the code – `struct kobject` is defined in the kernel like
     so:'
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: '`struct kobject`，即内核对象（也简称为 `struct kobject`，在内核中的某个地方徘徊）。此外，一个 kobject 可以导出一个或多个属性，这些属性在该
+    Kobject 的 sysfs 目录中表现为文件。现在，让我们回到代码中 —— `struct kobject` 在内核中的定义如下：'
 - en: '[PRE17]'
+  id: totrans-104
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'In the preceding data structure, only the main elements have been listed. Let''s
     take a look at them in more detail:'
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的数据结构中，仅列出了主要元素。让我们更详细地查看它们：
 - en: '`name` is the name of this kobject. It can be modified using the `kobject_set_name(struct
     kobject *kobj, const char *name)` function. It is used as the name of this `kobject`
     directory.'
+  id: totrans-106
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`name` 是此 kobject 的名称。可以通过 `kobject_set_name(struct kobject *kobj, const char
+    *name)` 函数修改该名称。它用作此 `kobject` 目录的名称。'
 - en: '`parent` is a pointer to another kobject, which is considered the parent of
     this kobject. It is used to build topologies and to describe the relationship
     between objects.'
+  id: totrans-107
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`parent` 是指向另一个 kobject 的指针，该 kobject 被视为此 kobject 的父对象。它用于构建拓扑并描述对象之间的关系。'
 - en: '`sd` points to a `struct sysfs_dirent` structure that represents the directory
     of this kobject in sysfs. `name` will be used as the name of this directory. If
     `parent` is set, then this directory will be a sub-directory in the parent''s
     directory.'
+  id: totrans-108
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`sd` 指向一个 `struct sysfs_dirent` 结构体，表示此 kobject 在 sysfs 中的目录。`name` 将用作此目录的名称。如果
+    `parent` 被设置，则该目录将成为父目录中的子目录。'
 - en: '`kref` provides reference counting for the kobject. It helps track whether
     an object is still in use or not and potentially releases it if it''s not being
     used anymore. Alternatively, it can prevent it from being removed if it''s still
     in use. When it''s used from within a kernel object, its initial value is `1`.'
+  id: totrans-109
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kref` 为 kobject 提供引用计数。它帮助跟踪对象是否仍在使用中，并在不再使用时可能释放它。或者，它可以防止对象在仍被使用时被删除。当它在内核对象中使用时，初始值为
+    `1`。'
 - en: '`ktype` describes the kobject. Every kobject is given a set of default attributes
     when it is created. The `ktype` element, which belongs to the `struct kobj_type`
     structure, is used to specify these default attributes. Such a structure allows
     kernel objects to share common operations (`sysfs_ops`), whether those objects
     are functionally related or not.'
+  id: totrans-110
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ktype` 描述了 kobject。每个 kobject 在创建时都会赋予一组默认属性。`ktype` 元素属于 `struct kobj_type`
+    结构体，用于指定这些默认属性。这样的结构允许内核对象共享公共操作（`sysfs_ops`），无论这些对象是否在功能上相关。'
 - en: '`kset` tells us which set (group) of objects this object belongs to.'
+  id: totrans-111
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kset` 告诉我们该对象属于哪个对象集（组）。'
 - en: 'Before a kobject can be used, it must be (exclusively) dynamically allocated
     and then initialized. To do so, drivers can use the `kzalloc()` (or `kmalloc()`)
     or `kobject_create()` function. With `kzalloc()`, the object is allocated and
     empty and must be initialized using another API, `kobject_init()`. With `kobject_create()`,
     allocation and initialization are implicit. These APIs are defined as follows:'
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 kobject 被使用之前，必须对其进行（独占）动态分配并初始化。为此，驱动程序可以使用 `kzalloc()`（或 `kmalloc()`）或 `kobject_create()`
+    函数。使用 `kzalloc()` 时，对象会被分配并且为空，需要使用另一个 API `kobject_init()` 来初始化。使用 `kobject_create()`
+    时，分配和初始化是隐式的。这些 API 定义如下：
 - en: '[PRE18]'
+  id: totrans-113
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: In the preceding code, `kobject_init()` expects, in its first parameter, a kobject
     that has been initially allocated, via `kzalloc()` for example. The second parameter,
     `ktype`, is mandatory, so it can't be `NULL`; otherwise, the kernel will complain
     (`dump_stack()`). `kobject_create()`, on the other hand, expects nothing; it does
     allocation and initialization implicitly (it calls `kzalloc()` and `kobject_init()`
     internally). On success, it returns a freshly initialized kobject object.
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`kobject_init()`的第一个参数期望一个已通过`kzalloc()`等方法分配的 kobject。第二个参数`ktype`是必需的，不能为`NULL`；否则，内核将报错（`dump_stack()`）。另一方面，`kobject_create()`不期望任何参数；它隐式地完成了分配和初始化（它内部调用了`kzalloc()`和`kobject_init()`）。如果成功，它将返回一个刚刚初始化的
+    kobject 对象。
 - en: 'Once a kobject has been initialized, the driver can use `kobject_add()` to
     link this object with the system, creating a sysfs directory entry for this kobject.
     Where this directory will be created depends on the parent element of the kobject
     being set or not. That said, if this parent is not set, it can be specified while
     adding the kobject to the system using `kobject_add()`, which is defined as follows:'
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦一个 kobject 被初始化，驱动程序可以使用`kobject_add()`将这个对象与系统连接，创建这个 kobject 的 sysfs 目录项。这个目录会创建在哪里取决于
+    kobject 的父元素是否已设置。也就是说，如果父元素没有设置，可以在使用`kobject_add()`将 kobject 添加到系统时指定，`kobject_add()`的定义如下：
 - en: '[PRE19]'
+  id: totrans-116
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: In the preceding function, `kobj` is the kernel object to be added to the system
     and `parent` is its parent. The `kobject` directory will be created as a sub-directory
     of its parent. If `parent` is `NULL`, the directory will be created under `/sys/`
     directly.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的函数中，`kobj`是要添加到系统中的内核对象，`parent`是它的父对象。`kobject`目录将作为父目录的子目录创建。如果`parent`为`NULL`，目录将直接在`/sys/`下创建。
 - en: 'Instead of using `kobject_init()` or `kobject_create()` and then `kobject_add()`
     individually, it is possible to use `kobject_init_and_add()`, which groups their
     actions. It''s defined like so:'
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 与其单独使用`kobject_init()`或`kobject_create()`，然后再使用`kobject_add()`，不如使用`kobject_init_and_add()`，它将这些操作组合在一起。它的定义如下：
 - en: '[PRE20]'
+  id: totrans-119
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'In the preceding interface, the object needs to be allocated first. There is
     another helper that will implicitly allocate, initialize, and add the kobject
     with the system. This function is `kobject_create_and_add()` and it''s defined
     as follows:'
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的接口中，首先需要分配对象。还有另一个辅助函数会隐式地分配、初始化并将 kobject 添加到系统中。这个函数是`kobject_create_and_add()`，其定义如下：
 - en: '[PRE21]'
+  id: totrans-121
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: The preceding function takes the name of the kobject that will be used as the
     directory name, as well as a parent kobject whose created directory will be a
     sub-directory. Passing `NULL` as the second parameter will result in the directory
     being created under `/sys/` directly.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的函数接受一个 kobject 名称，用作目录名，以及一个父 kobject，其创建的目录将作为子目录。如果将`NULL`作为第二个参数传递，则目录将直接创建在`/sys/`下。
 - en: 'That said, some predefined kobjects in the kernel already represent some directories
     under `/sys/`. Let''s look at a few of them:'
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 也就是说，内核中一些预定义的 kobjects 已经代表了`/sys/`下的一些目录。让我们看看其中的几个：
 - en: '`kernel_kobj`: This kobject is responsible for the `/sys/kernel` directory.'
+  id: totrans-124
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kernel_kobj`：这个 kobject 负责`/sys/kernel`目录。'
 - en: '`mm_kobj`: This is responsible for `/sys/kernel/mm`.'
+  id: totrans-125
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`mm_kobj`：这个对象负责`/sys/kernel/mm`。'
 - en: '`fs_kobj`: This is the filesystem kobject and it''s responsible for `/sys/fs`.'
+  id: totrans-126
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`fs_kobj`：这是文件系统 kobject，负责`/sys/fs`。'
 - en: '`hypervisor_kobj`: This is responsible for `/sys/hypervisor`.'
+  id: totrans-127
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`hypervisor_kobj`：这个对象负责`/sys/hypervisor`。'
 - en: '`power_kobj`: This is a power management kobject that''s used at the origin
     of `/sys/power`.'
+  id: totrans-128
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`power_kobj`：这是一个电源管理 kobject，用于`/sys/power`的起始位置。'
 - en: '`firmware_kobj`: This is the firmware kobject that owns the `/sys/firmware`
     directory.'
+  id: totrans-129
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`firmware_kobj`：这是拥有`/sys/firmware`目录的固件 kobject。'
 - en: Once you're done with a kobject, the driver should release it. The low-level
     function you can use to release a kobject is `kobject_release()`. However, this
     API does not consider other potential users of the kobject. It is raw and dummy.
@@ -665,43 +948,63 @@
     is set to `1`. Moreover, it is also recommended that users wrap the kobject's
     usage into the `kobject_get()` and `kobject_put()` functions, where `kobject_get()`
     will just increment the reference counter value.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦完成kobject的使用，驱动程序应该释放它。你可以使用的低级函数是`kobject_release()`。然而，这个API没有考虑kobject的其他潜在用户。它是原始且简单的。建议使用`kobject_put()`代替，它会递减kobject的引用计数，并在新的引用计数值为`0`时释放该kobject。记住，当kobject被初始化时，引用计数值被设置为`1`。此外，建议用户将kobject的使用包装到`kobject_get()`和`kobject_put()`函数中，其中`kobject_get()`只会增加引用计数值。
 - en: 'These APIs have the following prototypes:'
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些API具有以下原型：
 - en: '[PRE22]'
+  id: totrans-132
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: In the preceding code, `kobject_get()` takes the kobject to increase the reference
     counter as a parameter and returns this same kobject once the parameter has been
     initialized. `kobject_put()` will decrement 1 from the reference counter and,
     if the new value is `0`, `kobject_release()` will be automatically called on the
     object, which will release it.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`kobject_get()`将kobject作为参数来增加引用计数，并在初始化参数后返回相同的kobject。`kobject_put()`将从引用计数中减去1，如果新的值为`0`，则会自动调用`kobject_release()`来释放该对象。
 - en: 'The following code shows how to combine `kobject_create()`, `kobject_init()`,
     and `kobject_add()` to create and add a kernel object to the system:'
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下代码展示了如何结合`kobject_create()`、`kobject_init()`和`kobject_add()`来创建并将一个内核对象添加到系统中：
 - en: '[PRE23]'
+  id: totrans-135
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'As we can see, we could use an all-in-one function, such as `kobject_create_and_add()`,
     which internally calls `kobject_create()` and `kobject_add()`. The following excerpt
     from `drivers/base/core.c` shows how to use it:'
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们所看到的，我们可以使用一体化函数，如`kobject_create_and_add()`，它内部调用`kobject_create()`和`kobject_add()`。以下是`drivers/base/core.c`中的摘录，展示了如何使用它：
 - en: '[PRE24]'
+  id: totrans-137
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: Keep in mind that for each `struct kobject`, the corresponding kobject directory
     can be found in `/sys/`, and the upper directory is pointed out by `kobj->parent`.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 请记住，对于每个`struct kobject`，相应的kobject目录可以在`/sys/`中找到，父目录由`kobj->parent`指向。
 - en: Note
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Since it is mandatory to provide a `kobj_type` while initializing a kobject,
     all-in-one helpers use a default and kernel-provided `kobj_type`; that is, `dynamic_kobj_ktype`.
     Therefore, unless you have a good reason to initialize your `kobj_type` (most
@@ -709,28 +1012,38 @@
     should use `kobject_create*()` variants, which use the kernel-provided kobject
     type instead of `kobject_init*()`, which would require providing your own initialized
     `kobj_type`.
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于在初始化kobject时必须提供一个`kobj_type`，因此一体化的辅助函数使用默认的、由内核提供的`kobj_type`；即`dynamic_kobj_ktype`。因此，除非你有充分的理由初始化你的`kobj_type`（通常是在你希望填充一些默认属性时），否则你应该使用`kobject_create*()`变体，它们使用内核提供的kobject类型，而不是`kobject_init*()`，后者需要提供你自己的初始化`kobj_type`。
 - en: Understanding the kobj_type structure
+  id: totrans-141
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 理解kobj_type结构
 - en: A `struct kobj_type` structure, which means kernel object type, is a data structure
     that defines the behavior of a kobject element and controls what happens to this
     kobject when it is created or destroyed. Additionally, a `kobj_type` contains
     the default attributes of the kobject, as well as the hooks that allow it to operate
     on these attributes.
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: '`struct kobj_type`结构，即内核对象类型，是一个定义kobject元素行为并控制该kobject在创建或销毁时如何处理的数据结构。此外，`kobj_type`还包含kobject的默认属性，以及允许它操作这些属性的钩子函数。'
 - en: 'Because most devices of the same type have the same attributes, these attributes
     are isolated and stored in the `ktype` element. This allows them to be managed
     flexibly. Every kobject must have an associated `kobj_type` structure. Its data
     structure is defined as follows:'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 因为同一类型的大多数设备具有相同的属性，这些属性被隔离并存储在`ktype`元素中。这样可以灵活地管理它们。每个kobject都必须有一个关联的`kobj_type`结构。其数据结构定义如下：
 - en: '[PRE25]'
+  id: totrans-144
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: In the preceding data structure, `release` is a callback that's called on the
     release path of the kobject to give drivers a chance to release resources that
     have been allocated for the kobject. This callback is implicitly run when `kobject_put()`
@@ -738,15 +1051,23 @@
     structures. This field lists the attributes to be created for every kobject of
     this type, while `sysfs_ops` provides a set of methods that allow you to access
     those attributes.
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的数据结构中，`release` 是一个回调函数，在 kobject 的释放路径上被调用，允许驱动程序有机会释放为该 kobject 分配的资源。当
+    `kobject_put()` 即将释放 kobject 时，这个回调函数会隐式运行。`default_attrs` 是一个指向 `attribute` 结构体的指针数组。该字段列出了每个该类型
+    kobject 创建的属性，而 `sysfs_ops` 提供了一组方法，允许你访问这些属性。
 - en: 'The following code shows the definition of the `struct sysfs_ops` data structure
     in the kernel:'
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下代码展示了内核中 `struct sysfs_ops` 数据结构的定义：
 - en: '[PRE26]'
+  id: totrans-147
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: In the preceding code, `show` is the callback that's invoked in response to
     a read operation of an attribute being exposed by this `kobj_type` – that is,
     whenever an attribute is read from the user space. `buf` is the output buffer.
@@ -757,14 +1078,20 @@
     contain/provide a single, human-readable value or property, according to the sysfs
     rules; if you have a lot of data to return, you should consider breaking it into
     numerous attributes.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`show` 是一个回调函数，在读取由此 `kobj_type` 显示的属性时被调用——即每当从用户空间读取某个属性时。`buf` 是输出缓冲区。缓冲区的大小是固定的，长度为
+    `PAGE_SIZE`。必须暴露的数据需要放入 `buf` 中，最好使用 `scnprintf()`。最后，如果回调成功，它必须返回写入缓冲区的数据的大小（以字节为单位），如果失败则返回负值错误。每个属性应根据
+    sysfs 规则包含/提供一个单一的、可读的人类值或属性；如果你有大量数据要返回，应该考虑将其分解为多个属性。
 - en: '`store` is called for writing purposes – that is, when users write something
     into an attribute. Its `buf` parameter is `PAGE_SIZE` at most but it can be smaller.
     It must return the size (in bytes) of the data that was read from the buffer on
     success or a negative error on failure (or if an unwanted value is received).'
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: '`store` 用于写入操作——即当用户向属性写入数据时。它的 `buf` 参数最大为 `PAGE_SIZE`，但可以更小。成功时，必须返回从缓冲区读取的数据大小（以字节为单位），如果失败（或收到不期望的值）则返回负值错误。'
 - en: The `attr` pointer is passed as an argument into both methods and can be utilized
     to determine which attribute is being accessed. It is frequent for `show`/`store`
     methods to perform a series of tests you can perform on the attribute name to
@@ -776,88 +1103,137 @@
     structure. This is the method that's used by `kobj_sysfs_ops`, which represents
     the operations that are provided by `dynamic_kobj_ktype`. Both methods are demonstrated
     in the examples provided with this book.
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: '`attr` 指针作为参数传递给这两个方法，可以用来确定正在访问的属性是哪一个。`show`/`store` 方法经常会对属性名称进行一系列测试来判断这一点。另一方面，其他实现则将属性的结构体封装在一个包含数据的结构体中，该结构体提供了返回属性值所需的数据（例如
+    `struct kobject_attribute`、`struct device_attribute`、`struct driver_attribute`
+    和 `struct class_attribute` 等）；在这种情况下，`container_of` 宏用于获取指向封装结构体的指针。这是 `kobj_sysfs_ops`
+    使用的方法，`kobj_sysfs_ops` 代表由 `dynamic_kobj_ktype` 提供的操作。两个方法在本书的示例中都有演示。'
 - en: Understanding the kset structure
+  id: totrans-151
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 理解 `kset` 结构
 - en: The purpose of `struct kset` is mainly to group related kernel objects together.
     `kset` stands for kernel object sets, which can be interpreted as a collection
     of kobjects. In other words, a `kset` gathers related kobjects into a single place,
     such as all *block devices*.
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: '`struct kset` 的目的是将相关的内核对象组合在一起。`kset` 代表内核对象集合，可以理解为一组 kobject。换句话说，`kset`
+    将相关的 kobject 聚集在一个地方，例如所有的 *块设备*。'
 - en: 'The `kset` data structure is defined in the kernel like so:'
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: '`kset` 数据结构在内核中定义如下：'
 - en: '[PRE27]'
+  id: totrans-154
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: All the elements in the data structure are quite self-explanatory. Simply put,
     `list` is a linked list of all kobjects in `kset`, `list_lock` is a spinlock that
     protects linked list access (while adding or removing kobject elements in `kset`),
     and `kobj` represents the base class kobject for the set. This kobject will be
     used as the default parent of kobjects to be added in the set with a `NULL` parent.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 数据结构中的所有元素都非常直观。简而言之，`list` 是 `kset` 中所有 kobjects 的链表，`list_lock` 是一个自旋锁，用于保护链表访问（在向
+    `kset` 中添加或移除 kobject 元素时），而 `kobj` 代表该集合的基础类 kobject。这个 kobject 将作为添加到集合中的 kobjects
+    的默认父级，前提是其父级为 `NULL`。
 - en: 'Each registered `kset` corresponds to a sysfs directory that''s created on
     behalf of its `kobj` element. A `kset` can be created and added using the `kset_create_and_add()`
     function and removed with `kset_unregister()`. The following code shows the definitions
     for both:'
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个注册的 `kset` 对应一个由其 `kobj` 元素代表创建的 sysfs 目录。可以使用 `kset_create_and_add()` 函数创建并添加一个
+    `kset`，并通过 `kset_unregister()` 将其移除。以下代码显示了两者的定义：
 - en: '[PRE28]'
+  id: totrans-157
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: In the preceding APIs, `name` is the name of `kset`, which is also used as the
     name of the directory that will be created for `kset`. The `u` parameter is a
     pointer to a `struct uevent_ops`, which represents a set of `kset` so that, for
     example, it can add new environment variables or filter out the uevents if so
     desired. This parameter can be (and most of the time is) `NULL`. Finally, `parent_kobj`
     is the parent kobject of `kset`.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的 API 中，`name` 是 `kset` 的名称，也用作为 `kset` 创建的目录名称。`u` 参数是指向 `struct uevent_ops`
+    的指针，表示一组 `kset`，例如，它可以添加新的环境变量或在需要时过滤掉 uevents。这个参数可以是（而且大多数时候是）`NULL`。最后，`parent_kobj`
+    是 `kset` 的父级 kobject。
 - en: 'Adding a kobject to the set is as simple as specifying its `.kset` field for
     the right `kset`:'
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 将 kobject 添加到集合中非常简单，只需为正确的 `kset` 指定它的 `.kset` 字段：
 - en: '[PRE29]'
+  id: totrans-160
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Once you''re done with your `kset`, it can be released with `kset_unregister()`,
     after which it will be dynamically deallocated when it is no longer in use. The
     following code will release our example''s `kset`:'
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦完成对 `kset` 的操作，可以通过 `kset_unregister()` 释放它，之后当不再使用时，它将被动态地解除分配。以下代码将释放我们示例中的
+    `kset`：
 - en: '[PRE30]'
+  id: totrans-162
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: Now that we are familiar with kobjects and type structures, let's learn how
     to deal with non-default sysfs attributes.
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经熟悉了 kobjects 和类型结构，让我们来学习如何处理非默认的 sysfs 属性。
 - en: Working with non-default attributes
+  id: totrans-164
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 处理非默认属性
 - en: Attributes are sysfs files that are exported to the user space via kobjects.
     While default attributes might be enough most of the time, you can add other attributes.
     An attribute can be readable, writable, or both, from the user space.
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 属性是通过 kobjects 导出到用户空间的 sysfs 文件。虽然默认属性大多数时候已经足够，但你可以添加其他属性。一个属性可以是可读的、可写的，或者两者都能从用户空间进行操作。
 - en: 'An attribute definition looks as follows:'
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个属性定义如下所示：
 - en: '[PRE31]'
+  id: totrans-167
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: In the attribute data structure, `name` is the name of the attribute, which
     is also the name of the corresponding file entry. `owner` is the attribute owner
     – most of the time, this is `THIS_MODULE` – and `mode` specifies the read/write
     permissions for this attribute in **user-group-other** (**ugo**) format.
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 在属性数据结构中，`name` 是属性的名称，也就是对应文件条目的名称。`owner` 是属性的拥有者——大多数情况下是 `THIS_MODULE`——而
+    `mode` 以 **user-group-other**（**ugo**）格式指定此属性的读写权限。
 - en: 'Default attributes are very convenient to use but are not flexible enough.
     Moreover, simple attributes cannot be read or written except by their `kobj_type`
     sysfs ops, which means that if there are too many attributes, the branches in
@@ -865,20 +1241,29 @@
     a mechanism where each attribute is embedded in an enclosing and special data
     structure: `struct kobj_attribute`. This data structure exposes the wrapper routines
     for reading and writing.'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认属性使用起来非常方便，但灵活性不足。而且，除非通过它们的 `kobj_type` sysfs ops，否则简单的属性不能被读写，这意味着如果属性太多，`show/store`
+    函数中的分支会变得混乱。为了解决这个问题，kobject 核心提供了一种机制，将每个属性嵌入到一个封装的特殊数据结构中：`struct kobj_attribute`。这个数据结构提供了读取和写入的包装例程。
 - en: '`struct kobj_attribute` (defined in `include/linux/kobject.h`) looks as follows:'
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: '`struct kobj_attribute`（在 `include/linux/kobject.h` 中定义）如下所示：'
 - en: '[PRE32]'
+  id: totrans-171
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: In this data structure, `attr` is the attribute representing the file to be
     created, `show` is a pointer to a function that will be called when the file is
     read from the user space, and `store` is a pointer to a function that will be
     called when the file is written, again from the user space.
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个数据结构中，`attr` 是表示要创建的文件的属性，`show` 是一个指向函数的指针，该函数将在从用户空间读取文件时被调用，`store` 是一个指向函数的指针，该函数将在从用户空间写入文件时被调用。
 - en: Using the enclosing `kobj_attribute` structure makes developments more generic
     and extends attribute flexibility. This way, a pointer to `attr` is passed to
     either the `store` or `show` function and can be used not only to determine which
@@ -886,133 +1271,204 @@
     (that is, `kobj_attribute`) that this attribute's `show`/`store` method can be
     invoked from. To do so, you can use the `container_of` macro to obtain a pointer
     to the embedding structure.
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用封装的 `kobj_attribute` 结构使开发变得更加通用，并扩展了属性的灵活性。这样，指向 `attr` 的指针会被传递给 `store`
+    或 `show` 函数，且不仅可以用来确定哪个属性正在被访问，还可以用来获取封装的结构体（即 `kobj_attribute`），从而能够调用该属性的 `show`/`store`
+    方法。为了做到这一点，您可以使用 `container_of` 宏来获取指向嵌套结构体的指针。
 - en: 'The following is an excerpt from `lib/kobject.c` that demonstrates this generic
     mechanism in both the `show` and `store` methods of a kernel-provided sysfs operations
     element: `kobj_sysfs_ops`. This element is also the sysfs operations data structure
     (the `kobj_type->sysfs_ops` element) that''s used by `dynamic_kobj_ktype`:'
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是来自 `lib/kobject.c` 的一个摘录，演示了在内核提供的 sysfs 操作元素 `kobj_sysfs_ops` 的 `show` 和
+    `store` 方法中这种通用机制的应用。这个元素也是 sysfs 操作的数据结构（`kobj_type->sysfs_ops` 元素），它被 `dynamic_kobj_ktype`
+    使用：
 - en: '[PRE33]'
+  id: totrans-175
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: In the preceding code, the `container_of` macro does everything. This also reassures
     us that with this approach, we remain compatible with all the bus-, device-, class-,
     and driver-related kobject implementations, as we will see in the next section.
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`container_of` 宏完成了所有工作。这也让我们放心，使用这种方法，我们与所有总线、设备、类和驱动相关的 kobject 实现保持兼容，正如我们将在下一节中看到的那样。
 - en: 'Let''s go back to the APIs. You will probably always know which attributes
     you wish to expose in advance; thus, the attributes will almost always be declared
     statically. To help with this, the kernel provides the `__ATTR` macro for initializing
     `kobj_attribute`. This macro is defined as follows:'
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们回到这些 API。您可能总是会预先知道希望暴露哪些属性；因此，这些属性几乎总是会静态声明。为了帮助这一点，内核提供了 `__ATTR` 宏来初始化
+    `kobj_attribute`。该宏的定义如下：
 - en: '[PRE34]'
+  id: totrans-178
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: In the preceding macro definition, `_name` will be stringified and used as the
     attribute name, `_mode` represents the attribute mode, and `_show` and `_store`
     are pointers to the attribute's `show` and `store` methods, respectively.
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的宏定义中，`_name` 将被转换为字符串并用作属性名，`_mode` 表示属性的权限，`_show` 和 `_store` 分别是指向属性的
+    `show` 和 `store` 方法的指针。
 - en: 'The following is an example of two attribute''s declarations, `bar` and `foo`
     (this example will be used as a base later in this section):'
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是两个属性声明的示例，`bar` 和 `foo`（此示例将在本节后面作为基础使用）：
 - en: '[PRE35]'
+  id: totrans-181
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: In the preceding example, we have two attributes with the `0660` permission.
     The first attribute is named `foo`, the second one is named `bar`, and both use
     the same `show` and `store` methods.
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的示例中，我们有两个权限为 `0660` 的属性。第一个属性名为 `foo`，第二个属性名为 `bar`，这两个属性都使用相同的 `show` 和
+    `store` 方法。
 - en: 'Now, we must create the underlying file. The low-level kernel APIs that are
     used to add/remove attributes from the sysfs filesystem are `sysfs_create_file()`
     and `sysfs_remove_file()`, respectively. They are defined as follows:'
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们必须创建底层文件。用于在 sysfs 文件系统中添加/删除属性的低级内核 API 分别是 `sysfs_create_file()` 和 `sysfs_remove_file()`，它们的定义如下：
 - en: '[PRE36]'
+  id: totrans-184
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: '`sysfs_create_file()` returns 0 on success or a negative error on failure.
     `sysfs_remove_file()` must be given the same parameters to remove the file attributes.'
+  id: totrans-185
   prefs: []
   type: TYPE_NORMAL
+  zh: '`sysfs_create_file()` 在成功时返回 0，在失败时返回负错误。`sysfs_remove_file()` 必须给定相同的参数来删除文件属性。'
 - en: 'Let''s use these APIs to add our `bar` and `foo` attributes to the system:'
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们使用这些 API 将 `bar` 和 `foo` 属性添加到系统中：
 - en: '[PRE37]'
+  id: totrans-187
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'Once the preceding code has been executed, the `bar` and `foo` files will be
     visible in sysfs, in the `/sys/demo` directory. In our example, we used the `__ATTR`
     macro to define our attributes. We had to specify the name, the mode, and the
     `show`/`store` methods. The kernel provides convenience macros for the most frequent
     cases to make specifying attributes and writing code more succinct, readable,
     and easier. These macros are as follows:'
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦执行了前面的代码，`bar` 和 `foo` 文件将在 sysfs 中显示，并位于 `/sys/demo` 目录下。在我们的示例中，我们使用了 `__ATTR`
+    宏来定义我们的属性。我们需要指定名称、模式和 `show`/`store` 方法。内核提供了便捷的宏，用于最常见的情况，以简化属性的指定和代码的编写，使其更加简洁、可读和易于理解。这些宏如下：
 - en: '`__ATTR_RO(name)`: This assumes that `name_show` is the show callback''s name
     and sets the mode to `0444`.'
+  id: totrans-189
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`__ATTR_RO(name)`：假设 `name_show` 是 `show` 回调函数的名称，并将模式设置为 `0444`。'
 - en: '`__ATTR_WO(name)`: This assumes that `name_store` is the store function''s
     name and is restricted to mode `0200`, which means root write access only.'
+  id: totrans-190
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`__ATTR_WO(name)`：假设 `name_store` 是 `store` 函数的名称，并将模式限制为 `0200`，这意味着仅有 root
+    用户可以写入。'
 - en: '`__ATTR_RW(name)`: This assumes that `name_show` and `name_store` are for the
     `show` and `store` callbacks'' names, respectively, and sets the mode to `0644`.'
+  id: totrans-191
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`__ATTR_RW(name)`：假设 `name_show` 和 `name_store` 分别是 `show` 和 `store` 回调函数的名称，并将模式设置为
+    `0644`。'
 - en: '`__ATTR_NULL`: This is used as a list terminator. It sets both names to `NULL`
     and is used as an end of list indicator (see `kernel/workqueue.c`).'
+  id: totrans-192
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`__ATTR_NULL`：它作为列表的结束符使用。它将两个名称都设置为 `NULL`，并作为列表结束的指示符（见 `kernel/workqueue.c`）。'
 - en: 'All these macros only expect the name of the attribute as a parameter. The
     difference with these macros is that unlike `__ATTR`, whose `store`/`show` function
     names can be arbitrary, the attributes here are built under the assumption that
     the `show` and `store` methods are named `<attribute_name>_show` and `<attribute_name>_store`,
     respectively. The following code demonstrates this with the `__ATTR_RW_MODE` macro,
     which is defined as follows:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有这些宏只期望属性名作为参数。这些宏的不同之处在于，与 `__ATTR` 不同，后者的 `store`/`show` 函数名可以是任意的，而这里的属性是在假定
+    `show` 和 `store` 方法分别命名为 `<attribute_name>_show` 和 `<attribute_name>_store` 的前提下构建的。以下代码通过
+    `__ATTR_RW_MODE` 宏展示了这一点，该宏的定义如下：
 - en: '[PRE38]'
+  id: totrans-194
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'As we can see, the `.show` and `.store` fields are set with their attribute
     names suffixed with `_show` and `_store`, respectively. Let''s take a look at
     the following example:'
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 如我们所见，`.show` 和 `.store` 字段分别设置为属性名称，后缀分别为 `_show` 和 `_store`。我们来看以下示例：
 - en: '[PRE39]'
+  id: totrans-196
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: The preceding attribute declaration assumes that the `show` and `store` methods
     are defined as `foo_show` and `foo_store`, respectively.
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的属性声明假定 `show` 和 `store` 方法分别被定义为 `foo_show` 和 `foo_store`。
 - en: Note
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: If you need to provide a single store/show operation pair for all the attributes,
     you should probably define these attributes with `__ATTR`. However, if processing
     the attributes requires providing a show/store pair per attribute, you can use
     the other attribute definition macros.
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你需要为所有属性提供一对 `store/show` 操作，你应该使用 `__ATTR` 来定义这些属性。然而，如果处理这些属性需要为每个属性提供一对
+    `show/store` 操作，你可以使用其他属性定义宏。
 - en: 'The following code shows the implementation of the show/store function for
     our previously defined `foo` and `bar` attributes:'
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下代码展示了我们之前定义的 `foo` 和 `bar` 属性的 `show/store` 函数的实现：
 - en: '[PRE40]'
+  id: totrans-201
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: In the preceding code, instead of providing a pair of show/store operations
     per attribute, we have used the same function pair for all the attributes, and
     we differentiated the attributes by their respective names. This is a common practice
@@ -1020,12 +1476,18 @@
     attributes. This is because they sometimes impose different show/store function
     names for each attribute since they do not rely on the `__ATTR` macro for defining
     attributes.
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，我们没有为每个属性提供一对 `show/store` 操作，而是为所有属性使用了相同的函数对，并通过各自的名称区分这些属性。这是在使用通用的
+    `kobject_attribute` 而不是框架特定的属性时的常见做法。这是因为它们有时会为每个属性强制要求不同的 `show/store` 函数名称，因为它们不依赖于
+    `__ATTR` 宏来定义属性。
 - en: Working with binary attributes
+  id: totrans-203
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 与二进制属性的配合
 - en: So far, we have become familiar with the sysfs statement and mentioned that
     an attribute must store a single property/value in a human-readable text format,
     as well as that such an attribute has a `PAGE_SIZE` limit. However, there could
@@ -1034,22 +1496,31 @@
     is a device firmware transfer, where the user space would upload some binary data
     to be pushed to the hardware or PCI devices, exposing part or all of their configuration
     address spaces.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们已经熟悉了 sysfs 语句，并提到过属性必须以人类可读的文本格式存储单一的属性/值，并且该属性有一个 `PAGE_SIZE` 限制。然而，可能会出现一些情况，尽管很少见，但需要交换更大的数据并以二进制格式传输，例如，所有数据都支持随机访问。一个典型的例子是设备固件传输，其中用户空间会上传一些二进制数据，这些数据会被推送到硬件或
+    PCI 设备中，暴露部分或全部的配置地址空间。
 - en: To cover those cases, the sysfs framework provides binary attributes. Note that
     these attributes are for sending/receiving binary data that is not interpreted/manipulated
     by the kernel at all. It should *only* be used as a pass-through to and from hardware,
     with no interpretation by the kernel. The only manipulations you can perform are
     some checks on the magic number and size, for example.
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了涵盖这些情况，sysfs 框架提供了二进制属性。请注意，这些属性用于发送/接收内核完全不进行解释或操作的二进制数据。它应*仅*作为与硬件之间的传递通道，内核不会对其进行任何解释。你可以执行的唯一操作是对魔数和大小等进行一些检查。
 - en: 'Now, let''s get back to the code A binary attribute is represented using a
     `struct bin_attribute` and is defined as follows:'
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们回到代码中。二进制属性使用 `struct bin_attribute` 来表示，定义如下：
 - en: '[PRE41]'
+  id: totrans-207
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: In the preceding code, `attr` is the underlying classic attribute for this binary
     attribute and holds the name, owner, and permissions for the binary attribute.
     `size` represents the maximum size of the binary attribute (or zero if there is
@@ -1063,11 +1534,19 @@
     that's found in all read or write methods for all types of files. It refers to
     the offset from the start of the file – that is, offset into the binary data.
     Finally, `count` is the number of bytes to read or write.
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`attr` 是该二进制属性的底层经典属性，包含该二进制属性的名称、所有者和权限。`size` 表示二进制属性的最大大小（如果没有最大限制，则为零）。`private`
+    是一个可以用作任何方便的字段。大多数时候，它被分配为二进制属性的缓冲区。`read()`、`write()` 和 `mmap()` 函数是可选的，其工作方式与正常的
+    `char` 驱动程序等效。它们的参数中，`filp` 是与该属性相关联的已打开文件指针实例，`kobj` 是与此二进制属性相关联的底层 `kobject`。`buffer`
+    是分别用于读取或写入操作的输入或输出缓冲区。`off` 是所有类型文件的所有读取或写入方法中都会出现的偏移量参数，它表示从文件开始的偏移量——也就是二进制数据中的偏移量。最后，`count`
+    是读取或写入的字节数。
 - en: Note
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Though binary attributes may not have size limitations, larger data is always
     requested/sent on a `PAGE_SIZE` chunk basis. This means that, for example, the
     `write()` function can be called multiple times for a single load. However, this
@@ -1075,104 +1554,156 @@
     disadvantage is that sysfs has no way of signaling the end of a series of write
     operations, so code that implements a binary attribute must figure it out some
     other way.
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管二进制属性可能没有大小限制，但较大的数据始终按 `PAGE_SIZE` 块请求/发送。这意味着，例如，对于单次加载，`write()` 函数可能会被多次调用。然而，这种拆分是由内核处理的，因此对驱动程序是透明的。缺点是，sysfs
+    没有办法标记一系列写操作的结束，因此实现二进制属性的代码必须通过其他方式来解决这个问题。
 - en: 'For a binary attribute to be created, it must be allocated and initialized.
     Like classic attributes, there are two ways to allocate binary attributes – either
     statically or dynamically. For static allocation, the framework provides the low-level
     `__BIN_ATTR` macro, which is defined as follows:'
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: 要创建二进制属性，必须先分配并初始化。与经典属性一样，二进制属性的分配有两种方式——静态分配和动态分配。对于静态分配，框架提供了底层的 `__BIN_ATTR`
+    宏，其定义如下：
 - en: '[PRE42]'
+  id: totrans-212
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: It works similarly to the `__ATTR` macro. In terms of parameters, `_name` is
     the binary attribute name, `_mode` represents its permissions, `_read` and `_write`
     are the read and write functions, respectively, and `_size` is the size of the
     binary attribute.
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 它的工作原理类似于`__ATTR`宏。在参数方面，`_name`是二进制属性的名称，`_mode`表示其权限，`_read`和`_write`分别是读取和写入函数，`_size`是二进制属性的大小。
 - en: 'Like classic attributes, binary attributes have their own high-level helper
     macros to ease the process of defining them. Some of these macros are as follows:'
+  id: totrans-214
   prefs: []
   type: TYPE_NORMAL
+  zh: 与经典属性一样，二进制属性也有自己的高级辅助宏，以简化定义过程。以下是一些此类宏：
 - en: '[PRE43]'
+  id: totrans-215
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'These macros declare a single instance of `struct bin_attribute`, whose corresponding
     variable is named `bin_attribute_<name>`, as shown in the following `BIN_ATTR`
     definition:'
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些宏声明了一个`struct bin_attribute`的实例，其对应的变量命名为`bin_attribute_<name>`，如下所示的`BIN_ATTR`定义：
 - en: '[PRE44]'
+  id: totrans-217
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: 'Moreover, like classic attributes, these high-level macros expect the read/write
     methods to be named `<attribute_name>_read` and `<attribute_name>_write`, respectively,
     as shown in the following `__BIN_ATTR_RW` definition:'
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，与经典属性一样，这些高级宏期望读写方法分别命名为`<attribute_name>_read`和`<attribute_name>_write`，如下所示的`__BIN_ATTR_RW`定义：
 - en: '[PRE45]'
+  id: totrans-219
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: 'For dynamic allocation, a simple `kzalloc()` is enough. However, dynamically
     allocated binary attributes must be initialized using `sysfs_bin_attr_init()`,
     as shown here:'
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于动态分配，简单的`kzalloc()`就足够了。然而，动态分配的二进制属性必须使用`sysfs_bin_attr_init()`进行初始化，如下所示：
 - en: '[PRE46]'
+  id: totrans-221
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: After this, the driver must set other properties, such as the underlying attribute's
     mode, name, and permission, and optionally the read/write/map functions.
+  id: totrans-222
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此之后，驱动程序必须设置其他属性，如基础属性的模式、名称和权限，此外还可以选择设置读写/映射函数。
 - en: 'Unlike classic attributes, which can be set up as default attributes, binary
     attributes must be created explicitly. This can be done using `sysfs_create_bin_file()`,
     as follows:'
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 与经典属性不同，经典属性可以作为默认属性设置，而二进制属性必须显式创建。可以使用`sysfs_create_bin_file()`来实现，如下所示：
 - en: '[PRE47]'
+  id: totrans-224
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'This function returns `0` on success or a negative error on failure. Once you''re
     done with a binary attribute, it can be removed with `sysfs_remove_bin_file()`,
     which is defined as follows:'
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 该函数在成功时返回`0`，失败时返回负错误。当你完成对二进制属性的操作后，可以使用`sysfs_remove_bin_file()`将其删除，定义如下：
 - en: '[PRE48]'
+  id: totrans-226
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'The following is an excerpt (whose full version can be found in `drivers/i2c/i2c-slave-eeprom.c`)
     of a concrete example highlighting the use of a binary attribute that''s been
     allocated and initialized dynamically:'
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是一个摘录（完整版本可以在`drivers/i2c/i2c-slave-eeprom.c`中找到），展示了一个已分配并初始化的动态二进制属性的具体使用示例：
 - en: '[PRE49]'
+  id: totrans-228
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'Upon unloading the path of the module or when the device leaves, the associated
     binary file is removed, as follows:'
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: 当卸载模块路径或设备断开时，相关的二进制文件会被删除，如下所示：
 - en: '[PRE50]'
+  id: totrans-230
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: 'Then, when it comes to implementing the read/write function, data can be moved
     back and forth using `memcpy()`, as shown here:'
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，在实现读写功能时，可以使用`memcpy()`在数据之间来回移动，如下所示：
 - en: '[PRE51]'
+  id: totrans-232
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: In the preceding excerpt, the offset (the `off` parameter) points to where the
     data should be read/written, and `count` determines the size of this data.
+  id: totrans-233
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的摘录中，偏移量（`off` 参数）指示数据应读取/写入的位置，`count` 决定了数据的大小。
 - en: The concept of attribute group
+  id: totrans-234
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 属性组的概念
 - en: 'So far, we have learned how to individually add (binary) attributes by calling
     the `sysfs_create_file()` or `sysfs_create_bin_file()` function. While this is
     enough if we have a few attributes to add, it may become painful as the number
@@ -1180,11 +1711,16 @@
     to loop over the attributes to create each of them or invoke `sysfs_create_file()`
     as many times as there are attributes. Here is where the attribute group comes
     in. It relies on the `struct attribute_group` structure, which is defined as follows:'
+  id: totrans-235
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们已经学习了如何通过调用`sysfs_create_file()`或`sysfs_create_bin_file()`函数单独添加（二进制）属性。如果我们需要添加的属性不多，这已经足够，但当属性数量增加时，在添加或删除时可能会变得非常麻烦。驱动程序需要遍历所有属性，逐个创建它们，或者调用`sysfs_create_file()`与属性数量相同的次数。这时，属性组就显得尤为重要。它依赖于`struct
+    attribute_group`结构，定义如下：
 - en: '[PRE52]'
+  id: totrans-236
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: If it is unnamed, an attribute group will place all the attributes directly
     in the kobject's directory when defining a group of attributes. If, however, a
     `name` is supplied, a subdirectory will be created for the attributes, with the
@@ -1197,46 +1733,71 @@
     will replace the static permissions that have been defined in `struct attribute`.
     The `attrs` element is a pointer to a `NULL` terminated list of attributes, while
     `bin_attrs` is its counterpart for binary attributes.
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果没有命名，属性组将在定义属性组时将所有属性直接放入 kobject 的目录中。然而，如果提供了 `name`，则会为属性创建一个子目录，并且该目录的名称将是属性组的名称。`is_visible()`
+    是一个可选的回调函数，用于返回与属性组中特定属性相关的权限。它会为组中的每个（非二进制）属性反复调用。这个回调函数必须返回属性的读/写权限，或者如果该属性根本不应该被访问，则返回
+    `0`。`is_bin_visible()` 是 `is_visible()` 针对二进制属性的对应函数。返回的值/权限将替代在 `struct attribute`
+    中定义的静态权限。`attrs` 元素是指向以 `NULL` 结尾的属性列表的指针，而 `bin_attrs` 是二进制属性的对应元素。
 - en: 'The kernel functions that are used to add/remove group attributes to/from the
     filesystem are as follows:'
+  id: totrans-238
   prefs: []
   type: TYPE_NORMAL
+  zh: 用于向文件系统添加/删除属性组的内核函数如下：
 - en: '[PRE53]'
+  id: totrans-239
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: 'Back to our demo example with standard attributes, the two `bar` and `foo`
     attributes can be embedded into a `struct attribute_group`. This will allow us
     adding these to the system in a single shot, using one function call as follows:'
+  id: totrans-240
   prefs: []
   type: TYPE_NORMAL
+  zh: 回到我们的示例，使用标准属性，`bar` 和 `foo` 两个属性可以嵌入到一个 `struct attribute_group` 中。这将允许我们通过一次函数调用将它们添加到系统中，如下所示：
 - en: '[PRE54]'
+  id: totrans-241
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'Finally, to create the attributes in a single shot, we need to use `sysfs_create_group()`,
     as shown in the following code:'
+  id: totrans-242
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，要一次性创建属性，我们需要使用 `sysfs_create_group()`，如下代码所示：
 - en: '[PRE55]'
+  id: totrans-243
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: Here, we have demonstrated the importance of creating a group of attributes
     and how easy it is to use their APIs. While we have been generic so far, in the
     next section, we'll learn how to create framework-specific attributes.
+  id: totrans-244
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们展示了创建属性组的重要性，以及如何轻松使用它们的 API。虽然到目前为止我们一直在讨论通用内容，但在下一节中，我们将学习如何创建特定框架的属性。
 - en: Creating symbolic links
+  id: totrans-245
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 创建符号链接
 - en: 'Drivers can create/remove symbolic links on existing kobjects (directories)
     using `sysfs_{create|remove}_link()` functions, as shown here:'
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 驱动程序可以使用 `sysfs_{create|remove}_link()` 函数在现有的 kobject（目录）上创建/删除符号链接，如下所示：
 - en: '[PRE56]'
+  id: totrans-247
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: This allows an object to exist in more than one place or even create a shortcut.
     The `create` function will create a symbolic link called `name` that points to
     the remote `target` kobject's sysfs entry. The link will be created in the `kobj`
@@ -1246,33 +1807,48 @@
     persistent (unless the system is rebooted), even after target removal. Thus, the
     driver must consider that when the associated device leaves the system or when
     the module is unloaded.
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
+  zh: 这允许一个对象存在于多个位置，甚至创建一个快捷方式。`create` 函数将创建一个名为 `name` 的符号链接，指向远程 `target` kobject
+    的 sysfs 入口。该链接将被创建在 `kobj` kobject 目录下。一个著名的例子是设备同时出现在 `/sys/bus` 和 `/sys/devices`
+    中，因为总线控制器首先是一个设备，之后才暴露出一个总线。然而，请注意，创建的任何符号链接都会是持久性的（除非系统重启），即使目标被移除后也是如此。因此，驱动程序必须考虑在关联设备离开系统或模块卸载时的情况。
 - en: Overview of the device model from sysfs
+  id: totrans-249
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: sysfs 设备模型概览
 - en: sysfs is a non-persistent virtual filesystem that provides a global view of
     the system and exposes the kernel objects hierarchy (topology) using their kobjects.
     Each kobject shows up as a directory. The files in these directories represent
     the kernel variables that are exported by the related kobject. These files are
     called attributes and can be read or written.
+  id: totrans-250
   prefs: []
   type: TYPE_NORMAL
+  zh: sysfs 是一个非持久性的虚拟文件系统，提供系统的全局视图，并通过其 kobjects 显示内核对象层次结构（拓扑）。每个 kobject 都表现为一个目录。这些目录中的文件表示由相关
+    kobject 导出的内核变量。这些文件称为属性，可以进行读取或写入。
 - en: If any registered kobject creates a directory in sysfs, where the directory
     is created depends on the parent of this kobject (which is also a kobject, thus
     highlighting internal object hierarchies). In sysfs, top-level directories represent
     the common ancestors of object hierarchies or the subsystems that the objects
     belong to.
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果任何已注册的kobject在sysfs中创建了一个目录，目录的创建位置取决于该kobject的父对象（它也是一个kobject，因此突显了内部对象的层次结构）。在sysfs中，顶级目录表示对象层次结构的共同祖先或对象所属的子系统。
 - en: 'These top-level sysfs directories can be found in the `/sys/` directory, as
     follows:'
+  id: totrans-252
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些顶级sysfs目录可以在`/sys/`目录中找到，如下所示：
 - en: '[PRE57]'
+  id: totrans-253
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: '`block` contains a directory per block device on the system. Each of these
     contains subdirectories for partitions on the device. `bus` contains the registered
     bus on the system. `dev` contains the registered device nodes in a raw way (no
@@ -1283,156 +1859,226 @@
     on the system. `kernel` holds the kernel configuration options and status information.
     Finally, `module` is a list of loaded modules and `power` is the system power
     management control interface from the user space.'
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: '`block`包含系统中每个块设备的一个目录。每个目录包含该设备上分区的子目录。`bus`包含系统中已注册的总线。`dev`以原始方式（没有层次结构）包含已注册的设备节点，每个节点是指向`/sys/devices`目录中真实设备的符号链接。`devices`目录展示了系统中设备拓扑的真实视图。`firmware`展示了系统特定的低级子系统树，如ACPI、EFI和OF（设备树）。`fs`列出了系统上使用的文件系统。`kernel`包含内核配置选项和状态信息。最后，`module`是已加载模块的列表，`power`是来自用户空间的系统电源管理控制接口。'
 - en: 'Each of these directories corresponds to a kobject, some of which are exported
     as kernel symbols. These are as follows:'
+  id: totrans-255
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个这些目录都对应一个kobject，其中一些作为内核符号被导出。它们如下所示：
 - en: '`kernel_kobj`, which corresponds to `/sys/kernel`.'
+  id: totrans-256
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kernel_kobj`，对应于`/sys/kernel`。'
 - en: '`power_kobj`, which corresponds to `/sys/power`.'
+  id: totrans-257
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`power_kobj`，对应于`/sys/power`。'
 - en: '`firmware_kobj`, which corresponds to `/sys/firmware`. It''s exported in the
     `drivers/base/firmware.c` source file.'
+  id: totrans-258
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`firmware_kobj`，对应于`/sys/firmware`。它在`drivers/base/firmware.c`源文件中被导出。'
 - en: '`hypervisor_kobj`, which corresponds to `/sys/hypervisor`. It''s exported in
     the `drivers/base/hypervisor.c` source file.'
+  id: totrans-259
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`hypervisor_kobj`，对应于`/sys/hypervisor`。它在`drivers/base/hypervisor.c`源文件中被导出。'
 - en: '`fs_kobj`, which corresponds to `/sys/fs`. This is exported in the `fs/namespace.c`
     source file.'
+  id: totrans-260
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`fs_kobj`，对应于`/sys/fs`。它在`fs/namespace.c`源文件中被导出。'
 - en: For the rest, `class/`, `dev/` and `devices/` are created at boot time by the
     `devices_init()` function in `drivers/base/core.c` in the kernel sources, `block/`
     is created in `block/genhd.c`, and `bus/` is created as a `kset` in `drivers/base/bus.c`.
+  id: totrans-261
   prefs: []
   type: TYPE_NORMAL
+  zh: 其余的`class/`、`dev/`和`devices/`在启动时由内核源中的`devices_init()`函数在`drivers/base/core.c`中创建，`block/`在`block/genhd.c`中创建，`bus/`作为`kset`在`drivers/base/bus.c`中创建。
 - en: Creating device-, driver-, bus- and class-related attributes
+  id: totrans-262
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 创建与设备、驱动、总线和类相关的属性
 - en: So far, we have learned how to create dedicated kobjects to populate attributes
     inside. However, the device, driver, bus, and class frameworks provide attribute
     abstractions and file creation, where the attributes that are created are directly
     tied to the respective framework in the appropriate kobject directory.
+  id: totrans-263
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们已经学会了如何创建专用的kobject以填充其中的属性。然而，设备、驱动、总线和类框架提供了属性抽象和文件创建，其中创建的属性直接与适当kobject目录中的各自框架相关联。
 - en: 'To do so, each framework provides a framework-specific attribute data structure
     that encloses the default attribute and allows us to provide a custom show/store
     callback. These are `struct device_attribute`, `struct driver_attribute`, `struct
     bus_atttribute`, and `struct class_attribute` for the device, driver, bus, and
     class frameworks, respectively. They are defined like `kboj_attribute` is but
     use different names. Let''s look at their respective data structures:'
+  id: totrans-264
   prefs: []
   type: TYPE_NORMAL
+  zh: 为此，每个框架提供了一个特定于框架的属性数据结构，封装了默认属性并允许我们提供自定义的show/store回调。这些数据结构分别是`struct device_attribute`、`struct
+    driver_attribute`、`struct bus_attribute`和`struct class_attribute`，它们分别对应设备、驱动、总线和类框架。它们的定义类似于`kobj_attribute`，但使用不同的名称。让我们看看它们各自的数据结构：
 - en: 'Devices have the following attribute data structure:'
+  id: totrans-265
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设备有以下的属性数据结构：
 - en: '[PRE58]'
+  id: totrans-266
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: 'Classes have the following attribute data structure:'
+  id: totrans-267
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 类有以下的属性数据结构：
 - en: '[PRE59]'
+  id: totrans-268
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: 'The bus framework has the following attribute data structure:'
+  id: totrans-269
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 总线框架具有以下属性数据结构：
 - en: '[PRE60]'
+  id: totrans-270
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: 'Devices have the following attribute data structure:'
+  id: totrans-271
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设备具有以下属性数据结构：
 - en: '[PRE61]'
+  id: totrans-272
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: The preceding device-specific data structure's `show` function takes an additional
     `count` parameter, whereas the others do not.
+  id: totrans-273
   prefs: []
   type: TYPE_NORMAL
+  zh: 前述设备特定数据结构的`show`函数需要一个额外的`count`参数，而其他函数则没有。
 - en: 'They can be dynamically allocated with `kzalloc()` and initialized by setting
     the fields of their inner attribute elements and providing the appropriate callback
     functions. However, each framework provides a set of macros to statically allocate,
     initialize, and assign a single instance of their respective attribute data structure.
     Let''s look at these macros:'
+  id: totrans-274
   prefs: []
   type: TYPE_NORMAL
+  zh: 它们可以通过`kzalloc()`动态分配，并通过设置其内部属性元素的字段并提供适当的回调函数来初始化。然而，每个框架都提供了一组宏，用于静态分配、初始化并分配单个实例的各自属性数据结构。让我们看看这些宏：
 - en: 'The bus infrastructure provides the following macros:'
+  id: totrans-275
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 总线基础设施提供了以下宏：
 - en: '[PRE62]'
+  id: totrans-276
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: With these bus framework-specific macros, the resulting bus attribute variable
     is named `bus_attr_<_name>`. For example, the variable name that results from
     `BUS_ATTR_RW(foo)` will be `bus_attr_foo` and will be of the `struct bus_attribute`
     type.
+  id: totrans-277
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用这些特定于总线框架的宏，生成的总线属性变量将命名为`bus_attr_<_name>`。例如，`BUS_ATTR_RW(foo)`生成的变量名将是`bus_attr_foo`，类型为`struct
+    bus_attribute`。
 - en: 'For drivers, the following macros are provided:'
+  id: totrans-278
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于驱动程序，提供了以下宏：
 - en: '[PRE63]'
+  id: totrans-279
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: These driver-specific attribute definition macros will name the resulting variable
     using the `driver_attr_<_name>` pattern. Therefore, the variable that results
     from `DRIVER_ATTR_RW(foo)` will be of the `struct driver_attribute` type and will
     be named `driver_attr_foo`.
+  id: totrans-280
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些特定于驱动程序的属性定义宏将使用`driver_attr_<_name>`模式命名生成的变量。因此，`DRIVER_ATTR_RW(foo)`生成的变量将是`struct
+    driver_attribute`类型，命名为`driver_attr_foo`。
 - en: 'The class framework works with the following macros:'
+  id: totrans-281
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 类框架使用以下宏：
 - en: '[PRE64]'
+  id: totrans-282
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: Using these class-specific macros, the resulting variable will be of the `struct
     class_atribute` type and will be named based on the `class_attr_<_name>` pattern.
     Thus, the resulting variable name of `CLASS_ATTR_RW(foo)` will be `class_attr_foo`.
+  id: totrans-283
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用这些特定于类的宏，生成的变量将是`struct class_atribute`类型，并且将基于`class_attr_<_name>`模式命名。因此，`CLASS_ATTR_RW(foo)`生成的变量名将是`class_attr_foo`。
 - en: 'Finally, device-specific attributes can be statically allocated and initialized
     using the following macros:'
+  id: totrans-284
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 最后，设备特定属性可以通过以下宏静态分配和初始化：
 - en: '[PRE65]'
+  id: totrans-285
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: Device-specific attributes definition macros use their own pattern for variable
     names, which is `dev_attr_<_name>`. Thus, for example, `DEVICE_ATTR_RO(foo)` will
     result in a `struct device_attribute` object named `dev_attr_foo`.
+  id: totrans-286
   prefs: []
   type: TYPE_NORMAL
+  zh: 设备特定属性定义宏使用它们自己的变量名模式，即`dev_attr_<_name>`。因此，例如，`DEVICE_ATTR_RO(foo)`将生成一个名为`dev_attr_foo`的`struct
+    device_attribute`对象。
 - en: Because all these macros are built on top of `__ATTR_RW`, `__ATTR_RO`, and `__ATTR_WO`,
     they statically allocate and initialize a single instance of the framework-specific
     attribute data structure and assume the show/store functions are named `<attribute_name>_show`
@@ -1440,153 +2086,221 @@
     not rely on the `__ATTR` macro). There is an exception for `DEVICE_ATTR()`, which
     uses the show/store function as it was passed, without any suffix or prefix. This
     exception is because `DEVICE_ATTR` relies on `__ATTR` to define attributes.
+  id: totrans-287
   prefs: []
   type: TYPE_NORMAL
+  zh: 因为所有这些宏都建立在`__ATTR_RW`、`__ATTR_RO`和`__ATTR_WO`之上，它们静态分配并初始化一个框架特定属性数据结构的单个实例，并假设显示/存储函数分别命名为`<attribute_name>_show`和`<attribute_name>_store`（记住，这是因为它们不依赖于`__ATTR`宏）。`DEVICE_ATTR()`有一个例外，它使用传入的显示/存储函数，不加任何后缀或前缀。这个例外是因为`DEVICE_ATTR`依赖`__ATTR`来定义属性。
 - en: 'As we have seen, all these framework-specific macros use a predefined prefix
     to name the resulting framework-specific attribute object variable. Let''s take
     a look at the following class attribute:'
+  id: totrans-288
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们所见，所有这些特定于框架的宏都使用预定义的前缀来命名生成的框架特定属性对象变量。让我们看看以下类属性：
 - en: '[PRE66]'
+  id: totrans-289
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: 'This will create a static variable of the `struct class_attribute` type named
     `class_attr_foo` and will assume that its show and store functions are named `foo_show`
     and `foo_store`, respectively. This can be referenced in a group using its inner
     attribute element, as shown here:'
+  id: totrans-290
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将创建一个名为`class_attr_foo`的`struct class_attribute`类型的静态变量，并假定其显示和存储函数分别命名为`foo_show`和`foo_store`。可以在一个组中通过其内部属性元素来引用，如下所示：
 - en: '[PRE67]'
+  id: totrans-291
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: 'The most important thing when it comes to creating the respective files is
     that the driver can select the appropriate API from the following list:'
+  id: totrans-292
   prefs: []
   type: TYPE_NORMAL
+  zh: 创建相应文件时最重要的事情是，驱动程序可以从以下列表中选择适当的API：
 - en: '[PRE68]'
+  id: totrans-293
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: 'Here, the `device`, `driver`, `bus`, and `class` arguments are the respective
     device, driver, bus, and class entities that the attribute must be added to. Moreover,
     the attribute will be created in the directory that corresponds to the inner kobject
     of each entity, as shown in the following code:'
+  id: totrans-294
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，`device`、`driver`、`bus`和`class`参数分别表示设备、驱动、总线和类别实体，属性必须添加到这些实体中。此外，属性将被创建在每个实体的内部kobject所对应的目录中，代码如下所示：
 - en: '[PRE69]'
+  id: totrans-295
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: To kill two birds with one stone, the preceding code also shows that `device_create_file()`,
     `bus_create_file()`, `driver_create_file()` and `class_create_file()` all make
     an internal call to `sysfs_create_file()`.
+  id: totrans-296
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了一举两得，前面的代码还展示了`device_create_file()`、`bus_create_file()`、`driver_create_file()`和`class_create_file()`都内部调用了`sysfs_create_file()`。
 - en: 'Once you''re done with each respective attribute object, the appropriate removal
     method must be invoked. The following code shows the possible options:'
+  id: totrans-297
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦完成每个属性对象，必须调用适当的移除方法。以下代码展示了可能的选项：
 - en: '[PRE70]'
+  id: totrans-298
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE70]'
 - en: Each of these APIs expects the same arguments as those that are passed when
     the attributes are created.
+  id: totrans-299
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些API都期望与创建属性时传递的参数相同。
 - en: Now that you know how the inner show/store functions of the `kobj_atribute`
     elements are invoked, it should be obvious to you how those framework-specific
     show/store functions are invoked as well.
+  id: totrans-300
   prefs: []
   type: TYPE_NORMAL
+  zh: 既然你已经知道了如何调用`kobj_atribute`元素的内部show/store函数，那么你应该很清楚如何调用那些框架特定的show/store函数了。
 - en: Let's have a look at the device's implementation. The device framework has an
     internal `kobj_type` that implements device-specific show and store functions.
     These functions take in the inner attribute element as one of their arguments.
     After that, the `container_of` macro retrieves a pointer for the enclosing data
     structure (which is the framework-specific attribute data structure) that the
     framework-specific show and store functions are invoked from.
+  id: totrans-301
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看设备的实现。设备框架有一个内部的`kobj_type`，它实现了设备特定的show和store函数。这些函数将内部属性元素作为其中一个参数。然后，`container_of`宏会获取封闭数据结构的指针（即框架特定的属性数据结构），从而调用框架特定的show和store函数。
 - en: 'The following is an excerpt from `drivers/base/core.c` that shows the device-specific
     `sysfs_ops` implementation:'
+  id: totrans-302
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是`drivers/base/core.c`中的一段代码，展示了设备特定的`sysfs_ops`实现：
 - en: '[PRE71]'
+  id: totrans-303
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE71]'
 - en: 'Note that in the preceding code, `to_dev_attr()`, which is the macro that makes
     use of `container_of`, is defined as follows:'
+  id: totrans-304
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，在前面的代码中，`to_dev_attr()`，即使用`container_of`的宏，定义如下：
 - en: '[PRE72]'
+  id: totrans-305
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE72]'
 - en: The principle is the same for the bus (in `drivers/base/bus.c`), driver (in
     `drivers/base/bus.c`), and class (in `drivers/base/class.c`) attributes.
+  id: totrans-306
   prefs: []
   type: TYPE_NORMAL
+  zh: 总线（在`drivers/base/bus.c`中）、驱动（在`drivers/base/bus.c`中）和类别（在`drivers/base/class.c`中）属性的原理是相同的。
 - en: Making a sysfs attribute poll- and select-compatible
+  id: totrans-307
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 使sysfs属性兼容轮询和选择
 - en: Though this is not a requirement for dealing with sysfs attributes, the main
     idea here is to allow the `poll()` or `select()` system calls to be used on a
     given attribute to passively wait for a change. This change could be firmware
     becoming available, an alarm notification, or information that the attribute value
     has changed. While the user would sleep on the file waiting for a change, the
     driver must invoke `sysfs_notify()`to release any sleeping user.
+  id: totrans-308
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管这不是处理sysfs属性的必需条件，但这里的主要思想是允许在给定属性上使用`poll()`或`select()`系统调用，来被动地等待变化。这种变化可以是固件变得可用、警报通知，或属性值发生变化。当用户在文件上休眠等待变化时，驱动程序必须调用`sysfs_notify()`来唤醒任何休眠的用户。
 - en: 'This notification API is defined as follows:'
+  id: totrans-309
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个通知API的定义如下：
 - en: '[PRE73]'
+  id: totrans-310
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE73]'
 - en: If the `dir` parameter is not `NULL`, it is used to find a subdirectory from
     within the directory of `kobj`, which contains the attribute (presumably created
     by `sysfs_create_group`). This call will cause any polling process to wake up
     and process the event (which might be reading the new value, handling the alarm,
     and so on).
+  id: totrans-311
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果`dir`参数不是`NULL`，则用于在`kobj`的目录中查找包含属性的子目录（假设是由`sysfs_create_group`创建的）。此调用将使任何轮询进程唤醒并处理事件（可能是读取新值、处理警报等）。
 - en: Note
+  id: totrans-312
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: There will be no notifications without this function call; therefore, any polling
     process will end up waiting indefinitely (unless a timeout was specified in the
     system call).
+  id: totrans-313
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果没有此功能调用，则不会有任何通知；因此，任何轮询进程将最终无限期地等待（除非在系统调用中指定了超时）。
 - en: 'The following code, which shows the `store()` function of an attribute, is
     provided with this book:'
+  id: totrans-314
   prefs: []
   type: TYPE_NORMAL
+  zh: 下面的代码展示了属性的`store()`函数，本书提供了该代码：
 - en: '[PRE74]'
+  id: totrans-315
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE74]'
 - en: In the preceding code, it makes sense to call `sysfs_notify()` once the value
     has been updated so that the user code can read the accurate value.
+  id: totrans-316
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，一旦值更新，调用`sysfs_notify()`是有意义的，这样用户代码就可以读取准确的值。
 - en: The user code can directly pass the opened attribute file to `poll()` or `select()`
     without having to read the initial content of this attribute. Doing so is at the
     convenience of the developer. However, note that upon notification, `poll()` returns
     `POLLERR|POLLPRI` (as are flags, which users must request while invoking `poll()`),
     while `select()` returns the file descriptor, whether it is waiting for read,
     write, or exception events.
+  id: totrans-317
   prefs: []
   type: TYPE_NORMAL
+  zh: 用户代码可以直接将已打开的属性文件传递给`poll()`或`select()`，而不必读取该属性的初始内容。这是开发人员的方便做法。然而，请注意，在通知时，`poll()`返回`POLLERR|POLLPRI`（这些是标志，用户在调用`poll()`时必须请求），而`select()`则返回文件描述符，指示它是等待读取、写入还是异常事件。
 - en: Summary
+  id: totrans-318
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: By completing this chapter, you should be familiar with LDM, its data structures
     (bus, class, device, and driver), and its low-level data structures, which are
     `kobject`, `kset`, `kobj_type`, and `attributes` (or a group of these). You should
     now know how objects are represented within the kernel (device topology) and be
     able to create an attribute (or group) that exposes your device or driver features
     and properties through sysfs.
+  id: totrans-319
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成本章后，您应该熟悉LDM及其数据结构（总线、类、设备和驱动程序），以及其低级数据结构，包括`kobject`、`kset`、`kobj_type`和`attributes`（或这些的组合）。您现在应该知道内核内对象是如何表示的（设备拓扑），并能够创建一个属性（或属性组），通过sysfs暴露设备或驱动程序的特性和属性。
 - en: In the next chapter, we will cover the **IIO** (**Industrial I/O**) framework,
     which heavily uses the power of sysfs.
+  id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章中，我们将介绍**IIO**（**工业I/O**）框架，它大量使用sysfs的功能。

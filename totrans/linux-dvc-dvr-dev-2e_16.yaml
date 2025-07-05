@@ -3,6 +3,7 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '*第 13 章*：解密内核 IRQ 框架'
 - en: Linux is a system on which devices notify the kernel about events by means of
     **interrupt requests** (**IRQs**), though some devices are polled. The CPU exposes
     IRQ lines, shared or not, used by connected devices so that when a device needs
@@ -13,41 +14,50 @@
   id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 是一个系统，在该系统中，设备通过**中断请求**（**IRQs**）通知内核事件，尽管某些设备是轮询的。CPU 显示 IRQ 线路，无论是否共享，供连接的设备使用，以便当设备需要
+    CPU 时，它会向 CPU 发送请求。当 CPU 收到请求时，它会停止当前工作并保存其上下文，以便处理设备发出的请求。在处理完设备请求后，CPU 会恢复到中断发生时停止的状态。
 - en: In this chapter, we will deal with the APIs that the kernel offers to manage
     IRQs and the ways in which multiplexing can be done. Moreover, we will analyze
     and look closer at **interrupt controller** driver writing.
   id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将处理内核提供的用于管理 IRQ 的 API，以及如何进行多路复用。此外，我们还将分析并深入探讨**中断控制器**驱动的编写。
 - en: 'To summarize, in this chapter, the following topics will be covered:'
   id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 总结一下，本章将涵盖以下主题：
 - en: Brief presentation of interrupts
   id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 中断的简要介绍
 - en: Understanding interrupt controllers and interrupt multiplexing
   id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 理解中断控制器和中断多路复用
 - en: Diving into advanced peripheral IRQ management
   id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 深入探讨高级外设 IRQ 管理
 - en: Demystifying per-CPU interrupts
   id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 解密每个 CPU 的中断
 - en: Brief presentation of interrupts
   id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 中断的简要介绍
 - en: 'On many platforms, a special device is responsible for managing IRQ lines.
     That device is the interrupt controller and it stands between the CPU and the
     interrupt lines it manages. The following is a diagram that shows the interactions
@@ -55,23 +65,28 @@
   id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 在许多平台上，有一个特殊的设备负责管理 IRQ 线路。这个设备就是中断控制器，它位于 CPU 和它所管理的中断线路之间。下面是一个展示发生交互的图示：
 - en: '![Figure 13.1 – Interrupt controller and IRQ lines'
   id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 13.1 – 中断控制器与 IRQ 线路'
 - en: '](img/B17934_13_001.jpg)'
   id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_13_001.jpg)'
 - en: Figure 13.1 – Interrupt controller and IRQ lines
   id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 13.1 – 中断控制器与 IRQ 线路
 - en: 'Not only can devices raise interrupts, but some processor operations can do
     that too. There are then two different kinds of interrupts:'
   id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 不仅设备可以产生中断，一些处理器操作也可以。由此产生两种不同类型的中断：
 - en: Synchronous interrupts, called **exceptions**, are produced by the CPU while
     processing instructions. These are **non-maskable interrupts** (**NMIs**) and
     result from a critical malfunction such as hardware failure. They are always processed
@@ -80,6 +95,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 同步中断，称为**异常**，是由 CPU 在处理指令时产生的。这些是**不可屏蔽中断**（**NMIs**），通常由硬件故障等严重故障引起。它们总是由
+    CPU 处理。
 - en: Asynchronous interrupts, called **interrupts**, are issued by other hardware
     devices. These are normal and **maskable interrupts**. These are what we will
     discuss in the next sections of this chapter.
@@ -87,29 +104,34 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 异步中断，称为**中断**，由其他硬件设备发出。这些是正常的并且是**可屏蔽中断**。这些是本章接下来部分将讨论的内容。
 - en: Before getting deeper into interrupt management in the Linux kernel, let's talk
     a bit more about exceptions.
   id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 在深入了解 Linux 内核中的中断管理之前，我们先谈谈异常。
 - en: 'Exceptions are consequences of programming errors, handled by the kernel, which
     sends a signal to the program and tries to recover from the error. These are classified
     into two categories, enumerated as follows:'
   id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 异常是编程错误的结果，由内核处理，内核会向程序发送信号并尝试从错误中恢复。这些错误分为两类，列举如下：
 - en: '**Processor-detected exceptions**: Those the CPU generates in response to an
     anomalous condition, which are divided into three groups:'
   id: totrans-18
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**处理器检测到的异常**：这些是 CPU 在响应异常情况时产生的异常，可分为三类：'
 - en: Faults, which can generally be corrected (bogus instruction).
   id: totrans-19
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 故障，通常可以纠正（虚假的指令）。
 - en: Traps, which occur in the user process (invalid memory access, division by zero),
     are also a mechanism to switch to kernel mode in response to a system call. If
     the kernel code does cause a trap, it immediately panics.
@@ -118,28 +140,33 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 陷阱，通常发生在用户进程中（无效的内存访问、除以零），也是一种响应系统调用而切换到内核模式的机制。如果内核代码导致了陷阱，它会立即引发 panic。
 - en: Aborts – the serious errors.
   id: totrans-21
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 中止 – 严重错误。
 - en: '**Programmed exceptions**: These are requested by the programmer and handled
     like traps.'
   id: totrans-22
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**程序化异常**：这些是由程序员请求的，并像陷阱一样处理。'
 - en: Now that we have introduced the different families of interrupts, let's learn
     how they are implemented from within the interrupt controller.
   id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经介绍了不同类型的中断，接下来让我们学习它们在中断控制器中的实现。
 - en: Understanding interrupt controllers and interrupt multiplexing
   id: totrans-24
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 理解中断控制器和中断复用。
 - en: 'Having a single interrupt from the CPU is usually not enough. Most systems
     have tens or hundreds of them. Now comes interrupt controller, which allows them
     to be multiplexed. Very often, architecture or platform-specific implementations
@@ -147,31 +174,37 @@
   id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 来自CPU的单一中断通常不足以满足需求。大多数系统有数十个或数百个中断。此时就需要中断控制器，它允许这些中断进行复用。架构或平台特定的实现通常会提供一些特定的功能，如下所示：
 - en: Masking/unmasking individual interrupts
   id: totrans-26
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 屏蔽/解除屏蔽单个中断
 - en: Setting priorities
   id: totrans-27
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置优先级。
 - en: SMP affinity
   id: totrans-28
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: SMP亲和性。
 - en: Exotic features, such as wake-up interrupts
   id: totrans-29
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 异常特性，例如唤醒中断。
 - en: 'IRQ management and interrupt controller drivers both rely on the concept of
     the IRQ domain, which is built on top of the following structures:'
   id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: IRQ管理和中断控制器驱动都依赖于IRQ域的概念，该概念基于以下结构：
 - en: '`struct irq_chip`: This is the interrupt controller data structure. This structure
     also implements a set of methods that allow to drive the interrupt controller
     and that are directly called by core IRQ code.'
@@ -179,17 +212,20 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`struct irq_chip`：这是中断控制器的数据结构。该结构还实现了一组方法，用于驱动中断控制器，并且这些方法是由核心IRQ代码直接调用的。'
 - en: '`struct irqdomain`: This provides the following options:'
   id: totrans-32
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`struct irqdomain`：该结构提供以下选项：'
 - en: A pointer to the interrupt controller's firmware node (`fwnode`)
   id: totrans-33
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 指向中断控制器固件节点的指针（`fwnode`）
 - en: A function for converting an IRQ's firmware description into an ID local to
     this interrupt controller (`hwirq`, also called hardware IRQ number)
   id: totrans-34
@@ -197,6 +233,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 用于将IRQ的固件描述转换为此中断控制器本地的ID（`hwirq`，也称为硬件IRQ编号）的函数。
 - en: A way to retrieve the Linux view (`virq`, also called virtual IRQ number) of
     an IRQ from `hwirq`
   id: totrans-35
@@ -204,6 +241,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一种从`hwirq`中获取IRQ的Linux视图（`virq`，也称为虚拟IRQ编号）的方法。
 - en: '`struct irq_desc`: This structure is Linux''s view of an interrupt. It contains
     all the information about the interrupt as well as one-to-one mapping to the Linux
     interrupt number.'
@@ -211,29 +249,34 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`struct irq_desc`：该结构是Linux对中断的表示。它包含有关中断的所有信息，并与Linux中断编号一一对应。'
 - en: '`struct irq_action`: This structure is used to describe an IRQ handler.'
   id: totrans-37
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`struct irq_action`：该结构用于描述IRQ处理程序。'
 - en: '`struct irq_data`: This structure is embedded in the `struct irq_desc` structure
     and provides us with the following information:'
   id: totrans-38
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`struct irq_data`：该结构嵌套在`struct irq_desc`结构中，并提供以下信息：'
 - en: The data that is relevant to the IRQ chip managing this interrupt.
   id: totrans-39
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 与管理此中断的IRQ芯片相关的数据。
 - en: Both `virq` and `hwirq`.
   id: totrans-40
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 包含`virq`和`hwirq`。
 - en: A pointer to `struct irq_chip` (the IRQ chip data structure). Note that most
     IRQ chip-related function calls are given `irq_data` as a parameter, from which
     you can obtain the corresponding `struct irq_desc`.
@@ -242,6 +285,8 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 指向`struct irq_chip`（IRQ芯片数据结构）的指针。请注意，大多数与IRQ芯片相关的函数调用都将`irq_data`作为参数传递，通过它可以获取相应的`struct
+    irq_desc`。
 - en: 'All the preceding data structures are part of the IRQ domain API. An interrupt
     controller is represented in the kernel by an instance of the `struct irq_chip`
     structure, which describes the actual hardware device, and some methods used by
@@ -249,6 +294,7 @@
   id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述所有数据结构都是IRQ域API的一部分。中断控制器在内核中由`struct irq_chip`结构的一个实例表示，该结构描述了实际的硬件设备，以及IRQ核心使用的一些方法。以下代码块展示了它的定义：
 - en: '[PRE0]'
   id: totrans-43
   prefs: []
@@ -258,27 +304,32 @@
   id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下列表解释了结构中各个元素的含义：
 - en: '`parent_device`: This is a pointer to the parent of this IRQ chip.'
   id: totrans-45
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`parent_device`：这是指向此IRQ芯片父设备的指针。'
 - en: '`name`: This is the name for the`/proc/interrupts` file.'
   id: totrans-46
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`name`：这是`/proc/interrupts`文件的名称。'
 - en: '`irq_enable`: This hook enables the interrupt. If not set (if `NULL`), it defaults
     to `chip->unmask`.'
   id: totrans-47
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_enable`：该钩子用于启用中断。如果未设置（即`NULL`），则默认为`chip->unmask`。'
 - en: '`irq_disable`: This disables the interrupt.'
   id: totrans-48
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_disable`：该函数用于禁用中断。'
 - en: '`irq_ack`: This callback acknowledges an interrupt. It is unconditionally invoked
     by `handle_edge_irq()` and, therefore, must be defined (even an empty shell) for
     IRQ controller drivers that use `handle_edge_irq()` to handle interrupts. For
@@ -292,23 +343,29 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_ack`：该回调函数用于确认一个中断。`handle_edge_irq()` 会在任何情况下调用该函数，因此对于使用 `handle_edge_irq()`
+    来处理中断的 IRQ 控制器驱动程序，必须定义此回调函数（即使是空壳函数）。对于这样的控制器，此回调函数会在中断开始时被调用。有些控制器不需要这个函数。Linux
+    在中断被触发后立即调用此函数，远在处理中断之前。某些实现中此函数被映射到 `chip->disable()`，以便如果有另一个中断请求在线路上，当前中断请求处理完之前不会再次触发中断。'
 - en: '`irq_mask`: This is the hook that masks an interrupt source in the hardware
     so that it cannot be raised anymore.'
   id: totrans-50
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_mask`：这是一个钩子函数，用于在硬件中屏蔽中断源，以便该中断不再被触发。'
 - en: '`irq_unmask`: This hook unmasks an interrupt source.'
   id: totrans-51
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_unmask`：该钩子函数用于解除中断源的屏蔽。'
 - en: '`irq_eoi`: Linux invokes this `chip->enable()` to reverse operations done in
     `chip->ack()`.'
   id: totrans-52
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_eoi`：Linux 调用此 `chip->enable()` 来逆转 `chip->ack()` 中执行的操作。'
 - en: '`irq_set_affinity`: This sets the CPU affinity only on SMP machines. In such
     machines, this function is used to specify the CPU on which the interrupt will
     be handled. This function is unused in single-processor environments, as interrupts
@@ -317,40 +374,48 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_set_affinity`：此函数仅在 SMP 机器上设置 CPU 亲和性。在这样的机器上，此函数用于指定处理中断的 CPU。单处理器环境中不使用此函数，因为中断始终在同一个
+    CPU 上处理。'
 - en: '`irq_retrigger`: This retriggers the interrupt in the hardware, which resends
     an IRQ to the CPU.'
   id: totrans-54
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_retrigger`：此函数会在硬件中重新触发中断，从而将 IRQ 重新发送到 CPU。'
 - en: '`irq_set_type`: This sets the flow type, such as `IRQ_TYPE_LEVEL`, of an IRQ.'
   id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_set_type`：此函数设置 IRQ 的流类型，例如 `IRQ_TYPE_LEVEL`。'
 - en: '`irq_set_wake`: This enables/disables the power management wake-on of an IRQ.'
   id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_set_wake`：此函数用于启用/禁用 IRQ 的电源管理唤醒功能。'
 - en: '`irq_bus_lock`: This function locks access to slow bus (I2C) chips. Locking
     a mutex here is sufficient.'
   id: totrans-57
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_bus_lock`：此函数用于锁定对慢速总线（I2C）芯片的访问。在这里锁定一个互斥量就足够了。'
 - en: '`irq_bus_sync_unlock`: This function syncs and unlocks slow bus (I2C) chips,
     and unlocks the mutex previously locked.'
   id: totrans-58
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_bus_sync_unlock`：此函数同步并解锁慢速总线（I2C）芯片，同时解锁先前锁定的互斥量。'
 - en: '`irq_get_irqchip_state` and `irq_set_irqchip_state`: These return or set the
     internal state of an interrupt, respectively.'
   id: totrans-59
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_get_irqchip_state` 和 `irq_set_irqchip_state`：这两个函数分别用于返回或设置中断的内部状态。'
 - en: '`ipi_send_single` and `ipi_send_mask`: These are used, respectively, to send
     **inter-processor interrupts** (**IPIs**) either to a single CPU or to a set of
     CPUs defined by a mask. IPIs are used on SMP systems to generate a CPU remote
@@ -360,6 +425,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ipi_send_single` 和 `ipi_send_mask`：这两个函数分别用于向单个 CPU 或通过掩码定义的一组 CPU 发送 **处理器间中断**（**IPIs**）。在
+    SMP 系统中，IPIs 用于从本地 CPU 生成 CPU 远程中断。我们将在本章的 *破解每个 CPU 中断* 部分讨论这一点。'
 - en: 'Each interrupt controller is given a domain, which is to the controller what
     an address space is to a process (see [*Chapter 10*](B17934_10_Epub.xhtml#_idTextAnchor146),
     *Understanding the Linux Kernel Memory Allocation*). The interrupt controller
@@ -370,6 +437,9 @@
   id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个中断控制器都有一个域，这个域对控制器的作用类似于地址空间对进程的作用（参见 [*第 10 章*](B17934_10_Epub.xhtml#_idTextAnchor146)，*理解
+    Linux 内核内存分配*）。中断控制器域在内核中通过 `struct irq_domain` 结构来描述。它管理硬件 IRQ 编号与 Linux IRQ
+    编号（即虚拟 IRQ）之间的映射。它是硬件中断编号转换对象。以下代码块展示了其定义：
 - en: '[PRE1]'
   id: totrans-62
   prefs: []
@@ -380,32 +450,38 @@
   id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了可读性，只有与我们相关的元素被列出。以下列表告诉我们它们的含义：
 - en: '`name`: This is the name of the interrupt domain.'
   id: totrans-64
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`name`：这是中断域的名称。'
 - en: '`ops`: This is a pointer to the IRQ domain methods.'
   id: totrans-65
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ops`：这是指向 IRQ 域方法的指针。'
 - en: '`host_data`: This is a private data pointer for use by the owner. Not touched
     by the IRQ domain core code.'
   id: totrans-66
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`host_data`：这是一个供拥有者使用的私有数据指针。IRQ域核心代码不会修改它。'
 - en: '`flags`: This hosts per-IRQ domain flags.'
   id: totrans-67
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`flags`：这是每个IRQ域的标志。'
 - en: '`mapcount`: This is the number of mapped interrupts in this IRQ domain.'
   id: totrans-68
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`mapcount`：这是该IRQ域中已映射的中断数量。'
 - en: Like all the remaining elements, `fwnode` is optional. It is a pointer to the
     **device tree** (**DT**) node associated with the IRQ domain. Used when decoding
     DT interrupt specifiers.
@@ -413,6 +489,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 与所有其他元素一样，`fwnode`是可选的。它是指向与IRQ域相关联的**设备树**（**DT**）节点的指针。用于解码DT中断说明符。
 - en: 'An interrupt controller driver creates and registers an IRQ domain by calling
     one of the `irq_domain_add_<mapping_method>()` functions, where `<mapping_method>`
     is the method by which `hwirq` should be mapped to Linux `virq`. These functions
@@ -420,6 +497,8 @@
   id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 中断控制器驱动程序通过调用其中一个`irq_domain_add_<mapping_method>()`函数来创建并注册IRQ域，其中`<mapping_method>`是`hwirq`应如何映射到Linux
+    `virq`的映射方法。这些函数在下列列表中有详细描述：
 - en: '`irq_domain_add_linear()`: This uses a fixed-size table indexed by the `hwirq`
     number. When an `hwirq` number is mapped, an `irq_desc` object is allocated for
     this `hwirq` and the IRQ number is stored in the table. This linear mapping is
@@ -432,6 +511,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_domain_add_linear()`：该函数使用一个由`hwirq`编号索引的固定大小表。当一个`hwirq`编号被映射时，会为该`hwirq`分配一个`irq_desc`对象，并将IRQ编号存储在表中。这种线性映射适用于`hwirq`数量固定且较少的控制器或域（~
+    < 256）。这种映射的不便之处在于表的大小，它的大小与最大的`hwirq`编号相同。因此，IRQ编号查找时间是固定的，IRQ描述符只会为正在使用的IRQ分配。大多数驱动程序应使用线性映射。该函数的原型如下所示：'
 - en: '[PRE2]'
   id: totrans-72
   prefs:
@@ -452,6 +533,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_domain_add_tree()`：使用这种映射，IRQ域在基数树中维护`virqs`（Linux IRQ编号）和`hwirq`（硬件中断编号）之间的映射。当一个`hwirq`被映射时，会分配一个`irq_desc`对象，并将该硬件IRQ编号用作基数树的查找键。如果`hwirq`编号可能非常大，那么树形映射是一个可行的解决方案，因为它不需要分配一个和最大`hwirq`编号一样大的表。缺点是，`hwirq`到IRQ编号的查找会受到表中条目数量的影响。只有极少数驱动程序需要这种映射。内核中使用此API的用户不到10个。它的原型如下所示：'
 - en: '[PRE3]'
   id: totrans-74
   prefs:
@@ -465,6 +547,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_domain_add_nomap()`：你可能永远不会使用这种方法。不过，它的完整描述可以在`Documentation/IRQ-domain.txt`中找到，位于内核源代码树中。其原型如下所示：'
 - en: '[PRE4]'
   id: totrans-76
   prefs:
@@ -477,12 +560,14 @@
   id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这些函数中，`of_node`是指向中断控制器的DT节点的指针。`size`对应于域中中断的数量。`ops`表示映射/取消映射域的回调，`host_data`是控制器的私有数据指针。
 - en: 'When it is initially created, the IRQ domain is empty (no mapping). A mapping
     is created and added as and when the IRQ chip driver calls `irq_create_mapping()`,
     which has the following prototype:'
   id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 当IRQ域最初创建时，它是空的（没有映射）。当IRQ芯片驱动程序调用`irq_create_mapping()`时，会创建并添加映射，函数原型如下所示：
 - en: '[PRE5]'
   id: totrans-79
   prefs: []
@@ -494,6 +579,7 @@
   id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的函数中，`domain`是此硬件中断所属的域，或者为`NULL`表示默认域；`hwirq`表示该域空间中的硬件中断编号。
 - en: 'If a mapping for the `hwirq` number doesn''t already exist in the IRQ domain,
     the function will allocate a new Linux IRQ descriptor (`struct irq_desc`) structure,
     returning a virtual interrupt number at the same time. Then, it will associate
@@ -505,6 +591,9 @@
   id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果 `hwirq` 数字在 IRQ 域中还不存在映射，该函数将分配一个新的 Linux IRQ 描述符（`struct irq_desc`）结构，同时返回一个虚拟中断号。然后，它将通过
+    `irq_domain_associate()` 函数将其与 `hwirq` 数字关联（该函数又调用 `irq_domain_ops.map` 回调，以便驱动程序可以执行任何所需的硬件设置）。为了理解这一段，我们需要描述
+    IRQ 域操作数据结构（`struct irq_domain_ops`），该结构在下面的代码块中定义：
 - en: '[PRE6]'
   id: totrans-82
   prefs: []
@@ -517,6 +606,7 @@
   id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 数据结构中的元素已限制在本章的范围内。然而，完整的数据结构可以在内核源代码的 `include/linux/irqdomain.h` 中找到。以下列表告诉我们已列举元素的含义：
 - en: '`map`: This creates or updates mapping between a `virq` number and an `hwirq`
     number. This callback is invoked only once for a given mapping. It generally maps
     the `virq` number with a given handler using `irq_set_chip_and_handler()`, so
@@ -527,6 +617,9 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`map`: 这个回调函数创建或更新 `virq` 数字和 `hwirq` 数字之间的映射。该回调函数对于给定的映射只会被调用一次。它通常使用 `irq_set_chip_and_handler()`
+    将 `virq` 数字与给定的处理程序映射，以便调用 `generic_handle_irq()` 或 `handle_nested_irq()` 时触发该处理程序。`irq_set_chip_and_handler()`
+    函数定义如下所示：'
 - en: '[PRE7]'
   id: totrans-85
   prefs:
@@ -546,6 +639,11 @@
   id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此函数中，`irq` 是作为参数传递给 `map()` 函数的 Linux IRQ，而 `chip` 是你的 IRQ 芯片。然而，有些虚拟控制器几乎不需要在其
+    `irq_chip` 结构中做任何事情。在这种情况下，驱动程序传递 `dummy_irq_chip`，它在 `kernel/irq/dummychip.c`
+    中定义，是为这类控制器预定义的内核 `irq_chip` 结构。`handle` 决定了中断流处理器，它是调用通过 `request_irq()` 注册的实际处理器的那个。它的值取决于
+    IRQ 是边沿触发还是电平触发。在两种情况下，`handle` 应设置为 `handle_edge_irq` 或 `handle_level_irq`。这两者都是内核帮助函数，在调用真实的
+    IRQ 处理程序之前和之后执行一些操作。示例如下所示：
 - en: '[PRE8]'
   id: totrans-87
   prefs: []
@@ -559,6 +657,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`xlate`: 给定一个带有中断说明符的设备树节点，该钩子解码该说明符中的硬件中断号及其对应的 Linux 中断类型值。根据设备树控制器节点中指定的
+    `#interrupt-cells` 值，内核提供通用的翻译函数：'
 - en: '`irq_domain_xlate_twocell()`: Generic translation function to be used for direct
     two-cell binding. It works with a device tree IRQ specifier with two-cell bindings
     where the cell values map directly to the `hwirq` number and Linux IRQ flags.'
@@ -567,22 +667,27 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_domain_xlate_twocell()`: 用于直接两单元绑定的通用翻译函数。它与具有两单元绑定的设备树 IRQ 说明符一起工作，其中单元值直接映射到
+    `hwirq` 数字和 Linux IRQ 标志。'
 - en: '`irq_domain_xlate_onecell()`: Generic `xlate` for direct one-cell bindings.'
   id: totrans-90
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq_domain_xlate_onecell()`: 一种通用的 `xlate` 方法，用于直接一单元绑定。'
 - en: '`Irq_domain_xlate_onetwocell()`: Generic `xlate` for one- or two-cell bindings.'
   id: totrans-91
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Irq_domain_xlate_onetwocell()`: 一种通用的 `xlate` 方法，用于一或两单元绑定。'
 - en: 'An example of domain operation is given in the following code block:'
   id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 域操作的示例如下所示：
 - en: '[PRE9]'
   id: totrans-93
   prefs: []
@@ -596,6 +701,8 @@
   id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 当接收到中断时，`irq_find_mapping()` 函数会用来从 `hwirq` 编号查找 Linux IRQ 编号。当然，映射必须在返回之前存在。Linux
+    IRQ 编号总是与一个 `struct irq_desc` 结构关联，后者是 Linux 描述 IRQ 的结构，定义如下：
 - en: '[PRE10]'
   id: totrans-95
   prefs: []
@@ -606,48 +713,57 @@
   id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 该数据结构中的一些字段故意缺失。其余字段的定义如下：
 - en: '`kstat_irqs`: This is the per-CPU IRQ statistics since boot.'
   id: totrans-97
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kstat_irqs`：这是自启动以来每个 CPU 的 IRQ 统计信息。'
 - en: '`handle_irq`: This is the high-level IRQ events handler.'
   id: totrans-98
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`handle_irq`：这是高级的 IRQ 事件处理程序。'
 - en: '`action`: This represents the list of the IRQ actions for this descriptor.'
   id: totrans-99
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`action`：表示该描述符的 IRQ 动作列表。'
 - en: '`irqs_unhandled`: This is the stats field for spurious unhandled interrupts.'
   id: totrans-100
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irqs_unhandled`：这是处理未被处理的虚假中断的统计字段。'
 - en: '`lock`: This represents locking for SMP.'
   id: totrans-101
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`lock`：表示 SMP 的锁定。'
 - en: '`threads_active`: This is the number of IRQ action threads currently running
     for this descriptor.'
   id: totrans-102
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`threads_active`：当前为该描述符运行的 IRQ 动作线程数量。'
 - en: '`wait_for_threads`: This represents the wait queue for `sync_irq` to wait for
     threaded handlers.'
   id: totrans-103
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`wait_for_threads`：表示 `sync_irq` 等待线程处理程序的等待队列。'
 - en: '`nr_actions`: This is the number of installed actions on this descriptor.'
   id: totrans-104
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`nr_actions`：这是安装在该描述符上的动作数量。'
 - en: '`no_suspend_depth` and `force_resume_depth`: This represents the number of
     `irqaction` instances on an IRQ descriptor that have `IRQF_NO_SUSPEND` or `IRQF_FORCE_RESUME`
     flags set.'
@@ -655,16 +771,20 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`no_suspend_depth` 和 `force_resume_depth`：表示在具有 `IRQF_NO_SUSPEND` 或 `IRQF_FORCE_RESUME`
+    标志的 IRQ 描述符上 `irqaction` 实例的数量。'
 - en: '`dir`: This represents the `/proc/irq/` procfs entry.'
   id: totrans-106
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dir`：表示 `/proc/irq/` 的 procfs 条目。'
 - en: '`name`: This names the flow handler, visible in the `/proc/interrupts` output.'
   id: totrans-107
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`name`：命名流处理程序，在 `/proc/interrupts` 输出中可见。'
 - en: 'When registering an interrupt handler, this handler is added to the end of
     the `irq_desc.action` list associated with that interrupt line. For instance,
     each call to `request_irq()` (or the threaded version, `request_threaded_irq()`)
@@ -675,6 +795,9 @@
   id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 在注册中断处理程序时，该处理程序会被添加到与该中断线关联的 `irq_desc.action` 列表的末尾。例如，每次调用 `request_irq()`（或者线程版本的
+    `request_threaded_irq()`）都会创建并将一个 `struct irqaction` 结构添加到 `irq_desc.action` 列表的末尾（知道
+    `irq_desc` 是该中断的描述符）。对于共享中断，该字段将包含与注册的处理程序数量相等的 `irqaction` 对象。IRQ 动作数据结构的定义如下：
 - en: '[PRE11]'
   id: totrans-109
   prefs: []
@@ -684,71 +807,85 @@
   id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 该数据结构中每个元素的含义如下：
 - en: '`handler`: This is the non-threaded (hard) interrupt handler function.'
   id: totrans-111
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`handler`：这是非线程的（硬）中断处理程序函数。'
 - en: '`name`: This is the device name.'
   id: totrans-112
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`name`：设备名称。'
 - en: '`dev_id`: This is a cookie to identify the device.'
   id: totrans-113
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dev_id`：这是一个标识符，用于识别设备。'
 - en: '`percpu_dev_id`: This is a per-CPU cookie to identify the device.'
   id: totrans-114
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`percpu_dev_id`：这是一个每个 CPU 的标识符，用于识别设备。'
 - en: '`next`: This is a pointer to the next IRQ action for shared interrupts.'
   id: totrans-115
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`next`：这是指向共享中断的下一个 IRQ 动作的指针。'
 - en: '`irq`: This is the Linux interrupt number (`virq`).'
   id: totrans-116
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq`：这是 Linux 中断号（`virq`）。'
 - en: '`flags`: This represents the IRQ flags (see `IRQF_*`).'
   id: totrans-117
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`flags`：表示 IRQ 标志（见 `IRQF_*`）。'
 - en: '`thread_fn`: This is the threaded interrupt handler function for threaded interrupts.'
   id: totrans-118
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`thread_fn`：这是线程中断处理程序函数，适用于线程中断。'
 - en: '`thread`: This is a pointer to the thread structure in case of threaded interrupts.'
   id: totrans-119
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`thread`：这是指向线程结构的指针，适用于线程中断。'
 - en: '`thread_flags`: This represents the flags related to the thread.'
   id: totrans-120
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`thread_flags`：表示与线程相关的标志。'
 - en: '`thread_mask`: This is a bitmask for keeping track of thread activity.'
   id: totrans-121
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`thread_mask`：这是用于跟踪线程活动的位掩码。'
 - en: '`dir`: This points to the `/proc/irq/NN/<name>/` entry.'
   id: totrans-122
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dir`：指向 `/proc/irq/NN/<name>/` 条目。'
 - en: 'The following is the definition of important fields in the `struct irq_data`
     structure, which is per-IRQ chip data passed down to chip functions:'
   id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是 `struct irq_data` 结构中重要字段的定义，它是每个 IRQ 芯片的数据，传递给芯片函数：
 - en: '[PRE12]'
   id: totrans-124
   prefs: []
@@ -758,6 +895,7 @@
   id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下列表给出了该数据结构中元素的含义：
 - en: '`irq`: This is the interrupt number (Linux IRQ number).'
   id: totrans-126
   prefs:
@@ -887,6 +1025,9 @@
   id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: '`request_any_context_irq()` 表示你可以获得硬中断或线程中断。它的工作方式与常规的 `request_irq()` 相同，不同之处在于它会检查
+    IRQ 是否配置为嵌套中断，并调用正确的后端。换句话说，它根据上下文选择硬中断或线程处理方法。此函数在失败时返回负值。成功时，它返回 `IRQC_IS_HARDIRQ`
+    或 `IRQC_IS_NESTED`。以下代码块展示了一个用例：'
 - en: '[PRE14]'
   id: totrans-143
   prefs: []
@@ -902,28 +1043,35 @@
   id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述代码摘自一个输入设备驱动的示例。使用 `request_any_context_irq()` 的优点是，你不需要关心 IRQ 处理程序可以做什么，因为处理程序运行的上下文取决于提供
+    IRQ 线路的中断控制器。在我们的示例中，如果 GPIO 属于一个通过 I2C 或 SPI 总线连接的控制器，那么处理程序将是线程化的。否则（内存映射），处理程序将在硬中断上下文中运行。
 - en: Understanding IRQ and propagation
   id: totrans-145
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 理解 IRQ 和传播
 - en: 'Let''s consider the following diagram with a GPIO controller whose interrupt
     line is connected to a native GPIO on the SoC:'
   id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设我们有一个 GPIO 控制器，其中断线路连接到 SoC 上的本地 GPIO，如下图所示：
 - en: '![Figure 13.2 – Interrupt propagation'
   id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 13.2 – 中断传播'
 - en: '](img/B17934_13_002.jpg)'
   id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_13_002.jpg)'
 - en: Figure 13.2 – Interrupt propagation
   id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 13.2 – 中断传播
 - en: 'IRQs are always processed based on the Linux IRQ number (not `hwirq`). The
     general function to request an IRQ on a Linux system is `request_threaded_irq()`.
     `request_irq()` is a wrapper on `request_threaded_irq()` which just don''t provide
@@ -931,6 +1079,8 @@
   id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: IRQ 始终基于 Linux IRQ 编号进行处理（而非 `hwirq`）。在 Linux 系统中请求 IRQ 的通用函数是 `request_threaded_irq()`。`request_irq()`
+    是 `request_threaded_irq()` 的封装，只是不提供底半部分。以下代码块展示了它的原型：
 - en: '[PRE15]'
   id: totrans-151
   prefs: []
@@ -943,6 +1093,8 @@
   id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 当调用时，该函数使用 `irq_to_desc()` 宏提取与 IRQ 关联的 `struct irq_desc`。然后，它分配一个新的 `struct
+    irqaction` 结构并进行设置，填充如处理程序和标志等参数。以下代码块是摘录：
 - en: '[PRE16]'
   id: totrans-153
   prefs: []
@@ -954,6 +1106,8 @@
   id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 同一个函数最终通过调用 `__setup_irq()`（通过 `setup_irq()`）函数将描述符插入/注册到适当的 IRQ 列表中，该函数定义在
+    `kernel/irq/manage.c` 中。
 - en: 'Now, when an IRQ is raised, the kernel executes some assembler code in order
     to save the current state and jumps to the arch-specific handler, `handle_arch_irq`.
     For ARM architectures, this handler is set with the value of the `handle_irq`
@@ -962,6 +1116,9 @@
   id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，当 IRQ 被触发时，内核执行一些汇编代码以保存当前状态，并跳转到特定架构的处理程序 `handle_arch_irq`。对于 ARM 架构，这个处理程序通过
+    `setup_arch()` 函数在 `arch/arm/kernel/setup.c` 中的 `struct machine_desc` 中设置，并分配
+    `handle_irq` 字段的值。赋值过程如下：
 - en: '[PRE17]'
   id: totrans-156
   prefs: []
@@ -972,6 +1129,8 @@
   id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于使用 ARM 的 SoC，`handle_irq` 回调设置为 `gic_handle_irq`，在 `drivers/irqchip/irq-gic.c`
+    或 `drivers/irqchip/irq-gic-v3.c` 中：
 - en: '[PRE18]'
   id: totrans-158
   prefs: []
@@ -985,17 +1144,22 @@
   id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: '`gic_handle_irq()` 调用 `handle_domain_irq()`，接着执行 `generic_handle_irq()`，再调用
+    `generic_handle_irq_desc()`，最终调用 `desc->handle_irq()`。整个链条可以在 `arch/arm/kernel/irq.c`
+    中看到。现在，`handle_irq` 是流处理程序的实际调用，我们在图中将其注册为 `mcp23016_irq_handler`。'
 - en: '`gic_hande_irq()` is a GIC interrupt handler. `generic_handle_irq()` will execute
     the handler of the SoC''s GPIO4 IRQ, which will look for GPIO pins that issued
     the interrupt, and call `generic_handle_irq_desc()`.'
   id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: '`gic_hande_irq()`是一个GIC中断处理程序。`generic_handle_irq()`将执行SoC的GPIO4 IRQ的处理程序，该处理程序将查找发出中断的GPIO引脚，并调用`generic_handle_irq_desc()`。'
 - en: Chaining IRQs
   id: totrans-161
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 链接IRQ
 - en: This section describes how the interrupt handlers of a parent call its children's
     interrupt handlers, in turn calling their children's interrupt handlers, and so
     on. The kernel offers two approaches on how to call interrupt handlers for child
@@ -1004,11 +1168,13 @@
   id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节描述了父中断处理程序如何调用其子中断处理程序，进而调用其子中断处理程序，依此类推。内核提供了两种方法来在父设备（中断控制器）的IRQ处理程序中调用子设备的中断处理程序。这些方法是链式方法和嵌套方法。
 - en: Chained interrupts
   id: totrans-163
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 链式中断
 - en: This approach is used for SoC's internal GPIO controllers, which are memory-mapped
     and which do not put the caller to sleep when these are accessed. Chained means
     that those interrupts are just chains of function calls (for example, SoC's GPIO
@@ -1020,11 +1186,13 @@
   id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种方法用于SoC内部的GPIO控制器，这些控制器是内存映射的，并且在访问这些控制器时不会使调用者进入睡眠状态。链式中断意味着这些中断只是函数调用的链（例如，SoC的GPIO模块中断处理程序是从GIC中断处理程序中调用的，就像一个函数调用一样）。`generic_handle_irq()`用于中断链式处理。子IRQ处理程序是从父硬IRQ处理程序内部调用的。这意味着即使在子中断处理程序中，我们仍然处于一个原子上下文（硬件中断），并且驱动程序不得调用可能导致睡眠的函数。
 - en: Nested interrupts
   id: totrans-165
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 嵌套中断
 - en: With this flow, function calls are nested, which means interrupt handlers are
     not invoked in the parent's handler. `handle_nested_irq()` is used for creating
     nested interrupt child IRQs. Handlers are called inside a new thread created for
@@ -1035,16 +1203,19 @@
   id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过这种流程，函数调用是嵌套的，这意味着中断处理程序不会在父处理程序中被调用。`handle_nested_irq()`用于创建嵌套中断子IRQ。处理程序是在为此目的创建的新线程中调用的。此方法用于那些位于慢速总线（如SPI或I2C，如GPIO扩展器）上的控制器，其访问可能会进入睡眠状态（I2C和SPI访问过程可能会进入睡眠）。在进程上下文中运行的嵌套中断处理程序可以调用任何可能进入睡眠状态的函数。
 - en: Demystifying per-CPU interrupts
   id: totrans-167
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 解密每CPU中断
 - en: 'The most common ARM interrupt controller, GIC in the ARM multi-core processor,
     supports three types of interrupts:'
   id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 最常见的ARM中断控制器，ARM多核处理器中的GIC，支持三种类型的中断：
 - en: '**CPU private interrupts**: These interrupts are private per CPU. If triggered,
     such a per-CPU interrupt will exclusively be serviced on the target CPU or CPU
     to which it is bound. Private interrupts can be split into two families:'
@@ -1052,6 +1223,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**CPU专用中断**：这些中断是每个CPU专用的。如果触发，类似每CPU的中断将仅在目标CPU或与之绑定的CPU上进行服务。专用中断可以分为两类：'
 - en: '**Private peripheral interrupts** (**PPIs**): These are private and can only
     be generated by hardware bound to the CPU.'
   id: totrans-170
@@ -1059,6 +1231,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**专用外设中断**（**PPIs**）：这些中断是专用的，仅能由绑定到CPU的硬件生成。'
 - en: '**Software-generated interrupts** (**SGIs**): Unlike PPIs, these are generated
     by the software. Thanks to this, SGIs are usually used as interrupt IPIs for inter-core
     communication on multi-core systems, meaning that one CPU can generate an interrupt
@@ -1070,6 +1243,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**软件生成的中断**（**SGIs**）：与PPIs不同，SGIs是由软件生成的。由于这一点，SGIs通常作为多核系统中核心间通信的中断IPIs使用，这意味着一个CPU可以生成一个中断（通过将适当的消息，包括中断ID和目标CPU写入GIC控制器）到其他CPU。这就是本节要讨论的内容。'
 - en: '**Shared peripheral interrupts** (**SPIs**) (not to be confused with the SPI
     bus): These are the classical interrupts that we have discussed so far. Such interrupts
     can route to any CPU.'
@@ -1077,6 +1251,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**共享外设中断**（**SPIs**）（与SPI总线不同）：这些是我们到目前为止讨论的经典中断。这些中断可以路由到任何CPU。'
 - en: In systems with an interrupt controller that supports private interrupts per
     core, some of the IRQ controller registers will be banked so that they're only
     accessible from one core (for example, a core will only be able to read/write
@@ -1086,6 +1261,8 @@
   id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 在具有支持每核私有中断的中断控制器的系统中，某些 IRQ 控制器寄存器将被分区，这样它们只能从一个核心访问（例如，一个核心只能读取/写入它自己的中断配置）。通常，为了实现这一点，一些中断控制器寄存器是按
+    CPU 分区的；一个 CPU 可以通过写入它的分区寄存器来启用本地中断。
 - en: The distributor block and the CPU interface block are logically partitioned
     in the GIC. Interacting with interrupt sources, the distributor block prioritizes
     interrupts and delivers them to the CPU interface block. The CPU interface block
@@ -1094,23 +1271,27 @@
   id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 GIC 中，分配器块和 CPU 接口块在逻辑上是分区的。在与中断源交互时，分配器块对中断进行优先级排序，并将其传递给 CPU 接口块。CPU 接口块与系统中的处理器连接，管理与其连接的处理器的优先级屏蔽和抢占。
 - en: 'The GIC can support up to 8 CPU interfaces, each of which can handle up to
     1,020 interrupts. Interrupt ID numbers 0–1019 are assigned by the GIC as follows:'
   id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: GIC 支持最多 8 个 CPU 接口，每个接口最多可以处理 1,020 个中断。中断 ID 号 0 到 1019 由 GIC 按如下方式分配：
 - en: 'Interrupt numbers 0–31 are interrupts that are private to a CPU interface.
     These private interrupts are banked in the distributor block and split as follows:'
   id: totrans-176
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 中断号 0 到 31 是私有于 CPU 接口的中断。这些私有中断在分配器块中被分区，并按如下方式划分：
 - en: SGIs use banked interrupt numbers 0–15.
   id: totrans-177
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: SGIs 使用分区的中断号 0 到 15。
 - en: PPIs use banked interrupt numbers 16–31\. In SMP systems, for example, a per-CPU
     timer provided by clock event devices can generate such interrupts.
   id: totrans-178
@@ -1118,26 +1299,31 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: PPIs 使用分区的中断号 16 到 31。例如，在 SMP 系统中，时钟事件设备提供的每 CPU 定时器可以生成这样的中断。
 - en: SPIs use interrupt numbers 32–1,019.
   id: totrans-179
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: SPIs 使用中断号 32 到 1,019。
 - en: The remaining interrupts are reserved, that is, interrupt numbers 1020–1023.
   id: totrans-180
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 剩余的中断是保留的，即中断号 1020 到 1023。
 - en: Now that we are familiar with ARM GIC interrupt families, we can focus on the
     family we are interested in, that is, SGIs.
   id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经熟悉了 ARM GIC 中断家族，接下来可以专注于我们感兴趣的家族，也就是 SGIs。
 - en: SGIs and IPIs
   id: totrans-182
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: SGIs 和 IPIs
 - en: 'In ARM processors, there are 16 SGIs, numbered from 0 to 15, but the Linux
     kernel registers only a few of them: eight (from 0 to 7) to be precise. SGI8 to
     SGI15 are free for now. Registered SGIs are those defined in `enum ipi_msg_type`,
@@ -1145,6 +1331,8 @@
   id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 ARM 处理器中，共有 16 个 SGI，编号从 0 到 15，但 Linux 内核仅注册了其中的一部分：精确来说是八个（从 0 到 7）。SGI8
+    到 SGI15 当前未被使用。已注册的 SGI 是那些在 `enum ipi_msg_type` 中定义的，具体如下：
 - en: '[PRE19]'
   id: totrans-184
   prefs: []
@@ -1155,6 +1343,7 @@
   id: totrans-185
   prefs: []
   type: TYPE_NORMAL
+  zh: 它们各自的描述可以在一个字符串数组 `ipi_types` 中找到，该数组在下方代码块中定义：
 - en: '[PRE20]'
   id: totrans-186
   prefs: []
@@ -1165,6 +1354,7 @@
   id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: IPI 在 `set_smp_ipi_range()` 函数中注册，具体定义见下方代码块：
 - en: '[PRE21]'
   id: totrans-188
   prefs: []
@@ -1176,6 +1366,8 @@
   id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码块中，每个 IPI 都是通过 `request_percpu_irq()` 在每个 CPU 上注册的。我们可以看到，所有的 IPI 都使用相同的处理程序
+    `ipi_handler()`，其定义如下：
 - en: '[PRE22]'
   id: totrans-190
   prefs: []
@@ -1186,6 +1378,7 @@
   id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 在处理程序中执行的底层函数是 `do_handle_IPI()`，其定义如下：
 - en: '[PRE23]'
   id: totrans-192
   prefs: []
@@ -1195,12 +1388,14 @@
   id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 从前面的函数中，
 - en: '`IPI_WAKEUP`: This is used to wake up and boot a secondary CPU. It is mostly
     issued by the boot CPU.'
   id: totrans-194
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IPI_WAKEUP`：用于唤醒并启动一个二级 CPU。它主要由引导 CPU 发出。'
 - en: '`IPI_RESCHEDULE`: The Linux kernel uses rescheduling interrupts to tell another
     CPU core to schedule a thread. The scheduler on SMP systems does this to distribute
     the load over multiple CPU cores. As a general rule, it is ideal to have as many
@@ -1214,6 +1409,9 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IPI_RESCHEDULE`：Linux 内核使用重新调度中断来告诉其他 CPU 核心调度一个线程。SMP 系统上的调度器通过这种方式分配负载到多个
+    CPU 核心上。一般来说，理想的状态是让所有核心上尽可能多的进程在低功耗（低时钟频率）下运行，而不是让一个忙碌的核心全速运行，而其他核心处于睡眠状态。当调度器需要将任务从一个核心转移到另一个睡眠核心时，调度器会向该睡眠核心发送一个内核
+    IPI 消息，导致它从低功耗睡眠状态中醒来并开始执行进程。这些 IPI 事件会被 `powertop` 报告为“重新调度中断”。'
 - en: '`IPI_TIMER`: This is the timer broadcast interrupt. This IPI emulates a timer
     interrupt on an idle CPU. It is sent by the broadcast clock event/tick device
     to CPUs represented in `tick_broadcast_mask`, which is the bitmap that represents
@@ -1224,6 +1422,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IPI_TIMER`：这是定时器广播中断。这个 IPI 模拟了在空闲 CPU 上的定时器中断。它是由广播时钟事件/滴答设备发送到 `tick_broadcast_mask`
+    中表示的 CPU 上，`tick_broadcast_mask` 是表示处于睡眠模式的处理器列表的位图。滴答设备和广播掩码将在 [*第 3 章*](B17934_03_Epub.xhtml#_idTextAnchor039)中讨论，*处理内核核心助手*。'
 - en: '`IPI_CPU_STOP`: When a kernel panic occurs on one CPU, other CPUs are instructed
     to dump their stack and to stop execution via the `IPI_CPU_STOP` IPI message.
     The target CPUs are not shut down or taken offline; instead, they stop execution
@@ -1232,11 +1432,14 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IPI_CPU_STOP`：当一个 CPU 上发生内核恐慌时，其他 CPU 会通过 `IPI_CPU_STOP` IPI 消息指示转储它们的堆栈并停止执行。目标
+    CPU 并不会关闭或下线；相反，它们会停止执行并进入低功耗循环，处于**等待事件**（**WFE**）状态。'
 - en: '`IPI_CALL_FUNC`: This is used to run a function in another processor context.'
   id: totrans-198
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IPI_CALL_FUNC`：用于在另一个处理器上下文中运行函数。'
 - en: '`IPI_IRQ_WORK`: This is used to run a work in a hardware IRQ context. The kernel
     offers a bunch of mechanisms to defer works to a later time, especially out of
     the hardware interrupt context. There might, however, be the occasional need to
@@ -1248,11 +1451,14 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IPI_IRQ_WORK`：用于在硬件 IRQ 上下文中运行任务。内核提供了一系列机制来推迟任务的执行，特别是将任务从硬件中断上下文中移出。然而，偶尔可能需要在硬件中断上下文中运行任务，而此时并没有硬件便捷地发出中断信号。为了实现这一点，可以使用
+    IPI 来在硬件中断上下文中运行任务。这主要用于从非屏蔽中断中运行的代码，这类代码需要与系统的其他部分进行交互。'
 - en: 'On a running system, you can look for available IPIs from the `/proc/interrupt`
     file, as shown in the following code block:'
   id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 在运行中的系统上，你可以通过 `/proc/interrupt` 文件查找可用的 IPI，如下所示的代码块所示：
 - en: '[PRE24]'
   id: totrans-201
   prefs: []
@@ -1264,11 +1470,13 @@
   id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此处显示的命令输出中，第一列是 IPI 标识符，最后一列是 IPI 的描述。中间的列是每个 CPU 上相应的执行次数。
 - en: Summary
   id: totrans-203
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 概述
 - en: 'Now, IRQ multiplexing has no more secrets from you. We have discussed the most
     important element of IRQ management in Linux systems: the IRQ domain API. You
     have the basics to understand existing interrupt controller drivers, as well as
@@ -1277,8 +1485,11 @@
   id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，IRQ 多路复用对你来说没有什么秘密了。我们已经讨论了 Linux 系统中 IRQ 管理的最重要元素：IRQ 域 API。你已经掌握了理解现有中断控制器驱动程序的基础知识，以及它们在设备树中的绑定。我们讨论了
+    IRQ 传播，以便探索请求和处理程序调用之间发生了什么。
 - en: 'In the next chapter, we deal with a completely different topic: the Linux device
     model.'
   id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章中，我们将讨论一个完全不同的话题：Linux 设备模型。
