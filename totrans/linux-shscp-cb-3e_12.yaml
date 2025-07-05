@@ -3,84 +3,100 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 调优Linux系统
 - en: 'In this chapter, we will cover the following recipes:'
   id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将涵盖以下内容：
 - en: Identifying services
   id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 确定服务
 - en: Gathering socket data with `ss`
   id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`ss`收集套接字数据
 - en: Gathering system I/O usage with `dstat`
   id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`dstat`收集系统I/O使用情况
 - en: Identifying a resource hog with `pidstat`
   id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`pidstat`识别资源消耗大户
 - en: Tuning the Linux kernel with `sysctl`
   id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`sysctl`调整Linux内核
 - en: Tuning a Linux system with config files
   id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用配置文件调优Linux系统
 - en: Changing scheduler priority using the `nice` command
   id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`nice`命令改变调度器优先级
 - en: Introduction
   id: totrans-9
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 简介
 - en: No system runs as fast as we need it to run, and any computer's performance
     can be improved.
   id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 没有任何系统能以我们希望的速度运行，任何计算机的性能都可以提升。
 - en: We can improve the performance of a system by turning off unused services, by
     tuning the kernel parameters, or by adding new hardware.
   id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过关闭未使用的服务、调整内核参数或添加新硬件来提高系统的性能。
 - en: 'The first step in tuning a system is understanding what the demands are and
     whether they are being met. Different types of applications have different critical
     needs. The questions to ask yourself include the following:'
   id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 调优系统的第一步是理解需求是什么，以及这些需求是否得到了满足。不同类型的应用有不同的关键需求。你需要问自己以下问题：
 - en: Is the CPU the critical resource for this system? A system doing engineering
     simulations requires CPU cycles more than other resources.
   id: totrans-13
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于该系统，CPU是否是关键资源？一个进行工程模拟的系统比其他资源更需要CPU周期。
 - en: Is network bandwidth critical for this system? A file server does little computation,
     but can saturate its network capacity.
   id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于该系统，网络带宽是否至关重要？一个文件服务器几乎不进行计算，但可能会使其网络容量饱和。
 - en: Is disk access speed critical for this system? A file server or database server
     will put more demand on the disks than a calculation engine does.
   id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于该系统，磁盘访问速度是否至关重要？文件服务器或数据库服务器对磁盘的需求要比计算引擎高。
 - en: Is RAM the critical resource for this system? All systems need RAM, but a database
     server commonly builds large in-memory tables to perform queries, and file servers
     are more efficient with larger RAM for disk caches.
@@ -88,6 +104,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于该系统，RAM是否是关键资源？所有系统都需要RAM，但数据库服务器通常会构建大型内存表以执行查询，而文件服务器则通过更大的内存来提高磁盘缓存的效率。
 - en: Has your system been hacked? A system can suddenly become unresponsive because
     it's running unexpected malware. This is not common on Linux machines, but a system
     with many users (like a college or business network) is vulnerable to a brute-force
@@ -96,6 +113,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 你的系统是否被黑客攻击了？系统可能会突然变得无响应，因为它运行了意外的恶意软件。虽然这在Linux机器上不常见，但拥有众多用户的系统（例如大学或企业网络）容易受到暴力破解密码攻击。
 - en: 'The next question to ask is: How do I measure usage? Knowing how a system is
     being used will lead you to the questions, but may not lead you to the answer.
     A fileserver will cache commonly accessed files in the memory, so one with too
@@ -103,6 +121,7 @@
   id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来的问题是：我如何衡量系统的使用情况？了解一个系统的使用方式能帮助你提出问题，但可能不会直接给出答案。一个文件服务器会将常访问的文件缓存到内存中，因此内存不足的服务器可能会受到磁盘/内存的限制，而非网络限制。
 - en: Linux has tools for analyzing a system. Many have been discussed in [Chapter
     8](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml), *The Old-Boy Network*, [Chapter
     9](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml), *Put on The Monitor's Cap*, and
@@ -111,47 +130,56 @@
   id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux有一些用于分析系统的工具。许多工具已经在[第8章](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml)，*老男孩网络*，[第9章](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml)，*戴上监视器的帽子*，和[第11章](5bf336a4-5338-4a7a-b27e-1ebecac4704d.xhtml)，*追踪线索*中讨论过了。本章将介绍更多的监控工具。
 - en: Here is a list of subsystems and tools to examine them. Many (but not all) of
     these tools have been discussed in this book.
   id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是需要检查的子系统和工具列表。书中已经讨论了这些工具中的许多（但并非全部）。
 - en: 'CPU: `top`, `dstat`, `perf`, `ps`, `mpstat`, `strace`, `ltrace`'
   id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: CPU：`top`，`dstat`，`perf`，`ps`，`mpstat`，`strace`，`ltrace`
 - en: 'Network: `netstat`, `ss`, `iotop`, `ip`, `iptraf`, `nicstat`, `ethtool`, `lsof`'
   id: totrans-22
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 网络：`netstat`，`ss`，`iotop`，`ip`，`iptraf`，`nicstat`，`ethtool`，`lsof`
 - en: 'Disk: `ftrace`, `iostat`, `dstat`, `blktrace`'
   id: totrans-23
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 磁盘：`ftrace`，`iostat`，`dstat`，`blktrace`
 - en: 'RAM: top, `dstat`, `perf`, `vmstat`, `swapon`'
   id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 内存：top，`dstat`，`perf`，`vmstat`，`swapon`
 - en: Many of these tools are part of a standard Linux distribution. The others can
     be loaded with your package manager.
   id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些工具中的许多是标准Linux发行版的一部分。其他工具可以通过包管理器加载。
 - en: Identifying services
   id: totrans-26
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 确定服务
 - en: A Linux system can run hundreds of tasks at a time. Most of these are part of
     the operating system environment, but you might discover you're running a daemon
     or two you don't need.
   id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个Linux系统可以同时运行数百个任务。大部分任务是操作系统环境的一部分，但你可能会发现有些守护进程是你不需要的。
 - en: Linux distributions support one of the three utilities that start daemons and
     services. The traditional `SysV` system uses scripts in `/etc/init.d`. The newer
     `systemd` daemon uses the same `/etc/init.d` scripts and also uses a `systemctl`
@@ -159,6 +187,7 @@
   id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux发行版支持三种用于启动守护进程和服务的工具之一。传统的`SysV`系统使用位于`/etc/init.d`的脚本。较新的`systemd`守护进程使用相同的`/etc/init.d`脚本，并且还使用`systemctl`调用。一些发行版使用Upstart，它将配置脚本存储在`/etc/init`中。
 - en: The SysV `init` system is being phased out in favor of the `systemd` suite.
     The `upstart` utility was developed and used by Ubuntu, but discarded in favor
     of `systemd` with the 14.04 release. This chapter will focus on `systemd`, since
@@ -166,22 +195,26 @@
   id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: SysV `init`系统正在逐步淘汰，取而代之的是`systemd`套件。`upstart`工具是由Ubuntu开发并使用的，但在14.04版本中被抛弃，改为使用`systemd`。本章将重点介绍`systemd`，因为它是大多数发行版使用的系统。
 - en: Getting ready
   id: totrans-30
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: The first step is to determine whether your system is using the SysV `init`
     calls, `systemd`, or `upstart`.
   id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一步是确定你的系统使用的是SysV `init`调用、`systemd`还是`upstart`。
 - en: 'Linux/Unix systems must have an initialization process running as `PID 1`.
     This process executes a fork and exec to start every other process. The `ps` command
     may tell you which initialization process is running:'
   id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux/Unix系统必须有一个初始化进程作为`PID 1`运行。这个进程执行一个fork和exec来启动其他所有进程。`ps`命令可以告诉你哪个初始化进程正在运行：
 - en: '[PRE0]'
   id: totrans-33
   prefs: []
@@ -194,6 +227,8 @@
   id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上面的例子中，系统肯定正在运行`systemd`。然而，在一些发行版中，SysV `init`程序会被`符号链接`到实际的`init`进程，`ps`命令总是显示`/sbin/init`，无论实际上是使用的SysV
+    `init`、`upstart`还是`systemd`：
 - en: '[PRE1]'
   id: totrans-35
   prefs: []
@@ -203,6 +238,7 @@
   id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ps`和`grep`命令提供了更多线索：'
 - en: '[PRE2]'
   id: totrans-37
   prefs: []
@@ -212,6 +248,7 @@
   id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 或者，它们也可以这样使用：
 - en: '[PRE3]'
   id: totrans-39
   prefs: []
@@ -223,17 +260,21 @@
   id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果这些命令返回的任务包括`upstart-udev-bridge`或`systemd/systemd`，则系统分别正在运行`upstart`或`systemd`。如果没有匹配项，则系统可能正在运行SysV
+    `init`工具。
 - en: How to do it...
   id: totrans-41
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'The `service` command is supported on most distributions. The `-status-all`
     option will report the current status of all services defined in `/etc/init.d`.
     The output format varies between distributions:'
   id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: '`service`命令在大多数发行版中得到支持。`-status-all`选项将报告`/etc/init.d`中定义的所有服务的当前状态。不同发行版之间的输出格式有所不同：'
 - en: '[PRE4]'
   id: totrans-43
   prefs: []
@@ -243,6 +284,7 @@
   id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: Debian：
 - en: '[PRE5]'
   id: totrans-45
   prefs: []
@@ -252,6 +294,7 @@
   id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: CentOS：
 - en: '[PRE6]'
   id: totrans-47
   prefs: []
@@ -261,10 +304,12 @@
   id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: '`grep`命令将输出结果过滤为仅显示正在运行的任务：'
 - en: 'Debian:'
   id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: Debian：
 - en: '[PRE7]'
   id: totrans-50
   prefs: []
@@ -274,6 +319,7 @@
   id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: CentOS：
 - en: '[PRE8]'
   id: totrans-52
   prefs: []
@@ -284,42 +330,50 @@
   id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该禁用任何不必要的服务。这可以减轻系统负担并提高系统安全性。
 - en: 'Services to check for include the following:'
   id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要检查的服务包括以下内容：
 - en: '`smbd`, nmbd: These are the Samba daemons used to share resources between Linux
     and Windows systems.'
   id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`smbd`、`nmbd`：这些是用于在Linux和Windows系统之间共享资源的Samba守护进程。'
 - en: '`telnet`: This is the old, insecure login program. Unless there is an overwhelming
     need for this, use SSH.'
   id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`telnet`：这是一个古老的、不安全的登录程序。除非有强烈的需求，否则使用SSH。'
 - en: '`ftp`: This is the old, insecure File Transfer Protocol. Use SSH and scp instead.'
   id: totrans-57
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ftp`：这是一个古老的、不安全的文件传输协议。应使用SSH和scp代替。'
 - en: '`rlogin`: This is remote login. SSH is more secure.'
   id: totrans-58
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`rlogin`：这是远程登录。SSH更加安全。'
 - en: '`rexec`: This is remote exec. SSH is more secure.'
   id: totrans-59
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`rexec`：这是远程执行。SSH更加安全。'
 - en: '`automount`: If you are not using NFS or Samba you probably don''t need this.'
   id: totrans-60
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`automount`：如果你不使用NFS或Samba，你可能不需要这个。'
 - en: '`named`: This daemon provides **Domain Name Service** (**DNS**). It''s only
     necessary if the system is defining the local names and IP addresses. You don''t
     need it to resolve names and access the net.'
@@ -327,12 +381,14 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`named`：这个守护进程提供**域名服务**（**DNS**）。只有在系统定义本地名称和IP地址时才需要它。你不需要它来解析名称和访问网络。'
 - en: '`lpd`: The **Line Printer Daemon** lets other systems use this system''s printer.
     If this is not a print server, you don''t need this service.'
   id: totrans-62
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`lpd`：**行打印守护进程**允许其他系统使用此系统的打印机。如果这不是打印服务器，则不需要此服务。'
 - en: '`nfsd`: This is the **Network File System** daemon. It lets remote machines
     mount this computer''s disk partitions. If this is not a file server, you probably
     don''t need this service.'
@@ -340,39 +396,47 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`nfsd`：这是 **网络文件系统** 守护进程。它允许远程计算机挂载此计算机的磁盘分区。如果这不是文件服务器，您可能不需要此服务。'
 - en: '`portmap`: This is part of the NFS support. If the system is not using NFS,
     you don''t need this.'
   id: totrans-64
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`portmap`：这是 NFS 支持的一部分。如果系统未使用 NFS，则不需要此服务。'
 - en: '`mysql`: The **mysql** application is a database server. It may be used by
     your webserver.'
   id: totrans-65
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`mysql`：**mysql** 应用程序是一个数据库服务器。它可能被您的 Web 服务器使用。'
 - en: '`httpd`: This is the HTTP daemon. It sometimes gets installed as part of a
     **Server System** set of packages.'
   id: totrans-66
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`httpd`：这是 HTTP 守护进程。有时它作为 **服务器系统** 软件包的一部分被安装。'
 - en: There are several potential ways to disable an unnecessary service depending
     on whether your system is Redhat or Debian derived, and whether it's running `systemd`,
     SysV, or Upstart. All of these commands must be run with root privileges.
   id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据系统是基于 RedHat 还是 Debian，且是否运行 `systemd`、SysV 或 Upstart，禁用不必要服务的方式有多种。这些命令都必须以
+    root 权限运行。
 - en: systemd-based computers
   id: totrans-68
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 基于 systemd 的计算机
 - en: 'The `systemctl` command enables and disables services. The syntax is as follows:'
   id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: '`systemctl` 命令用于启用和禁用服务。语法如下：'
 - en: '[PRE9]'
   id: totrans-70
   prefs: []
@@ -382,6 +446,7 @@
   id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 另外，也可以按如下方式进行：
 - en: '[PRE10]'
   id: totrans-72
   prefs: []
@@ -391,6 +456,7 @@
   id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 要禁用 FTP 服务器，请使用以下命令：
 - en: '[PRE11]'
   id: totrans-74
   prefs: []
@@ -401,6 +467,7 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 基于 RedHat 的计算机
 - en: The `chkconfig` utility provides a frontend for working with SysV style initialization
     scripts in `/etc/rc#.d`. The `-del` option disables a service, while the `-add`
     option enables a service. Note that an initialization file must already exist
@@ -408,10 +475,13 @@
   id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: '`chkconfig` 工具提供了一个前端，用于处理 `/etc/rc#.d` 中的 SysV 风格初始化脚本。`-del` 选项用于禁用服务，而 `-add`
+    选项用于启用服务。请注意，必须已有初始化文件才能添加服务。'
 - en: 'The syntax is as follows:'
   id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 语法如下：
 - en: '[PRE12]'
   id: totrans-78
   prefs: []
@@ -421,6 +491,7 @@
   id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 要禁用 HTTPD 守护进程，请使用以下命令：
 - en: '[PRE13]'
   id: totrans-80
   prefs: []
@@ -431,16 +502,20 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 基于 Debian 的计算机
 - en: 'Debian-based systems provide the `update-rc.d` utility to control SysV style
     initialization scripts. The `update-rc.d` command supports `enable` and `disable`
     as subcommands:'
   id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 基于 Debian 的系统提供 `update-rc.d` 工具来控制 SysV 风格的初始化脚本。`update-rc.d` 命令支持 `enable`
+    和 `disable` 作为子命令：
 - en: 'To disable the telnet daemon, use the following command:'
   id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 要禁用 telnet 守护进程，请使用以下命令：
 - en: '[PRE14]'
   id: totrans-84
   prefs: []
@@ -451,12 +526,15 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 还有更多
 - en: These techniques will find services that have been started at root with the
     SysV or systemd initialization scripts. However, services may be started manually,
     or in a boot script, or with `xinetd`.
   id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些技术将找到已通过 SysV 或 systemd 初始化脚本以 root 用户身份启动的服务。然而，服务可能是手动启动的，或者在启动脚本中，或通过 `xinetd`
+    启动的。
 - en: 'The `xinetd` daemon functions in a similar way to init: it starts services.
     Unlike init, the `xinitd` daemon only starts a service when it''s requested. For
     services such as SSH, which are required infrequently and run for a long time
@@ -466,15 +544,19 @@
   id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: '`xinetd` 守护进程的功能与 init 类似：它启动服务。与 init 不同，`xinetd` 守护进程只有在请求时才启动服务。对于像 SSH
+    这样的服务，它们不常需要，且一旦启动后运行时间较长，这可以减轻系统负担。像 `httpd` 这样执行小操作（提供网页）且频繁的服务，最有效的方式是启动一次并保持运行。'
 - en: The configuration file for **xinet** is `/etc/xinetd.conf`. The individual service
     files are commonly stored in `/etc/xinetd.d`.
   id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: '**xinet** 的配置文件是 `/etc/xinetd.conf`。各个服务文件通常存储在 `/etc/xinetd.d`。'
 - en: 'The individual service files resemble this:'
   id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 各个服务文件大致如下：
 - en: '[PRE15]'
   id: totrans-90
   prefs: []
@@ -486,10 +568,12 @@
   id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过更改 `disable` 字段的值，可以启用或禁用服务。如果 `disable` 为 `no`，则服务已启用。如果 `disable` 为 `yes`，则服务已禁用。
 - en: 'After editing a service file, you must restart `xinetd`:'
   id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 编辑服务文件后，必须重新启动 `xinetd`：
 - en: '[PRE16]'
   id: totrans-93
   prefs: []
@@ -500,47 +584,57 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 ss 收集套接字数据
 - en: The daemons started by `init` and `xinetd` may not be the only services running
     on a system. Daemons can be started by commands in an `init` local file `(/etc/rc.d/rc.local`),
     a `crontab` entry, or even by a user with privileges.
   id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 由 `init` 和 `xinetd` 启动的守护进程可能不是系统中唯一运行的服务。守护进程可以通过 `init` 本地文件 `(/etc/rc.d/rc.local)`
+    中的命令、`crontab` 条目，甚至是有权限的用户启动。
 - en: The `ss` command returns socket statistics, including services using sockets,
     and current socket status.
   id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ss`命令返回套接字统计信息，包括使用套接字的服务和当前的套接字状态。'
 - en: Getting ready
   id: totrans-97
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: The `ss` utility is included in the `iproute2` package that is already installed
     on most modern distributions.
   id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ss`工具包含在`iproute2`包中，该包在大多数现代发行版中已经预装。'
 - en: How to do it...
   id: totrans-99
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何执行...
 - en: The `ss` command displays more information than the `netstat` command. These
     recipes will introduce a few of its features.
   id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ss`命令显示的信息比`netstat`命令更多。这些示例将介绍它的一些功能。'
 - en: Displaying the status of tcp sockets
   id: totrans-101
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 显示TCP套接字的状态
 - en: 'A `tcp` socket connection is opened for every HTTP access, every SSH session,
     and so on. The `-t` option reports the status of TCP connections:'
   id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 每次HTTP访问、每个SSH会话等，都会为每个`tcp`套接字连接打开一个连接。`-t`选项报告TCP连接的状态：
 - en: '[PRE17]'
   id: totrans-103
   prefs: []
@@ -551,6 +645,7 @@
   id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个例子显示了一个连接到IP地址`192.168.1.2`的NFS服务器，以及一个到`192.168.1.4`的SSH连接。
 - en: The `CLOSE-WAIT` socket status means that the `FIN` signal has been sent, but
     the socket has not been fully closed. A socket can remain in this state forever
     (or until you reboot). Terminating the process that owns the socket may free the
@@ -558,31 +653,37 @@
   id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: '`CLOSE-WAIT`套接字状态意味着`FIN`信号已发送，但套接字尚未完全关闭。套接字可能永远保持在此状态（或直到你重启）。终止拥有该套接字的进程可能释放该套接字，但不能保证。'
 - en: Tracing applications listening on ports
   id: totrans-106
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 跟踪监听端口的应用程序
 - en: A service on your system will open a socket in the `listen` mode to accept network
     connections from a remote site. The SSHD application does this to listen for SSH
     connections, http servers do this to accept HTTP requests, and so on.
   id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 系统上的服务将以`listen`模式打开一个套接字，以接受来自远程站点的网络连接。SSHD应用程序就是这样做的，用来监听SSH连接，HTTP服务器也是如此，用来接受HTTP请求，依此类推。
 - en: If your system has been hacked, it might have a new application listening for
     instructions from its master.
   id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的系统被黑客攻击，可能会有一个新的应用程序正在监听来自其主人的指令。
 - en: The `-l` option to `ss` will list sockets that are open in the `listen` mode.
     The `-u` option specifies to report UDP sockets. A `-t` option reports TCP sockets.
   id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ss`命令的`-l`选项将列出以`listen`模式打开的套接字。`-u`选项指定报告UDP套接字。`-t`选项报告TCP套接字。'
 - en: 'This command shows a subset of the listening UDP sockets on a Linux workstation:'
   id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 该命令显示了Linux工作站上监听的UDP套接字的一个子集：
 - en: '[PRE18]'
   id: totrans-111
   prefs: []
@@ -594,17 +695,20 @@
   id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 该输出显示系统将接受**远程过程调用**（**sunrpc**）。此端口由`portmap`程序使用。`portmap`程序控制对RPC服务的访问，并且被`nfs`客户端和服务器使用。
 - en: The `ipp` and `ntp` ports are used for **Internet Printing Protocol** and **Network
     Time Protocol**. Both are useful tools, but may not be required on a given system.
   id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ipp`和`ntp`端口分别用于**互联网打印协议**和**网络时间协议**。这两个工具都很有用，但在某些系统上可能不需要。'
 - en: 'Ports `766` and `898` are not listed in `/etc/services`. The `-I` option of
     the `lsof` command will display the task that has a port open. You may need to
     have root access to view this:'
   id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 端口`766`和`898`没有列在`/etc/services`中。`lsof`命令的`-I`选项将显示打开端口的任务。你可能需要具有root权限才能查看：
 - en: '[PRE19]'
   id: totrans-115
   prefs: []
@@ -614,6 +718,7 @@
   id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 或者：
 - en: '[PRE20]'
   id: totrans-117
   prefs: []
@@ -624,21 +729,25 @@
   id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 该命令显示，监听端口`898`的任务是RPC系统的一部分，而不是黑客。
 - en: How it works
   id: totrans-119
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 工作原理
 - en: The `ss` command uses system calls to extract information from the internal
     kernel tables. The known services and ports on your system are defined in `/etc/services`.
   id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ss`命令使用系统调用从内部内核表中提取信息。系统上已知的服务和端口在`/etc/services`中定义。'
 - en: Gathering system I/O usage with dstat
   id: totrans-121
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用dstat收集系统I/O使用情况
 - en: Knowing what services are running may not tell you which services are slowing
     down your system. The top command (discussed in [Chapter 9](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml),
     *Put on the Monitor's Cap*) will tell you about CPU usage and how much time is
@@ -647,25 +756,30 @@
   id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 知道正在运行哪些服务可能并不能告诉你哪些服务正在拖慢系统。`top`命令（在[第9章](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml)中讨论，*戴上显示器的帽子*）会告诉你CPU使用情况以及等待I/O的时间，但它可能无法告诉你足够的信息来追踪超负荷的任务。
 - en: Tracking I/O and context switches can help trace a problem to its source.
   id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 跟踪I/O和上下文切换可以帮助追踪问题的根源。
 - en: The `dstat` utility can point you to a potential bottleneck.
   id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: '`dstat`工具可以帮助你找到潜在的瓶颈。'
 - en: Getting ready
   id: totrans-125
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'The **dstat** application is not commonly installed. It will need to be installed
     with your package manager. It requires Python 2.2, which is installed by default
     on modern Linux systems:'
   id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: '**dstat** 应用程序通常不会预装。需要通过包管理器安装。它需要 Python 2.2，现代 Linux 系统默认安装此版本：'
 - en: '[PRE21]'
   id: totrans-127
   prefs: []
@@ -676,6 +790,7 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 操作方法...
 - en: The dstat application displays disk, network, memory usage, and running task
     information at regular intervals. The default output gives you an overview of
     the system activity. By default, this report is updated every second on a new
@@ -683,25 +798,30 @@
   id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: dstat 应用程序定期显示磁盘、网络、内存使用情况和运行任务信息。默认输出提供了系统活动的概览。默认情况下，这份报告每秒会更新一次并显示在新的一行，方便与之前的值进行比较。
 - en: The default output lets you track overall system activity. The application supports
     more options to track top resource users.
   id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认输出让你能够跟踪整体的系统活动。该应用程序还支持更多选项，以跟踪资源消耗最多的进程。
 - en: Viewing system activity
   id: totrans-131
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 查看系统活动
 - en: Invoking dstat with no arguments will show CPU activity, disk I/O, network I/O,
     paging, interrupts, and context switches at one second intervals.
   id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果不带任何参数调用 dstat，它会以每秒一次的间隔显示 CPU 活动、磁盘 I/O、网络 I/O、分页、硬件中断和上下文切换。
 - en: 'The following example shows the default `dstat` output:'
   id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下示例显示了默认的 `dstat` 输出：
 - en: '[PRE22]'
   id: totrans-134
   prefs: []
@@ -712,11 +832,13 @@
   id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以忽略第一行。那些值是 dstat 从表格中提取的初始内容。接下来的行显示了在时间片期间的活动。
 - en: In this sample, the CPU is mostly idle, and there is little disk activity. The
     system is generating network traffic, but only a few packets a second.
   id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此示例中，CPU 大部分时间处于空闲状态，磁盘活动很少。系统正在生成网络流量，但每秒只有少量的数据包。
 - en: There is no paging on this system. Linux only pages out memory to disk when
     the main memory is exhausted. Paging lets a system run more applications than
     it could run without paging, but disk access is thousands of times slower than
@@ -724,10 +846,12 @@
   id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个系统没有进行分页。Linux 只有在主内存耗尽时，才会将内存分页到磁盘。分页可以让系统运行比没有分页时更多的应用程序，但磁盘访问比内存访问慢几千倍，所以如果需要分页，计算机会变得非常缓慢。
 - en: If your system sees consistent paging activity, it needs more RAM or fewer applications.
   id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的系统出现持续的分页活动，它需要更多的内存或更少的应用程序。
 - en: A database application can cause intermittent paging when queries that require
     building large in-memory arrays are evaluated. It may be possible to rewrite these
     queries using the IN operation instead of a JOIN to reduce the memory requirement.
@@ -735,6 +859,8 @@
   id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个数据库应用程序可能会在评估需要构建大规模内存数组的查询时导致间歇性的分页。可以通过将查询改写为使用 IN 操作而不是 JOIN 来减少内存需求。（这是比本书中介绍的
+    SQL 更高级的用法。）
 - en: '**Context switches** (**csw**) happen with every system call (refer to the
     strace and ltrace discussion in [Chapter 11](5bf336a4-5338-4a7a-b27e-1ebecac4704d.xhtml),
     *Tracing the Clues*) and when a timeslice expires and another application is given
@@ -743,63 +869,76 @@
   id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: '**上下文切换**（**csw**）发生在每次系统调用时（请参见 [第11章](5bf336a4-5338-4a7a-b27e-1ebecac4704d.xhtml)，*追踪线索*
+    中的 strace 和 ltrace 讨论），以及当时间片到期时，系统将另一个应用程序的访问权限转交给 CPU。每当执行 I/O 操作或程序进行自我调整时，都会发生系统调用。'
 - en: If the system is performing tens of thousands of context switches per second,
     it's a symptom of a potential problem.
   id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果系统每秒执行数万个上下文切换，这是潜在问题的症状。
 - en: How it works
   id: totrans-142
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 工作原理
 - en: The `dstat` utility is a Python script that collects and analyzes data from
     the `/proc` filesystem described in [Chapter 10](20129291-0a5b-43a8-ad0c-54c74992d0e3.xhtml),
     *Administration Calls*.
   id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: '`dstat` 工具是一个 Python 脚本，收集并分析来自 `/proc` 文件系统的数据，详见 [第10章](20129291-0a5b-43a8-ad0c-54c74992d0e3.xhtml)，*管理调用*。'
 - en: There's more...
   id: totrans-144
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'The `dstat` utility can identify the top resource user in a category:'
   id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: '`dstat` 工具可以识别某一类别中资源消耗最多的进程：'
 - en: '**-top-bio Disk Usage**: This reports the process performing the most block
     I/O'
   id: totrans-146
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-top-bio 磁盘使用情况**：此项报告执行最多块 I/O 的进程。'
 - en: '-**top-cpu CPU Usage**: This reports the process using the most CPU resources'
   id: totrans-147
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: -**top-cpu CPU 使用情况**：这是报告使用最多 CPU 资源的进程。
 - en: '**-top-io I/O usage**: This reports the process performing the most I/O (usually
     network I/O)'
   id: totrans-148
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-top-io I/O 使用情况**：此项报告执行最多 I/O（通常是网络 I/O）的进程。'
 - en: '**-top-latency System Load**: This shows the process with the highest latency'
   id: totrans-149
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-top-latency 系统负载**：此项显示具有最高延迟的进程。'
 - en: '**-top-mem Memory Usage**: This shows the process using the most memory'
   id: totrans-150
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-top-mem 内存使用情况**：此选项显示使用最多内存的进程'
 - en: 'The following example displays the CPU and Network usage and the top users
     in each category:'
   id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下示例显示了每个类别的 CPU 和网络使用情况以及各个类别中的顶级用户：
 - en: '[PRE23]'
   id: totrans-152
   prefs: []
@@ -810,36 +949,43 @@
   id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 在运行虚拟机的系统上，虚拟机使用最多的 CPU 时间，但占用的大部分 IO 资源不多。CPU 大部分时间处于空闲状态。
 - en: The `-c` and `-n` options specify showing the CPU usage and Network usage, respectively.
   id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: '`-c` 和 `-n` 选项分别指定显示 CPU 使用情况和网络使用情况。'
 - en: Identifying a resource hog with pidstat
   id: totrans-155
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 pidstat 识别资源占用者
 - en: The `-top-io` and `-top-cpu` flags will identify a top resource user, but might
     not provide enough information to identify the problem if there are multiple instances
     of a resource hog.
   id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: '`-top-io` 和 `-top-cpu` 标志将标识一个主要的资源使用者，但如果有多个资源占用者实例，可能无法提供足够的信息来识别问题。'
 - en: The `pidstat` program will report per-process statistics, which can be sorted
     to provide more insight.
   id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: '`pidstat` 程序将报告每个进程的统计数据，可以按需排序，以提供更多的洞察信息。'
 - en: Getting ready
   id: totrans-158
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: 'The `pidstat` application may not be installed by default. It can be installed
     with this command:'
   id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: '`pidstat` 应用程序可能不会默认安装。可以通过以下命令进行安装：'
 - en: '[PRE24]'
   id: totrans-160
   prefs: []
@@ -850,34 +996,41 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'The pidstat application has several options for generating different reports:'
   id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: pidstat 应用程序有多个选项用于生成不同的报告：
 - en: '`-d`: This reports IO statistics'
   id: totrans-163
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-d`：此选项报告 IO 统计数据'
 - en: '`-r`: This reports page faults and memory utilization'
   id: totrans-164
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-r`：此选项报告页面错误和内存利用率'
 - en: '`-u`: This reports CPU utilization'
   id: totrans-165
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-u`：此选项报告 CPU 利用率'
 - en: '`-w`: This reports task switches'
   id: totrans-166
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-w`：此选项报告任务切换情况'
 - en: 'Report Context Switch activity:'
   id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 报告上下文切换活动：
 - en: '[PRE25]'
   id: totrans-168
   prefs: []
@@ -889,6 +1042,8 @@
   id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: pidstat 应用程序按 PID 编号对报告进行排序。数据可以通过排序工具进行重新组织。以下命令显示每秒产生最多上下文切换的五个应用程序（`-w` 输出中的*字段
+    4*）：
 - en: '[PRE26]'
   id: totrans-170
   prefs: []
@@ -899,76 +1054,91 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 它是如何工作的
 - en: The pidstat application queries the kernel to get task information. The sort
     and head utilities reduce the data to pinpoint the program hogging a resource.
   id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: pidstat 应用程序查询内核以获取任务信息。排序和头部（head）工具会将数据缩减，找出占用资源最多的程序。
 - en: Tuning the Linux kernel with sysctl
   id: totrans-173
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 sysctl 调整 Linux 内核
 - en: The Linux kernel has about 1,000 tunable parameters. These default to reasonable
     values for common usage, which means they are not perfect for anyone.
   id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 内核大约有 1,000 个可调参数。这些默认值适用于常见用法，意味着它们并不适合所有人。
 - en: Getting started
   id: totrans-175
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 入门
 - en: The `sysctl` command is available on all Linux systems. You must be root to
     modify kernel parameters.
   id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: '`sysctl` 命令在所有 Linux 系统上均可用。你必须是 root 用户才能修改内核参数。'
 - en: The `sysctl` command will change the parameter value immediately, but the value
     will revert to the original value upon reboot unless you add a line to define
     the parameter to `/etc/sysctl.conf`.
   id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: '`sysctl` 命令会立即更改参数值，但除非你在 `/etc/sysctl.conf` 中添加一行定义该参数，否则重启后值会恢复为原始值。'
 - en: It's a good policy to change a value manually and test it before modifying `sysctl.conf`.
     You can make a system unbootable by applying bad values to `/etc/sysctl.conf`.
   id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 在修改 `sysctl.conf` 之前，最好手动更改值并进行测试。错误的值可能导致系统无法启动，从而无法应用 `/etc/sysctl.conf`。
 - en: How to do it...
   id: totrans-179
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'The `sysctl` command supports several options:'
   id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: '`sysctl` 命令支持多个选项：'
 - en: '`-a`: This reports all available parameters'
   id: totrans-181
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-a`：此选项报告所有可用的参数'
 - en: '`-p FILENAME`: This reads values from `FILENAME`. By default from `/etc/sysctl.conf`'
   id: totrans-182
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-p FILENAME`：此选项从 `FILENAME` 读取值。默认从 `/etc/sysctl.conf`'
 - en: '`PARAM`: This reports the current value of `PARAM`'
   id: totrans-183
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`PARAM`：此选项报告 `PARAM` 的当前值'
 - en: '`PARAM=NEWVAL`: This sets the value of `PARAM`'
   id: totrans-184
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`PARAM=NEWVAL`：此选项设置 `PARAM` 的值'
 - en: Tuning the task scheduler
   id: totrans-185
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 调整任务调度器
 - en: 'The task scheduler is optimized for a desktop environment, where a fast response
     to a user is more important than overall efficiency. Increasing the time a task
     stays resident improves the performance of server systems. The following example
@@ -976,6 +1146,8 @@
   id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 任务调度器针对桌面环境进行了优化，在这种环境中，快速响应用户比整体效率更为重要。增加任务驻留时间有助于提升服务器系统的性能。以下示例检查了 `kernel.sched_migration_cost_ns`
+    的值：
 - en: '[PRE27]'
   id: totrans-187
   prefs: []
@@ -990,6 +1162,7 @@
   id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: '`kernel_sched_migration_cost_ns`（在旧版本内核中为`kernel.sched_migration_cost`）控制任务在交换前会保持活跃多久。在任务或线程较多的系统上，这可能会导致过多的上下文切换开销。默认值`500000`纳秒对运行Postgres或Apache服务器的系统来说太小。建议将值更改为5毫秒：'
 - en: '[PRE28]'
   id: totrans-189
   prefs: []
@@ -1000,20 +1173,24 @@
   id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: 在某些系统（特别是Postgres服务器）上，取消设置`sched_autogroup_enabled`参数可以提高性能。
 - en: Tuning a network
   id: totrans-191
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 调整网络
 - en: The default values for network buffers may be too small on a system performing
     many network operations (NFS client, NFS server, and so on).
   id: totrans-192
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于执行大量网络操作的系统（如NFS客户端、NFS服务器等），网络缓冲区的默认值可能太小。
 - en: 'Examine the values for maximum read buffer memory:'
   id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 检查最大读取缓冲区内存的值：
 - en: '[PRE29]'
   id: totrans-194
   prefs: []
@@ -1023,6 +1200,7 @@
   id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 增加网络服务器的值：
 - en: '[PRE30]'
   id: totrans-196
   prefs: []
@@ -1033,11 +1211,13 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 它是如何工作的
 - en: The `sysctl` command lets you directly access kernel parameters. By default,
     most distributions optimize these parameters for a normal workstation.
   id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: '`sysctl`命令让你可以直接访问内核参数。默认情况下，大多数发行版会为普通工作站优化这些参数。'
 - en: If your system has lots of memory, you can improve performance by increasing
     the amount of memory devoted to buffers. If it's short on memory, you may want
     to shrink these. If the system is a server, you may want to keep tasks resident
@@ -1045,67 +1225,80 @@
   id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的系统内存较大，你可以通过增加分配给缓冲区的内存量来提高性能。如果内存较少，你可能需要缩减这些缓冲区的大小。如果系统是服务器，你可能希望让任务在内存中驻留更长时间，而不是单用户工作站那样频繁交换。
 - en: There's more...
   id: totrans-200
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: The `/proc` filesystem is available on all Linux distributions. It includes
     a folder for every running task and folders for all the major kernel subsystems.
     The files within these folders can be viewed and updated with `cat`.
   id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: '`/proc`文件系统在所有Linux发行版中都可用。它包括一个文件夹用于每个正在运行的任务，还包括所有主要内核子系统的文件夹。这些文件夹中的文件可以通过`cat`命令查看和更新。'
 - en: The parameters supported by sysctl are commonly supported by the `/proc` filesystem
     as well.
   id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: sysctl支持的参数通常也被`/proc`文件系统支持。
 - en: Thus, `net.core.rmem_max` can also be accessed as `/proc/sys/net/core/rmem_max`.
   id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，`net.core.rmem_max`也可以通过`/proc/sys/net/core/rmem_max`来访问。
 - en: Tuning a Linux system with config files
   id: totrans-204
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用配置文件调整Linux系统
 - en: The Linux system includes several files to define how disks are mounted, and
     so on. Some parameters can be set in these files instead of using `/proc` or `sysctl`.
   id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux系统包含多个文件来定义如何挂载磁盘等。可以在这些文件中设置一些参数，而不是使用`/proc`或`sysctl`。
 - en: Getting ready
   id: totrans-206
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: There are several files in `/etc` that control how a system is configured. These
     can be edited with a standard text editor such as `vi` or `emacs`. The changes
     may not take effect until the system is rebooted.
   id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`/etc`目录下有多个文件控制着系统的配置。这些文件可以使用标准文本编辑器（如`vi`或`emacs`）进行编辑。更改可能需要重启系统才能生效。
 - en: How to do it...
   id: totrans-208
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: The `/etc/fstab` file defines how disks are to be mounted and what options are
     supported.
   id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: '`/etc/fstab`文件定义了磁盘的挂载方式以及支持的选项。'
 - en: The Linux system records when a file is created, modified, and read. There is
     little value in knowing that a file has been read, and updating the `Acessed`
     timestamp every time a common utility like cat is accessed gets expensive.
   id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux系统记录了文件的创建、修改和读取时间。知道文件是否已被读取并没有太大意义，而每次常见的工具（如`cat`）被访问时更新`Accessed`时间戳会导致额外开销。
 - en: 'The `noatime` and `relatime` mount options will reduce disk thrashing:'
   id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: '`noatime`和`relatime`挂载选项将减少磁盘的频繁访问：'
 - en: '[PRE31]'
   id: totrans-212
   prefs: []
@@ -1116,6 +1309,7 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 它是如何工作的
 - en: The preceding example mounts the / partition (which includes `/bin` and `/usr/bin`)
     with the usual default options, plus the `noatime` parameter to disable updating
     the disk every time a file is accessed. The `/var` partition (which includes the
@@ -1124,11 +1318,13 @@
   id: totrans-214
   prefs: []
   type: TYPE_NORMAL
+  zh: 上面的示例挂载了`/`分区（其中包含`/bin`和`/usr/bin`），使用了常见的默认选项，并增加了`noatime`参数，以禁用每次访问文件时都更新磁盘。`/var`分区（包含邮件队列文件夹）设置了realtime选项，这将确保至少每天更新一次时间，而不是每次访问文件时都更新。
 - en: Changing scheduler priority using the nice command
   id: totrans-215
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用nice命令更改调度器优先级
 - en: Every task on a Linux system has a priority. The priority values range from
     -20 to 19\. The lower the priority (**-20**), the more CPU time a task will be
     allocated. The default priority is **0**.
