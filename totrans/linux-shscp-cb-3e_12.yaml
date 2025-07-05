@@ -1,73 +1,90 @@
 - en: Tuning a Linux System
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'In this chapter, we will cover the following recipes:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
 - en: Identifying services
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Gathering socket data with `ss`
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Gathering system I/O usage with `dstat`
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Identifying a resource hog with `pidstat`
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Tuning the Linux kernel with `sysctl`
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Tuning a Linux system with config files
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Changing scheduler priority using the `nice` command
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Introduction
+  id: totrans-9
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: No system runs as fast as we need it to run, and any computer's performance
     can be improved.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
 - en: We can improve the performance of a system by turning off unused services, by
     tuning the kernel parameters, or by adding new hardware.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
 - en: 'The first step in tuning a system is understanding what the demands are and
     whether they are being met. Different types of applications have different critical
     needs. The questions to ask yourself include the following:'
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
 - en: Is the CPU the critical resource for this system? A system doing engineering
     simulations requires CPU cycles more than other resources.
+  id: totrans-13
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Is network bandwidth critical for this system? A file server does little computation,
     but can saturate its network capacity.
+  id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Is disk access speed critical for this system? A file server or database server
     will put more demand on the disks than a calculation engine does.
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Is RAM the critical resource for this system? All systems need RAM, but a database
     server commonly builds large in-memory tables to perform queries, and file servers
     are more efficient with larger RAM for disk caches.
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -75,6 +92,7 @@
     it's running unexpected malware. This is not common on Linux machines, but a system
     with many users (like a college or business network) is vulnerable to a brute-force
     password attack.
+  id: totrans-17
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -82,6 +100,7 @@
     being used will lead you to the questions, but may not lead you to the answer.
     A fileserver will cache commonly accessed files in the memory, so one with too
     little memory may be disk/RAM limited rather than network limited.'
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
 - en: Linux has tools for analyzing a system. Many have been discussed in [Chapter
@@ -89,227 +108,296 @@
     9](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml), *Put on The Monitor's Cap*, and
     [Chapter 11](5bf336a4-5338-4a7a-b27e-1ebecac4704d.xhtml), *Tracing The Clues*.
     This chapter will introduce more monitoring tools.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
 - en: Here is a list of subsystems and tools to examine them. Many (but not all) of
     these tools have been discussed in this book.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
 - en: 'CPU: `top`, `dstat`, `perf`, `ps`, `mpstat`, `strace`, `ltrace`'
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Network: `netstat`, `ss`, `iotop`, `ip`, `iptraf`, `nicstat`, `ethtool`, `lsof`'
+  id: totrans-22
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Disk: `ftrace`, `iostat`, `dstat`, `blktrace`'
+  id: totrans-23
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'RAM: top, `dstat`, `perf`, `vmstat`, `swapon`'
+  id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Many of these tools are part of a standard Linux distribution. The others can
     be loaded with your package manager.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
 - en: Identifying services
+  id: totrans-26
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: A Linux system can run hundreds of tasks at a time. Most of these are part of
     the operating system environment, but you might discover you're running a daemon
     or two you don't need.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
 - en: Linux distributions support one of the three utilities that start daemons and
     services. The traditional `SysV` system uses scripts in `/etc/init.d`. The newer
     `systemd` daemon uses the same `/etc/init.d` scripts and also uses a `systemctl`
     call. Some distributions use Upstart, which stores configuration scripts in `/etc/init`.
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
 - en: The SysV `init` system is being phased out in favor of the `systemd` suite.
     The `upstart` utility was developed and used by Ubuntu, but discarded in favor
     of `systemd` with the 14.04 release. This chapter will focus on `systemd`, since
     that's the system used by most distributions.
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-30
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The first step is to determine whether your system is using the SysV `init`
     calls, `systemd`, or `upstart`.
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
 - en: 'Linux/Unix systems must have an initialization process running as `PID 1`.
     This process executes a fork and exec to start every other process. The `ps` command
     may tell you which initialization process is running:'
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE0]'
+  id: totrans-33
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'In the previous example, the system is definitely running `systemd`. However,
     on some distributions, the SysV `init` program is `sym-linked` to the actual `init`
     process, and `ps` will always show `/sbin/init`, whether it''s SysV `init`, `upstart`,
     or `systemd` that''s actually being used:'
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE1]'
+  id: totrans-35
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'The `ps` and `grep` commands give more clues:'
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE2]'
+  id: totrans-37
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Alternatively, they can be used like this:'
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE3]'
+  id: totrans-39
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: If either of these commands return tasks such as `upstart-udev-bridge` or `systemd/systemd`,
     the system is running `upstart` or `systemd`, respectively. If there are no matches,
     then your system is probably running the SysV `init` utility.
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it...
+  id: totrans-41
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'The `service` command is supported on most distributions. The `-status-all`
     option will report the current status of all services defined in `/etc/init.d`.
     The output format varies between distributions:'
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE4]'
+  id: totrans-43
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'Debian:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE5]'
+  id: totrans-45
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'CentOS:'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE6]'
+  id: totrans-47
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'The `grep` command will reduce the output to only running tasks:'
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
 - en: 'Debian:'
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE7]'
+  id: totrans-50
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'CentOS:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE8]'
+  id: totrans-52
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: You should disable any unnecessary services. This reduces the load on the system
     and improves the system security.
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
 - en: 'Services to check for include the following:'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
 - en: '`smbd`, nmbd: These are the Samba daemons used to share resources between Linux
     and Windows systems.'
+  id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`telnet`: This is the old, insecure login program. Unless there is an overwhelming
     need for this, use SSH.'
+  id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`ftp`: This is the old, insecure File Transfer Protocol. Use SSH and scp instead.'
+  id: totrans-57
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`rlogin`: This is remote login. SSH is more secure.'
+  id: totrans-58
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`rexec`: This is remote exec. SSH is more secure.'
+  id: totrans-59
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`automount`: If you are not using NFS or Samba you probably don''t need this.'
+  id: totrans-60
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`named`: This daemon provides **Domain Name Service** (**DNS**). It''s only
     necessary if the system is defining the local names and IP addresses. You don''t
     need it to resolve names and access the net.'
+  id: totrans-61
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`lpd`: The **Line Printer Daemon** lets other systems use this system''s printer.
     If this is not a print server, you don''t need this service.'
+  id: totrans-62
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`nfsd`: This is the **Network File System** daemon. It lets remote machines
     mount this computer''s disk partitions. If this is not a file server, you probably
     don''t need this service.'
+  id: totrans-63
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`portmap`: This is part of the NFS support. If the system is not using NFS,
     you don''t need this.'
+  id: totrans-64
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`mysql`: The **mysql** application is a database server. It may be used by
     your webserver.'
+  id: totrans-65
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`httpd`: This is the HTTP daemon. It sometimes gets installed as part of a
     **Server System** set of packages.'
+  id: totrans-66
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: There are several potential ways to disable an unnecessary service depending
     on whether your system is Redhat or Debian derived, and whether it's running `systemd`,
     SysV, or Upstart. All of these commands must be run with root privileges.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
 - en: systemd-based computers
+  id: totrans-68
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'The `systemctl` command enables and disables services. The syntax is as follows:'
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE9]'
+  id: totrans-70
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'Alternatively, it can also be as follows:'
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE10]'
+  id: totrans-72
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'To disable an FTP server, use the following command:'
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE11]'
+  id: totrans-74
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: RedHat-based computers
+  id: totrans-75
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -317,42 +405,56 @@
     scripts in `/etc/rc#.d`. The `-del` option disables a service, while the `-add`
     option enables a service. Note that an initialization file must already exist
     to add a service.
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
 - en: 'The syntax is as follows:'
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE12]'
+  id: totrans-78
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'To disable the HTTPD daemon, use the following command:'
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE13]'
+  id: totrans-80
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: Debian-based computers
+  id: totrans-81
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'Debian-based systems provide the `update-rc.d` utility to control SysV style
     initialization scripts. The `update-rc.d` command supports `enable` and `disable`
     as subcommands:'
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
 - en: 'To disable the telnet daemon, use the following command:'
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE14]'
+  id: totrans-84
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: There's more
+  id: totrans-85
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: These techniques will find services that have been started at root with the
     SysV or systemd initialization scripts. However, services may be started manually,
     or in a boot script, or with `xinetd`.
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
 - en: 'The `xinetd` daemon functions in a similar way to init: it starts services.
@@ -361,138 +463,179 @@
     once started, this reduces the system load. Services such as `httpd` that perform
     small actions (serve a web page) frequently are more efficient to start once and
     keep running.'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
 - en: The configuration file for **xinet** is `/etc/xinetd.conf`. The individual service
     files are commonly stored in `/etc/xinetd.d`.
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
 - en: 'The individual service files resemble this:'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE15]'
+  id: totrans-90
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: A service can be enabled or disabled by changing the value of the `disable`
     field. If `disable` is `no`, the service is enabled. If disable is `yes`, the
     service is disabled.
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
 - en: 'After editing a service file, you must restart `xinetd`:'
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE16]'
+  id: totrans-93
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: Gathering socket data with ss
+  id: totrans-94
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The daemons started by `init` and `xinetd` may not be the only services running
     on a system. Daemons can be started by commands in an `init` local file `(/etc/rc.d/rc.local`),
     a `crontab` entry, or even by a user with privileges.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
 - en: The `ss` command returns socket statistics, including services using sockets,
     and current socket status.
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-97
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The `ss` utility is included in the `iproute2` package that is already installed
     on most modern distributions.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it...
+  id: totrans-99
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The `ss` command displays more information than the `netstat` command. These
     recipes will introduce a few of its features.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
 - en: Displaying the status of tcp sockets
+  id: totrans-101
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'A `tcp` socket connection is opened for every HTTP access, every SSH session,
     and so on. The `-t` option reports the status of TCP connections:'
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE17]'
+  id: totrans-103
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: This example shows an NFS server connected at IP address `192.168.1.2` and an
     SSH connection to `192.168.1.4`.
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
 - en: The `CLOSE-WAIT` socket status means that the `FIN` signal has been sent, but
     the socket has not been fully closed. A socket can remain in this state forever
     (or until you reboot). Terminating the process that owns the socket may free the
     socket, but that's not guaranteed.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
 - en: Tracing applications listening on ports
+  id: totrans-106
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: A service on your system will open a socket in the `listen` mode to accept network
     connections from a remote site. The SSHD application does this to listen for SSH
     connections, http servers do this to accept HTTP requests, and so on.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
 - en: If your system has been hacked, it might have a new application listening for
     instructions from its master.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
 - en: The `-l` option to `ss` will list sockets that are open in the `listen` mode.
     The `-u` option specifies to report UDP sockets. A `-t` option reports TCP sockets.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
 - en: 'This command shows a subset of the listening UDP sockets on a Linux workstation:'
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE18]'
+  id: totrans-111
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: This output shows that this system will accept **Remote Procedure Calls** (**sunrpc**).
     This port is used by the `portmap` program. The `portmap` program controls access
     to the RPC services and is used by the `nfs` client and server.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
 - en: The `ipp` and `ntp` ports are used for **Internet Printing Protocol** and **Network
     Time Protocol**. Both are useful tools, but may not be required on a given system.
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
 - en: 'Ports `766` and `898` are not listed in `/etc/services`. The `-I` option of
     the `lsof` command will display the task that has a port open. You may need to
     have root access to view this:'
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE19]'
+  id: totrans-115
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'Or:'
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE20]'
+  id: totrans-117
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: This command shows that the tasks listening on port `898` are part of the RPC
     system, not a hacker.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
 - en: How it works
+  id: totrans-119
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The `ss` command uses system calls to extract information from the internal
     kernel tables. The known services and ports on your system are defined in `/etc/services`.
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
 - en: Gathering system I/O usage with dstat
+  id: totrans-121
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -501,27 +644,35 @@
     *Put on the Monitor's Cap*) will tell you about CPU usage and how much time is
     spent waiting for IO, but it might not tell you enough to track down a task that's
     overloading the system.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
 - en: Tracking I/O and context switches can help trace a problem to its source.
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
 - en: The `dstat` utility can point you to a potential bottleneck.
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-125
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'The **dstat** application is not commonly installed. It will need to be installed
     with your package manager. It requires Python 2.2, which is installed by default
     on modern Linux systems:'
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE21]'
+  id: totrans-127
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: How to do it...
+  id: totrans-128
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -529,47 +680,59 @@
     information at regular intervals. The default output gives you an overview of
     the system activity. By default, this report is updated every second on a new
     line, allowing easy comparison with previous values.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
 - en: The default output lets you track overall system activity. The application supports
     more options to track top resource users.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
 - en: Viewing system activity
+  id: totrans-131
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: Invoking dstat with no arguments will show CPU activity, disk I/O, network I/O,
     paging, interrupts, and context switches at one second intervals.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
 - en: 'The following example shows the default `dstat` output:'
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE22]'
+  id: totrans-134
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: You can ignore the first line. Those values are the initial contents of the
     tables dstat mines. The subsequent lines show the activity during a time slice.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
 - en: In this sample, the CPU is mostly idle, and there is little disk activity. The
     system is generating network traffic, but only a few packets a second.
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
 - en: There is no paging on this system. Linux only pages out memory to disk when
     the main memory is exhausted. Paging lets a system run more applications than
     it could run without paging, but disk access is thousands of times slower than
     memory access, so a computer will slow to a crawl if it needs to page.
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
 - en: If your system sees consistent paging activity, it needs more RAM or fewer applications.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
 - en: A database application can cause intermittent paging when queries that require
     building large in-memory arrays are evaluated. It may be possible to rewrite these
     queries using the IN operation instead of a JOIN to reduce the memory requirement.
     (This is a more advanced SQL than what is covered in this book.)
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
 - en: '**Context switches** (**csw**) happen with every system call (refer to the
@@ -577,182 +740,232 @@
     *Tracing the Clues*) and when a timeslice expires and another application is given
     access to the CPU. A system call happens whenever I/O is performed or a program
     resizes itself.'
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
 - en: If the system is performing tens of thousands of context switches per second,
     it's a symptom of a potential problem.
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
 - en: How it works
+  id: totrans-142
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The `dstat` utility is a Python script that collects and analyzes data from
     the `/proc` filesystem described in [Chapter 10](20129291-0a5b-43a8-ad0c-54c74992d0e3.xhtml),
     *Administration Calls*.
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
 - en: There's more...
+  id: totrans-144
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'The `dstat` utility can identify the top resource user in a category:'
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
 - en: '**-top-bio Disk Usage**: This reports the process performing the most block
     I/O'
+  id: totrans-146
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '-**top-cpu CPU Usage**: This reports the process using the most CPU resources'
+  id: totrans-147
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '**-top-io I/O usage**: This reports the process performing the most I/O (usually
     network I/O)'
+  id: totrans-148
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '**-top-latency System Load**: This shows the process with the highest latency'
+  id: totrans-149
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '**-top-mem Memory Usage**: This shows the process using the most memory'
+  id: totrans-150
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'The following example displays the CPU and Network usage and the top users
     in each category:'
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE23]'
+  id: totrans-152
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: On a system running an active virtual machine, the VM uses the most CPU time,
     but not the bulk of the IO. The CPU is spending most of its time in the idle state.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
 - en: The `-c` and `-n` options specify showing the CPU usage and Network usage, respectively.
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
 - en: Identifying a resource hog with pidstat
+  id: totrans-155
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The `-top-io` and `-top-cpu` flags will identify a top resource user, but might
     not provide enough information to identify the problem if there are multiple instances
     of a resource hog.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
 - en: The `pidstat` program will report per-process statistics, which can be sorted
     to provide more insight.
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-158
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'The `pidstat` application may not be installed by default. It can be installed
     with this command:'
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE24]'
+  id: totrans-160
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: How to do it...
+  id: totrans-161
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'The pidstat application has several options for generating different reports:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
 - en: '`-d`: This reports IO statistics'
+  id: totrans-163
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`-r`: This reports page faults and memory utilization'
+  id: totrans-164
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`-u`: This reports CPU utilization'
+  id: totrans-165
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`-w`: This reports task switches'
+  id: totrans-166
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Report Context Switch activity:'
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE25]'
+  id: totrans-168
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'The pidstat application sorts its report by the PID number. The data can be
     re-organized with the sort utility. The following command displays the five applications
     that generate the most context switches per second (*Field 4* in the `-w` output):'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE26]'
+  id: totrans-170
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: How it works
+  id: totrans-171
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The pidstat application queries the kernel to get task information. The sort
     and head utilities reduce the data to pinpoint the program hogging a resource.
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
 - en: Tuning the Linux kernel with sysctl
+  id: totrans-173
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The Linux kernel has about 1,000 tunable parameters. These default to reasonable
     values for common usage, which means they are not perfect for anyone.
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
 - en: Getting started
+  id: totrans-175
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The `sysctl` command is available on all Linux systems. You must be root to
     modify kernel parameters.
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
 - en: The `sysctl` command will change the parameter value immediately, but the value
     will revert to the original value upon reboot unless you add a line to define
     the parameter to `/etc/sysctl.conf`.
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
 - en: It's a good policy to change a value manually and test it before modifying `sysctl.conf`.
     You can make a system unbootable by applying bad values to `/etc/sysctl.conf`.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it...
+  id: totrans-179
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: 'The `sysctl` command supports several options:'
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
 - en: '`-a`: This reports all available parameters'
+  id: totrans-181
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`-p FILENAME`: This reads values from `FILENAME`. By default from `/etc/sysctl.conf`'
+  id: totrans-182
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`PARAM`: This reports the current value of `PARAM`'
+  id: totrans-183
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`PARAM=NEWVAL`: This sets the value of `PARAM`'
+  id: totrans-184
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Tuning the task scheduler
+  id: totrans-185
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -760,113 +973,146 @@
     to a user is more important than overall efficiency. Increasing the time a task
     stays resident improves the performance of server systems. The following example
     examines the value of `kernel.sched_migration_cost_ns`:'
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE27]'
+  id: totrans-187
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'The `kernel_sched_migration_cost_ns` (and `kernel.sched_migration_cost` in
     older kernels) controls how long a task will remain active before being exchanged
     for another task. On systems with many tasks or many threads, this can result
     in too much overhead being used for context switching. The default value of `500000`
     ns is too small for systems running Postgres or Apache servers. It''s recommended
     that you change the value to 5 ms:'
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE28]'
+  id: totrans-189
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: On some systems (postgres servers in particular), unsetting the `sched_autogroup_enabled`
     parameter improves performance.
+  id: totrans-190
   prefs: []
   type: TYPE_NORMAL
 - en: Tuning a network
+  id: totrans-191
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The default values for network buffers may be too small on a system performing
     many network operations (NFS client, NFS server, and so on).
+  id: totrans-192
   prefs: []
   type: TYPE_NORMAL
 - en: 'Examine the values for maximum read buffer memory:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE29]'
+  id: totrans-194
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Increase values for network servers:'
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE30]'
+  id: totrans-196
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: How it works
+  id: totrans-197
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The `sysctl` command lets you directly access kernel parameters. By default,
     most distributions optimize these parameters for a normal workstation.
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
 - en: If your system has lots of memory, you can improve performance by increasing
     the amount of memory devoted to buffers. If it's short on memory, you may want
     to shrink these. If the system is a server, you may want to keep tasks resident
     longer than you would for a single-user workstation.
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
 - en: There's more...
+  id: totrans-200
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The `/proc` filesystem is available on all Linux distributions. It includes
     a folder for every running task and folders for all the major kernel subsystems.
     The files within these folders can be viewed and updated with `cat`.
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
 - en: The parameters supported by sysctl are commonly supported by the `/proc` filesystem
     as well.
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
 - en: Thus, `net.core.rmem_max` can also be accessed as `/proc/sys/net/core/rmem_max`.
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
 - en: Tuning a Linux system with config files
+  id: totrans-204
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The Linux system includes several files to define how disks are mounted, and
     so on. Some parameters can be set in these files instead of using `/proc` or `sysctl`.
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-206
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: There are several files in `/etc` that control how a system is configured. These
     can be edited with a standard text editor such as `vi` or `emacs`. The changes
     may not take effect until the system is rebooted.
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it...
+  id: totrans-208
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: The `/etc/fstab` file defines how disks are to be mounted and what options are
     supported.
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
 - en: The Linux system records when a file is created, modified, and read. There is
     little value in knowing that a file has been read, and updating the `Acessed`
     timestamp every time a common utility like cat is accessed gets expensive.
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
 - en: 'The `noatime` and `relatime` mount options will reduce disk thrashing:'
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE31]'
+  id: totrans-212
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: How it works
+  id: totrans-213
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -875,81 +1121,121 @@
     the disk every time a file is accessed. The `/var` partition (which includes the
     mail spool folder) has the realtime option set, which will update time at least
     once every day, but not every time a file is accessed.
+  id: totrans-214
   prefs: []
   type: TYPE_NORMAL
 - en: Changing scheduler priority using the nice command
+  id: totrans-215
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: Every task on a Linux system has a priority. The priority values range from
     -20 to 19\. The lower the priority (**-20**), the more CPU time a task will be
     allocated. The default priority is **0**.
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个 Linux 系统上的任务都有一个优先级。优先级的值范围从 -20 到 19。优先级值越低（**-20**），任务分配到的 CPU 时间就越多。默认优先级是
+    **0**。
 - en: Not all tasks need the same priority. An interactive application needs to respond
     quickly or it becomes difficult to use. A background task run via `crontab` only
     needs to finish before it is scheduled to run again.
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 并非所有任务都需要相同的优先级。交互式应用程序需要快速响应，否则会变得难以使用。通过 `crontab` 运行的后台任务只需要在计划再次运行之前完成。
 - en: The `nice` command will modify a task's priority. It can be used to invoke a
     task with modified priority. Raising a task's priority value will free resources
     for other tasks.
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: '`nice` 命令将修改任务的优先级。可以用它来调用一个修改过优先级的任务。提高任务的优先级值会为其他任务释放资源。'
 - en: How to do it...
+  id: totrans-219
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'Invoking the `nice` command with no arguments will report a task''s current
     priority:'
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果没有参数调用 `nice` 命令，将报告任务的当前优先级：
 - en: '[PRE32]'
+  id: totrans-221
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'Invoking the `nice` command followed by another command name will run the second
     command with a *niceness* of `10`–it will add 10 to the task''s default priority:'
+  id: totrans-222
   prefs: []
   type: TYPE_NORMAL
+  zh: 调用 `nice` 命令并跟随另一个命令名称，将以 `10` 的 *niceness* 执行第二个命令——它会将 10 加到任务的默认优先级上：
 - en: '[PRE33]'
+  id: totrans-223
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'Invoking the `nice` command with a value before the command will run the command
     with a defined *niceness*:'
+  id: totrans-224
   prefs: []
   type: TYPE_NORMAL
+  zh: 在命令前调用 `nice` 命令并设置一个值，将以定义的 *niceness* 执行该命令：
 - en: '[PRE34]'
+  id: totrans-225
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'Only a superuser can give a task a higher priority (lower priority number),
     by assigning a negative niceness value:'
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 只有超级用户才能通过分配负的 niceness 值为任务设置更高的优先级（更低的优先级数字）：
 - en: '[PRE35]'
+  id: totrans-227
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: How it works
+  id: totrans-228
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 工作原理
 - en: The `nice` command modifies the kernel's scheduling table to run a task with
     a greater or lesser priority. The lower the priority value, the more time the
     scheduler will give to this task.
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: '`nice` 命令修改内核的调度表，以更高或更低的优先级运行任务。优先级值越低，调度器分配给此任务的时间就越多。'
 - en: There's more
+  id: totrans-230
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 还有更多
 - en: The `renice` command modifies the priority of a running task. Tasks that use
     a lot of resources, but are not time-critical, can be made *nicer* with this command.
     The `top` command is useful to find tasks that are utilizing the CPU the most.
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: '`renice` 命令修改正在运行的任务的优先级。那些消耗大量资源但对时间要求不高的任务，可以使用这个命令将其变得*更加友好*。`top` 命令有助于找到最占用
+    CPU 的任务。'
 - en: 'The `renice` command is invoked with a new priority value and the program ID
     (PID):'
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: '`renice` 命令通过新优先级值和程序 ID（PID）来调用：'
 - en: '[PRE36]'
+  id: totrans-233
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'

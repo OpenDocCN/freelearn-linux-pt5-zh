@@ -1,574 +1,845 @@
 - en: Tracing the Clues
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 跟踪线索
 - en: 'In this chapter, we will cover the following topics:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将涉及以下主题：
 - en: Tracing packets with `tcpdump`
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`tcpdump`跟踪数据包
 - en: Finding packets with `ngrep`
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`ngrep`查找数据包
 - en: Tracing network routes with `ip`
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`ip`跟踪网络路由
 - en: Tracing system calls with `strace`
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`strace`跟踪系统调用
 - en: Tracing dynamic library functions with `ltrace`
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`ltrace`跟踪动态库函数
 - en: Introduction
+  id: totrans-7
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 介绍
 - en: Nothing happens without a trace. On a Linux system, we can trace events via
     the log files discussed in [Chapter 9](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml),
     *Put On The Monitor's Cap*. The `top` command shows which programs use the most
     CPU time, and `watch`, `df`, and `du` let us monitor disk usage.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 没有跟踪，什么也不会发生。在Linux系统中，我们可以通过[第9章](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml)中讨论的日志文件来跟踪事件，*佩戴显示器帽*。`top`命令显示哪些程序使用了最多的CPU时间，`watch`、`df`和`du`让我们监控磁盘使用情况。
 - en: This chapter will describe ways to get more information about network packets,
     CPU usage, disk usage, and dynamic library calls.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将描述获取更多关于网络数据包、CPU使用情况、磁盘使用情况和动态库调用的信息的方法。
 - en: Tracing packets with tcpdump
+  id: totrans-10
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用tcpdump跟踪数据包
 - en: Just knowing which applications are using a given port may not be sufficient
     information to trace down a problem. Sometimes you need to check the data that
     is being transferred as well.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 仅知道哪些应用程序正在使用某个端口，可能不足以追踪问题。有时你还需要检查正在传输的数据。
 - en: Getting ready
+  id: totrans-12
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'You need to be a root user to run `tcpdump`. The `tcpdump` application may
     not be installed in your system by default. So install it with your package manager:'
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要是root用户才能运行`tcpdump`。`tcpdump`应用程序可能在你的系统中没有默认安装，因此需要通过包管理器安装：
 - en: '[PRE0]'
+  id: totrans-14
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: How to do it...
+  id: totrans-15
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何做到……
 - en: The `tcpdump` application is the frontend to Wireshark and other network sniffer
     programs. The GUI interface supports many of the options we'll describe shortly.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: '`tcpdump`应用程序是Wireshark和其他网络嗅探程序的前端。图形界面支持我们将很快描述的许多选项。'
 - en: 'This application''s default behavior is to display every packet seen on the
     primary Ethernet link. The format of a packet report is as follows:'
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 该应用程序的默认行为是显示在主以太网链路上看到的每个数据包。数据包报告的格式如下：
 - en: '[PRE1]'
+  id: totrans-18
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'The name-value pairs include:'
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 名称-值对包括：
 - en: '`Flags`: The flags associated with this packet are as follows:'
+  id: totrans-20
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Flags`：与此数据包相关的标志如下：'
 - en: The term `S` stands for **SYN** (**Start Connection**)
+  id: totrans-21
   prefs:
   - PREF_UL
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`S`代表**SYN**（**开始连接**）'
 - en: The term `F` stands for **FIN** (**Finish Connection**)
+  id: totrans-22
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`F`代表**FIN**（**结束连接**）'
 - en: The term `P` stands for **PUSH** (**Push data**)
+  id: totrans-23
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`P`代表**PUSH**（**推送数据**）'
 - en: The term `R` stands for **RST** (**Reset Connection**)
+  id: totrans-24
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`R`代表**RST**（**重置连接**）'
 - en: The period `.` means there are no flags
+  id: totrans-25
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 句号`.`表示没有标志
 - en: '`seq`: This refers to the sequence number of the packet. It will be echoed
     in an ACK to identify the packet being acknowledged.'
+  id: totrans-26
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`seq`：这指的是数据包的序列号。它将在ACK中回显，以识别被确认的数据包。'
 - en: '`ack`: This refers to the acknowledgement that indicates a packet is received.
     The value is the sequence number from a previous packet.'
+  id: totrans-27
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ack`：这指的是确认，表示已收到数据包。其值为来自先前数据包的序列号。'
 - en: '`win`: This indicates the size of the buffer at the destination.'
+  id: totrans-28
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`win`：这表示目的地缓冲区的大小。'
 - en: '`options`: This refers to the TCP options defined for this packet. It is reported
     as a comma-separated set of key-value pairs.'
+  id: totrans-29
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`options`：这指的是为此数据包定义的TCP选项。它以逗号分隔的键值对形式报告。'
 - en: 'The following output shows requests from a Windows computer to the SAMBA server
     intermingled with a DNS request. The intermingling of different packets from different
     sources and applications makes it difficult to track a specific application or
     traffic on a given host. However, the `tcpdump` command has flags that make our
     life easier:'
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下输出显示了来自Windows计算机到SAMBA服务器的请求，夹杂着DNS请求。不同源和应用程序的数据包交错，使得追踪特定应用程序或主机上的流量变得困难。然而，`tcpdump`命令有一些标志，可以让我们的生活变得更轻松：
 - en: '[PRE2]'
+  id: totrans-31
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: The `-w` flag sends the `tcpdump` output to a file instead of the terminal.
     The output format is in binary form, which can be read with the `-r` flag. Sniffing
     packets must be done with root privileges, but displaying the results from a previously
     saved file can be done as a normal user.
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: '`-w`标志将`tcpdump`的输出发送到文件，而不是终端。输出格式为二进制形式，可以通过`-r`标志读取。嗅探数据包必须以root权限进行，但从先前保存的文件显示结果可以作为普通用户进行。'
 - en: 'By default, `tcpdump` runs and collects data until it is killed using Ctrl-C
     or **SIGTERM**. The `-c` flag limits the number of packets:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，`tcpdump`运行并收集数据，直到通过Ctrl-C或**SIGTERM**结束。`-c`标志限制数据包的数量：
 - en: '[PRE3]'
+  id: totrans-34
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: As a rule, we want to examine the activity on a single host, perhaps a single
     application.
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，我们希望检查单个主机上的活动，可能是某个特定的应用程序。
 - en: The last values of the `tcpdump` command line form an expression that helps
     us filter packets. The expression is a set of key-value pairs with modifiers and
     Boolean operators. The next recipes demonstrate using filters.
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: '`tcpdump` 命令行的最后几个值构成了一个表达式，帮助我们过滤数据包。这个表达式是由带有修饰符和布尔运算符的键值对组成的。接下来的示例演示了如何使用过滤器。'
 - en: Displaying only HTTP packets
+  id: totrans-37
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 只显示 HTTP 数据包
 - en: 'The `port` key displays only the packets sent to or from a given port:'
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: '`port` 键只显示发送到或从指定端口的数据包：'
 - en: '[PRE4]'
+  id: totrans-39
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: Displaying only HTTP packets generated by this host
+  id: totrans-40
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 只显示由该主机生成的 HTTP 数据包
 - en: 'If you are trying to track web usage on your network, you may only need to
     see the packets generated on your site. The `src` modifier specifies only these
     packets, with given values, in the source file. The `dst` modifier specifies only
     the destination:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你尝试追踪网络上的网页使用情况，可能只需要查看你网站上生成的数据包。`src` 修饰符仅指定这些数据包，以及给定的值，来自源文件。`dst` 修饰符则指定目的地：
 - en: '[PRE5]'
+  id: totrans-42
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: Viewing the packet payload as well as headers
+  id: totrans-43
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 查看数据包的有效载荷以及头部
 - en: If you need to track down the host that's swamping the network, all you need
     is headers. If you are trying to debug a web or database application, you probably
     need to see the contents of the packets as well as the headers.
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你需要追踪某个淹没网络的主机，你只需要头部信息。如果你正在调试一个 web 或数据库应用程序，你可能需要查看数据包的内容以及头部信息。
 - en: The `-X` flag will include the packet data in the output.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: '`-X` 标志将把数据包数据包含在输出中。'
 - en: The host keyword can be combined with port information to limit the report to
     data to and from a given host.
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: '`host` 关键字可以与端口信息结合，限制报告仅显示往返于指定主机的数据。'
 - en: 'The two tests are connected with **and** to perform the Boolean **and** operation,
     and they report only those packets that are to or from noucorp.com and/or the
     `HTTP` server. The sample output shows the start of a `GET` request and the server''s
     reply:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两个测试用 **and** 连接，执行布尔 **and** 操作，并且仅报告那些来自或去往 noucorp.com 和/或 `HTTP` 服务器的数据包。示例输出显示了一个
+    `GET` 请求的开始以及服务器的回复：
 - en: '[PRE6]'
+  id: totrans-48
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: How it works...
+  id: totrans-49
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 工作原理...
 - en: The `tcpdump` application sets a promiscuous flag that causes the NIC to pass
     all the packets to the processor. It does this instead of filtering only the ones
     that pertain to this host. This flag allows the recording of any packet on the
     physical network that the host is connected to, not just the packets intended
     for this host.
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: '`tcpdump` 应用程序设置了一个混杂标志，导致网络接口卡（NIC）将所有数据包传递给处理器。它这样做，而不是仅过滤那些与该主机相关的数据包。这个标志允许记录主机所在物理网络上的任何数据包，而不仅仅是传送到该主机的数据包。'
 - en: This application is used to trace issues with overloaded network segments, hosts
     that generate unexpected traffic, network looping, faulty NICs, malformed packets,
     and more.
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个应用程序用于追踪超负荷网络段、生成意外流量的主机、网络环路、故障的 NIC、格式错误的数据包等问题。
 - en: With the `-w` and `-r` option, `tcpdump` saves data in raw format, allowing
     you to examine it later as a regular user. For example, if there are excessive
     network packet collisions at 3:00 A.M., you can set up a `cron` job to run `tcpdump`
     at 3:00 A.M. and then examine the data during normal working hours.
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 `-w` 和 `-r` 选项，`tcpdump` 会以原始格式保存数据，允许你稍后以常规用户身份查看它。例如，如果凌晨 3 点网络数据包发生了大量碰撞，你可以设置一个
+    `cron` 任务，在凌晨 3 点运行 `tcpdump`，然后在正常工作时间查看数据。
 - en: Finding packets with ngrep
+  id: totrans-53
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 ngrep 查找数据包
 - en: The `ngrep` application is a cross between `grep` and `tcpdump`. It watches
     network ports and displays packets that match a pattern. You must have root privileges
     to run `ngrep`.
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ngrep` 应用程序是 `grep` 和 `tcpdump` 的结合体。它监视网络端口并显示与模式匹配的数据包。你必须拥有 root 权限才能运行
+    `ngrep`。'
 - en: Getting ready
+  id: totrans-55
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'You may not have the `ngrep` package installed. However, it can be installed
     with most package managers:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可能没有安装 `ngrep` 包。不过，你可以通过大多数包管理器安装它：
 - en: '[PRE7]'
+  id: totrans-57
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: How to do it...
+  id: totrans-58
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: The `ngrep` application accepts a pattern to watch for (such as `grep`), a filter
     string (such as `tcpdump`), and many command-line flags to fine-tune its behavior.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ngrep` 应用程序接受一个模式进行匹配（如同 `grep`），一个过滤字符串（如同 `tcpdump`），以及许多命令行标志来微调其行为。'
 - en: 'The following example watches the traffic on port `80` and reports any packets
     with the string `Linux` in them:'
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下示例监视 `80` 端口的流量，并报告任何包含字符串 `Linux` 的数据包：
 - en: '[PRE8]'
+  id: totrans-61
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: The `-q` flag directs `ngrep` to only print the headers and payloads.
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: '`-q` 标志使 `ngrep` 只打印头部和有效载荷。'
 - en: The `-c` flag defines the number of columns to use for payload data. By default,
     the number is four, which is not useful for text-based packets.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: '`-c` 标志定义了用于负载数据的列数。默认情况下，列数是四，这对于基于文本的数据包来说并不实用。'
 - en: After the flags is the match string (Linux), followed by a filter expression
     using the same filter language as `tcpdump`.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 在标志之后是匹配字符串（Linux），然后是使用与 `tcpdump` 相同过滤语言的过滤器表达式。
 - en: How it works...
+  id: totrans-65
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The `ngrep` application also sets the promiscuous flag, allowing it to sniff
     all the visible packets, whether they relate to the host or not.
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ngrep` 应用程序还设置了混杂模式标志，允许它嗅探所有可见的数据包，无论这些数据包是否与主机相关。'
 - en: The previous example displayed all of the HTTP traffic. If the host system is
     on a wireless network or wired via a hub (instead of a switch), it will display
     all of the web traffic caused by all the active users.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 上面的例子展示了所有的 HTTP 流量。如果主机系统连接在无线网络或通过集线器（而非交换机）进行有线连接，它会显示所有活跃用户造成的所有 Web 流量。
 - en: There's more...
+  id: totrans-68
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: The `-x` option in `ngrep` displays a hex dump as well as a printable form.
     Combining this with `-X` allows you to search for a binary string (perhaps a virus
     signature or some known pattern).
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ngrep` 中的 `-x` 选项显示十六进制转储和可打印形式。将其与 `-X` 结合使用，可以搜索二进制字符串（例如病毒签名或某些已知模式）。'
 - en: 'This example watches for a binary stream from an HTTPS connection:'
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个例子监视来自 HTTPS 连接的二进制流：
 - en: '[PRE9]'
+  id: totrans-71
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: The hash marks indicate the packets that were scanned; they do not include the
     target pattern. There are many more options to `ngrep`; read the `man` page for
     the complete list.
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 哈希标记表示已扫描的数据包；它们不包括目标模式。`ngrep` 有许多其他选项；请阅读 `man` 页面查看完整列表。
 - en: Tracing network routes with ip
+  id: totrans-73
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 ip 路由追踪网络
 - en: The `ip` utility reports information about the state of your network. It can
     tell you how many packets are being sent and received, what types of packets are
     being sent, how the packets are being routed, and more.
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ip` 工具报告有关网络状态的信息。它可以告诉你有多少数据包正在发送和接收，发送的是哪种类型的数据包，数据包是如何路由的，等等。'
 - en: Getting ready
+  id: totrans-75
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: The `netstat` utility described in [Chapter 8](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml),
     *The Old-Boy Network* is standard in all Linux distributions; however, it is now
     being replaced by more efficient utilities, such as `ip`. These new utilities
     are included in the `iproute2` package, which is already installed on most modern
     distributions.
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 [第 8 章](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml) 中描述的 `netstat` 工具，*老式网络*，是所有
+    Linux 发行版的标准工具；然而，它现在正被更高效的工具所取代，例如 `ip`。这些新工具包含在 `iproute2` 包中，已经安装在大多数现代发行版中。
 - en: How to do it...
+  id: totrans-77
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何做...
 - en: The `ip` utility has many features. This recipe will discuss a few that are
     useful for tracing network behavior.
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ip` 工具有很多功能。本节将讨论一些在追踪网络行为时非常有用的功能。'
 - en: Reporting routes with ip route
+  id: totrans-79
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 ip route 报告路由
 - en: When packets don't reach their destination (`ping` or `traceroute` fail), the
     first thing an experienced user checks is the cables. The next thing to check
     is the routing tables. If a system lacks a default gateway (`0.0.0.0`), it will
     only find machines on its physical network. If you have multiple networks running
     on the same wires, you'll need to add routes to allow machines attached to one
     network to send packets to another.
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 当数据包无法到达目标（`ping` 或 `traceroute` 失败）时，一个有经验的用户首先检查的是电缆。接下来要检查的是路由表。如果系统缺少默认网关（`0.0.0.0`），它只能找到物理网络上的机器。如果你有多个网络在同一条线路上运行，你需要添加路由以允许连接到一个网络的机器向另一个网络发送数据包。
 - en: 'The `ip route` command reports known routes:'
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ip route` 命令报告已知的路由：'
 - en: '[PRE10]'
+  id: totrans-82
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: The `ip route` report is space-delimited. After the first element, it consists
     of a set of keys and values.
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ip route` 报告是以空格分隔的。在第一个元素之后，它由一组键值对组成。'
 - en: The first line in the preceding code describes the `10.8.0.2` address as a tunnel
     device that uses a kernel protocol, and this address is only valid on this tunnel
     device. The second line describes the `192.168.87.x` network used to communicate
     with virtual machines. The third line is the primary network of this system, which
     is connected to `/dev/eth0`. The last line defines the default route, which routes
     to `192.168.1.1` through `eth0`.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 上面的代码中的第一行描述了 `10.8.0.2` 地址作为一个使用内核协议的隧道设备，该地址仅在这个隧道设备上有效。第二行描述了 `192.168.87.x`
+    网络，用于与虚拟机通信。第三行是该系统的主网络，它连接到 `/dev/eth0`。最后一行定义了默认路由，通过 `eth0` 路由到 `192.168.1.1`。
 - en: 'The keys reported by `ip route` include the following:'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ip route` 报告的键包括以下内容：'
 - en: '`via`: This refers to the address of the next hop.'
+  id: totrans-86
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`via`：指的是下一个跳跃的地址。'
 - en: '`proto`: This is the protocol identifier of the route. The kernel protocol
     is a route installed by the kernel, while static routes are defined by an administrator.'
+  id: totrans-87
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`proto`：这是路由的协议标识符。内核协议是由内核安装的路由，而静态路由由管理员定义。'
 - en: '`scope`: This refers to the scope where the address is valid. A link scope
     is only valid on this device.'
+  id: totrans-88
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`scope`：这是指地址有效的作用范围。链路作用域仅在此设备上有效。'
 - en: '`dev`: This is the device associated with the address.'
+  id: totrans-89
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dev`：这是与该地址关联的设备。'
 - en: Tracing recent IP connections and the ARP table
+  id: totrans-90
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 追踪最近的 IP 连接和 ARP 表
 - en: 'The `ip neighbor` command reports known relationships between the IP address,
     device, and hardware MAC address. It reports whether the relationship was reestablished
     recently or has gone stale:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ip neighbor` 命令报告已知的 IP 地址、设备和硬件 MAC 地址之间的关系。它报告该关系是否已重新建立，或者是否已经过时：'
 - en: '[PRE11]'
+  id: totrans-92
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: The output of the `ip neighbor` command shows that there has been no recent
     activity between either this system and the default gateway, or this system and
     the host at `192.168.1.4`. It also shows that there has been no recent activity
     in the virtual machines and the host at `192.168.1.2` is connected recently.
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ip neighbor` 命令的输出显示当前系统与默认网关之间，或者当前系统与 `192.168.1.4` 之间没有最近的活动。它还显示虚拟机与 `192.168.1.2`
+    之间没有最近活动，而该主机最近连接。'
 - en: The current status of `REACHABLE` in the preceding output means that the `arp`
     table is up to date and the host thinks it knows the MAC address of the remote
     system. The value of `STALE` here does not indicate that the system is unreachable;
     it merely means the values in the `arp` table have expired. When your system tries
     to use one of these routes, it sends an ARP request first to verify the MAC address
     associated with the IP address.
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述输出中的 `REACHABLE` 状态意味着 `arp` 表是最新的，并且主机认为它知道远程系统的 MAC 地址。此处的 `STALE` 值并不表示系统不可达，它仅仅表示
+    `arp` 表中的值已过期。当系统尝试使用这些路由时，它首先会发送 ARP 请求以验证与 IP 地址关联的 MAC 地址。
 - en: The relationship between the MAC address and the IP address should only change
     when the hardware is changed or devices are reassigned.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: MAC 地址与 IP 地址之间的关系应仅在硬件更换或设备重新分配时发生变化。
 - en: If devices on a network show intermittent connectivity, it may mean that two
     devices have been assigned the same IP address. It could also be possible that
     two DHCP servers are running or someone has manually assigned an address that's
     already in use.
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果网络上的设备显示间歇性连接，可能意味着两个设备被分配了相同的 IP 地址。也可能是两个 DHCP 服务器正在运行，或者有人手动分配了一个已经在使用的地址。
 - en: In the case of two devices with the same IP address, the reported MAC address
     for a given IP address will change in intervals, and the `ip neighbor` command
     will help track down the misconfigured device.
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 当两个设备具有相同的 IP 地址时，给定 IP 地址的 MAC 地址会间歇性变化，`ip neighbor` 命令可以帮助追踪错误配置的设备。
 - en: Tracing a route
+  id: totrans-98
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 路由追踪
 - en: 'The `traceroute` command discussed in [Chapter 8](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml),
     *The Old-Boy Network* traces a packet''s entire path from the current host to
     its destination. The `route get` command reports the next hop from the current
     machine:'
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 [第 8 章](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml)《老男孩网络》中讨论的 `traceroute`
+    命令追踪从当前主机到目标的整个数据包路径。`route get` 命令报告当前机器的下一跳：
 - en: '[PRE12]'
+  id: totrans-100
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'The preceding return shows that the route to the virtual machine is through
     the vmnet8 interface located at `172.16.183.1`. The packets sent to this site
     will be split if they are larger than 1,500 bytes and discarded after 64 hops:'
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述返回结果显示通往虚拟机的路由通过位于 `172.16.183.1` 的 vmnet8 接口。发送到此站点的数据包如果大于 1,500 字节，将被分割，并且在
+    64 跳后丢弃：
 - en: '[PRE13]'
+  id: totrans-102
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: To reach an address on the Internet, a packet needs to leave the local network
     via the default gateway, and the link to this gateway is the host's `eth0` device
     at `192.168.1.3`.
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 要访问 Internet 上的一个地址，数据包需要通过默认网关离开本地网络，通往该网关的连接是主机的 `eth0` 设备，地址为 `192.168.1.3`。
 - en: How it works...
+  id: totrans-104
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The `ip` command runs in the user space and interfaces in the kernel tables.
     Using this command, a normal user can examine the network configuration whereas
     a superuser can configure the network.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ip` 命令在用户空间运行并与内核表接口。使用此命令，普通用户可以检查网络配置，而超级用户可以配置网络。'
 - en: Tracing system calls with strace
+  id: totrans-106
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 strace 跟踪系统调用
 - en: A GNU/Linux computer may have hundreds of tasks running at a time, but it will
     possess only one Network Interface, one disk drive, one keyboard, and so on. The
     Linux kernel allocates these limited resources and controls how tasks access them.
     This prevents two tasks from accidently intermingling data in a disk file, for
     example.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 一台GNU/Linux计算机可能同时运行数百个任务，但它只会拥有一个网络接口、一个磁盘驱动器、一个键盘，等等。Linux内核分配这些有限的资源并控制任务如何访问它们。这可以防止两个任务在磁盘文件中不小心混淆数据，例如。
 - en: When you run an application, it uses a combination of **User-Space libraries**
     (functions such as `printf` and `fopen`) and System-Space Libraries (functions
     such as `write` and `open`). When your program calls `printf` (or a script invokes
     the `echo` command), it invokes a user-space library call to `printf` to format
     the output string; this is followed by a system-space call to the `write` function.
     The system call makes sure only one task can access a resource at a time.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 当你运行一个应用程序时，它会使用**用户空间库**（如`printf`和`fopen`）和系统空间库（如`write`和`open`）的组合。当你的程序调用`printf`（或者脚本调用`echo`命令）时，它会调用一个用户空间库的`printf`来格式化输出字符串；接着会调用系统空间的`write`函数。系统调用确保只有一个任务可以同时访问一个资源。
 - en: In a perfect world, all computer programs would run with no problems. In an
     almost perfect world, you'd have the source code, the program would be compiled
     with debugging support, and it would fail consistently.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 在一个完美的世界里，所有计算机程序都能无故障地运行。在一个几乎完美的世界里，你会有源代码，程序会使用调试支持进行编译，并且它会始终一致地出错。
 - en: In the real world, you sometimes have to cope with programs where you don't
     have the source, and it fails intermittently. Developers can't help you unless
     you give them some data to work with.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 在现实世界中，你有时不得不应对一些没有源代码、且间歇性失败的程序。除非你提供一些数据给开发者，否则他们无法帮你解决问题。
 - en: The Linux `strace` command reports the system calls that an application makes;
     this can help us understand what it's doing even if we don't have the source code.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux的`strace`命令报告应用程序所做的系统调用；即使我们没有源代码，它也能帮助我们理解程序在做什么。
 - en: Getting ready
+  id: totrans-112
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'The `strace` command is installed as part of the Developer package; it can
     be installed separately as well:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: '`strace`命令作为开发者包的一部分安装；也可以单独安装：'
 - en: '[PRE14]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: How to do it...
+  id: totrans-115
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何做到这一点……
 - en: One way to understand `strace` is to write a short C program and use `strace`
     to see what system calls it makes.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 理解`strace`的一种方式是编写一个简短的C程序，并使用`strace`查看它调用了哪些系统调用。
 - en: This test program allocates memory, uses the memory, prints a short message,
     frees the memory, and exits.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个测试程序分配内存，使用内存，打印一条简短的消息，释放内存，并退出。
 - en: 'The `strace` output shows the system functions this program calls:'
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: '`strace`输出显示了这个程序调用的系统函数：'
 - en: '[PRE15]'
+  id: totrans-119
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: How it works...
+  id: totrans-120
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: The first lines are standard start up commands for any application. The `execve`
     call is the system call to initialize a new executable. The `brk` call returns
     the current memory address, and the `mmap` call allocates 4,096 bytes of memory
     for dynamic libraries and other applications that load housekeeping.
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 前几行是任何应用程序的标准启动命令。`execve`调用是初始化新可执行文件的系统调用。`brk`调用返回当前内存地址，`mmap`调用为动态库和其他加载的程序分配了4,096字节的内存。
 - en: The attempt to access `ld.so.preload` fails because `ld.so.preload` is a hook
     to preload the libraries. It is not required on most production systems.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 尝试访问`ld.so.preload`失败，因为`ld.so.preload`是一个用于预加载库的钩子。大多数生产系统中并不需要它。
 - en: The `ld.so.cache` file is the memory-resident copy of `/etc/ld.so,conf.d`, which
     contains the paths for loading dynamic libraries. These values are kept in memory
     to reduce the overhead in starting programs.
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ld.so.cache`文件是`/etc/ld.so.conf.d`的内存驻留副本，包含了加载动态库的路径。这些值保存在内存中，以减少启动程序时的开销。'
 - en: The next lines with `mmap`, `mprotect`, `arch``_``prctl`, and `munmap` calls
     continue to load the libraries and mapping devices to memory.
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来的几行包含`mmap`、`mprotect`、`arch_prctl`和`munmap`调用，继续加载库并将设备映射到内存中。
 - en: The two calls to `brk` are invoked by the program's `malloc` call. This allocates
     100 bytes from the heap.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两个`brk`调用是由程序的`malloc`调用触发的。它从堆中分配了100字节的内存。
 - en: The `strcat` call is a user-space function that doesn't generate any system
     calls.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: '`strcat`调用是一个用户空间函数，不会生成任何系统调用。'
 - en: The `printf` call doesn't generate a system call to format the data, but it
     makes calls to send the formatted string to `stdout`.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: '`printf`调用不会生成系统调用来格式化数据，但它会发起调用将格式化后的字符串发送到`stdout`。'
 - en: The `fstat` and `mmap` calls load and initialize the `stdout` device. These
     calls occur only once in a program that generates output to `stdout`.
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: '`fstat`和`mmap`调用加载并初始化`stdout`设备。这些调用在生成输出到`stdout`的程序中只会发生一次。'
 - en: The `write` system call sends the string to `stdout`.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: '`write`系统调用将字符串发送到`stdout`。'
 - en: Finally, the `exit_group` call exits the program, frees resources, and terminates
     all the threads associated with the executable.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，`exit_group`调用退出程序，释放资源，并终止与可执行文件相关的所有线程。
 - en: Note that there is no `brk` call associated with freeing memory. The `malloc`
     and `free` functions are user-space functions that manage a task's memory. They
     only invoke the `brk` function if the program's overall memory footprint changes.
@@ -577,82 +848,122 @@
     it remains a part of this program's memory pool. The next `malloc` uses memory
     from the pool of available memory space until it's exhausted. At this point, another
     `brk` call adds more memory to the program's memory pool.
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，没有与释放内存相关联的`brk`调用。`malloc`和`free`函数是用户空间函数，管理任务的内存。只有在程序的整体内存占用发生变化时，它们才会调用`brk`函数。当程序分配*N*字节时，它需要将这么多字节添加到可用内存中。当它释放这个块时，内存被标记为可用，但它仍然是这个程序内存池的一部分。接下来的`malloc`会使用来自可用内存池的内存空间，直到内存池耗尽。此时，另一个`brk`调用会将更多内存添加到程序的内存池中。
 - en: Tracing dynamic library functions with ltrace
+  id: totrans-132
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用ltrace跟踪动态库函数
 - en: Knowing the user-space library functions being called is as useful as knowing
     the system functions being invoked. The `ltrace` command provides a similar function
     to `strace`; however, it tracks user-space library calls instead of system calls.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 知道调用了哪些用户空间的库函数和知道调用了哪些系统函数一样有用。`ltrace`命令提供了类似于`strace`的功能；不过，它跟踪的是用户空间的库函数调用，而不是系统调用。
 - en: Getting ready
+  id: totrans-134
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: Have the `ltrace` command installed using the Developer tools.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 安装开发工具以使用`ltrace`命令。
 - en: How to do it...
+  id: totrans-136
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'To trace user-space dynamic library calls, invoke the `strace` command, followed
     by the command you want to trace:'
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 要跟踪用户空间的动态库调用，执行`strace`命令，然后是你想要跟踪的命令：
 - en: '[PRE16]'
+  id: totrans-138
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'The next example is a program with a subroutine:'
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一个示例是带有子例程的程序：
 - en: '[PRE17]'
+  id: totrans-140
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: In the `ltrace` output, we see the call to the dynamically linked `strcat`;
     however, we do not see the statically linked local function, namely `print`. The
     call to `printf` was simplified to a call to `puts`. The calls to `malloc` and
     `free` are shown since they are user-space function calls.
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`ltrace`输出中，我们看到了对动态链接的`strcat`的调用；但是我们没有看到静态链接的本地函数，即`print`。`printf`的调用被简化为对`puts`的调用。`malloc`和`free`的调用被显示出来，因为它们是用户空间函数调用。
 - en: How it works...
+  id: totrans-142
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The `ltrace` and `strace` utilities use the `ptrace` function to rewrite the
     **Procedure Linkage Table** (**PLT**) which maps between dynamic library calls
     and the actual memory address of the called function. This means that `ltrace`
     can trap any dynamically linked function call but not a statically linked function.
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ltrace`和`strace`工具使用`ptrace`函数来重写**过程链接表**（**PLT**），该表将动态库调用映射到被调用函数的实际内存地址。这意味着`ltrace`可以捕获任何动态链接的函数调用，但不能捕获静态链接的函数。'
 - en: There's more...
+  id: totrans-144
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: 'The `ltrace` and `strace` commands are useful, but it would be really nice
     to trace both user-space and system-space function calls. The `-S` option to `ltrace`
     will do this. The next example shows the `ltrace -S` output from the previous
     executable:'
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ltrace`和`strace`命令非常有用，但如果能够同时跟踪用户空间和系统空间的函数调用，那就更好了。`ltrace`的`-S`选项可以做到这一点。下一个示例显示了从之前的可执行文件中获取的`ltrace
+    -S`输出：'
 - en: '[PRE18]'
+  id: totrans-146
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: This shows the same type of startup call (`sbrk`, `mmap`, and so on) as the
     `strace` example.
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 这与`strace`示例显示的启动调用（如`sbrk`、`mmap`等）相同。
 - en: When a user-space function invokes a system-space function (as with the `malloc`
     and puts calls), the display shows that the user-space function was interrupted
     (`malloc(100 <unfinished...>)` and then resumed `(<... malloc resumed>)` after
     the system call was completed.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 当一个用户空间的函数调用了系统空间的函数（如`malloc`和puts调用）时，显示会显示该用户空间函数被中断（`malloc(100 <unfinished...>)`），并在系统调用完成后恢复（`(<...
+    malloc resumed>)`）。
 - en: Note that the `malloc` call needed to pass control to `sbrk` to allocate more
     memory for the application. However, the `free` call does not shrink the application;
     it just frees the memory for future use by this application.
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，`malloc`调用需要将控制权传递给`sbrk`，以便为应用程序分配更多内存。然而，`free`调用不会缩小应用程序的内存，它只是释放内存供未来该应用程序使用。
