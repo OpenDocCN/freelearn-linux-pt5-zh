@@ -1,70 +1,104 @@
 - en: Chapter 2. ZFS
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第 2 章：ZFS
 - en: 'In this chapter, we will cover the following recipes:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将覆盖以下内容：
 - en: Creating ZFS storage pools and filesystems
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建 ZFS 存储池和文件系统
 - en: Playing with ZFS faults and properties
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 玩转 ZFS 故障和属性
 - en: Creating a ZFS snapshot and clone
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建 ZFS 快照和克隆
 - en: Performing a backup in a ZFS filesystem
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在 ZFS 文件系统中执行备份
 - en: Handling logs and caches
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 处理日志和缓存
 - en: Managing devices in storage pools
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 管理存储池中的设备
 - en: Configuring spare disks
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 配置备用磁盘
 - en: Handling ZFS snapshots and clones
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 处理 ZFS 快照和克隆
 - en: Playing with COMSTAR
+  id: totrans-10
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 玩转 COMSTAR
 - en: Mirroring the root pool
+  id: totrans-11
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 镜像根池
 - en: ZFS shadowing
+  id: totrans-12
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: ZFS 阴影
 - en: Configuring ZFS sharing with the SMB share
+  id: totrans-13
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 SMB 共享配置 ZFS 共享
 - en: Setting and getting other ZFS properties
+  id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置和获取其他 ZFS 属性
 - en: Playing with the ZFS swap
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 玩转 ZFS 交换空间
 - en: Introduction
+  id: totrans-16
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 引言
 - en: 'ZFS is a 128-bit transactional filesystem offered by Oracle Solaris 11, and
     it supports 256 trillion directory entries, does not have any upper limit of files,
     and is always consistent on disk. Oracle Solaris 11 makes ZFS its default filesystem,
@@ -81,188 +115,286 @@
     raidz2 (similar to RAID-6) that uses at least five disks (3D and 2P), and raidz3
     (similar to RAID-6, but with an additional level of parity) that uses at least
     eight disks (5D and 3P).'
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: ZFS 是 Oracle Solaris 11 提供的 128 位事务文件系统，它支持 256 万亿个目录条目，没有文件数量的上限，并且始终在磁盘上保持一致性。Oracle
+    Solaris 11 将 ZFS 作为默认文件系统，提供一些功能，如存储池、快照、克隆和卷。在管理 ZFS 对象时，第一步是创建一个 ZFS 存储池。存储池可以由整个磁盘、文件和切片组成，考虑到任何提到的块设备的最小大小是
+    128 MB。此外，在创建 ZFS 存储池时，可用的 RAID 配置包括条带（RAID 0）、镜像（RAID 1）和 RAID-Z（类似于 RAID-5）。镜像和
+    RAID-Z 配置都支持一个名为自愈数据的功能，通过保护数据来工作。在这种情况下，当磁盘上出现坏块时，ZFS 框架会从另一个复制的磁盘中获取相同的块来修复原始坏块。RAID-Z
+    提供三种变体：raidz1（类似于 RAID-5），使用至少三个磁盘（两个数据磁盘和一个奇偶校验磁盘）；raidz2（类似于 RAID-6），使用至少五个磁盘（3D
+    和 2P）；以及 raidz3（类似于 RAID-6，但具有额外的奇偶校验级别），使用至少八个磁盘（5D 和 3P）。
 - en: Creating ZFS storage pools and filesystems
+  id: totrans-18
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建 ZFS 存储池和文件系统
 - en: To start playing with ZFS, the first step is to create a storage pool, and afterwards,
     all filesystems will be created inside these storage pools. To accomplish the
     creation of a storage pool, we have to decide which raid configuration we will
     use (stripe, mirror, or RAID-Z) to create the storage pool and, afterwards, the
     filesystems on it.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 要开始玩转 ZFS，第一步是创建一个存储池，之后所有的文件系统都会在这些存储池中创建。为了完成存储池的创建，我们需要决定使用哪种 RAID 配置（条带、镜像或
+    RAID-Z）来创建存储池，然后再在其上创建文件系统。
 - en: Getting ready
+  id: totrans-20
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: To follow this recipe, it is necessary to use a virtual machine (VMware or VirtualBox)
     that runs Oracle Solaris 11 with 4 GB RAM and eight 4 GB disks. Once the virtual
     machine is up and running, log in as the root user and open a terminal.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 要遵循此步骤，必须使用一台运行 Oracle Solaris 11 的虚拟机（VMware 或 VirtualBox），并且该虚拟机需要有 4 GB 的内存和八个
+    4 GB 的磁盘。虚拟机启动并运行后，作为 root 用户登录并打开终端。
 - en: How to do it…
+  id: totrans-22
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做…
 - en: 'A storage pool is a logical object, and it represents the physical characteristics
     of the storage and must be created before anything else. To create a storage pool,
     the first step is to list all the available disks on the system and choose what
     disks will be used by running the following command as the root role:'
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 存储池是一个逻辑对象，它代表存储的物理特性，必须在其他任何操作之前创建。创建存储池的第一步是列出系统中所有可用的磁盘，并选择将要使用的磁盘，可以通过以
+    root 角色运行以下命令来完成：
 - en: '[PRE0]'
+  id: totrans-24
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Following the selection of disks, create a `zpool create` storage pool and
     verify the information about this pool using the `zpool list` and `zpool status`
     commands. Before these steps, we have to decide the pool configuration: stripe
     (default), mirror, raidz, raidz2, or raidz3\. If the configuration isn''t specified,
     stripe (raid0) will be assumed as default. Then, a pool is created by running
     the following command:'
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 在选择磁盘后，创建一个`zpool create`存储池，并使用`zpool list`和`zpool status`命令验证此池的信息。在这些步骤之前，我们必须决定池的配置：stripe（默认），mirror，raidz，raidz2或raidz3。如果没有指定配置，默认假设为stripe（raid0）。然后，通过运行以下命令创建池：
 - en: '[PRE1]'
+  id: totrans-26
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'To list the pool, execute the following commands:'
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 要列出池，请执行以下命令：
 - en: '[PRE2]'
+  id: totrans-28
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'To verify the status of the pool, run the following commands:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 要验证池的状态，请运行以下命令：
 - en: '[PRE3]'
+  id: totrans-30
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'Although it''s out of the scope of this chapter, we can list some related performance
     information by running the following command:'
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管这超出了本章的范围，但我们可以通过运行以下命令列出一些相关的性能信息：
 - en: '[PRE4]'
+  id: totrans-32
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'If necessary, a second and third storage pool can be created using the same
     commands but taking different disks and, in this case, by changing to the `mirror`
     and `raidz` configurations, respectively. This task is accomplished by running
     the following commands:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果需要，可以使用相同的命令创建第二个和第三个存储池，但要使用不同的磁盘，并分别切换到`mirror`和`raidz`配置。此任务可以通过运行以下命令来完成：
 - en: '[PRE5]'
+  id: totrans-34
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'Once the storage pools are created, it''s time to create filesystems in these
     pools. First, let''s create a filesystem named `zfs_stripe_1` in the `oracle_stripe_1`
     pool. Execute the following command:'
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 存储池创建完成后，是时候在这些池中创建文件系统了。首先，让我们在`oracle_stripe_1`池中创建一个名为`zfs_stripe_1`的文件系统。执行以下命令：
 - en: '[PRE6]'
+  id: totrans-36
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'Repeating the same syntax, it''s easy to create two new filesystems named `zfs_mirror_1`
     and `zfs_raidz_1` in `oracle_mirror_1` and `oracle_raidz_1`, respectively:'
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用相同的语法，很容易在`oracle_mirror_1`和`oracle_raidz_1`中分别创建名为`zfs_mirror_1`和`zfs_raidz_1`的两个新文件系统：
 - en: '[PRE7]'
+  id: totrans-38
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'The listing of recently created filesystems is done by running the following
     command:'
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 最近创建的文件系统列表可以通过运行以下命令获取：
 - en: '[PRE8]'
+  id: totrans-40
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'The ZFS engine has automatically created the mount-point directory for all
     the created filesystems, and it has been mounted on them. This can also be verified
     by executing the following command:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: ZFS引擎已经为所有创建的文件系统自动创建了挂载点目录，并且已将其挂载。也可以通过执行以下命令来验证这一点：
 - en: '[PRE9]'
+  id: totrans-42
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: The last two lines confirm that the ZFS filesystems that we created are already
     mounted and ready to use.
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后的两行确认我们创建的ZFS文件系统已经挂载并准备好使用。
 - en: An overview of the recipe
+  id: totrans-44
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 本教程概览
 - en: This recipe has taught us how to create a storage pool with different configurations
     such as stripe, mirror, and raidz. Additionally, we learned how to create filesystems
     in these pools.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 本教程教我们如何创建具有不同配置的存储池，如stripe，mirror和raidz。此外，我们还学习了如何在这些池中创建文件系统。
 - en: Playing with ZFS faults and properties
+  id: totrans-46
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 操作ZFS故障和属性
 - en: ZFS is completely oriented by properties that can change the behavior of storage
     pools and filesystems. This recipe will touch upon important properties from ZFS,
     and we will learn how to handle them.
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: ZFS完全基于可以改变存储池和文件系统行为的属性。本教程将涉及ZFS中的一些重要属性，我们将学习如何处理这些属性。
 - en: Getting ready
+  id: totrans-48
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: To follow this recipe, it is necessary to use a virtual machine (VMware or VirtualBox)
     that runs Oracle Solaris 11 with 4 GB RAM and eight 4 GB disks. Once the virtual
     machine is up and running, log in as the root user and open a terminal.
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了跟随本教程，需要使用一个虚拟机（VMware或VirtualBox），该虚拟机运行Oracle Solaris 11，具有4 GB RAM和八个4
+    GB磁盘。虚拟机启动并运行后，作为root用户登录并打开终端。
 - en: How to do it…
+  id: totrans-50
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'Every ZFS object has properties that can be accessed and, most of the time,
     changed. For example, to get the pool properties, we must execute the following
     command:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个ZFS对象都有可以访问且大多数情况下可以更改的属性。例如，要获取池的属性，我们必须执行以下命令：
 - en: '[PRE10]'
+  id: totrans-52
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Some useful information from the previous output is that the free space is
     3.97 GB (the `free` property), the pool is online (the `health` property), and
     `0%` of the total capacity was used (the `capacity` property). If we need to know
     about any problem related to the pool (referring to the `health` property), it''s
     recommended that you get this information by running the following command:'
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 从先前输出的一些有用信息中，我们可以看到空闲空间为3.97 GB（`free`属性），池处于在线状态（`health`属性），并且总容量的`0%`已被使用（`capacity`属性）。如果我们需要了解与池相关的任何问题（参考`health`属性），建议通过运行以下命令获取此信息：
 - en: '[PRE11]'
+  id: totrans-54
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'Another fantastic method to check whether all data in the specified storage
     pool is okay is using the `zpool scrub` command that examines whether the checksums
     are correct, and for replicated devices (such as mirror and raidz configurations),
     the `zpool scrub` command repairs any discovered problem. To follow the `zpool
     scrub` results, the `zpool status` command can be used as follows:'
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一种检查指定存储池中所有数据是否正常的绝佳方法是使用 `zpool scrub` 命令，它检查校验和是否正确，并且对于复制设备（例如镜像和 raidz
+    配置），`zpool scrub` 命令会修复发现的问题。为了跟踪 `zpool scrub` 结果，可以使用 `zpool status` 命令，方法如下：
 - en: '[PRE12]'
+  id: totrans-56
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'After some time, if everything went well, the same `zpool` status command should
     show the following output:'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 一段时间后，如果一切顺利，同样的 `zpool` 状态命令应显示以下输出：
 - en: '[PRE13]'
+  id: totrans-58
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'During an analysis of possible disk errors, the following `zpool history` command,
     which shows all the events that occurred on the pool, could be interesting and
     suitable:'
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 在分析可能的磁盘错误时，以下 `zpool history` 命令可能非常有用，能够显示池上发生的所有事件：
 - en: '[PRE14]'
+  id: totrans-60
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'The Oracle Solaris Fault Manager, through its `fmd` daemon, is a framework
     that receives any information related to potential problems that were detected
     by the system, diagnoses these problems and, eventually, takes a proactive action
@@ -270,94 +402,142 @@
     framework offers the following `fmadm` command that, when used with the `faulty`
     argument, displays information about resources that the Oracle Solaris Fault Manager
     believes to be faulty:'
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: Oracle Solaris 故障管理器通过其 `fmd` 守护进程提供了一个框架，接收系统检测到的潜在问题信息，对这些问题进行诊断，并最终采取主动措施以保持系统完整性，例如禁用内存模块。因此，该框架提供了以下
+    `fmadm` 命令，当与 `faulty` 参数一起使用时，显示 Oracle Solaris 故障管理器认为有故障的资源信息：
 - en: '[PRE15]'
+  id: totrans-62
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'The following `dmesg` command confirms any suspicious hardware error:'
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下 `dmesg` 命令确认任何可疑的硬件错误：
 - en: '[PRE16]'
+  id: totrans-64
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'From the `zpool status` command, there are some possible values for the `status`
     field:'
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 从 `zpool status` 命令中，可以看到 `status` 字段的一些可能值：
 - en: '`ONLINE`:. This means that the pool is good'
+  id: totrans-66
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ONLINE`：这意味着池是正常的'
 - en: '`FAULTED`: This means that the pool is bad'
+  id: totrans-67
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`FAULTED`：这意味着池存在故障'
 - en: '`OFFLINE`: This means that the pool was disabled by the administrator'
+  id: totrans-68
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`OFFLINE`：这意味着池被管理员禁用'
 - en: '`DEGRADED`: This means that something (likely a disk) is bad, but the pool
     is still working'
+  id: totrans-69
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`DEGRADED`：这意味着某些东西（很可能是磁盘）出现了故障，但池仍在工作'
 - en: '`REMOVED`: This means that a disk was hot-swapped'
+  id: totrans-70
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`REMOVED`：这意味着磁盘进行了热插拔'
 - en: '`UNAVAIL`: This means that the device or virtual device can be opened'
+  id: totrans-71
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`UNAVAIL`：这意味着设备或虚拟设备无法打开'
 - en: 'Returning to ZFS properties, it''s easy to get property information from a
     ZFS filesystem by running the following commands:'
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 回到 ZFS 属性，可以通过运行以下命令轻松获取 ZFS 文件系统的属性信息：
 - en: '[PRE17]'
+  id: totrans-73
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: The previous two commands deserve an explanation—`zfs list –r` shows all the
     datasets (filesystems, snapshots, clones, and so on) under the `oracle_mirror_1`
     storage pool. Additionally, `zfs get all oracle_mirror_1/zfs_mirror_1` displays
     all the properties from the `zfs_mirror_1` filesystem.
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 前两条命令需要做一些解释——`zfs list –r` 显示了 `oracle_mirror_1` 存储池下的所有数据集（文件系统、快照、克隆等）。此外，`zfs
+    get all oracle_mirror_1/zfs_mirror_1` 显示了 `zfs_mirror_1` 文件系统的所有属性。
 - en: There are many filesystem properties (some of them are read-only and others
     read-write), and it's advisable to know some of them. Almost all are inheritable—a
     child (for example, a snapshot or clone object) inherits a configured value for
     a parent object (for example, a filesystem).
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件系统有许多属性（其中一些是只读的，其他是读写的），建议了解其中的一些属性。几乎所有属性都是可继承的——子对象（例如快照或克隆对象）会继承父对象（例如文件系统）配置的值。
 - en: 'Setting a property value is done by executing the following command:'
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 设置属性值的方法是执行以下命令：
 - en: '[PRE18]'
+  id: totrans-77
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: The old mount point was renamed to the `/oracle_mirror_1/another_point` directory
     and remounted again. Later, we'll return to this point and review some properties.
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 旧的挂载点被重命名为 `/oracle_mirror_1/another_point` 目录，并重新挂载。稍后我们将回到这一点并查看一些属性。
 - en: 'When it''s necessary, a ZFS filesystem has to be renamed by running the following
     command:'
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 当有需要时，可以通过运行以下命令重命名 ZFS 文件系统：
 - en: '[PRE19]'
+  id: totrans-80
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: Oracle Solaris 11 automatically altered the mount point of the renamed filesystem
     and remounted it again.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: Oracle Solaris 11 自动更改了重命名的文件系统的挂载点，并重新挂载了该文件系统。
 - en: 'To destroy a ZFS filesystem or storage pool, there can''t be any process that
     accesses the dataset. For example, if we try to delete the `zfs_test` filesystem
     when a process is using the directory, we get an error:'
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 要销毁ZFS文件系统或存储池，不能有任何访问数据集的进程。例如，如果我们尝试在某个进程正在使用该目录时删除`zfs_test`文件系统，就会收到错误：
 - en: '[PRE20]'
+  id: totrans-83
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'This case presents several possibilities—first (and the most recommended) is
     to understand what processes or applications are using the mentioned filesystem.
     Once the guilty processes or applications are found, the next step is to stop
@@ -368,11 +548,15 @@
     obviously, is not advisable and would probably cause data loss. The following
     is the second procedure (killing the problematic process) by running the following
     commands:'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 本案例提供了几种可能性——首先（也是最推荐的）是了解哪些进程或应用程序正在使用提到的文件系统。一旦找到有罪的进程或应用程序，下一步就是停止它们。因此，可以在不丢失任何数据的情况下解决所有问题。然而，如果找不到有罪的进程的可能性，那么杀死有问题的进程将是一个可行且不可预测的选项，其中可能会发生数据丢失。最后，使用`-f`选项会引起*强制销毁*，显然这是不可取的，可能会导致数据丢失。以下是通过运行以下命令的第二个过程（杀死有问题的进程）：
 - en: '[PRE21]'
+  id: totrans-85
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'We used the `fuser` command that enables us to look for processes that access
     a specific file or directory. Therefore, according to the previous two outputs,
     there''s a process using the `/oracle_stripe_1/zfs_test_1` filesystem, and the
@@ -381,25 +565,38 @@
     be enough to leave the `/oracle_stripe_1/zfs_test_1` directory. Nonetheless, if
     we didn''t know how to solve the problem, the last resource would be to kill the
     offending process by running the following command:'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们使用了`fuser`命令，它使我们能够查找访问特定文件或目录的进程。因此，根据前两个输出，有一个进程正在使用`/oracle_stripe_1/zfs_test_1`文件系统，而`ps
+    –ef`命令显示`bash`进程是罪魁祸首，这是正确的，因为在尝试删除之前我们已经更改了挂载点。要解决这个问题，只需保留`/oracle_stripe_1/zfs_test_1`目录即可。不过，如果我们不知道如何解决这个问题，最后的办法就是运行以下命令杀死有问题的进程：
 - en: '[PRE22]'
+  id: totrans-87
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'At this time, there isn''t a process accessing the filesystem, so it''s possible
     to destroy it:'
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 此时，没有进程访问文件系统，因此可能会将其销毁：
 - en: '[PRE23]'
+  id: totrans-89
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'To verify whether the filesystem was correctly destroyed, execute the following
     command:'
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 要验证文件系统是否正确销毁，请执行以下命令：
 - en: '[PRE24]'
+  id: totrans-91
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'Everything worked fine, and the filesystem was destroyed. Nonetheless, if there
     was a snapshot or clone under this filesystem (we''ll review and learn about them
     in the next recipe), we wouldn''t have been able to delete the filesystem, and
@@ -413,103 +610,152 @@
     action). To prove this statement, in the next example, we''re going to create
     one filesystem in the `oracle_stripe_1` pool, put some information into it, and,
     at the end, we''re going to destroy all pools:'
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 一切顺利进行，文件系统被销毁。然而，如果在此文件系统下存在快照或克隆（我们将在下一个操作步骤中查看和学习它们），我们将无法删除文件系统，并且应该使用相同的命令并加上`–r`选项（用于快照内部）或`–R`选项（用于快照和克隆内部）。从这里开始，还可以使用`zpool
+    destroy`命令销毁整个池。然而，我们应该注意一个细节——如果没有任何进程使用要销毁池中任何文件系统，Oracle Solaris 11在销毁池时不会询问任何关于销毁池的问题。池中的所有内容都将被销毁，不会有任何提示（这与Windows系统不同，在执行危险操作前会提示警告）。为了证明这个说法，在下一个示例中，我们将在`oracle_stripe_1`池中创建一个文件系统，向其中放入一些信息，最后将销毁所有池：
 - en: '[PRE25]'
+  id: totrans-93
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: An overview of the recipe
+  id: totrans-94
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 配方概述
 - en: Taking the `zpool` and `zfs` commands, we created, listed, renamed, and destroyed
     pools and filesystems. Furthermore, we learned how to view properties and alter
     them, especially the mount point property that's very essential for daily ZFS
     administration. We also learned how to see the pool history, monitor the pool,
     and gather important information about related pool failures.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过使用`zpool`和`zfs`命令，我们创建、列出、重命名和销毁了池和文件系统。此外，我们还学习了如何查看和修改属性，特别是对日常ZFS管理至关重要的挂载点属性。我们还学习了如何查看池历史、监控池并收集关于相关池故障的重要信息。
 - en: Creating a ZFS snapshot and clone
+  id: totrans-96
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建ZFS快照和克隆
 - en: A ZFS snapshot and clone play fundamental roles in the ZFS framework and in
     Oracle Solaris 11, as there are many uses for these features, and one of them
     is to execute backup and restore files from the ZFS filesystem. For example, a
     snapshot could be handy when either there is some corruption in the ZFS filesystem
     or a user loses a specific file. Using ZFS snapshots makes it possible to completely
     rollback the ZFS filesystem to a specific point or date.
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: ZFS快照和克隆在ZFS框架和Oracle Solaris 11中扮演着重要角色，因为这些功能有许多用途，其中之一就是执行备份和从ZFS文件系统恢复文件。例如，当ZFS文件系统出现损坏或用户丢失特定文件时，快照可能非常有用。使用ZFS快照可以将ZFS文件系统完全回滚到某个特定的时间点或日期。
 - en: Getting ready
+  id: totrans-98
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: To follow this recipe, it is necessary to use a virtual machine (VMware or VirtualBox)
     that runs Oracle Solaris 11 with 4 GB RAM and eight 4 GB disks. Once the virtual
     machine is up and running, log in as the root user and open a terminal.
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 要遵循这个步骤，需要使用一台虚拟机（VMware或VirtualBox），运行Oracle Solaris 11，配置4 GB的内存和8块4 GB的磁盘。一旦虚拟机启动并运行，作为root用户登录并打开终端。
 - en: How to do it…
+  id: totrans-100
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Creating a snapshot is a fundamental task that can be executed by running the
     following commands:'
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 创建快照是一个基本任务，可以通过运行以下命令来执行：
 - en: '[PRE26]'
+  id: totrans-102
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Before continuing, I suggest that we copy some big files to the `pool_1/fs_1`
     filesystem. In this case, I used files that I already had on my system, but you
     can copy anything into the filesystem. Run the following commands:'
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 在继续之前，我建议我们将一些大文件复制到`pool_1/fs_1`文件系统中。在这个例子中，我使用了系统中已有的文件，但你可以将任何文件复制到文件系统中。运行以下命令：
 - en: '[PRE27]'
+  id: totrans-104
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'Finally, we create the snapshot by running the following command:'
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们通过运行以下命令来创建快照：
 - en: '[PRE28]'
+  id: totrans-106
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'By default, snapshots aren''t shown even when using the `zfs list -r` command:'
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，即使使用`zfs list -r`命令，快照也不会显示：
 - en: '[PRE29]'
+  id: totrans-108
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'This behavior is controlled by the `listsnapshots` property (its value is `off`
     by default) from the pool:'
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种行为由池的`listsnapshots`属性控制（其默认值为`off`）：
 - en: '[PRE30]'
+  id: totrans-110
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'It''s necessary to alter `listsnapshots` to `on` to change this behavior:'
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要将`listsnapshots`修改为`on`，以更改此行为：
 - en: '[PRE31]'
+  id: totrans-112
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'It worked as planned. However, when executing the previous command, all datasets
     (filesystems and snapshots) are listed. To list only snapshots, it is necessary
     to specify a filter using the`–t` option as follows:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 一切按计划进行。然而，当执行前面的命令时，所有数据集（文件系统和快照）都会被列出。为了仅列出快照，需要使用`–t`选项指定过滤器，如下所示：
 - en: '[PRE32]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: The previous command has shown only the existing snapshots as expected. An interesting
     fact is that snapshots live inside filesystems, and initially, they don't take
     any space on disk. However, as the filesystem is being altered, snapshots take
     free space, and this could be a big concern. Considering this, the `SIZE` property
     equals zero and `REFER` equals `63.1M`, which is the exact size of the `pool_1/fs_1`
     filesystem.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 之前的命令如预期地仅显示了现有的快照。一个有趣的事实是，快照存在于文件系统内部，最初它们不会占用磁盘空间。然而，随着文件系统的更改，快照会占用空闲空间，这可能是一个大问题。考虑到这一点，`SIZE`属性的值为零，而`REFER`为`63.1M`，这正是`pool_1/fs_1`文件系统的确切大小。
 - en: The `REFER` field deserves an explanation—when snapshots are explained in any
     IT area, the classification is the same. There are physical snapshots and logical
     snapshots. Physical snapshots take the same space from a reference filesystem,
@@ -520,8 +766,10 @@
     created. After this initial time, snapshots won't be synchronized with the reference
     filesystem anymore. If the administrator wants both synchronized, they should
     do it manually.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: '`REFER`字段值得解释——当在任何IT领域解释快照时，分类都是一样的。快照有物理快照和逻辑快照。物理快照占用与参考文件系统相同的空间，并且在读/写操作期间两者不会相互影响。创建快照需要较长时间，因为它是参考文件系统中所有内容的“复制”。在这种情况下，快照是一个静态图像，表示创建快照时文件系统的确切状态。此后，快照将不再与参考文件系统同步。如果管理员希望两者保持同步，必须手动操作。'
 - en: The other classification, logical snapshots, is very different from the first
     one. When a logical snapshot is made, only pointers to data from the reference
     filesystem are created, but there is no data inside the snapshot. This process
@@ -535,8 +783,10 @@
     same data from the time that it was created. A second and worse effect is that
     if the reference filesystem is lost, every snapshot becomes invalid. Why? Because
     the reference filesystem doesn't exist anymore, and all pointers become invalid.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一种分类，逻辑快照，与物理快照完全不同。当创建逻辑快照时，只会创建指向参考文件系统数据的指针，但快照内部没有数据。这个过程非常快，且占用的磁盘空间很小。缺点是任何读操作都会影响参考文件系统。还有两个附加效果——当参考文件系统中的某些数据发生变化时，操作系统会将要修改的数据复制到快照中，再进行修改（这个过程叫做**写时复制**（**COW**））。为什么？因为我们之前解释过，快照是参考文件系统在某一时刻的静态图像。如果某些数据发生变化，快照必须保持不变，并且必须包含创建时的相同数据。第二个更严重的后果是，如果参考文件系统丢失，所有快照都会失效。为什么？因为参考文件系统不再存在，所有的指针都会变得无效。
 - en: 'Return to the `REFER` field explanation; it means how much data in the reference
     filesystem is being referenced by a pointer in the snapshot. A clone is a copy
     of a filesystem, and it''s based on snapshots, so to create a clone, a snapshot
@@ -546,245 +796,364 @@
     Other interesting facts are that as the snapshot must exist before creating a
     clone, the clone is dependent on the snapshot, and both must be created in the
     same pool. Create a pool by executing the following commands:'
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 回到`REFER`字段的解释；它表示在快照中，指针引用了参考文件系统中的多少数据。克隆是文件系统的一个副本，并且是基于快照的，因此创建克隆之前，必须先创建快照。然而，克隆和快照之间有一个根本性的区别——快照是只读对象，而克隆是读/写对象。因此，我们可以像写入文件系统一样在克隆中进行写操作。另一个有趣的事实是，由于在创建克隆之前必须存在快照，克隆依赖于快照，且两者必须在同一个池中创建。通过执行以下命令可以创建一个池：
 - en: '[PRE33]'
+  id: totrans-119
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'If we look at this output, it''s complicated to distinguish a clone from a
     filesystem. Nonetheless, we could gather enough details to be able to distinguish
     the datasets:'
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们看一下这个输出，区分克隆和文件系统是比较复杂的。然而，我们可以收集足够的细节来区分这些数据集：
 - en: '[PRE34]'
+  id: totrans-121
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'The `origin` property doesn''t show anything relevant to pools and snapshots,
     but when this property is analyzed on a clone context, it shows us that the clone
     originated from the `pool1_/fs_1@snap1` snapshot. Therefore, it''s feasible to
     confirm that `pool_1/fs_1@snap1` is indeed a snapshot by running the following
     command:'
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: '`origin`属性与池和快照无关，但当在克隆上下文中分析此属性时，它会告诉我们克隆来源于`pool1_/fs_1@snap1`快照。因此，通过运行以下命令，我们可以确认`pool_1/fs_1@snap1`确实是一个快照：'
 - en: '[PRE35]'
+  id: totrans-123
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'In ZFS, the object creation order is `pool` | `filesystem` | `snapshot` | `clone`.
     So, the destruction order should be the inverse: `clone` | `snapshot` | `filesystem`
     | `pool`. It''s possible to skip steps using special options that we''ll learn
     about later.'
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 在ZFS中，对象创建顺序是`pool` | `filesystem` | `snapshot` | `clone`。因此，销毁顺序应为相反顺序：`clone`
+    | `snapshot` | `filesystem` | `pool`。通过使用特别选项，我们可以跳过某些步骤，这些选项将在稍后介绍。
 - en: 'For example, if we try to destroy a filesystem that contains a snapshot, the
     following error will be shown:'
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，如果我们尝试销毁包含快照的文件系统，将显示以下错误：
 - en: '[PRE36]'
+  id: totrans-126
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'In the same way, if we try to destroy a snapshot without removing the clone
     first, the following message will be shown:'
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样地，如果我们在没有先移除克隆的情况下尝试销毁快照，将显示以下信息：
 - en: '[PRE37]'
+  id: totrans-128
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'The last two cases have shown that it''s necessary to follow the right order
     to destroy datasets in ZFS. Execute the following command:'
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后两个案例表明，必须按照正确的顺序销毁ZFS中的数据集。请执行以下命令：
 - en: '[PRE38]'
+  id: totrans-130
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'When the correct sequence is followed, it''s possible to destroy each dataset
     one by one, although, as we mentioned earlier, it would be possible to skip steps.
     The next sequence shows how this is possible. Execute the following command:'
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 当按照正确的顺序执行时，您可以逐个销毁每个数据集，尽管正如我们之前提到的，实际上可以跳过某些步骤。接下来的步骤展示了如何做到这一点。请执行以下命令：
 - en: '[PRE39]'
+  id: totrans-132
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: Finally, we used the `-R` option, and everything was destroyed—including the
     clone, snapshot, and filesystem.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们使用了`-R`选项，一切都被销毁了——包括克隆、快照和文件系统。
 - en: An overview of the recipe
+  id: totrans-134
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 本教程概述
 - en: We learned how to manage snapshots and clones, including how to create, list,
     distinguish, and destroy them. Finally, this closes our review about the fundamentals
     of ZFS.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们学习了如何管理快照和克隆，包括如何创建、列出、区分和销毁它们。最后，这就结束了我们关于ZFS基础的复习。
 - en: Performing a backup in a ZFS filesystem
+  id: totrans-136
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 在ZFS文件系统中执行备份
 - en: Ten years ago, I didn't think about learning how to use any backup software,
     and honestly, I didn't like this kind of software because I thought it was so
     simple. Nowadays, I can see why I was so wrong.
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 十年前，我从未考虑过学习如何使用任何备份软件，老实说，我不喜欢这类软件，因为我觉得它们太简单了。如今，我明白自己当时是多么错误。
 - en: Administering and managing backup software is the most fundamental activity
     in IT, acting as the last line of defense against hackers. By the way, hackers
     are winning the war using all types of resources—malwares, Trojans, viruses, worms,
     and spywares, and only backups of file servers and applications can save a company.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 管理和操作备份软件是IT中最基本的活动，它是抵御黑客攻击的最后防线。顺便说一下，黑客正在利用各种资源——恶意软件、木马、病毒、蠕虫和间谍软件来赢得这场战争，只有文件服务器和应用程序的备份才能挽救公司。
 - en: Oracle Solaris 11 offers a simple solution composed of two commands (`zfs send`
     and `zfs recv`) to back up ZFS filesystem data. During the backup operation, data
     is generated as a stream and sent (using the `zfs send` command) through the network
     to another Oracle Solaris 11 system that receives this stream (using `zfs recv`).
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: Oracle Solaris 11提供了一种简单的解决方案，由两个命令（`zfs send`和`zfs recv`）组成，用于备份ZFS文件系统数据。在备份操作中，数据以流的形式生成，并通过网络（使用`zfs
+    send`命令）发送到另一个Oracle Solaris 11系统，该系统接收该流（使用`zfs recv`）。
 - en: 'Oracle Solaris 11 is able to produce two kinds of streams: the replication
     stream, which includes the filesystem and all its dependent datasets (snapshots
     and clones), and the recursive stream, which includes the filesystems and clones,
     but excludes snapshots. The default stream type is the replication stream.'
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: Oracle Solaris 11能够生成两种类型的流：复制流，它包括文件系统及其所有依赖的数据集（快照和克隆）；递归流，它包括文件系统和克隆，但不包括快照。默认的流类型是复制流。
 - en: This recipe will show you how to execute a backup and restore operation.
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 本教程将向您展示如何执行备份和恢复操作。
 - en: Getting ready
+  id: totrans-142
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: To follow this recipe, it's necessary to have two virtual machines (VMware or
     VirtualBox) that run Oracle Solaris 11, with 4 GB RAM each and eight 4 GB disks.
     The systems used in this recipe are named `solaris11-1` and `solaris11-2`.
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 要跟随本教程，您需要两台运行Oracle Solaris 11的虚拟机（VMware或VirtualBox），每台虚拟机需要4 GB内存和8块4 GB的硬盘。教程中使用的系统名为`solaris11-1`和`solaris11-2`。
 - en: How to do it…
+  id: totrans-144
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何执行…
 - en: 'All the ZFS backup operations are based on snapshots. This procedure will do
     everything from the beginning—creating a pool, filesystem, and snapshot and then
     executing the backup. Execute the following commands:'
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有ZFS备份操作都基于快照。本过程将从头开始执行——创建池、文件系统和快照，然后执行备份。请执行以下命令：
 - en: '[PRE40]'
+  id: totrans-146
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'The following commands remove some files from the `backuptest_pool/zfs1` filesystem:'
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下命令会从 `backuptest_pool/zfs1` 文件系统中删除一些文件：
 - en: '[PRE41]'
+  id: totrans-148
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: 'We omitted a very interesting fact about snapshots—when any file is deleted
     from the filesystem, it doesn''t disappear forever. There is a hidden directory
     named `.zfs` inside each filesystem; it contains snapshots, and all the removed
     files go to a subdirectory inside this hidden directory. Let''s look at the following
     commands:'
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们遗漏了一个关于快照的非常有趣的事实——当文件从文件系统中删除时，它并不会永远消失。每个文件系统中都有一个名为 `.zfs` 的隐藏目录；它包含快照，所有删除的文件都会进入这个隐藏目录下的一个子目录。我们来看以下命令：
 - en: '[PRE42]'
+  id: totrans-150
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'Using this information about the localization of deleted files, any file could
     be restored, and even better, it would be possible to revert the filesystem to
     the same content as when the snapshot was taken. This operation is named `rollback`,
     and it can be executed using the following commands:'
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 利用关于已删除文件定位的信息，任何文件都可以恢复，更好的是，可以将文件系统恢复到快照拍摄时的内容。这个操作被称为 `rollback`，可以通过以下命令执行：
 - en: '[PRE43]'
+  id: totrans-152
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: Every single file was restored to the filesystem, as nothing had happened.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个文件都被恢复到文件系统中，仿佛什么都没有发生。
 - en: 'Going a step ahead, let''s see how to back up the filesystem data to another
     system that runs Oracle Solaris 11\. The first step is to connect to another system
     (`solaris 11-2`) and create and prepare a pool to receive the backup stream from
     the `solaris11-1` source system by running the following commands:'
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 进一步来看，让我们看看如何将文件系统数据备份到运行 Oracle Solaris 11 的另一台系统。第一步是连接到另一台系统（`solaris 11-2`），并通过运行以下命令创建并准备一个池，用于接收来自
+    `solaris11-1` 源系统的备份流：
 - en: '[PRE44]'
+  id: totrans-155
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: We enabled the `readonly` property from `away_pool`. Why? Because we have to
     keep the metadata consistent while receiving data from another host and afterwards
     too.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们启用了 `away_pool` 的 `readonly` 属性。为什么？因为我们必须在从另一台主机接收数据时保持元数据的一致性，之后也需要这样做。
 - en: 'Continuing this procedure, the next step is to execute the remote backup from
     the `solaris11-1` source machine, sending all filesystem data to the `solaris11-2`
     target machine:'
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 继续这个过程，下一步是从 `solaris11-1` 源机器执行远程备份，将所有文件系统数据发送到 `solaris11-2` 目标机器：
 - en: '[PRE45]'
+  id: totrans-158
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: We used the `ssh` command to send all data through a secure tunnel, but we could
     have used the `netcat` command (it's included in Oracle Solaris, and there's more
     information about it on [http://netcat.sourceforge.net/](http://netcat.sourceforge.net/))
     if security isn't a requirement.
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们使用了 `ssh` 命令通过安全通道发送所有数据，但如果安全性不是要求，我们本可以使用 `netcat` 命令（它包含在 Oracle Solaris
+    中，更多信息可以在 [http://netcat.sourceforge.net/](http://netcat.sourceforge.net/) 上找到）。
 - en: 'You can verify that all data is present on the target machine by executing
     the following command:'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以通过执行以下命令来验证目标机器上所有数据是否存在：
 - en: '[PRE46]'
+  id: totrans-161
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: 'According to this output, the remote backup, using the `zfs send` and `zfs
     recv` commands, has worked as expected. The restore operation is similar, so let''s
     destroy every file from the `backuptest_pool/zfs1` filesystem in the first system
     (`solaris11-1`) as well as its snapshot by running the following commands:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据这个输出，使用 `zfs send` 和 `zfs recv` 命令的远程备份工作如预期般顺利。恢复操作类似，因此我们也可以通过运行以下命令销毁 `backuptest_pool/zfs1`
+    文件系统中的所有文件以及它的快照，这样就能在第一台系统（`solaris11-1`）中实现：
 - en: '[PRE47]'
+  id: totrans-163
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'From the second machine (`solaris11-2`), the restore procedure can be executed
     by running the following commands:'
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 从第二台机器（`solaris11-2`），可以通过运行以下命令执行恢复过程：
 - en: '[PRE48]'
+  id: totrans-165
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'The restore operation is similar to what we did during the backup, but we have
     to change the direction of the command where the `solaris11-1` system is the target
     and `solaris11-2` is the source now:'
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 恢复操作类似于我们在备份过程中所做的，但我们必须改变命令的方向，`solaris11-1` 系统是目标，而 `solaris11-2` 是源系统：
 - en: '[PRE49]'
+  id: totrans-167
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: You can see that we used the `ssh` command to make a secure transmission between
     the systems. Again, we could have used another tool such as `netcat` and the methodology
     would have done the same thing.
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以看到我们使用了 `ssh` 命令来在系统之间进行安全传输。再次强调，我们也可以使用其他工具，比如 `netcat`，方法是一样的。
 - en: 'Returning to the `solaris11-1` system, verify that all data was recovered by
     running the following command:'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 返回到 `solaris11-1` 系统，运行以下命令验证所有数据是否已恢复：
 - en: '[PRE50]'
+  id: totrans-170
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: ZFS is amazing. The backup and restore operations are simple to execute, and
     everything has worked so well. The removed files are back.
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: ZFS 真是太棒了。备份和恢复操作执行起来很简单，一切都顺利进行。删除的文件已经恢复。
 - en: An overview of the recipe
+  id: totrans-172
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 操作步骤概览
 - en: 'On ZFS, the restore and backup operations are done through two commands: `zfs
     send` and `zfs recv`. Both operations are based on snapshots, and they make it
     possible to save data on the same machine or on another machine. During the explanation,
     we also learned about the snapshot rollback procedure.'
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 ZFS 中，恢复和备份操作是通过两个命令完成的：`zfs send` 和 `zfs recv`。这两个操作都基于快照，并且可以将数据保存在同一台机器或另一台机器上。在解释过程中，我们还学习了快照回滚的过程。
 - en: Handling logs and caches
+  id: totrans-174
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理日志和缓存
 - en: ZFS has some very interesting internal structures that can greatly improve the
     performance of the pool and filesystem. One of them is **ZFS intent log** (**ZIL**),
     which was created to get more intensive and sequential write request performance,
@@ -793,8 +1162,12 @@
     TXG) are flushed to the disk or a request is received. When using ZIL, all of
     the write operations are done on ZIL, and afterwards, they are committed to the
     filesystem, helping prevent any data loss.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: ZFS 拥有一些非常有趣的内部结构，可以极大地提高池和文件系统的性能。其中之一是 **ZFS 意图日志** (**ZIL**)，它的创建旨在提升更密集和顺序的写入请求性能，从而实现更多的
+    **每秒输入/输出操作数** (**IOPS**)，并将任何事务记录保存在内存中，直到事务组（称为 TXG）被刷新到磁盘或接收到请求。当使用 ZIL 时，所有的写入操作都会先写入
+    ZIL，然后再提交到文件系统，帮助防止数据丢失。
 - en: Usually, the ZIL space is allocated from the main storage pool, but this could
     fragment data. Oracle Solaris 11 allows us to decide where ZIL will be held. Most
     implementations put ZIL on a dedicated disk or, even better, on a mirrored configuration
@@ -802,16 +1175,23 @@
     log devices for ZIL shouldn't be confused with database logfiles' disks. Usually,
     ZIL device logs don't have a size bigger than half of the RAM size, but other
     aspects must be considered to provide a consistent guideline when making its sizing.
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，ZIL 空间是从主存储池中分配的，但这可能会导致数据碎片化。Oracle Solaris 11 允许我们决定 ZIL 存放的位置。大多数实现将 ZIL
+    放在专用磁盘上，或者更好的是，使用 SSD 磁盘或闪存设备配置镜像存储，特别指出 ZIL 的日志设备不应与数据库日志文件的磁盘混淆。通常，ZIL 设备日志的大小不会超过
+    RAM 大小的一半，但在确定其大小时，必须考虑其他方面，以提供一致的指南。
 - en: Another very popular structure of ZFS is the **Adaptive Replacement Cache**
     (**ARC**), which increases to occupy almost all free memory (RAM minus 1 GB) of
     Oracle Solaris 11, but without pushing the application data out of memory. A very
     positive aspect of ARC is that it improves the reading performance a lot, because
     if data can be found in the memory (ARC), there isn't a necessity of taking any
     information from disks.
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一种非常流行的 ZFS 结构是 **自适应替换缓存** (**ARC**)，它会增加并占用几乎所有的空闲内存（RAM 减去 1 GB），但不会将应用程序数据推出内存。ARC
+    的一个非常积极的方面是，它大大提高了读取性能，因为如果数据可以在内存（ARC）中找到，就无需从磁盘读取任何信息。
 - en: Beyond ARC, there's another type of cache named L2ARC, which is similar to a
     cache level 2 between the main memory and the disk. L2ARC complements ARC, and
     using SSD disks is suitable for this type of cache, given that one of the more
@@ -819,36 +1199,54 @@
     Here's a very important fact to be remembered—L2ARC writes data to the cache devices
     (SSD disks) in an asynchronous way, so L2ARC is not recommended for intensive
     (sequential) writes.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了 ARC，还有另一种类型的缓存，称为 L2ARC，它类似于主内存和磁盘之间的二级缓存。L2ARC 补充了 ARC，使用 SSD 磁盘非常适合这种类型的缓存，因为其中一个高效的场景是将
+    L2ARC 部署为随机读加速器。这里有一个非常重要的事实需要记住——L2ARC 以异步方式将数据写入缓存设备（SSD 磁盘），因此不建议将 L2ARC 用于密集（顺序）写入操作。
 - en: Getting ready
+  id: totrans-179
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: This recipe is going to use a virtual machine (from VirtualBox or VMware) with
     4 GB of memory, Oracle Solaris 11 (installed), and at least eight 4 GB disks.
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个方案将使用一台虚拟机（来自 VirtualBox 或 VMware），配置 4 GB 内存、已安装的 Oracle Solaris 11 和至少八个
+    4 GB 的磁盘。
 - en: How to do it…
+  id: totrans-181
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'There are two methods to configure a log object in a pool—either the pool is
     created with log devices (at the same time) or log devices are added after the
     pool''s creation. The latter method is used more often, so the following procedure
     takes this approach:'
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置池中的日志对象有两种方法——要么在创建池时同时配置日志设备，要么在池创建后添加日志设备。后一种方法使用得更为频繁，因此以下步骤采用这种方法：
 - en: '[PRE51]'
+  id: totrans-183
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'In the next command, we''ll add a log in the mirror mode, which is very appropriate
     to prevent a single point of failure. So, execute the following command:'
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一个命令中，我们将以镜像模式添加一个日志，这是非常合适的，可以防止单点故障。因此，执行以下命令：
 - en: '[PRE52]'
+  id: totrans-185
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: Perfect! The mirrored log was added as expected. It's appropriate to explain
     about the `mirror-0` and `mirror-1` objects from `zpool status`. Both objects
     are virtual devices. When a pool is created, the disks that were chosen are organized
@@ -858,104 +1256,153 @@
     by other software or storage. Virtual devices are generated when the `stripe`,
     `mirror`, and `raidz` pools are created. Additionally, they are also created when
     a log and cache are inserted into the pool.
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 完美！镜像日志已按预期添加。接下来很有必要解释一下`zpool status`中的`mirror-0`和`mirror-1`对象。这两个对象是虚拟设备。当创建池时，所选的磁盘会在一个名为虚拟设备（`vdev`）的结构下进行组织，然后，这个`vdev`对象会被呈现给池。粗略地说，池由虚拟设备组成，而每个虚拟设备则由磁盘、分区、文件或其他软件或存储呈现的任何卷组成。虚拟设备在创建`stripe`、`mirror`和`raidz`池时生成。此外，在将日志和缓存插入池时，它们也会被创建。
 - en: 'If a disk log removal is necessary, execute the following command:'
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果需要移除磁盘日志，请执行以下命令：
 - en: '[PRE53]'
+  id: totrans-188
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: 'It would be possible to remove both log disks at once by specifying `mirror-1`
     (the virtual device), which represents the logs:'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以通过指定`mirror-1`（虚拟设备）来一次性移除两个日志磁盘，这代表了日志：
 - en: '[PRE54]'
+  id: totrans-190
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'As we explained at the beginning of this procedure, it''s usual to add logs
     after a pool has been created, but it would be possible and easy to create a pool
     and, at the same time, include the log devices during the creation process by
     executing the following command:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们在本过程开始时所解释的，通常是在创建池后添加日志，但也可以通过执行以下命令，在创建池的同时将日志设备包含在内，这样做既简单又便捷：
 - en: '[PRE55]'
+  id: totrans-192
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'According to the explanation about the L2ARC cache at the beginning of the
     recipe, it''s also possible to add a cache object (L2ARC) into the ZFS pool using
     a syntax very similar to the one used when adding log objects by running the following
     command:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据食谱开头对L2ARC缓存的解释，还可以通过运行以下命令，使用类似于添加日志对象的语法将缓存对象（L2ARC）添加到ZFS池中：
 - en: '[PRE56]'
+  id: totrans-194
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: 'Similarly, like log devices, a pool could be created including cache devices
     in a single step:'
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 类似地，像日志设备一样，可以通过一步操作创建一个包含缓存设备的池：
 - en: '[PRE57]'
+  id: totrans-196
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: It worked as expected! However, it's necessary to note that cache objects can't
     be mirrored as we did when adding log devices, and they can't be part of a RAID-Z
     configuration.
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 它如预期般工作！然而，需要注意的是，缓存对象不能像添加日志设备时那样进行镜像，也不能成为RAID-Z配置的一部分。
 - en: 'Removing a cache device from a pool is done by executing the following command:'
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 从池中移除缓存设备的操作是通过执行以下命令完成的：
 - en: '[PRE58]'
+  id: totrans-199
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: A final and important warning—every time `cache` objects are added into a pool,
     wait until the data comes into cache (the warm-up phase). It usually takes around
     2 hours.
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后一个重要的警告——每次将`cache`对象添加到池中时，请等到数据进入缓存（预热阶段）。这通常需要大约2小时。
 - en: An overview of the recipe
+  id: totrans-201
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 食谱概述
 - en: ARC, L2ARC, and ZIL are common structures in ZFS administration, and we learned
     how to create and remove both logs and cache from the ZFS pool. There are very
     interesting procedures and recommendations about performance and tuning that includes
     these objects, but it's out of the scope of this book.
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: ARC、L2ARC和ZIL是ZFS管理中常见的结构，我们已经学会了如何创建和移除ZFS池中的日志和缓存。关于这些对象的性能和调优方面，有很多有趣的程序和建议，但这超出了本书的范围。
 - en: Managing devices in storage pools
+  id: totrans-203
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 管理存储池中的设备
 - en: Manipulating and managing devices are common tasks when working with a ZFS storage
     pool, and more maintenance activities involve adding, deleting, attaching, and
     detaching disks. According to Oracle, ZFS supports raid0 (`stripe`), raid1 (`mirror`),
     raidz (similar to raid5, with one parity disk), raidz2 (similar to raid6, but
     uses two parity disks), and raidz3 (three parity disks), and additionally, there
     could be a combination such as raid 0+1 or raid 1+0.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 操作和管理设备是使用ZFS存储池时常见的任务，更多的维护活动包括添加、删除、附加和分离磁盘。根据Oracle的说法，ZFS支持raid0（`stripe`）、raid1（`mirror`）、raidz（类似于raid5，带有一个校验磁盘）、raidz2（类似于raid6，但使用两个校验磁盘）和raidz3（三个校验磁盘），此外，还可以有像raid
+    0+1或raid 1+0这样的组合。
 - en: Getting ready
+  id: totrans-205
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: This recipe is going to use a virtual machine (from VirtualBox or VMware) with
     4 GB of memory, a running Oracle Solaris 11 installation, and at least eight 4
     GB disks.
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个例子将使用一台虚拟机（来自VirtualBox或VMware），配备4 GB内存，运行Oracle Solaris 11安装，并至少有八个4 GB磁盘。
 - en: How to do it…
+  id: totrans-207
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'According to the previous recipes, the structure of a mirrored pool is `pool`
     | `vdev` | `disks`, and the next command shouldn''t be new to us:'
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据之前的示例，镜像池的结构是 `pool` | `vdev` | `disks`，接下来的命令对我们来说应该并不陌生：
 - en: '[PRE59]'
+  id: totrans-209
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: 'Eventually, in a critical environment, it could be necessary to increase the
     size of the pool, given that there are some ways to accomplish it. However, not
     all of them are correct, because this procedure must be done with care to keep
@@ -964,458 +1411,677 @@
     first being `vdev` (`mirror-0`) with two disks concatenated and a second `vdev`
     that doesn''t have any redundancy. If the second `vdev` fails, the entire pool
     is lost. Oracle Solaris notifies us about the problem when we try this wrong configuration:'
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: 最终，在一个关键环境中，可能需要增加池的大小，因为有些方法可以实现这一点。然而，并非所有方法都是正确的，因为此过程必须小心操作，以保持冗余性。例如，以下命令由于只添加了一个磁盘，导致增加冗余失败，在这种情况下，我们将会有两个vdev，第一个是
+    `vdev`（`mirror-0`）包含两个串联的磁盘，第二个vdev则没有冗余性。如果第二个vdev失败，整个池将会丢失。当我们尝试这种错误配置时，Oracle
+    Solaris会提醒我们问题所在：
 - en: '[PRE60]'
+  id: totrans-211
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: If we wanted to proceed even with this notification, it would be enough to add
     the `-f` option, but this isn't recommended.
+  id: totrans-212
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们希望即使在收到此通知的情况下继续操作，只需添加 `-f` 选项，但不推荐这样做。
 - en: 'The second example is very similar to the first one, and we tried to add two
     disks instead of only one:'
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 第二个示例与第一个非常相似，只是我们尝试添加了两个磁盘，而不是一个：
 - en: '[PRE61]'
+  id: totrans-214
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: Again, the error remains because we added two disks, but we haven't mirrored
     them. In this case, the explanation is the same, and we would have a single point
     of failure if we tried to proceed.
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样，由于我们添加了两个磁盘，但没有将它们镜像，因此错误依然存在。在这种情况下，解释是相同的，如果我们继续操作，将会有单点故障。
 - en: 'Therefore, the correct method to expand the pool and keep the tolerance against
     failure is by executing the following command:'
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，扩展池并保持容错能力的正确方法是执行以下命令：
 - en: '[PRE62]'
+  id: totrans-217
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: 'It worked! The final configuration is one that is similar to RAID 1+0, where
     there are two mirrored vdevs and all the data is spread over them. In this case,
     if the pool has a failure disk in any vdevs, data information is preserved. Furthermore,
     there are two vdevs in the pool: `mirror-0` and `mirror-1`.     If we wished to remove a single disk from a mirror, it could be done by executing
     the following command:'
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: 成功了！最终的配置类似于RAID 1+0，其中有两个镜像vdev，所有数据都分布在它们之间。在这种情况下，如果池中任何vdev出现故障，数据仍然得以保存。此外，池中有两个vdev：`mirror-0`
+    和 `mirror-1`。如果我们希望从镜像中移除一个磁盘，可以通过执行以下命令来完成：
 - en: '[PRE63]'
+  id: totrans-219
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: 'If the plan is to remove the whole mirror (`vdev`), execute the following command:'
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果计划是删除整个镜像（`vdev`），可以执行以下命令：
 - en: '[PRE64]'
+  id: totrans-221
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: All deletions were done successfully.
+  id: totrans-222
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有删除操作已成功完成。
 - en: 'A mirrored pool with two disks is fine and is used very often, but some companies
     require a more resilient configuration with three disks. To use a more realistic
     case, let''s create a mirrored pool with two disks, create a filesystem inside
     it, copy some aleatory data into this filesystem (the reader can choose any data),
     and finally, add a third disk. Perform the following commands:'
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个包含两个磁盘的镜像池是完全可以的，而且这种配置非常常见，但有些公司要求使用更具韧性的配置，比如三个磁盘。为了使用更实际的案例，我们来创建一个包含两个磁盘的镜像池，在其中创建一个文件系统，将一些随机数据复制到该文件系统中（读者可以选择任何数据），最后添加第三个磁盘。执行以下命令：
 - en: '[PRE65]'
+  id: totrans-224
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: 'Again, in the preceding command, we could have copied any data. Finally, the
     command that executes our task is as follows:'
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样，在之前的命令中，我们可以复制任何数据。最后，执行我们任务的命令如下：
 - en: '[PRE66]'
+  id: totrans-226
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: 'In the preceding command, we attached a new disk (`c8t10d0`) to a mirrored
     pool and specified where the current data would be copied from (`c8t9d0`). After
     resilvering (resynchronization), the pool organization is as follows:'
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 在之前的命令中，我们将一个新磁盘（`c8t10d0`）附加到镜像池，并指定当前数据的复制来源（`c8t9d0`）。重新同步（resilvering）后，池的组织结构如下：
 - en: '[PRE67]'
+  id: totrans-228
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: Now, the `mir_pool3` pool is a three-way mirror pool, and all data is resilvered
     (resynchronized).
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，`mir_pool3` 池已经是一个三路镜像池，所有数据已经重新同步（resilvered）。
 - en: 'Some maintenance procedures require that we disable a disk to prevent any reading
     or writing operation on this device. Thus, when this disk is put to the `offline`
     state, it remains `offline` even after a reboot. Considering our existing three-way
     mirrored pool, the last device can be put in `offline`:'
+  id: totrans-230
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些维护程序要求我们禁用磁盘，以防止对该设备进行任何读取或写入操作。因此，当该磁盘进入`offline`状态时，即使重启后，它仍将保持`offline`状态。考虑到我们现有的三路镜像池，最后一个设备可以被设置为`offline`：
 - en: '[PRE68]'
+  id: totrans-231
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: There are some interesting findings—the `c8t10d0` disk is `OFFLINE`, `vdev`
     (`mirror-0`) is in the `DEGRADED` state, and the `mir_pool3` pool is in the `DEGRADED`
     state too.
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: 有一些有趣的发现——`c8t10d0`磁盘处于`OFFLINE`状态，`vdev`（`mirror-0`）处于`DEGRADED`状态，而`mir_pool3`池也处于`DEGRADED`状态。
 - en: 'The opposite operation to change the status of a disk to `ONLINE` is very easy,
     and while the pool is being resilvered, its status will be `DEGRADED`:'
+  id: totrans-233
   prefs: []
   type: TYPE_NORMAL
+  zh: 将磁盘状态更改为`ONLINE`的操作非常简单，而且在池正在进行恢复操作时，它的状态将为`DEGRADED`：
 - en: '[PRE69]'
+  id: totrans-234
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: 'One of the most useful and interesting tasks when managing pools is disk replacement,
     which only happens when there are pools using one of the following configurations:
     `raid1`, `raidz`, `raidz2`, or `raid3`. Why? Because a disk replacement couldn''t
     compromise the data availability, and only these configurations can ensure this
     premise.'
+  id: totrans-235
   prefs: []
   type: TYPE_NORMAL
+  zh: 管理池时最有用和最有趣的任务之一就是磁盘替换，这只在使用以下配置之一的池中发生：`raid1`、`raidz`、`raidz2`或`raid3`。为什么？因为磁盘替换不会影响数据可用性，只有这些配置能够确保这一前提。
 - en: 'Two kinds of replacement exist:'
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 存在两种替换方式：
 - en: Replacement of a failed device by another in the same slot
+  id: totrans-237
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 用另一个设备替换同一槽位中的故障设备
 - en: Replacement of a failed device by another from another slot
+  id: totrans-238
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 用来自其他槽位的设备替换故障设备
 - en: Both methods are straight and easy to execute. For example, we're using VirtualBox
     in this example, and to simulate the first case, we're going to power off Oracle
     Solaris 11 (`solaris11-1`), remove the disk that will be replaced (`c8t10d0`),
     create a new one in the same slot, and power on the virtual machine again (`solaris11-1`).
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: 两种方法都非常直接且易于执行。例如，在这个示例中，我们使用VirtualBox，并且为了模拟第一种情况，我们将关闭Oracle Solaris 11（`solaris11-1`），移除要替换的磁盘（`c8t10d0`），在相同的槽位中创建一个新的磁盘，然后再次启动虚拟机（`solaris11-1`）。
 - en: 'Before performing all these steps, we''ll copy more data (here, it can be any
     data of your choice) to the `zfs1` filesystem inside the `mir_pool3` pool:'
+  id: totrans-240
   prefs: []
   type: TYPE_NORMAL
+  zh: 在执行所有这些步骤之前，我们将复制更多的数据（这里可以是任何你选择的数据）到`mir_pool3`池中的`zfs1`文件系统：
 - en: '[PRE70]'
+  id: totrans-241
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE70]'
 - en: 'On the VirtualBox Manager, click on the virtual machine with `solaris11-1`,
     go to **Settings**, and then go to **Storage**. Once there, remove the disks from
     slot 10 and create another disk at the same place (slot 10). After the physical
     replacement is done, power on the virtual machine (`solaris11-1`) again. After
     the login, open a terminal and execute the following command:'
+  id: totrans-242
   prefs: []
   type: TYPE_NORMAL
+  zh: 在VirtualBox管理器中，点击虚拟机`solaris11-1`，进入**设置**，然后进入**存储**。在这里，移除槽位10中的磁盘，并在同一位置（槽位10）创建另一个磁盘。物理更换完成后，再次启动虚拟机（`solaris11-1`）。登录后，打开终端并执行以下命令：
 - en: '[PRE71]'
+  id: totrans-243
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE71]'
 - en: 'As the `c8t10d0` device was exchanged for a new one, the `zpool status mir_pool3`
     command shows that it''s unavailable (`UNAVAIL`). This is the expected status.
     According to the previous explanation, the idea is that the failed disk is exchanged
     for another one in the same slot. Execute the following commands:'
+  id: totrans-244
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于`c8t10d0`设备被更换为新设备，`zpool status mir_pool3`命令显示它不可用（`UNAVAIL`）。这是预期的状态。根据前面的解释，目的是将故障磁盘替换为同一槽位中的另一个磁盘。执行以下命令：
 - en: '[PRE72]'
+  id: totrans-245
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE72]'
 - en: The `c8t10d0` disk was replaced and is being resilvered now. This time, we need
     to wait for the resilvering to complete.
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: '`c8t10d0`磁盘已被替换，并正在进行重同步操作。现在，我们需要等待重同步完成。'
 - en: 'If we''re executing the replacement for a disk from another slot, the procedure
     is easier. For example, in the following steps, we''re replacing the `c8t9d0`
     disk with `c8t3d0` by executing the following steps:'
+  id: totrans-247
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们是对来自另一个槽位的磁盘进行替换，过程会更简单。例如，在以下步骤中，我们将`c8t9d0`磁盘替换为`c8t3d0`，执行以下步骤：
 - en: '[PRE73]'
+  id: totrans-248
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE73]'
 - en: Again, after the resync process is over, everything will be okay.
+  id: totrans-249
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样，在重同步过程完成后，一切将恢复正常。
 - en: An overview of the recipe
+  id: totrans-250
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 操作概述
 - en: Managing disks is the most important task when working with ZFS. In this section,
     we learned how to add, remove, attach, detach, and replace a disk. All these processes
     will take a long time on a normal daily basis.
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: 管理磁盘是使用ZFS时最重要的任务。在本节中，我们学习了如何添加、移除、附加、分离和更换磁盘。所有这些过程在日常操作中会耗费大量时间。
 - en: Configuring spare disks
+  id: totrans-252
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 配置备用磁盘
 - en: In a big company environment, there are a hundred disks working 24/7, and literally,
     it's impossible to know when a disk will fail. Imagine lots of disks failing during
     the day and how much time the replacement operations would take. This pictured
     context is useful to show the importance of spare disks. When deploying spare
     disks in a pool in a system, if any disk fails, the spare disk will take its place
     automatically, and data availability won't be impacted.
+  id: totrans-253
   prefs: []
   type: TYPE_NORMAL
+  zh: 在大型公司环境中，有一百块磁盘 24/7 工作，实际上，无法预测什么时候磁盘会故障。想象一下，白天大量磁盘故障，替换操作将花费多长时间。这个场景有助于展示备用磁盘的重要性。在系统中为池部署备用磁盘时，如果某个磁盘发生故障，备用磁盘会自动替代它，数据的可用性不会受到影响。
 - en: In the ZFS framework, spare disks are configured per storage pool, and after
     the appropriate configuration, even when a disk fails, nothing is necessary. The
     ZFS makes the entire replacement job automatic.
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 ZFS 框架中，备用磁盘是按存储池配置的，经过适当配置后，即使某个磁盘发生故障，也不需要任何操作。ZFS 会自动完成整个替换过程。
 - en: Getting ready
+  id: totrans-255
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: This recipe requires a virtual machine (VirtualBox or VMware) that runs Oracle
     Solaris 11 with 4 GB RAM and at least eight disks of 4 GB each.
+  id: totrans-256
   prefs: []
   type: TYPE_NORMAL
+  zh: 此操作需要一个运行 Oracle Solaris 11、4 GB 内存并且至少有八块 4 GB 磁盘的虚拟机（VirtualBox 或 VMware）。
 - en: How to do it…
+  id: totrans-257
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'A real situation using spare disks is where there''s a mirrored pool, so to
     simulate this scenario, let''s execute the following command:'
+  id: totrans-258
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用备用磁盘的真实场景是有一个镜像池，因此，为了模拟这个场景，我们执行以下命令：
 - en: '[PRE74]'
+  id: totrans-259
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE74]'
 - en: 'Adding spare disks in this pool is done by executing the following commands:'
+  id: totrans-260
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此池中添加备用磁盘通过执行以下命令完成：
 - en: '[PRE75]'
+  id: totrans-261
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE75]'
 - en: 'As we mentioned earlier, spare disks will be used only when something wrong
     happens to the disks. To test the environment with spare disks, a good practice
     is shutting down Oracle Solaris 11 (`shutdown –y –g0`), removing the `c8t3d0`
     disk (SCSI slot 3) from the virtual machine''s configuration, and turning on the
     virtual machine again. The status of `mir_pool4` presented by Oracle Solaris 11
     is as follows:'
+  id: totrans-262
   prefs: []
   type: TYPE_NORMAL
+  zh: 如前所述，备用磁盘只有在磁盘出现故障时才会使用。为了使用备用磁盘测试环境，一个好的做法是关闭 Oracle Solaris 11（`shutdown –y
+    –g0`），从虚拟机配置中移除 `c8t3d0` 磁盘（SCSI 插槽 3），然后重新启动虚拟机。Oracle Solaris 11 展示的 `mir_pool4`
+    状态如下：
 - en: '[PRE76]'
+  id: totrans-263
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE76]'
 - en: Perfect! The disk that was removed is being shown as unavailable (`UNAVAIL`),
     and the `c8t5d0` spare disk has taken its place (`INUSE`). The pool is shown as
     `DEGRADED` to notify the administrator that a main disk is facing problems.
+  id: totrans-264
   prefs: []
   type: TYPE_NORMAL
+  zh: 完美！被移除的磁盘显示为不可用（`UNAVAIL`），而 `c8t5d0` 备用磁盘已取而代之（`INUSE`）。池显示为 `DEGRADED`，通知管理员主磁盘出现问题。
 - en: 'Finally, let''s return to the configuration—power off the virtual machine,
     reinsert the removed disk again to the same SCSI slot 3, and power on the virtual
     machine. After completing all the steps, run the following command:'
+  id: totrans-265
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，返回配置—关闭虚拟机，将移除的磁盘重新插入同一 SCSI 插槽 3，并重新启动虚拟机。完成所有步骤后，运行以下命令：
 - en: '[PRE77]'
+  id: totrans-266
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE77]'
 - en: 'According to the output, the `c8d5d0` spare disk continues to show its status
     as `INUSE` even when the `c8t3d0` disk is online again. To signal to the spare
     disk that `c8t3d0` is online again before Oracle Solaris updates it, execute the
     following commands:'
+  id: totrans-267
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据输出，当 `c8t3d0` 磁盘重新上线时，`c8d5d0` 备用磁盘仍然显示其状态为 `INUSE`。为了在 Oracle Solaris 更新之前通知备用磁盘
+    `c8t3d0` 已经重新上线，执行以下命令：
 - en: '[PRE78]'
+  id: totrans-268
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE78]'
 - en: ZFS is amazing. Initially, the `c8t3d0` disk has come online again, but the
     `c8t5d0` spare disk was still in use (`INUSE`). Afterwards, we ran the `zpool
     online mir_pool4 c8t3d0` command to confirm the online status of `c8t3d0`, and
     the spare disk (`c8t5d0`) became available and started acting as a spare disk.
+  id: totrans-269
   prefs: []
   type: TYPE_NORMAL
+  zh: ZFS 真是太棒了。最初，`c8t3d0` 磁盘已经重新上线，但 `c8t5d0` 备用磁盘仍处于使用中（`INUSE`）。之后，我们运行了 `zpool
+    online mir_pool4 c8t3d0` 命令来确认 `c8t3d0` 的在线状态，备用磁盘（`c8t5d0`）变为可用并开始作为备用磁盘工作。
 - en: 'Finally, remove the spare disk by executing the following command:'
+  id: totrans-270
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，通过执行以下命令移除备用磁盘：
 - en: '[PRE79]'
+  id: totrans-271
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE79]'
 - en: An overview of the recipe
+  id: totrans-272
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 配方概述
 - en: In this section, you saw how to configure spare disks, and some experiments
     were done to explain its exact working.
+  id: totrans-273
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，您看到了如何配置备用磁盘，并进行了实验以解释其确切的工作原理。
 - en: Handling ZFS snapshots and clones
+  id: totrans-274
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理 ZFS 快照和克隆
 - en: ZFS snapshot is a complex theme that can have its functionality extended using
     the hold and release operations. Additionally, other tasks such as renaming snapshots,
     promoting clones, and executing differential snapshots are crucial in daily administration.
     All these points will be covered in this recipe.
+  id: totrans-275
   prefs: []
   type: TYPE_NORMAL
+  zh: ZFS 快照是一个复杂的主题，可以通过使用挂起和释放操作来扩展其功能。此外，其他任务，如重命名快照、提升克隆和执行差异快照，在日常管理中也至关重要。所有这些内容将在本食谱中涵盖。
 - en: Getting ready
+  id: totrans-276
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: This recipe can be followed using a virtual machine (VirtualBox or VMware) with
     4 GB RAM, a running Oracle Solaris 11 application, and at least eight disks with
     4 GB each.
+  id: totrans-277
   prefs: []
   type: TYPE_NORMAL
+  zh: 本食谱可以通过一个虚拟机（VirtualBox 或 VMware）来执行，要求有 4 GB 的内存、运行中的 Oracle Solaris 11 应用程序，至少八个每个
+    4 GB 的磁盘。
 - en: How to do it…
+  id: totrans-278
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'From what we learned in the previous recipes, let''s create a pool and a filesystem,
     and populate this filesystem with any data (readers can copy any data into this
     filesystem) and two snapshots by executing the following commands:'
+  id: totrans-279
   prefs: []
   type: TYPE_NORMAL
+  zh: 从我们在前面的食谱中学到的内容来看，让我们创建一个池和一个文件系统，并通过执行以下命令将任何数据填充到该文件系统中（读者可以将任何数据复制到该文件系统），同时创建两个快照：
 - en: '[PRE80]'
+  id: totrans-280
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE80]'
 - en: 'Deleting a snapshot is easy as we already saw it previously in the chapter,
     and if it''s necessary, it can be done by executing the following command:'
+  id: totrans-281
   prefs: []
   type: TYPE_NORMAL
+  zh: 删除快照很简单，正如我们在本章前面看到的那样，如果有必要，可以通过执行以下命令来完成：
 - en: '[PRE81]'
+  id: totrans-282
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE81]'
 - en: 'Like the operation of removing a snapshot, renaming it is done by running the
     following command:'
+  id: totrans-283
   prefs: []
   type: TYPE_NORMAL
+  zh: 与删除快照的操作类似，重命名快照是通过运行以下命令完成的：
 - en: '[PRE82]'
+  id: totrans-284
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE82]'
 - en: 'Both actions (renaming and destroying) are common operations that are done
     when handling snapshots. Nonetheless, the big question that comes up is whether
     it would be possible to prevent a snapshot from being deleted. This is where a
     new snapshot operation named `hold` can help us. When a snapshot is put in `hold`
     status, it can''t be removed. This behavior can be configured by running the following
     command:'
+  id: totrans-285
   prefs: []
   type: TYPE_NORMAL
+  zh: 两个操作（重命名和销毁）是处理快照时常见的操作。然而，出现的一个大问题是，是否可以防止删除一个快照。这时，一个名为`hold`的新快照操作可以帮助我们。当一个快照处于`hold`状态时，它无法被删除。这种行为可以通过运行以下命令来配置：
 - en: '[PRE83]'
+  id: totrans-286
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE83]'
 - en: 'To list the snapshots on hold, execute the following commands:'
+  id: totrans-287
   prefs: []
   type: TYPE_NORMAL
+  zh: 要列出挂起的快照，请执行以下命令：
 - en: '[PRE84]'
+  id: totrans-288
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE84]'
 - en: 'Through the `zfs hold keep` command, the snapshot was left in suspension, and
     afterwards, we tried to remove it without success because of the hold. If there
     were other descendants from the `simple_pool/zfs1` filesystem, it would be possible
     to hold all of them by executing the following command:'
+  id: totrans-289
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过`zfs hold keep`命令，快照被挂起，之后我们尝试删除它，但由于挂起状态未能成功删除。如果`simple_pool/zfs1`文件系统有其他后代，我们可以通过执行以下命令挂起它们所有：
 - en: '[PRE85]'
+  id: totrans-290
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE85]'
 - en: 'An important detail must be reinforced here—a snapshot can only be destroyed
     when it''s released, and there''s a property named `userrefs` that tells whether
     the snapshot is being held or not. Using this information, the releasing and destruction
     operations can be executed in a row by running the following command:'
+  id: totrans-291
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要强调一个重要的细节——只有在释放后，快照才能被销毁，并且有一个名为`userrefs`的属性，它告诉我们快照是否处于挂起状态。使用这些信息，释放和销毁操作可以通过运行以下命令依次执行：
 - en: '[PRE86]'
+  id: totrans-292
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE86]'
 - en: 'Going a little further, Oracle Solaris 11 allows us to determine what has changed
     in a filesystem when comparing two snapshots. To understand how it works, the
     first step is to take a new snapshot named `snap_1`. Afterwards, we have to alter
     the content of the `simple_pool/zfs1` filesystem to take a new snapshot (`snap_2`)
     and determine what has changed in the filesystem. The entire procedure is accomplished
     by executing the following commands:'
+  id: totrans-293
   prefs: []
   type: TYPE_NORMAL
+  zh: 更进一步，Oracle Solaris 11 允许我们在比较两个快照时，确定文件系统中发生了哪些变化。要理解它是如何工作的，第一步是创建一个名为`snap_1`的新快照。之后，我们需要更改`simple_pool/zfs1`文件系统的内容，创建一个新的快照（`snap_2`），并确定文件系统中发生了哪些变化。整个过程可以通过执行以下命令完成：
 - en: '[PRE87]'
+  id: totrans-294
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE87]'
 - en: 'The following command is the most important from this procedure because it
     takes the differential snapshot:'
+  id: totrans-295
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下命令是这个过程中的最重要的一条，因为它用于执行差异快照：
 - en: '[PRE88]'
+  id: totrans-296
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE88]'
 - en: The previous command has shown that the new file in `/simple_pool_1/zfs1` is
     the `hosts` file, and it was expected according to our previous setup. The `+`
     identifier indicates that a file or directory was added, the `-` identifier indicates
     that a file or directory was removed, the `M` identifier indicates that a file
     or directory was modified, and the `R` identifier indicates that a file or directory
     was renamed.
+  id: totrans-297
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的命令显示，在`/simple_pool_1/zfs1`中的新文件是`hosts`文件，并且这是根据我们之前的设置所期望的。`+`标识符表示文件或目录被添加，`-`标识符表示文件或目录被删除，`M`标识符表示文件或目录被修改，`R`标识符表示文件或目录被重命名。
 - en: 'Now that we are reaching the end of this section, we should remember that earlier
     in this chapter, we reviewed how to make a clone from a snapshot, but not all
     operations were shown. The fact about clone is that it is possible to promote
     it to a normal filesystem and, eventually, remove the original filesystem (if
     necessary) because there isn''t a clone as a descendant anymore. Let''s verify
     the preceding sentence by running the following commands:'
+  id: totrans-298
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经接近本节的结尾，我们应该记得，在本章的早些时候，我们回顾了如何从快照中创建克隆，但并未展示所有的操作。关于克隆的事实是，它可以被提升为一个正常的文件系统，并最终删除原始的文件系统（如果需要），因为克隆不再是任何后代。让我们通过运行以下命令来验证前面的句子：
 - en: '[PRE89]'
+  id: totrans-299
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE89]'
 - en: 'Until this point, everything is okay. The next command shows us that `simple_pool_1/zfs1_clone`
     is indeed a clone:'
+  id: totrans-300
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，一切正常。下一条命令向我们展示，`simple_pool_1/zfs1_clone`确实是一个克隆：
 - en: '[PRE90]'
+  id: totrans-301
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE90]'
 - en: 'The next command promotes the existing clone to an independent filesystem:'
+  id: totrans-302
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一条命令将现有的克隆提升为独立的文件系统：
 - en: '[PRE91]'
+  id: totrans-303
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE91]'
 - en: We're able to prove that `simple_pool_1/zfs1_clone1` is a new filesystem because
     the clone didn't require any space (size of `25K`), and the recently promoted
     clone to filesystem takes 63.1M now. Moreover, the `origin` property doesn't point
     to a snapshot object anymore.
+  id: totrans-304
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们能够证明`simple_pool_1/zfs1_clone1`是一个新的文件系统，因为该克隆没有占用任何空间（大小为`25K`），而最近提升为文件系统的克隆现在占用了63.1M。此外，`origin`属性不再指向快照对象。
 - en: An overview of the recipe
+  id: totrans-305
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 配方概述
 - en: This section has explained how to create, destroy, hold, and release a snapshot,
     as well as how to promote a clone to a real filesystem. Furthermore, you saw how
     to determine the difference between two snapshots.
+  id: totrans-306
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节已经解释了如何创建、销毁、保持和释放快照，以及如何将克隆提升为真正的文件系统。此外，您还看到如何确定两个快照之间的差异。
 - en: Playing with COMSTAR
+  id: totrans-307
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 玩转COMSTAR
 - en: '**Common Protocol SCSI Target** (**COMSTAR**) is a framework that was introduced
     in Oracle Solaris 11; this makes it possible for Oracle Solaris 11 to access disks
     in another system that is running any operating system (Oracle Solaris, Oracle
     Enterprise Linux, and so on). This access happens through the network using protocols
     such as **iSCSI**, **Fibre** **Channel over Ethernet** (**FCoE**), or **Fibre
     Channel** (**FC**).'
+  id: totrans-308
   prefs: []
   type: TYPE_NORMAL
+  zh: '**常见协议SCSI目标**（**COMSTAR**）是Oracle Solaris 11中引入的一个框架；它使得Oracle Solaris 11能够通过网络访问运行任何操作系统（如Oracle
+    Solaris、Oracle Enterprise Linux等）的另一台系统上的磁盘。这种访问通过网络使用诸如**iSCSI**、**以太网光纤通道**（**FCoE**）或**光纤通道**（**FC**）等协议进行。'
 - en: One big advantage of using COMSTAR is that Oracle Solaris 11 is able to reach
     the disks on another machine without using a HBA board (very expensive) for an
     FC channel access. There are also disadvantages such as the fact that dump devices
     don't support the iSCSI disks offered by COMSTAR and the network infrastructure
     can become overloaded.
+  id: totrans-309
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用COMSTAR的一个大优点是，Oracle Solaris 11能够在不使用HBA卡（非常昂贵）的情况下，访问另一台机器上的磁盘，避免了FC通道访问。也有一些缺点，比如转储设备不支持COMSTAR提供的iSCSI磁盘，网络基础设施可能会变得过载。
 - en: Getting ready
+  id: totrans-310
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: This section requires two virtual machines that run Oracle Solaris 11, both
     with 4 GB RAM and eight 4 GB disks. Additionally, both virtual machines must be
     in the same network and have access to each other.
+  id: totrans-311
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节需要两台运行Oracle Solaris 11的虚拟机，每台虚拟机有4 GB内存和八个4 GB的磁盘。此外，这两台虚拟机必须在同一网络中，并且能够互相访问。
 - en: How to do it…
+  id: totrans-312
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'A good approach when configuring iSCSI is to have an initial plan, a well-defined
     list of disks that will be accessed using iSCSI, and to determine which system
     will be the initiator (`solaris11-2`) and the target (`solaris11-1`). Therefore,
     let''s list the existing disks by executing the following command:'
+  id: totrans-313
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置iSCSI时，一个好的方法是有一个初步计划，列出将通过iSCSI访问的磁盘，并确定哪个系统将是发起者（`solaris11-2`）和目标（`solaris11-1`）。因此，让我们通过执行以下命令来列出现有的磁盘：
 - en: '[PRE92]'
+  id: totrans-314
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE92]'
 - en: 'According to the previous two commands, the `c8t3d0` and `c8t12d0` disks are
     available for use. Nevertheless, unfortunately, the COMSTAR software isn''t installed
     in Oracle Solaris 11 by default; we have to install it to use the iSCSI protocol
@@ -1423,175 +2089,258 @@
     in [Chapter 1](part0015_split_000.html#page "Chapter 1. IPS and Boot Environments"),
     *IPS and Boot Environments*, we can confirm whether the appropriate package is
     or isn''t installed on the system by running the following command:'
+  id: totrans-315
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据前两个命令，`c8t3d0`和`c8t12d0`磁盘可以使用。然而，不幸的是，COMSTAR软件在Oracle Solaris 11中默认未安装；我们必须安装它才能在`solaris11-1`系统上使用iSCSI协议。因此，通过使用在[第1章](part0015_split_000.html#page
+    "Chapter 1. IPS和启动环境")中配置的IPS框架，*IPS和启动环境*，我们可以通过运行以下命令确认系统上是否安装了适当的包：
 - en: '[PRE93]'
+  id: totrans-316
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE93]'
 - en: 'The iSCSI target feature was installed through a package named `storage-server`,
     but the feature is only enabled if the `stmf` service is also enabled. Therefore,
     let''s enable the service by executing the following commands:'
+  id: totrans-317
   prefs: []
   type: TYPE_NORMAL
+  zh: iSCSI目标功能是通过一个名为`storage-server`的软件包安装的，但只有当`stmf`服务也启用时，功能才会被启用。因此，让我们通过执行以下命令启用该服务：
 - en: '[PRE94]'
+  id: totrans-318
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE94]'
 - en: At this point, the system is ready to be configured as an iSCSI target. Before
     proceeding, let's learn a new concept about ZFS.
+  id: totrans-319
   prefs: []
   type: TYPE_NORMAL
+  zh: 此时，系统已经准备好配置为iSCSI目标。在继续之前，让我们学习一个关于ZFS的新概念。
 - en: ZFS has a nice feature named ZFS volumes that represent and work as block devices.
     ZFS volumes are identified as devices in `/dev/zvol/dsk/rdsk/pool/[volume_name]`.
     The other nice thing about ZFS volumes is that after they are created, the size
     of the volume is reserved in the pool.
+  id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: ZFS有一个很好的功能，叫做ZFS卷，它代表并作为块设备工作。ZFS卷在`/dev/zvol/dsk/rdsk/pool/[volume_name]`中作为设备标识。ZFS卷的另一个优点是，当它们创建后，卷的大小会在池中保留。
 - en: It's necessary to create a ZFS volume and, afterwards, a **Logical Unit** (**LUN**)
     from this ZFS volume to use iSCSI in Oracle Solaris 11\. Eventually, less experienced
     administrators don't know that the LUN concept comes from the storage world (Oracle,
     EMC, and Hitachi). A storage box presents a volume (configured as raid0, raid1,
     raid5, and so on) to the operating system, and this volume is known as LUN, but
     from the operating system's point view, it's only a simple disk.
+  id: totrans-321
   prefs: []
   type: TYPE_NORMAL
+  zh: 有必要从ZFS卷中创建一个ZFS卷和一个**逻辑单元**（**LUN**），以便在Oracle Solaris 11中使用iSCSI。最终，经验较少的管理员可能不知道LUN概念来源于存储领域（如Oracle、EMC和日立）。一个存储设备向操作系统呈现一个卷（配置为raid0、raid1、raid5等），这个卷被称为LUN，但从操作系统的角度来看，它只是一个普通的磁盘。
 - en: 'So, let''s create a ZFS volume. The first step is to create a pool:'
+  id: totrans-322
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，让我们创建一个ZFS卷。第一步是创建一个池：
 - en: '[PRE95]'
+  id: totrans-323
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE95]'
 - en: 'Now, it''s time to create a volume (in this case, using a size of 2 GB) by
     running the following command:'
+  id: totrans-324
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，是时候创建一个卷了（在本例中，使用2 GB的大小），通过运行以下命令：
 - en: '[PRE96]'
+  id: totrans-325
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE96]'
 - en: 'Next, as a requirement to present the volume through the network using iSCSI,
     it''s necessary to create LUN from the `mypool_iscsi/myvolume` volume:'
+  id: totrans-326
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，作为通过网络使用iSCSI呈现卷的要求，必须从`mypool_iscsi/myvolume`卷创建LUN：
 - en: '[PRE97]'
+  id: totrans-327
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE97]'
 - en: 'Our main concern is to make the recently created LUN viewable from any host
     that needs to access it. So, let''s configure the access that is available and
     permitted from all hosts by running the following command:'
+  id: totrans-328
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的主要关注点是使最近创建的LUN可以被任何需要访问它的主机查看。因此，让我们通过运行以下命令来配置允许并允许所有主机访问：
 - en: '[PRE98]'
+  id: totrans-329
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE98]'
 - en: 'Currently, the iSCSI target service can be disabled; now, it must be checked
     and enabled if necessary:'
+  id: totrans-330
   prefs: []
   type: TYPE_NORMAL
+  zh: 当前，iSCSI目标服务可以禁用；现在，必须检查并在必要时启用它：
 - en: '[PRE99]'
+  id: totrans-331
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE99]'
 - en: 'It''s important to realize the dependencies from this service by executing
     the following command:'
+  id: totrans-332
   prefs: []
   type: TYPE_NORMAL
+  zh: 执行以下命令以意识到此服务的依赖关系非常重要：
 - en: '[PRE100]'
+  id: totrans-333
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE100]'
 - en: 'Now that the iSCSI target service is enabled, let''s create a new iSCSI target.
     Remember that to access the available disks through the network and using iSCSI,
     we have to create a target (something like an access port or an iSCSI server)
     to enable this access. Then, to create a target in the `solaris11-1` machine,
     execute the following command:'
+  id: totrans-334
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在iSCSI目标服务已启用，让我们创建一个新的iSCSI目标。请记住，为了通过网络访问可用的磁盘并使用iSCSI，我们必须创建一个目标（类似于一个访问端口或iSCSI服务器）来启用这种访问。然后，为了在`solaris11-1`机器上创建目标，请执行以下命令：
 - en: '[PRE101]'
+  id: totrans-335
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE101]'
 - en: 'The iSCSI target has some important default properties, and one of them determines
     whether an authentication scheme will be required or not. The following output
     confirms that authentication (`auth`) isn''t enabled:'
+  id: totrans-336
   prefs: []
   type: TYPE_NORMAL
+  zh: iSCSI目标具有一些重要的默认属性，其中之一确定是否需要身份验证方案。以下输出确认身份验证（`auth`）未启用：
 - en: '[PRE102]'
+  id: totrans-337
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE102]'
 - en: From here, we are handling two systems—`solaris11-1` (`192.168.1.106`), which
     was configured as the iSCSI target, and `solaris11-2` (`192.168.1.109`), which
     will be used as an initiator. By the way, we should remember that an iSCSI initiator
     is a kind of iSCS client that's necessary to access iSCSI disks offered by other
     systems.
+  id: totrans-338
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们处理的是两个系统——`solaris11-1`（`192.168.1.106`），它已配置为iSCSI目标，以及`solaris11-2`（`192.168.1.109`），它将作为发起器使用。顺便提一下，我们应该记住，iSCSI发起器是一种iSCSI客户端，必须用来访问其他系统提供的iSCSI磁盘。
 - en: 'To configure an initiator, the first task is to verify that the iSCSI initiator
     service and its dependencies are enabled by executing the following command:'
+  id: totrans-339
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置发起器的第一步是通过执行以下命令验证iSCSI发起器服务及其依赖项是否已启用：
 - en: '[PRE103]'
+  id: totrans-340
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE103]'
 - en: 'The configured initiator has some very interesting properties:'
+  id: totrans-341
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置的发起器具有一些非常有趣的属性：
 - en: '[PRE104]'
+  id: totrans-342
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE104]'
 - en: According to the preceding output, `Authentication Type` is configured to `NONE`;
     this is the same configuration for the target. For now, it's appropriate because
     both systems must have the same authentication scheme.
+  id: totrans-343
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据前面的输出，`Authentication Type`被配置为`NONE`；这是目标的相同配置。现在，这样的配置是适当的，因为两个系统必须使用相同的认证方案。
 - en: 'Before the iSCSI configuration procedure, there are three methods to find an
     iSCSI disk on another system: static, send target, and iSNS. However, while all
     of them certainly have a specific use for different scenarios, a complete explanation
     about these methods is out of scope. Therefore, we will choose the *send target*
     method that is a kind of automatic mechanism to find iSCSI disks in internal networks.'
+  id: totrans-344
   prefs: []
   type: TYPE_NORMAL
+  zh: 在iSCSI配置程序之前，有三种方法可以在另一个系统上找到iSCSI磁盘：静态、发送目标和iSNS。然而，虽然它们在不同场景中各有其特定用途，但对这些方法的详细解释超出了本文的范围。因此，我们将选择*发送目标*方法，这是一种自动机制，用于在内部网络中查找iSCSI磁盘。
 - en: 'To verify the configured method and to enable the send targets methods, execute
     the following commands:'
+  id: totrans-345
   prefs: []
   type: TYPE_NORMAL
+  zh: 要验证已配置的方法并启用发送目标方法，请执行以下命令：
 - en: '[PRE105]'
+  id: totrans-346
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE105]'
 - en: 'The `solaris11-1` system was configured as an iSCSI target, and we created
     a LUN in this system to be accessed by the network. On the `solaris11-2` system
     (iSCSI initiator), we have to register the iSCSI target system (`solaris11-1`)
     to discover which LUNs are available to be accessed. To accomplish these tasks,
     execute the following commands:'
+  id: totrans-347
   prefs: []
   type: TYPE_NORMAL
+  zh: '`solaris11-1`系统已配置为iSCSI目标，并且我们在此系统中创建了一个LUN，以便通过网络访问。在`solaris11-2`系统（iSCSI发起器）中，我们必须注册iSCSI目标系统（`solaris11-1`），以便发现可访问的LUN。要完成这些任务，请执行以下命令：'
 - en: '[PRE106]'
+  id: totrans-348
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE106]'
 - en: The previous command shows the configured target on the `solaris11-1` system
     (first line of the output).
+  id: totrans-349
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述命令显示了在`solaris11-1`系统上配置的目标（输出的第一行）。
 - en: 'To confirm the successfully added target, iSCSI LUNs available from the iSCSI
     target (`solaris11-1`) are shown by the following command:'
+  id: totrans-350
   prefs: []
   type: TYPE_NORMAL
+  zh: 要确认成功添加的目标，可以通过以下命令查看来自iSCSI目标（`solaris11-1`）的可用iSCSI LUN：
 - en: '[PRE107]'
+  id: totrans-351
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE107]'
 - en: 'The iSCSI volume (presented as a disk for the iSCSI initiator) from the `solaris11-1`
     system was found, and it can be used normally as it is a local device. To test
     it, execute the following command:'
+  id: totrans-352
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`solaris11-1`系统中找到了iSCSI卷（作为iSCSI发起器呈现为磁盘），并且由于它是本地设备，所以可以正常使用。要进行测试，请执行以下命令：
 - en: '[PRE108]'
+  id: totrans-353
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE108]'
 - en: Normally, this configuration (without authentication) is the configuration that
     we'll see in most companies, although it isn't recommended.
+  id: totrans-354
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，这种配置（没有认证）是大多数公司会看到的配置，尽管不推荐这样做。
 - en: Some businesses require that all data communication be authenticated, requiring
     both the iSCSI target and initiator to be configured with an authentication scheme
     where a password is set on the iSCSi target (`solaris11-1`), forcing the same
     credential to be set on the iSCSI initiator (`solaris11-2`).
+  id: totrans-355
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些企业要求所有数据通信都必须经过认证，因此需要同时在iSCSI目标和发起器上配置认证方案，在iSCSI目标（`solaris11-1`）上设置密码，并强制在iSCSI发起器（`solaris11-2`）上设置相同的凭据。
 - en: When managing authentication, it's possible to configure the iSCSI authentication
     scheme using the CHAP method (unidirectional or bidirectional) or even RADIUS.
     As an example, we're going to use CHAP unidirectional where the client (`solaris
@@ -1599,126 +2348,176 @@
     iSCSI target) to access the iSCSI target devices (LUNs or, at the end, ZFS volumes).
     However, if a bidirectional authentication was used, both the target and initiator
     should present a CHAP password to authenticate each other.
+  id: totrans-356
   prefs: []
   type: TYPE_NORMAL
 - en: 'On the `solaris11-1` system, list the current target''s configuration by executing
     the following command:'
+  id: totrans-357
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE109]'
+  id: totrans-358
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE109]'
 - en: 'According to the output, currently, the authentication isn''t configured to
     use the CHAP authentication. Therefore, it can be done by executing the following
     command:'
+  id: totrans-359
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE110]'
+  id: totrans-360
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE110]'
 - en: 'That''s great, but there isn''t any enabled password to make the authentication
     happen. Thus, we have to set a password (`packt1234567`) to complete the target
     configuration. By the way, the password is long because the CHAP password must
     have 12 characters at least:'
+  id: totrans-361
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE111]'
+  id: totrans-362
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE111]'
 - en: 'On the `solaris11-2` system, the CHAP authentication must be set up to make
     it possible for the initiator to log in to the target; now, execute the following
     command:'
+  id: totrans-363
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE112]'
+  id: totrans-364
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE112]'
 - en: 'On the `solaris11-2` system (initiator), we have to confirm that it continues
     using the iSCSI dynamic discovery (`sendtargets`):'
+  id: totrans-365
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE113]'
+  id: totrans-366
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE113]'
 - en: 'The same password from the target (`packt1234567`) must be set on the `solaris11-2`
     system (initiator). Moreover, the CHAP authentication also must be configured
     by running the following command:'
+  id: totrans-367
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE114]'
+  id: totrans-368
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE114]'
 - en: 'Verifying the authentication configuration from the initiator node and available
     targets can be done using the following command:'
+  id: totrans-369
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE115]'
+  id: totrans-370
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE115]'
 - en: 'Finally, we have to update the device tree configuration using the `devfsadm`
     command to confirm that the target is available for the initiator (`solaris11-2`)
     access. If everything has gone well, the iSCSI disk will be visible using the
     `format` command:'
+  id: totrans-371
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE116]'
+  id: totrans-372
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE116]'
 - en: 'As a simple example, the following commands create a pool and filesystem using
     the iSCSI disk that was discovered and configured in the previous steps:'
+  id: totrans-373
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE117]'
+  id: totrans-374
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE117]'
 - en: 'Great! The iSCSI configuration with the CHAP authentication has worked smoothly.
     Now, to consolidate all the acquired knowledge, the following commands undo all
     the iSCSI configurations, first on the initiator (`solaris11-2`) and afterwards
     on the target (`solaris11-1`), as follows:'
+  id: totrans-375
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE118]'
+  id: totrans-376
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE118]'
 - en: 'By updating the device tree (the `devfsadm` and `format` commands), we can
     see that the iSCSI disk has disappeared:'
+  id: totrans-377
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE119]'
+  id: totrans-378
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE119]'
 - en: 'Now, the unconfiguring process must be done on the target (`solaris11-2`).
     First, list the existing LUNs:'
+  id: totrans-379
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE120]'
+  id: totrans-380
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE120]'
 - en: 'Remove the existing LUN:'
+  id: totrans-381
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE121]'
+  id: totrans-382
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE121]'
 - en: 'List the currently configured targets:'
+  id: totrans-383
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE122]'
+  id: totrans-384
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE122]'
 - en: 'Delete the existing targets:'
+  id: totrans-385
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE123]'
+  id: totrans-386
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE123]'
 - en: 'Destroy the pool that contains the iSCSI disk:'
+  id: totrans-387
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE124]'
+  id: totrans-388
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE124]'
 - en: Finally, we did it. There isn't an iSCSI configuration anymore.
+  id: totrans-389
   prefs: []
   type: TYPE_NORMAL
 - en: A few months ago, I wrote a tutorial that explains how to configure a free VTL
@@ -1727,91 +2526,120 @@
     interesting to see a real case about how to use the iSCSI initiator to access
     an external application. Check the references at the end of this chapter to learn
     more about this VTL document.
+  id: totrans-390
   prefs: []
   type: TYPE_NORMAL
 - en: An overview of the recipe
+  id: totrans-391
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
 - en: In this section, you learned about all the iSCSI configurations using COMSTAR
     with and without the CHAP authentication. Moreover, the undo configuration steps
     were also provided.
+  id: totrans-392
   prefs: []
   type: TYPE_NORMAL
 - en: Mirroring the root pool
+  id: totrans-393
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: Nowadays, systems running very critical applications without a working mirrored
     boot disk is something unthinkable. However, when working with ZFS, the mirroring
     process of the boot disk is smooth and requires few steps to accomplish it.
+  id: totrans-394
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-395
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: To follow this recipe, it's necessary to have a virtual machine (VirtualBox
     or VMware) that runs Oracle Solaris 11 with 4 GB RAM and a disk the same size
     as the existing boot disk. This example uses an 80 GB disk.
+  id: totrans-396
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it…
+  id: totrans-397
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'Before thinking about boot disk mirroring, the first thing to do is check is
     the `rpool` health:'
+  id: totrans-398
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE125]'
+  id: totrans-399
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE125]'
 - en: 'According to this output, `rpool` is healthy, so the next step is to choose
     a disk with a size that is equal to or bigger than the original `rpool` disk.
     Then, we need to call the `format` tool and prepare it to receive the same data
     from the original disk as follows:'
+  id: totrans-400
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE126]'
+  id: totrans-401
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE126]'
 - en: 'Once we''ve chosen which will be the mirrored disk, the second disk has to
     be attached to the existing root pool (`rpool`) to mirror the boot and system
     files. Remember that the mirroring process will include all the snapshots from
     the filesystem under the `rpool` disk. The mirroring process is initiated by running:'
+  id: totrans-402
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE127]'
+  id: totrans-403
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE127]'
 - en: Note
+  id: totrans-404
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
 - en: Make sure that you wait until resilvering is done before rebooting.
+  id: totrans-405
   prefs: []
   type: TYPE_NORMAL
 - en: 'To follow the mirroring process, execute the following commands:'
+  id: totrans-406
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE128]'
+  id: totrans-407
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE128]'
 - en: 'To avoid executing the previous command several times, it would be simpler
     to make a script as follows:'
+  id: totrans-408
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE129]'
+  id: totrans-409
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE129]'
 - en: 'Finally, the `rpool` pool is completely mirrored as follows:'
+  id: totrans-410
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE130]'
+  id: totrans-411
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE130]'
 - en: An overview of the recipe
+  id: totrans-412
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -1820,9 +2648,11 @@
     disk (through BIOS, we're able to initialize the system from the mirrored disk).
     For example, this example was done using VirtualBox, so the alternative disk can
     be chosen using the *F12* key.
+  id: totrans-413
   prefs: []
   type: TYPE_NORMAL
 - en: ZFS shadowing
+  id: totrans-414
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -1833,6 +2663,7 @@
     copy (migrate) data through NFS or locally (between two machines), and the filesystem
     types that can be used as the origin are UFS, VxFS (from Symantec), and surely,
     the fantastic ZFS.
+  id: totrans-415
   prefs: []
   type: TYPE_NORMAL
 - en: An additional and very attractive characteristic of this feature is the fact
@@ -1840,9 +2671,11 @@
     at the target, and it can access all data that was already migrated. If the required
     data wasn't copied to the new machine (target) while being accessed, then ZFS
     will fail through to the source (original data).
+  id: totrans-416
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-417
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1850,9 +2683,11 @@
     with Oracle Solaris 11 installed and 4 GB RAM each. Furthermore, the example will
     show you how to migrate data from an existing filesystem (`/shadowing_pool/origin_filesystem`)
     in the `solaris11-2` system (source) to the `solaris11-1` system (target or destination).
+  id: totrans-418
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it…
+  id: totrans-419
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1861,99 +2696,137 @@
     Therefore, the first step to handle shadowing is to install the `shadow-migration`
     package on the destination machine to where the data will be migrated, by executing
     the following command:'
+  id: totrans-420
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE131]'
+  id: totrans-421
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE131]'
 - en: 'After the installation of the package, it''s suggested that you check whether
     the shadowing service is enabled, by executing the following command:'
+  id: totrans-422
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE132]'
+  id: totrans-423
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE132]'
 - en: 'As the shadowing service isn''t enabled, run the following command to enable
     it:'
+  id: totrans-424
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE133]'
+  id: totrans-425
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE133]'
 - en: On the second machine (`solaris11-2`, the source host), the filesystem to be
     migrated must be shared in a read-only mode using NFS. Why must it be read-only
     ? Because the content can't change during the migration.
+  id: totrans-426
   prefs: []
   type: TYPE_NORMAL
 - en: 'Let''s set up a test ZFS filesystem to be migrated using Shadow Migration and
     to make the filesystem read-only:'
+  id: totrans-427
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE134]'
+  id: totrans-428
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE134]'
 - en: 'The following command copies some data (readers can copy anything) to the `shadowing_pool/origin_filesystem`
     filesystem from `solaris11-2` to simulate a real case of migration:'
+  id: totrans-429
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE135]'
+  id: totrans-430
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE135]'
 - en: 'Share the origin filesystem as read-only data (`-o ro`) using the NFS service
     by executing the following command:'
+  id: totrans-431
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE136]'
+  id: totrans-432
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE136]'
 - en: 'On the first machine (`solaris11-1`), which is the destination where data will
     be migrated (copied), check whether the NFS share is okay and reachable by running
     the following command:'
+  id: totrans-433
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE137]'
+  id: totrans-434
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE137]'
 - en: 'The system is all in place. The shadowing process is ready to start from the
     second system (`solaris11-2`) to the first system (`solaris11-1`). This process
     will create the `shadowed_pool/shad_filesystem` filesystem by executing the following
     command:'
+  id: totrans-435
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE138]'
+  id: totrans-436
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE138]'
 - en: 'The shadowing process can be tracked by running the `shadowstat` command:'
+  id: totrans-437
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE139]'
+  id: totrans-438
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE139]'
 - en: 'The finished shadowing task is verified by executing the following command:'
+  id: totrans-439
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE140]'
+  id: totrans-440
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE140]'
 - en: 'The shadowing process worked! Moreover, the same operation is feasible to be
     accomplished using two local ZFS filesystems (the previous process was done through
     NFS between the `solaris11-2` and `solaris11-1` systems). Thus, the entire recipe
     can be repeated to copy some files to the source filesystem (it can be any data
     we want) and to start the shadowing activity by running the following commands:'
+  id: totrans-441
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE141]'
+  id: totrans-442
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE141]'
 - en: 'Everything has worked perfectly as expected, but in this case, we used two
     local ZFS filesystems instead of using the NFS service. Therefore, the completed
     process can be checked and finished by executing the following command:'
+  id: totrans-443
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE142]'
+  id: totrans-444
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE142]'
 - en: An overview of the recipe
+  id: totrans-445
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -1961,9 +2834,11 @@
     filesystem through NFS and using local filesystems. In both cases, it's necessary
     to set the read-only mode for the source filesystem. Furthermore, you learned
     how to monitor the shadowing using `shadowstat` and even the `shadow` property.
+  id: totrans-446
   prefs: []
   type: TYPE_NORMAL
 - en: Configuring ZFS sharing with the SMB share
+  id: totrans-447
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -1972,9 +2847,11 @@
     File System** (**CIFS**) protocols, both being very common in the Windows world.
     In this section, we're going to configure two filesystems and access these using
     CIFS.
+  id: totrans-448
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-449
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1982,26 +2859,34 @@
     Solaris 11, with 4 GB memory each, and some test disks with 4 GB. Furthermore,
     we'll require an additional machine that runs Windows (for example, Windows 7)
     to test the CIFS shares offered by Oracle Solaris 11.
+  id: totrans-450
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it…
+  id: totrans-451
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'To begin the recipe, it''s necessary to install the smb service by executing
     the following command:'
+  id: totrans-452
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE143]'
+  id: totrans-453
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE143]'
 - en: 'Let''s create a pool and two filesystems inside it by executing the following
     command:'
+  id: totrans-454
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE144]'
+  id: totrans-455
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE144]'
 - en: Another crucial configuration is to set mandatory locking (the `nbmand` property)
     for each filesystem, which will be offered by CIFS, because Unix usually uses
     advisory locking and SMB uses mandatory locking. A very quick explanation about
@@ -2009,164 +2894,220 @@
     clients (or processes) from having read or write access to a shared file. On the
     other hand, mandatory clients prevent any non-cooperating clients (or processes)
     from having read or write access to shared file.
+  id: totrans-456
   prefs: []
   type: TYPE_NORMAL
 - en: 'We can accomplish this task by running the following commands:'
+  id: totrans-457
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE145]'
+  id: totrans-458
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE145]'
 - en: 'Our initial setup is ready. The following step shares the `cifs_pool/zfs_cifs_1`
     and `cifs_pool/zfs_cifs_2` filesystems through the SMB protocol and configures
     a share name (`name`), protocol (`prot`), and path (`file system path`). Moreover,
     a cache client (`csc`) is also configured to smooth the performance when the filesystem
     is overused:'
+  id: totrans-459
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE146]'
+  id: totrans-460
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE146]'
 - en: 'Finally, to enable the SMB share feature for each filesystem, we must set the
     `sharesmb` attribute to `on`:'
+  id: totrans-461
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE147]'
+  id: totrans-462
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE147]'
 - en: 'The SMB Server service isn''t enabled by default. By the way, the **Service
     Management Facility** (**SMF**) still wasn''t introduced, but the `svcs –a` command
     lists all the installed services and shows which services are online, offline,
     or disabled. As we are interested only in the `smb/server` service, we can use
     the `grep` command to filter the target service by executing the following command:'
+  id: totrans-463
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE148]'
+  id: totrans-464
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE148]'
 - en: 'The `smb/server` service is disabled, and to enable it, you need to execute
     the following command:'
+  id: totrans-465
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE149]'
+  id: totrans-466
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE149]'
 - en: 'A suitable test is to list the shares provided by the SMB server either by
     getting the value of the `share` filesystem property or by executing the `share`
     command as follows:'
+  id: totrans-467
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE150]'
+  id: totrans-468
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE150]'
 - en: 'To proceed with a real test that accesses an SMB share, let''s create a regular
     user named `aborges` and assign a password to him by running the following command:'
+  id: totrans-469
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE151]'
+  id: totrans-470
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE151]'
 - en: 'The user `aborges` needs to be enabled in the SMB service, so execute the following
     command:'
+  id: totrans-471
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE152]'
+  id: totrans-472
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE152]'
 - en: 'To confirm that the user `aborges` was created and enabled for the SMB service,
     run the following command:'
+  id: totrans-473
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE153]'
+  id: totrans-474
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE153]'
 - en: 'According to the previous output, a **security identifier** (**SID**) was assigned
     to the user `aborges`. The next step is to enable the SMB authentication by adding
     a new library (`pam_smb_passwd.so.1`) in the authentication scheme by executing
     the following command:'
+  id: totrans-475
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE154]'
+  id: totrans-476
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE154]'
 - en: 'The best way to test all the steps until here is to verify that the shares
     are currently being offered to the other machine (`solaris11-2`) by running the
     following command:'
+  id: totrans-477
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE155]'
+  id: totrans-478
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE155]'
 - en: 'To show which shares are available from the `solaris11-1` host, run the following
     command:'
+  id: totrans-479
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE156]'
+  id: totrans-480
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE156]'
 - en: 'To mount the first ZFS share (`zfs_cifs_1`) using the SMB service on `solaris11-2`
     from `solaris11-1`, execute the following command:'
+  id: totrans-481
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE157]'
+  id: totrans-482
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE157]'
 - en: 'The mounted filesystem is an SMB filesystem (`-F smbfs`), and it''s easy to
     check its content by executing the following commands:'
+  id: totrans-483
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE158]'
+  id: totrans-484
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE158]'
 - en: 'SMB is very common in Windows environments, and then, it would be nice to access
     these shares from a Windows machine (Windows 7 in this case) by accessing the
     network shares by going to the **Start** menu and typing `\\192.168.1.119` as
     shown in the following screenshot:'
+  id: totrans-485
   prefs: []
   type: TYPE_NORMAL
 - en: '![How to do it…](img/00008.jpeg)'
+  id: totrans-486
   prefs: []
   type: TYPE_IMG
 - en: 'From the previous screenshot, there are two shares being offered to us: `zfs_cifs_1`
     and `zfs_cifs_2`. Therefore, we can try to access one of them by double-clicking
     it and filling out the credentials as shown in the following screenshot:'
+  id: totrans-487
   prefs: []
   type: TYPE_NORMAL
 - en: '![How to do it…](img/00009.jpeg)'
+  id: totrans-488
   prefs: []
   type: TYPE_IMG
 - en: 'As expected, the username and password are required according to the rules
     from the Windows system that enforce the `[Workgroup][Domain]\[user]` syntax.
     So, after we fill the textboxes, the `zfs_cifs_1 file system` content is shown
     as seen in the following screenshot:'
+  id: totrans-489
   prefs: []
   type: TYPE_NORMAL
 - en: '![How to do it…](img/00010.jpeg)'
+  id: totrans-490
   prefs: []
   type: TYPE_IMG
 - en: 'Everything has worked as we expected, and if we need to undo the SMB sharing
     offered by the `solaris11-1` system, it''s easy to do so by executing the following
     command:'
+  id: totrans-491
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE159]'
+  id: totrans-492
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE159]'
 - en: An overview of the recipe
+  id: totrans-493
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
 - en: In this section, the CIFS sharing in Oracle Solaris 11 was also explained in
     a step-by-step procedure that showed us how to configure and access CIFS shares.
+  id: totrans-494
   prefs: []
   type: TYPE_NORMAL
 - en: Setting and getting other ZFS properties
+  id: totrans-495
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: Managing ZFS properties is one of the secrets when we are working with the ZFS
     filesystem, and this is the reason why understanding the inherence concept is
     very important.
+  id: totrans-496
   prefs: []
   type: TYPE_NORMAL
 - en: 'One ZFS property can usually have three origins as source: `local` (the property
@@ -2176,17 +3117,21 @@
     and `none` (the property is read-only, and its value was generated by ZFS). Based
     on these key concepts, the sections are going to present different and interesting
     properties for daily administration.'
+  id: totrans-497
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-498
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: This recipe can be followed using two virtual machines (VirtualBox or VMware)
     with Oracle Solaris 11 installed, 4 GB RAM, and eight disks of at least 4 GB.
+  id: totrans-499
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it…
+  id: totrans-500
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -2195,20 +3140,27 @@
     and configure. Therefore, the following commands will create a pool and three
     filesystems under this pool. Additionally, we are going to copy some data (a reminder
     again—we could use any data) into the first filesystem as follows:'
+  id: totrans-501
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE160]'
+  id: totrans-502
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE160]'
 - en: 'To get all the properties from a pool and filesystem, execute the following
     command:'
+  id: totrans-503
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE161]'
+  id: totrans-504
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE161]'
 - en: Both commands have a similar syntax, and we've got all the properties from the
     `prop_pool` pool and the `prop_pool/zfs_1` filesystem.
+  id: totrans-505
   prefs: []
   type: TYPE_NORMAL
 - en: In the *ZFS shadowing* section, we touched the NFS subject, and some filesystems
@@ -2217,64 +3169,88 @@
     default (when we use this value, it isn't managed by ZFS and is still using `/etc/dfs/dfstab`).
     Let's take the `sharenfs` property, which will be used to highlight some basic
     concepts about properties.
+  id: totrans-506
   prefs: []
   type: TYPE_NORMAL
 - en: 'As usual, the property listing is too long; it is faster to get only one property''s
     value by executing the following command:'
+  id: totrans-507
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE162]'
+  id: totrans-508
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE162]'
 - en: 'Moreover, the same property can be got recursively by running the following
     command:'
+  id: totrans-509
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE163]'
+  id: totrans-510
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE163]'
 - en: From the last three outputs, we noticed that the `sharenfs` property is disabled
     on the pool and filesystems, and this is the default value set by Oracle Solaris
     11.
+  id: totrans-511
   prefs: []
   type: TYPE_NORMAL
 - en: 'The `sharenfs` property can be enabled by executing the following command:'
+  id: totrans-512
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE164]'
+  id: totrans-513
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE164]'
 - en: 'As `sharenfs` was set to `on` for `prop_pool/zfs_1`, the source value has changed
     to `local`, indicating that this value wasn''t inherited, but it was set locally.
     Therefore, execute the following command:'
+  id: totrans-514
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE165]'
+  id: totrans-515
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE165]'
 - en: 'The NFS sharing can be confirmed by running the following command:'
+  id: totrans-516
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE166]'
+  id: totrans-517
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE166]'
 - en: 'Creating a new file stem under `zfs_1` shows us an interesting characteristic.
     Execute the following command:'
+  id: totrans-518
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE167]'
+  id: totrans-519
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE167]'
 - en: 'The new `zfs_4` filesystem has the `sharenfs` property inherited from the `upper
     zfs_1` filesystem; now execute the following command to list all the inherited
     properties:'
+  id: totrans-520
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE168]'
+  id: totrans-521
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE168]'
 - en: That's great! The new `zfs_4` filesystem has inherited the `sharenfs` property,
     and it appears in the `share` output command.
+  id: totrans-522
   prefs: []
   type: TYPE_NORMAL
 - en: 'A good question is whether a filesystem will be able to fill all the space
@@ -2282,20 +3258,26 @@
     properties related to the amount of space on the disk. The first of them, the
     `quota` property, is a well-known property that limits how much space a dataset
     (filesystem in this case) can fill in a pool. Let''s take an example:'
+  id: totrans-523
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE169]'
+  id: totrans-524
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE169]'
 - en: 'All filesystems struggle to use the same space (`3.52G`), and one of them can
     fill more space than the other (or all the free space), so it is possible that
     a filesystem suffered a "run out space" error. A solution would be to limit the
     space a filesystem can take up by executing the following command:'
+  id: totrans-525
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE170]'
+  id: totrans-526
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE170]'
 - en: The `zfs_3` filesystem space was limited to 1 GB, and it can't exceed this threshold.
     Nonetheless, there isn't any additional guarantee that it has 1 GB to fill. This
     is subtle—it can't exceed 1 GB, but there is no guarantee that even 1 GB is enough
@@ -2303,6 +3285,7 @@
     and all the descendants such as snapshots and clones. Finally and obviously, it
     isn't possible to set a quota value lesser than the currently used space of the
     dataset.
+  id: totrans-527
   prefs: []
   type: TYPE_NORMAL
 - en: A solution for this apparent problem is the `reservation` property. When using
@@ -2310,56 +3293,77 @@
     take this space. Sure, it isn't possible to make a reservation above the quota
     or maximum free space, and the same rule is followed—the reservation is for a
     filesystem and its descendants.
+  id: totrans-528
   prefs: []
   type: TYPE_NORMAL
 - en: 'When the `reservation` property is set to a value, this amount is discounted
     from the total available pool space, and the used pool space is increased by the
     same value:'
+  id: totrans-529
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE171]'
+  id: totrans-530
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE171]'
 - en: 'Each dataset under `prop_pool` has its `reservation` property:'
+  id: totrans-531
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE172]'
+  id: totrans-532
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE172]'
 - en: 'The `reservation` property is configured to a specific value (for example,
     512 MB), given that this amount is subtracted from the pool''s available space
     and added to its used space. Now, execute the following command:'
+  id: totrans-533
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE173]'
+  id: totrans-534
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE173]'
 - en: The concern about space is usually focused on a total value for the whole pool,
     but it's possible to limit the available space for individual users or groups.
+  id: totrans-535
   prefs: []
   type: TYPE_NORMAL
 - en: 'Setting the quota for users is done through the `userquota` property and for
     groups using the `groupquota` property:'
+  id: totrans-536
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE174]'
+  id: totrans-537
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE174]'
 - en: 'Getting the used and quota space from users and groups is done by executing
     the following command:'
+  id: totrans-538
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE175]'
+  id: totrans-539
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE175]'
 - en: 'Removing all the quota values that were set until now is done through the following
     sequence:'
+  id: totrans-540
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE176]'
+  id: totrans-541
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE176]'
 - en: An overview of the recipe
+  id: totrans-542
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -2368,9 +3372,11 @@
     ZFS pool, filesystems, snapshots, and clones. Moreover, there are other additional
     properties that can improve the ZFS functionality, and I suggest that readers
     look for all of them in *ZFS Administration Guide*.
+  id: totrans-543
   prefs: []
   type: TYPE_NORMAL
 - en: Playing with the ZFS swap
+  id: totrans-544
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -2380,18 +3386,22 @@
     Unfortunately, when Oracle Solaris 11 is initially installed, the correct swap
     size can be underestimated or overestimated, given that any possible mistake can
     be corrected easily. This section will show you how to manage this issue.
+  id: totrans-545
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-546
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: This recipe requires a virtual machine (VMware or VirtualBox) with Oracle Solaris
     11 installed and 4 GB RAM. Additionally, it's necessary to have access to eight
     4 GB disks.
+  id: totrans-547
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it…
+  id: totrans-548
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -2404,50 +3414,64 @@
     exceptions such as when predicting a database installation. Remember that the
     swap area can be a dedicated partition or a file; the best way to list the swap
     areas (and their free space) is by executing the following command:'
+  id: totrans-549
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE177]'
+  id: totrans-550
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE177]'
 - en: 'From the previous output, the meaning of each column is as follows:'
+  id: totrans-551
   prefs: []
   type: TYPE_NORMAL
 - en: '`swapfile`: This shows that swap areas come from two ZFS volumes `(/dev/zvol/dsk/rpool/swap`
     and `/dev/zvol/dsk/rpool/newswap`)'
+  id: totrans-552
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`dev`: This shows the major and minor number of swap devices'
+  id: totrans-553
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`swaplo`: This shows the minimum possible swap space, which is limited to the
     memory page size and its respective value is usually obtained as units of sectors
     (512 bytes) by executing the `pagesize` command'
+  id: totrans-554
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`blocks`: This is the total swap space in sectors'
+  id: totrans-555
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`free`: This is the free swap space (4 GB)'
+  id: totrans-556
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'An alternative way to collect information about the swap area is using the
     same `swap` command with the `–s` option, as shown in the following command:'
+  id: totrans-557
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE178]'
+  id: totrans-558
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE178]'
 - en: 'From this command output, we have:'
+  id: totrans-559
   prefs: []
   type: TYPE_NORMAL
 - en: '`519668k bytes allocated`: This is a swap space that indicates the amount of
     swap space that already has been used earlier but is not necessarily in use this
     time. Therefore, it''s reserved and available to be used when required.'
+  id: totrans-560
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2458,130 +3482,172 @@
     the disk (any filesystem). They are moved to a swap area because the shortage
     of RAM (physical memory) occurs many times because of the sum of stack, shared
     memory, and process heap, which is larger than the available physical memory.'
+  id: totrans-561
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`946696k used`: This is total amount of swap space that is reserved or allocated.'
+  id: totrans-562
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`4260372k available`: This is the amount of swap space available for future
     allocation.'
+  id: totrans-563
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Until now, you''ve learned how to monitor swap areas. From now, let''s see
     how to add and delete swap space on Oracle Solaris 11 by executing the following
     commands:'
+  id: totrans-564
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE179]'
+  id: totrans-565
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE179]'
 - en: 'Two lines (`rpool/newswap` and `rpool/swap`) prove that the swap space has
     a size of 4 GB (2 GB + 2 GB), and both datasets are ZFS volumes, which can be
     verified by executing the following command:'
+  id: totrans-566
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE180]'
+  id: totrans-567
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE180]'
 - en: 'Continuing from the previous section (getting and setting properties), the
     swap space can be changed by altering the `volsize` property if the pool has free
     space. Then, run the following command:'
+  id: totrans-568
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE181]'
+  id: totrans-569
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE181]'
 - en: 'A simple way to increase the swap space would be by changing the `volsize`
     value. Then, execute the following commands:'
+  id: totrans-570
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE182]'
+  id: totrans-571
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE182]'
 - en: 'Eventually, it''s necessary to add a new volume because the free space on a
     pool isn''t enough, so it can be done by executing the following commands:'
+  id: totrans-572
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE183]'
+  id: totrans-573
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE183]'
 - en: 'Once the swap volume has been created, the next step is to add it as a swap
     device by running the following command:'
+  id: totrans-574
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE184]'
+  id: totrans-575
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE184]'
 - en: 'Finally, the new swap device must be included in the `vfstab` file under `etc`
     to be mounted during the Oracle Solaris 11 boot:'
+  id: totrans-576
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE185]'
+  id: totrans-577
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE185]'
 - en: 'Last but not least, the task of removing the swap area is very simple. First,
     the entry in `/etc/vfstab` needs to be deleted. Before removing the swap areas,
     they need to be listed as follows:'
+  id: totrans-578
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE186]'
+  id: totrans-579
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE186]'
 - en: 'Second, the swap volume must be unregistered from the system by running the
     following command:'
+  id: totrans-580
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE187]'
+  id: totrans-581
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE187]'
 - en: 'Earlier, the `rpool/newswap` volume was increased. However, it would be impossible
     to decrease it because `rpool/newswap` was in use (busy). Now, as the first 2
     GB space from this volume was removed, this 2 GB part isn''t in use at this moment,
     and the total volume (3 GB) can be reduced. Execute the following commands:'
+  id: totrans-582
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE188]'
+  id: totrans-583
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE188]'
 - en: An overview of the recipe
+  id: totrans-584
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
 - en: You saw how to add, remove, and monitor the swap space using the ZFS framework.
     Furthermore, You learned some very important concepts such as reserved, allocated,
     and free swap.
+  id: totrans-585
   prefs: []
   type: TYPE_NORMAL
 - en: References
+  id: totrans-586
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: '*Oracle Solaris Administration -* *ZFS File Systems* at [http://docs.oracle.com/cd/E23824_01/html/821-1448/preface-1.html#scrolltoc](http://docs.oracle.com/cd/E23824_01/html/821-1448/preface-1.html#scrolltoc)'
+  id: totrans-587
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '*How to configure a* *free VTL (Virtual Tape Library)* at [http://alexandreborgesbrazil.files.wordpress.com/2013/09/how-to-configure-a-free-vtl1.pdf](http://alexandreborgesbrazil.files.wordpress.com/2013/09/how-to-configure-a-free-vtl1.pdf)'
+  id: totrans-588
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '*Oracle Solaris* *Tunable Parameters Reference Manual* at [http://docs.oracle.com/cd/E23823_01/html/817-0404/preface-1.html#scrolltoc](http://docs.oracle.com/cd/E23823_01/html/817-0404/preface-1.html#scrolltoc)'
+  id: totrans-589
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '*Oracle Solaris* *Administration: SMB and Windows Interoperability* at [http://docs.oracle.com/cd/E23824_01/html/821-1449/toc.html](http://docs.oracle.com/cd/E23824_01/html/821-1449/toc.html)'
+  id: totrans-590
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '*Playing with Swap Monitoring and Increasing Swap Space Using ZFS Volumes In*
     *Oracle Solaris 11.1* (by Alexandre Borges) at [http://www.oracle.com/technetwork/articles/servers-storage-admin/monitor-swap-solaris-zfs-2216650.html](http://www.oracle.com/technetwork/articles/servers-storage-admin/monitor-swap-solaris-zfs-2216650.html)'
+  id: totrans-591
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '*Playing with ZFS Encryption* *In Oracle Solaris 11* (by Alexandre Borges)
     at [http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris-zfs-encryption-2242161.html](http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris-zfs-encryption-2242161.html)'
+  id: totrans-592
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
