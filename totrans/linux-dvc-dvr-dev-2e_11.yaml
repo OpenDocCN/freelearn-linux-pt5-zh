@@ -1,7 +1,9 @@
 - en: '*Chapter 9*: Writing SPI Device Drivers'
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '*第 9 章*：编写 SPI 设备驱动程序'
 - en: The **Serial Peripheral Interface** (**SPI**) is (at least) a 4-wire bus – **Master
     Input Slave Output** (**MISO**), **Master Output Slave Input** (**MOSI**), **Serial
     Clock** (**SCK**), and **Chip Select** (**CS**) – which is used to connect serial
@@ -9,195 +11,284 @@
     the clock. Its speed can reach up to 80 MHz, though there is no real speed limitation
     (this is much faster than I2C as well). The same applies to the CS line, which
     is always managed by the master.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: '**串行外围接口** (**SPI**) 至少是一个 4 线总线 – **主机输入从机输出** (**MISO**), **主机输出从机输入** (**MOSI**),
+    **串行时钟** (**SCK**), 和 **芯片选择** (**CS**) – 用于连接串行闪存和模数/数模转换器。主机始终生成时钟。其速度可达到 80
+    MHz，但实际上没有速度限制（这比 I2C 快得多）。同样适用于 CS 线，始终由主机管理。'
 - en: 'Each of these signal names has a synonym:'
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个这些信号名称都有一个同义词：
 - en: Whenever you see **Slave Input Master Output** (**SIMO**), **Slave Data Input**
     (**SDI**), or **Data Input** (**DI**), they refer to MOSI.
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 每当你看到 **从机输入主机输出** (**SIMO**), **从机数据输入** (**SDI**), 或 **数据输入** (**DI**), 它们指的是
+    MOSI。
 - en: '**Slave Output Master Input** (**SOMI**), **Slave Data Output** (**SDO**),
     and **Data Output** (**DO**) refer to MISO.'
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**从机输出主机输入** (**SOMI**), **从机数据输出** (**SDO**), 和 **数据输出** (**DO**) 指的是 MISO。'
 - en: '**Serial Clock** (**SCK**), **Clock** (**CLK**), and **Serial Clock** (**SCL**)
     refer to SCK.'
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**串行时钟** (**SCK**), **时钟** (**CLK**), 和 **串行时钟** (**SCL**) 是指 SCK。'
 - en: S̅ S̅ is the Slave Select line, also called CS. CSx can be used (where *x* is
     an index such as CS0, CS1), EN and ENB too, meaning enable. CS is usually an active
     low signal.
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: S̅ S̅ 是从机选择线，也称为 CS。可以使用 CSx（其中 *x* 是索引，如 CS0、CS1）、EN 和 ENB，意思是使能。CS 通常是一个低有效信号。
 - en: 'The following diagram shows how SPI devices are connected to the controller
     via the bus it exposes:'
+  id: totrans-7
   prefs: []
   type: TYPE_NORMAL
+  zh: 下图显示了 SPI 设备通过其暴露的总线连接到控制器的方式：
 - en: '![Figure 9.1 – SPI slave devices and master interconnection'
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 9.1 – SPI 从机设备和主机互连'
 - en: '](img/B17934_09_001.jpg)'
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_09_001.jpg)'
 - en: Figure 9.1 – SPI slave devices and master interconnection
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 9.1 – SPI 从机设备和主机互连
 - en: 'From the preceding diagram, we can represent the Linux kernel SPI framework
     as follows:'
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 从上图可以看出，我们可以将 Linux 内核中的 SPI 框架表示如下：
 - en: '[PRE0]'
+  id: totrans-12
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: The CPU is the master hosting the SPI controller, also known as the SPI master,
     which manages the bus segment hosting the SPI slave devices. In the kernel SPI
     framework, the bus is managed by a platform driver while the slave is driven by
     an SPI device driver. However, both drivers use APIs provided by the SPI core.
     In this chapter, we will be focusing on SPI (slave) device drivers, though references
     to the controller will be mentioned if necessary.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: CPU 是托管 SPI 控制器的主机，也称为 SPI 主控，负责管理托管 SPI 从机设备的总线段。在内核 SPI 框架中，总线由平台驱动程序管理，而从机则由
+    SPI 设备驱动程序驱动。但是，这两种驱动程序都使用 SPI 核心提供的 API。在本章中，我们将重点关注 SPI（从机）设备驱动程序，但如有必要，也会提及控制器。
 - en: 'This chapter will walk through SPI driver concepts such as the following:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将介绍诸如以下的 SPI 驱动程序概念：
 - en: Understanding the SPI framework abstraction in the Linux kernel
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 理解 Linux 内核中的 SPI 框架抽象
 - en: Dealing with the SPI driver abstraction and architecture
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 处理 SPI 驱动程序抽象和架构
 - en: Learning how not to write SPI device drivers
+  id: totrans-17
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 学习如何不编写 SPI 设备驱动程序
 - en: Understanding the SPI framework abstractions in the Linux kernel
+  id: totrans-18
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 理解 Linux 内核中的 SPI 框架抽象
 - en: 'The Linux kernel SPI framework is made up of a few data structures, the most
     important of which are the following:'
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 内核 SPI 框架由几个数据结构组成，其中最重要的是以下内容：
 - en: '`spi_controller`, used to abstract the SPI master device.'
+  id: totrans-20
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi_controller`，用于抽象 SPI 主设备。'
 - en: '`spi_device`, used to abstract a slave device sitting on the SPI bus.'
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi_device`，用于抽象连接到 SPI 总线上的从机设备。'
 - en: '`spi_driver`, the driver of the slave device.'
+  id: totrans-22
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi_driver`，从机设备的驱动程序。'
 - en: '`spi_transfer`, which is the low-level representation of one segment of a protocol.
     It represents a single operation between the master and slave. It expects Tx and/or
     Rx buffers as well as the length of the data to be exchanged and an optional CS
     behavior.'
+  id: totrans-23
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi_transfer`，这是协议的低级表示中的一个片段。它表示主机与从机之间的单个操作。它期望 Tx 和/或 Rx 缓冲区以及要交换的数据长度和可选的
+    CS 行为。'
 - en: '`spi_message`, which is an atomic sequence of transfers.'
+  id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi_message`，这是一个原子传输序列。'
 - en: Let's now introduce each of these data structures, one after the other, starting
     with the most complex, which represents the SPI controller's data structure.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在让我们逐个介绍这些数据结构，从最复杂的开始，即代表 SPI 控制器数据结构。
 - en: Brief introduction to struct spi_controller
+  id: totrans-26
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 简要介绍 `struct spi_controller`
 - en: 'Throughout this chapter, we will reference the controller because it is deeply
     coupled with the slaves and other data structures that the SPI framework is made
     up of. It is necessary therefore to introduce its data structure, represented
     by `struct spi_controller` and defined as follows:'
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将引用控制器，因为它与 SPI 框架中由从设备和其他数据结构深度耦合。因此，有必要介绍其数据结构，表示为 `struct spi_controller`，并定义如下：
 - en: '[PRE1]'
+  id: totrans-28
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Only the important elements required for a better understanding of the data
     structure used in this chapter are listed in the preceding code. The following
     list explains their use:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 仅列出了本章用于更好理解数据结构的关键元素。以下列表解释了它们的用途：
 - en: '`num_chipselect` indicates the number of CSs assigned to this controller. CSs
     are used to distinguish individual SPI slaves and are numbered from 0.'
+  id: totrans-30
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`num_chipselect` 表示分配给此控制器的 CS 数量。CS 用于区分单独的 SPI 从设备，并从 0 开始编号。'
 - en: '`min_speed_hz` and `max_speed_hz` are the lowest and the highest transfer speeds
     supported by this controller, respectively.'
+  id: totrans-31
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`min_speed_hz` 和 `max_speed_hz` 分别是此控制器支持的最低和最高传输速度。'
 - en: '`set_cs_timing` is a method provided if the SPI controller supports CS timing
     configuration, in which case the client drivers would call `spi_set_cs_timing()`
     with the requested timings. It has been deprecated in recent kernel versions by
     this patch: [https://lore.kernel.org/lkml/20210609071918.2852069-1-gregkh@linuxfoundation.org/](https://lore.kernel.org/lkml/20210609071918.2852069-1-gregkh@linuxfoundation.org/)).'
+  id: totrans-32
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`set_cs_timing` 是一个方法，当 SPI 控制器支持 CS 时序配置时提供，在这种情况下，客户端驱动程序将调用 `spi_set_cs_timing()`
+    来设置请求的时序。该方法已在最近的内核版本中被该补丁弃用：[https://lore.kernel.org/lkml/20210609071918.2852069-1-gregkh@linuxfoundation.org/](https://lore.kernel.org/lkml/20210609071918.2852069-1-gregkh@linuxfoundation.org/))。'
 - en: '`transfer` adds a message to the transfer queue of the controller. On the controller
     registration path (thanks to `spi_register_controller()`), the SPI core checks
     whether this field is `NULL` or not:'
+  id: totrans-33
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`transfer` 将消息添加到控制器的传输队列中。在控制器注册路径中（感谢 `spi_register_controller()`），SPI 核心会检查该字段是否为
+    `NULL`：'
 - en: If `NULL`, the SPI core will check if either `transfer_one` or `transfer_one_message`
     is set, in which case it assumes this controller supports message queuing and
     invokes `spi_controller_initialize_queue()`, which will set this field with `spi_queued_transfer`
     (which is the SPI core helper to queue SPI messages to the controller's queue
     and to schedule the message pump `kworker` if it is not already running or busy).
+  id: totrans-34
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果为 `NULL`，SPI 核心将检查 `transfer_one` 或 `transfer_one_message` 是否已设置，在这种情况下，假设该控制器支持消息排队，并调用
+    `spi_controller_initialize_queue()`，该函数将把此字段设置为 `spi_queued_transfer`（这是 SPI 核心帮助程序，用于将
+    SPI 消息排入控制器的队列，并在 `kworker` 没有运行或繁忙时调度消息泵）。
 - en: Moreover, `spi_controller_initialize_queue()` will create both a dedicated kthread
     worker (`kworker` element) and a work struct (`pump_messages` element) for this
     controller. This worker will be scheduled quite often in order to process the
     message queue in a FIFO order.
+  id: totrans-35
   prefs:
   - PREF_IND
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 此外，`spi_controller_initialize_queue()` 将为该控制器创建一个专用的 kthread 工作线程（`kworker`
+    元素）和一个工作结构体（`pump_messages` 元素）。这个工作线程将被频繁调度，以按照 FIFO 顺序处理消息队列。
 - en: Next, the controller's `queued` element is set to true by the SPI core.
+  id: totrans-36
   prefs:
   - PREF_IND
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 接下来，SPI 核心将控制器的 `queued` 元素设置为 true。
 - en: Finally, if the controller's `rt` element has been set to true by the driver
     prior to calling the registration API, the SPI core will set the scheduling policy
     of the worker thread to the real-time FIFO policy, with a priority of 50.
+  id: totrans-37
   prefs:
   - PREF_IND
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 最后，如果驱动程序在调用注册 API 之前已将控制器的 `rt` 元素设置为 true，则 SPI 核心将把工作线程的调度策略设置为实时 FIFO 策略，优先级为
+    50。
 - en: If `NULL`, and both `transfer_one` and `transfer_one_message` are also `NULL`,
     this is an error, and the controller is not registered.
+  id: totrans-38
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果为 `NULL`，并且 `transfer_one` 和 `transfer_one_message` 也都是 `NULL`，则发生错误，且控制器未注册。
 - en: If not `NULL`, the SPI core assumes the controller does not support queuing
     and does not call `spi_controller_initialize_queue()`.
+  id: totrans-39
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果不是 `NULL`，SPI 核心假定控制器不支持队列，也不会调用 `spi_controller_initialize_queue()`。
 - en: '`transfer_one` and `transfer_one_message` are mutually exclusive. If both are
     set, the former won''t be invoked by the SPI core. `transfer_one` transfers a
     single SPI transfer and has no notion of `spi_message`. `transfer_one_message`,
@@ -211,376 +302,547 @@
     transfers unless it is modified by a transfer that has `spi_transfer.cs_change
     = 1`. The message transfers will be performed using the clock and SPI mode parameters
     previously applied by `setup()` for this device.'
+  id: totrans-40
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`transfer_one`和`transfer_one_message`是互斥的。如果两者都设置，SPI核心将不会调用前者。`transfer_one`传输单个SPI传输，并没有`spi_message`的概念。如果驱动程序提供了`transfer_one_message`，它必须基于`spi_message`工作，并将负责处理消息中的所有传输。那些不需要处理消息算法的控制器驱动程序只需要设置`transfer_one`回调，在这种情况下，SPI核心将会设置`transfer_one_message`为`spi_transfer_one_message`。`spi_transfer_one_message`将在调用驱动程序提供的`transfer_one`回调之前，处理所有的消息逻辑、时序、CS以及其他硬件相关的属性。除非传输中有`spi_transfer.cs_change
+    = 1`的传输修改了它，否则CS将在整个消息传输过程中保持活动状态。消息传输将使用之前通过`setup()`为此设备应用的时钟和SPI模式参数来执行。'
 - en: '`kworker`: This is the kernel thread dedicated to the message pump processing.'
+  id: totrans-41
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kworker`：这是专门用于消息泵处理的内核线程。'
 - en: '`pump_messages`: This is an abstraction of a work struct data structure for
     scheduling the function that processes the SPI message queue. It is scheduled
     in `kworker`. This work struct is backed by the `spi_pump_messages()` method,
     which checks if there are any SPI messages in the queue that need to be processed,
     and if so, it calls the driver to initialize the hardware and transfer each message.'
+  id: totrans-42
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`pump_messages`：这是一个工作结构数据结构的抽象，用于调度处理SPI消息队列的函数。它被调度在`kworker`中。该工作结构由`spi_pump_messages()`方法支持，后者会检查队列中是否有需要处理的SPI消息，如果有，则调用驱动程序来初始化硬件并传输每个消息。'
 - en: '`queue_lock`: The spinlock to synchronize access to the message queue.'
+  id: totrans-43
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`queue_lock`：用于同步访问消息队列的自旋锁。'
 - en: '`queue`: The message queue for this controller.'
+  id: totrans-44
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`queue`：此控制器的消息队列。'
 - en: '`idling`: This indicates whether the controller device is entering an idle
     state.'
+  id: totrans-45
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`idling`：这表示控制器设备是否进入空闲状态。'
 - en: '`cur_msg`: The currently in-flight SPI message.'
+  id: totrans-46
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`cur_msg`：当前正在传输的SPI消息。'
 - en: '`busy`: This indicates the busyness of the message pump.'
+  id: totrans-47
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`busy`：这表示消息泵的忙碌状态。'
 - en: '`running`: This indicates that the message pump is running.'
+  id: totrans-48
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`running`：这表示消息泵正在运行。'
 - en: '`Rt`: This indicates whether `kworker` will run the message pump with real-time
     priority.'
+  id: totrans-49
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Rt`：这表示`kworker`是否会以实时优先级运行消息泵。'
 - en: '`dma_tx`: The DMA transmit channel (when supported by the controller).'
+  id: totrans-50
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dma_tx`：DMA传输通道（当控制器支持时）。'
 - en: '`dma_rx`: The DMA receiving channel (when supported by the controller).'
+  id: totrans-51
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dma_rx`：DMA接收通道（当控制器支持时）。'
 - en: 'SPI transfers always read and write the same number of bytes, which means even
     when the client driver issues a half-duplex transfer, full duplex is emulated
     by the SPI core with `dummy_rx` and `dummy_tx` used to achieve this purpose:'
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: SPI传输始终读取和写入相同数量的字节，这意味着即使客户端驱动程序发起的是半双工传输，SPI核心也会通过使用`dummy_rx`和`dummy_tx`来模拟全双工，从而实现这一目的：
 - en: '`dummy_rx`: This is a dummy receive buffer used for full-duplex devices, such
     that if a transfer''s receive buffer is `NULL`, received data will be shifted
     to this dummy receive buffer before being discarded.'
+  id: totrans-53
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dummy_rx`：这是一个虚拟接收缓冲区，用于全双工设备。当传输的接收缓冲区为`NULL`时，接收到的数据将首先被转移到此虚拟接收缓冲区，然后再被丢弃。'
 - en: '`dummy_tx`: This is a dummy transmit buffer used for full-duplex devices, such
     that if a transfer''s transmit buffer is `NULL`, this dummy transmit buffer will
     be zero-filled and used as a transmit buffer for the transfer.'
+  id: totrans-54
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dummy_tx`：这是一个虚拟传输缓冲区，用于全双工设备。当传输的发送缓冲区为`NULL`时，这个虚拟发送缓冲区将被填充为零，并作为传输的发送缓冲区使用。'
 - en: 'Do note that the SPI core names the SPI message pump worker task with the controller
     device name (dev->name), set in `spi_register_controller()` as follows:'
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，SPI核心将SPI消息泵工作任务命名为控制器设备名称（dev->name），该名称在`spi_register_controller()`中设置，如下所示：
 - en: '[PRE2]'
+  id: totrans-56
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Later, when the worker is created during the queue initialization (remember,
     `spi_controller_initialize_queue()`), it is given this name, as follows:'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 后来，当工作线程在队列初始化期间创建时（记住，`spi_controller_initialize_queue()`），它将被赋予以下名称：
 - en: '[PRE3]'
+  id: totrans-58
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'To recognize the SPI message pump worker on your system, you can run the following
     command:'
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 要识别系统中的 SPI 消息泵工作线程，你可以运行以下命令：
 - en: '[PRE4]'
+  id: totrans-60
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: In the preceding snippet, we can see the worker's name made up of the bus name
     along with the bus number.
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，我们可以看到工作线程的名称由总线名称和总线编号组成。
 - en: In this section, we analyzed the concepts on the controller side to help get
     an understanding of the whole SPI slave implementation in the Linux kernel. The
     importance of this data structure is so great that I recommend you read this section
     whenever you feel you don't understand any mechanism in the coming sections. Now
     we can switch to SPI device data structures for real.
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们分析了控制器端的概念，以帮助理解 Linux 内核中整个 SPI 从设备的实现。这个数据结构的重要性非常大，我建议每当你在后续章节中遇到不理解的机制时，都可以回过头来阅读本节内容。现在我们可以真正转向
+    SPI 设备的数据结构了。
 - en: The struct spi_device structure
+  id: totrans-63
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: '`struct spi_device` 结构体'
 - en: 'The first and most obvious data structure, `struct spi_device` represents an
     SPI device and is defined in `include/linux/spi/spi.h`:'
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个也是最明显的数据结构，`struct spi_device` 表示一个 SPI 设备，并在 `include/linux/spi/spi.h` 中定义：
 - en: '[PRE5]'
+  id: totrans-65
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'For the sake of readability, the number of fields listed is reduced to the
     strict minimum needed for the purpose of the book. The following list details
     the meaning of each element in this structure:'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了可读性，列出的字段数减少到本书目的所需的最少数量。以下列表详细说明了此结构中每个元素的含义：
 - en: '`controller` represents the SPI controller this slave device belongs to. In
     other words, it represents the SPI controller (bus) on which the device is connected.'
+  id: totrans-67
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`controller` 表示该从设备所属的 SPI 控制器。换句话说，它表示设备连接的 SPI 控制器（总线）。'
 - en: The `master` element is still there for compatibility reasons and will be deprecated
     soon. It was the old name of the controller.
+  id: totrans-68
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`master` 元素仍然存在，是为了兼容性原因，并且很快会被弃用。它曾是控制器的旧名称。'
 - en: '`max_speed_hz` is the maximum clock rate to be used with this slave; this parameter
     can be changed from within the driver. We can override that parameter using `spi_transfer.speed_hz`
     for each transfer. We will discuss SPI transfer later.'
+  id: totrans-69
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`max_speed_hz` 是与此从设备一起使用的最大时钟速率；此参数可以通过驱动程序内部进行更改。我们可以使用 `spi_transfer.speed_hz`
+    来覆盖该参数，应用于每个传输。稍后我们将讨论 SPI 传输。'
 - en: '`chip_select` is the CS line assigned to this device. It is active low by default.
     This behavior can be changed in `mode` by adding the `SPI_CS_HIGH` flag.'
+  id: totrans-70
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`chip_select` 是分配给该设备的 CS 线。默认情况下，它是低电平有效的。可以通过在 `mode` 中添加 `SPI_CS_HIGH` 标志来更改此行为。'
 - en: '`rt`, if `true`, will make the message pump worker of the `controller` run
     as a real-time task'
+  id: totrans-71
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`rt`，如果为 `true`，将使 `controller` 的消息泵工作线程作为实时任务运行。'
 - en: '`mode` defines how data should be clocked. The device driver may change this.
     The data clocking is MSB by default for each word in a transfer. This behavior
     can be overridden by specifying `SPI_LSB_FIRST`.'
+  id: totrans-72
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`mode` 定义了数据如何时钟化。设备驱动程序可以更改此设置。数据时钟化默认是每个字传输时的 MSB。此行为可以通过指定 `SPI_LSB_FIRST`
+    来覆盖。'
 - en: '`irq` represents the interrupt number (registered as a device resource in your
     board initialization file or through the device tree) you should pass to `request_irq()`
     to receive interrupts from this device.'
+  id: totrans-73
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`irq` 表示中断号（在你的板初始化文件中注册为设备资源，或者通过设备树进行注册），你应该将其传递给 `request_irq()` 来接收该设备的中断。'
 - en: '`cs_gpio` and `cs_gpiod` are both optional. The former is the legacy integer-based
     GPIO number of the CS line, while the latter is the new and recommended interface,
     based on the GPIO descriptor.'
+  id: totrans-74
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`cs_gpio` 和 `cs_gpiod` 都是可选的。前者是基于整数的传统 GPIO 号，表示 CS 线，而后者是新的、推荐的接口，基于 GPIO
+    描述符。'
 - en: 'A word about SPI modes – they are built using two characteristics:'
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于 SPI 模式的一点说明——它们是通过两个特性构建的：
 - en: 'CPOL, which is the initial clock polarity:'
+  id: totrans-76
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: CPOL，即初始时钟极性：
 - en: '`0`: The initial clock state is low, and the first edge is rising.'
+  id: totrans-77
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`0`：初始时钟状态为低电平，第一个边沿为上升。'
 - en: '`1`: The initial clock state is high, and the first state is falling.'
+  id: totrans-78
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`1`：初始时钟状态为高电平，第一个状态为下降。'
 - en: 'CPHA is the clock phase, determining at which edge the data will be sampled:'
+  id: totrans-79
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: CPHA 是时钟相位，决定数据在何种边沿被采样：
 - en: '`0`: Data is latched at the falling edge (high to low transition), whereas
     the output changes at the rising edge.'
+  id: totrans-80
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`0`：数据在下降沿（高到低过渡）时被锁存，而输出在上升沿变化。'
 - en: '`1`: Data is latched at rising edge (low to high transition), and the output
     changes at the falling edge.'
+  id: totrans-81
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`1`：数据在上升沿（低到高的转换）时锁存，输出在下降沿时变化。'
 - en: 'This allows us to distinguish four SPI modes, which are derived macros made
     up of a mix of two main macros, defined in `include/linux/spi/spi.h` as follows:'
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 这使我们能够区分四种 SPI 模式，这些模式是由两个主要宏的混合衍生而来，这些宏在 `include/linux/spi/spi.h` 中定义如下：
 - en: '[PRE6]'
+  id: totrans-83
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'The combinations of these macros give the following SPI modes:'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些宏的组合给出了以下 SPI 模式：
 - en: '![Table 9.1 – SPI modes kernel definition'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: '![表 9.1 – SPI 模式内核定义'
 - en: '](img/Table_9.1.jpg)'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/Table_9.1.jpg)'
 - en: Table 9.1 – SPI modes kernel definition
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 表 9.1 – SPI 模式内核定义
 - en: The following diagram is the representation of each SPI mode, in the same order
     as defined in the preceding array. That being said, only the MOSI line is represented,
     but the principle is the same for MISO.
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下图表表示了每个 SPI 模式，顺序与前面的数组定义一致。也就是说，仅表示了 MOSI 线，但 MISO 线的原理是相同的。
 - en: '![Figure 9.2 – SPI operating modes'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 9.2 – SPI 操作模式'
 - en: '](img/B17934_09_002.jpg)'
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_09_002.jpg)'
 - en: Figure 9.2 – SPI operating modes
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 9.2 – SPI 操作模式
 - en: Now that we are familiar with the SPI device data structure and the modes such
     a device can operate in, we can switch to the second-most important structure,
     the one representing the SPI device driver.
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经熟悉了 SPI 设备数据结构及其操作模式，我们可以切换到第二重要的数据结构，即表示 SPI 设备驱动程序的结构。
 - en: The spi_driver structure
+  id: totrans-93
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: spi_driver 结构体
 - en: 'Also called the protocol driver, an SPI device driver is responsible for driving
     devices sitting on the SPI bus. It is abstracted in the kernel by `struct spi_driver`,
     declared as follows:'
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 也叫做协议驱动程序，SPI 设备驱动程序负责驱动连接在 SPI 总线上的设备。它通过 `struct spi_driver` 在内核中进行抽象，声明如下：
 - en: '[PRE7]'
+  id: totrans-95
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'The following list outlines the meanings of the elements in this data structure:'
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下列表概述了此数据结构中元素的含义：
 - en: '`id_table`: This is the list of SPI devices supported by this driver.'
+  id: totrans-97
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`id_table`：这是此驱动程序支持的 SPI 设备列表。'
 - en: '`probe`: This method binds this driver to the SPI device. This function will
     be invoked on any device claiming this driver and will decide whether this driver
     is in charge of that device or not. If yes, the binding process occurs.'
+  id: totrans-98
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`probe`：此方法将此驱动程序绑定到 SPI 设备。此函数会在任何声明为该驱动程序的设备上调用，并决定该驱动程序是否负责该设备。如果是，则发生绑定过程。'
 - en: '`remove`: Unbinds this driver from the SPI device.'
+  id: totrans-99
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`remove`：将此驱动程序从 SPI 设备中解绑。'
 - en: '`shutdown`: This is invoked during system state changes such as powering down
     and halting.'
+  id: totrans-100
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`shutdown`：此方法在系统状态变更时调用，例如关闭电源和停止操作。'
 - en: '`driver`: This is the low-level driver structure for the device and driver
     model.'
+  id: totrans-101
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`driver`：这是设备和驱动模型的低级驱动程序结构。'
 - en: This is all we can say for now on this data structure, except that each SPI
     device driver must fill and expose one instance of this type.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 目前我们只能说这些数据结构的情况，除了每个 SPI 设备驱动程序必须填充并暴露该类型的一个实例之外。
 - en: The message transfer data structures
+  id: totrans-103
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 消息传输数据结构
 - en: 'The SPI I/O model consists of a set of queued messages, each of which can be
     made up of one or more SPI transfers. While a single message consists of one or
     more `struct spi_transfer` objects, each transfer represents a full duplex SPI
     transaction. Messages are submitted and processed either synchronously or asynchronously.
     The following is a diagram explaining the concept of message and transfer:'
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: SPI I/O 模型由一组排队的消息组成，每条消息可以包含一个或多个 SPI 传输。单个消息由一个或多个 `struct spi_transfer` 对象组成，每个传输代表一个全双工的
+    SPI 事务。消息可以同步或异步提交和处理。以下是解释消息和传输概念的示意图：
 - en: '![Figure 9.3 – Example SPI message structure'
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 9.3 – 示例 SPI 消息结构'
 - en: '](img/B17934_09_003.jpg)'
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_09_003.jpg)'
 - en: Figure 9.3 – Example SPI message structure
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 9.3 – 示例 SPI 消息结构
 - en: 'Now that we are familiar with the theoretical aspects, we can introduce the
     SPI transfer data structure, declared as follows:'
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经了解了理论方面的内容，可以介绍 SPI 传输数据结构，其声明如下：
 - en: '[PRE8]'
+  id: totrans-109
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'The following are the meanings of each element in the data structure:'
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是数据结构中每个元素的含义：
 - en: '`tx_buf` is a pointer to the buffer that contains the data to be written. If
     set to `NULL`, this transfer will be considered as half duplex as a read-only
     transaction. It should be DMA-safe when you need to perform an SPI transaction
     through DMA.'
+  id: totrans-111
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`tx_buf` 是指向包含待写入数据的缓冲区的指针。如果设置为 `NULL`，则此传输将被视为半双工读取事务。需要通过 DMA 执行 SPI 事务时，它应该是
+    DMA 安全的。'
 - en: '`rx_buf` is a buffer for data to be read (with the same properties as `tx_buf`),
     or `NULL` in a write-only transaction.'
+  id: totrans-112
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`rx_buf`是一个数据缓冲区，用于读取数据（具有与`tx_buf`相同的属性），或者在只写事务中为`NULL`。'
 - en: '`tx_dma` is the `tx_buf`, in case `spi_message.is_dma_mapped` is set to `1`.'
+  id: totrans-113
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`tx_dma`是`tx_buf`，前提是`spi_message.is_dma_mapped`被设置为`1`。'
 - en: '`rx_dma` is the same as `tx_dma`, but for `rx_buf`.'
+  id: totrans-114
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`rx_dma`与`tx_dma`相同，但用于`rx_buf`。'
 - en: '`len` represents the size of the `rx` and `tx` buffers in bytes. Only `len`
     bytes shift out (or in) and attempting to shift out a partial word would result
     in an error.'
+  id: totrans-115
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`len`表示`rx`和`tx`缓冲区的字节大小。只有`len`字节会被移出（或移入），并且尝试移出部分字会导致错误。'
 - en: '`speed_hz` supersedes the default speed specified in `spi_device.max_speed_hz`,
     but only for the current transfer. If `0`, the default (from `spi_device`) is
     used.'
+  id: totrans-116
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`speed_hz`覆盖了`spi_device.max_speed_hz`中指定的默认速度，但仅适用于当前的传输。如果为`0`，则使用默认值（来自`spi_device`）。'
 - en: '`bits_per_word`: A data transfer involves one or more words. A word is a unit
     of data whose size in bits varies according to the needs. Here, `bits_per_word`
     represents the size in bits of a word for this SPI transfer. This overrides the
     default value provided in `spi_device.bits_per_word`. If `0`, the default (from
     `spi_device`) is used.'
+  id: totrans-117
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`bits_per_word`：数据传输涉及一个或多个字。字是数据单元，其大小（以位为单位）根据需求而变化。在这里，`bits_per_word`表示此SPI传输中一个字的位数大小。这将覆盖`spi_device.bits_per_word`中提供的默认值。如果为`0`，则使用默认值（来自`spi_device`）。'
 - en: '`cs_change` determines whether the CS becomes inactive after this transfer
     completes. All SPI transfers begin with the appropriate CS signal active. Normally,
     it remains selected until the last transfer in the message is completed. Using
     `cs_change`, drivers can change the CS signal.'
+  id: totrans-118
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`cs_change`决定在此传输完成后CS是否变为不活动。所有SPI传输都以适当的CS信号激活开始。通常，它会保持选中状态，直到消息中的最后一个传输完成。通过使用`cs_change`，驱动程序可以改变CS信号。'
 - en: This flag is used to make the CS temporarily inactive in the middle of the message
     (that is, before processing the `spi_transfer` on which it is specified) if the
     transfer isn't the last one in the message. Toggling CS in this way may be required
     to complete a chip command, allowing a single SPI message to handle the entire
     set of chip transactions.
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 该标志用于在消息的中间使CS暂时失效（即在处理指定的`spi_transfer`之前），如果该传输不是消息中的最后一个。以这种方式切换CS可能是完成芯片命令所必需的，从而允许单个SPI消息处理整个芯片事务集。
 - en: '`delay_usecs` represents the delay (in microseconds) following this transfer
     before (optionally) changing the `chip_select` status, then starting the next
     transfer or completing this `spi_message`.'
+  id: totrans-120
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`delay_usecs`表示在此传输之后，延迟（以微秒为单位），然后（可选地）更改`chip_select`状态，接着开始下一个传输或完成此`spi_message`。'
 - en: Note
+  id: totrans-121
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 注意
 - en: SPI transfers always write the same number of bytes as they read, even in half-duplex
     transactions. The SPI core achieves this thanks to the controller's `dummy_rx`
     and `dummy_tx` elements. When the transmit buffer is null, `spi_transfer->tx_buf`
@@ -588,70 +850,98 @@
     while filling `rx_buf` with the data coming from the slave. If the receive buffer
     is null, `spi_transfer->rx_buf` will be set with the controller's `dummy_rx` and
     the data shifted in will be discarded.
+  id: totrans-122
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: SPI传输总是写入与读取相同数量的字节，即使在半双工传输中也是如此。SPI核心通过控制器的`dummy_rx`和`dummy_tx`元素实现这一点。当传输缓冲区为null时，`spi_transfer->tx_buf`将被设置为控制器的`dummy_tx`。然后，零将被移出，同时将从从设备接收到的数据填充到`rx_buf`中。如果接收缓冲区为null，则`spi_transfer->rx_buf`将被设置为控制器的`dummy_rx`，并且接收到的数据将被丢弃。
 - en: struct spi_message
+  id: totrans-123
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: struct spi_message
 - en: '`spi_message` is used to atomically issue a sequence of transfers, each represented
     by a `struct spi_transfer` instance. We say *atomically* because no other `spi_message`
     may use that SPI bus until the ongoing sequence completes. Do however note that
     there are platforms that can handle many such sequences with a single programmed
     DMA transfer. An SPI message structure has the following declaration:'
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: '`spi_message`用于原子地发出一系列传输，每个传输由一个`struct spi_transfer`实例表示。我们之所以称之为*原子*，是因为在进行中的序列完成之前，其他任何`spi_message`都不能使用该SPI总线。需要注意的是，有些平台能够通过单个编程DMA传输处理多个此类序列。SPI消息结构具有以下声明：'
 - en: '[PRE9]'
+  id: totrans-125
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'The following list outlines the meanings of elements in this data structure:'
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下列表概述了此数据结构中各元素的含义：
 - en: '`transfers` is the list of transfers that constitute the message. We will see
     later how to add a transfer to this list. Using the `spi_transfer.cs_change` flag
     on the last transfer in that atomic group may potentially save costs for chip
     deselect and select operations.'
+  id: totrans-127
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`transfers` 是构成消息的传输列表。我们稍后会看到如何将传输添加到此列表。在该原子组中的最后一个传输使用 `spi_transfer.cs_change`
+    标志，可能会减少芯片取消选择和选择操作的成本。'
 - en: '`is_dma_mapped` informs the controller whether to use DMA (or not) to perform
     the transaction. Your code is then responsible for providing DMA and CPU virtual
     addresses for each transfer buffer.'
+  id: totrans-128
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`is_dma_mapped` 向控制器指示是否使用 DMA（或不使用 DMA）来执行事务。你的代码需要为每个传输缓冲区提供 DMA 和 CPU 虚拟地址。'
 - en: '`complete` is a callback called when the transaction is done, and `context`
     is the parameter to be given to the callback.'
+  id: totrans-129
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`complete` 是在事务完成时调用的回调，`context` 是传递给回调的参数。'
 - en: '`frame_length` will be set automatically with the total number of bytes in
     the message.'
+  id: totrans-130
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`frame_length` 会自动设置为消息中所有字节的总数。'
 - en: '`actual_length` is the number of bytes transferred in all successful segments.'
+  id: totrans-131
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`actual_length` 是所有成功片段中传输的字节数。'
 - en: '`status` reports the transfer''s status. This is `0` on success; otherwise,
     it''s `-errno`.'
+  id: totrans-132
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`status` 报告传输的状态。成功时为`0`，否则为`-errno`。'
 - en: '`spi_transfer` elements in a message are processed in FIFO order. Until the
     message is completed (that is, until the completion callback is executed), you
     must make sure not to use transfer buffers in order to avoid data corruption.
     The code that submits a `spi_message` (and its `spi_transfers`) to the lower layers
     is responsible for managing its memory. Drivers must ignore the message (and its
     transfers) once submitted at least until its completion callback is invoked.'
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: '`spi_transfer` 元素在消息中按 FIFO 顺序处理。在消息完成之前（即在完成回调执行之前），你必须确保不使用传输缓冲区，以避免数据损坏。提交
+    `spi_message`（及其 `spi_transfers`）到下层的代码负责管理其内存。驱动程序一旦提交消息（及其传输），必须忽略该消息（及其传输），至少要等到其完成回调被调用。'
 - en: Accessing the SPI device
+  id: totrans-134
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 访问 SPI 设备
 - en: An SPI controller is able to communicate with one or more slaves, that is, one
     or more `struct spi_device`. They form a tiny bus that shares MOSI, MISO, and
     SCK signals but not CS. Because those shared signals are ignored unless the chip
@@ -660,43 +950,62 @@
     of `spi_message` transactions, moving data between CPU memory and an SPI slave
     device. For each message instance it queues, it calls the message's completion
     callback when the transaction completes.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个 SPI 控制器能够与一个或多个从设备进行通信，也就是说，与一个或多个 `struct spi_device` 进行通信。它们构成一个小型总线，共享
+    MOSI、MISO 和 SCK 信号，但不共享 CS 信号。由于这些共享信号在芯片未被选择时会被忽略，因此每个设备都可以被编程以使用不同的时钟速率。SPI
+    控制器驱动程序通过 `spi_message` 事务队列来管理与这些设备的通信，将数据在 CPU 内存和 SPI 从设备之间传输。对于它排队的每个消息实例，它会在事务完成时调用该消息的完成回调。
 - en: 'Before a message can be submitted to the bus, it has to be initialized with
     `spi_message_init()`, which has the following prototype:'
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 在消息提交到总线之前，它必须通过 `spi_message_init()` 进行初始化，该函数的原型如下：
 - en: '[PRE10]'
+  id: totrans-137
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'This function will zero each element in the structure and initialize the transfers
     list. For each transfer to be added to the message, you should call `spi_message_add_tail()`
     on that transfer, which will result in enqueuing the transfer into the message''s
     transfers list. It has the following declaration:'
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 该函数将零初始化结构中的每个元素，并初始化传输列表。对于要添加到消息中的每个传输，你应当对该传输调用 `spi_message_add_tail()`，这将导致该传输被排入消息的传输列表。它具有如下声明：
 - en: '[PRE11]'
+  id: totrans-139
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'Once this is done, you have two choices to start the transaction:'
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦完成此操作，你有两种选择来开始事务：
 - en: '`int spi_sync(struct spi_device *spi, struct spi_message *message)`, which
     returns `0` on success, else a negative error code. This function may sleep and
     is not to be used in interrupt contexts. Do however note that this function may
     sleep in a non-interruptible manner, and does not allow specifying a timeout.
     A DMA-capable controller''s driver may leverage this DMA feature to push/pull
     data directly into/from the message buffers.'
+  id: totrans-141
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`int spi_sync(struct spi_device *spi, struct spi_message *message)`，成功时返回`0`，否则返回负的错误代码。该函数可能会休眠，且不能在中断上下文中使用。需要注意的是，该函数可能会以不可中断的方式休眠，并且不允许指定超时。具有
+    DMA 能力的控制器驱动程序可能会利用该 DMA 特性，直接将数据推送或拉取到/从消息缓冲区。'
 - en: The SPI device's CS is activated by the core during an entire message (from
     the first transfer to the last), and is then normally disabled between messages.
     There are drivers which, in order to minimize the impacts of selecting a chip
     (to save power for example), leave it selected, anticipating that the next message
     will go to the same chip.
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: SPI设备的CS会在整个消息期间（从第一个传输到最后一个）由核心激活，然后通常在消息之间禁用。有些驱动程序为了最小化选择芯片的影响（例如为了节省电力），会保持芯片处于选中状态，预期下一个消息会发送到同一芯片。
 - en: '`spi_async()` function, which can be used in an any context (atomic or not),
     and whose prototype is `int spi_async(struct spi_device *spi, struct spi_message
     *message)`. This function is context agnostic since only submission is done and
@@ -705,9 +1014,12 @@
     is undefined. At the time it is invoked, `message->status` holds the completion
     status, which is either `0` (to indicate complete success) or a negative error
     code.'
+  id: totrans-143
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi_async()`函数可以在任何上下文中使用（无论是否为原子上下文），其原型为`int spi_async(struct spi_device
+    *spi, struct spi_message *message)`。此函数与上下文无关，因为它只进行提交，处理是异步的。然而，完成回调会在无法休眠的上下文中调用。在调用此回调之前，`message->status`的值是未定义的。回调调用时，`message->status`保存完成状态，状态为`0`表示完全成功，或者是负的错误代码。'
 - en: After that callback returns, the driver that initiated the transfer request
     may deallocate the associated memory since it's no longer in use by any SPI core
     or controller driver code. Until the completion callback of the currently processed
@@ -715,15 +1027,21 @@
     This rule applies to synchronous transfer calls as well, since they are wrappers
     around this core asynchronous primitive. This function returns `0` on success,
     else a negative error code.
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 在回调返回后，发起传输请求的驱动程序可以释放相关的内存，因为它不再被任何SPI核心或控制器驱动代码使用。直到当前处理的消息的完成回调返回，排队到该设备的任何后续`spi_message`才会被处理。这条规则同样适用于同步传输调用，因为它们是该核心异步原语的封装。此函数成功时返回`0`，否则返回负的错误代码。
 - en: 'The following is an excerpt from a driver demonstrating SPI message and transfer
     initialization and submission:'
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是一个驱动程序的摘录，演示了SPI消息和传输的初始化与提交：
 - en: '[PRE12]'
+  id: totrans-146
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'The preceding excerpt however shows static initialization, on the fly, where
     both messages and transfers are discarded on the return path of the function.
     There may be cases where the driver would like to pre-allocate messages along
@@ -731,11 +1049,15 @@
     initialization overhead. In such cases, dynamic allocation can be used thanks
     to `spi_message_alloc()`, and freed using `spi_message_free()`. They have the
     following prototypes:'
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，前面的摘录展示了静态初始化，在执行时，消息和传输会在函数返回路径中被丢弃。有些情况下，驱动程序可能希望在驱动生命周期内预分配消息及其传输，以避免频繁的初始化开销。在这种情况下，可以通过`spi_message_alloc()`使用动态分配，并通过`spi_message_free()`释放。它们具有以下原型：
 - en: '[PRE13]'
+  id: totrans-148
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'In the preceding snippet, `ntrans` is the number of transfers to allocate for
     this new `spi_message`, and `flags` represents the flags for the freshly allocated
     memory, where using `GFP_KERNEL` is enough. On success, this function returns
@@ -743,43 +1065,59 @@
     elements using kernel list-related macros such as `list_first_entry`, `list_next_entry`,
     or even `list_for_each_entry`. The following is an example showing the usage of
     these macros:'
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，`ntrans`是分配给这个新`spi_message`的传输次数，`flags`代表新分配内存的标志，使用`GFP_KERNEL`就足够了。如果成功，这个函数会返回新分配的消息结构及其传输。你可以使用内核列表相关宏来访问传输元素，例如`list_first_entry`、`list_next_entry`，甚至是`list_for_each_entry`。以下是展示这些宏使用的示例：
 - en: '[PRE14]'
+  id: totrans-150
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: In the preceding excerpt, we have not only shown how to use dynamic message
     and transfer allocation. We have also seen how `spi_async()` is used. This example
     is quite useless since the allocated message and transfers are immediately freed
     upon completion. A best practice with dynamic allocation is to allocate Tx and
     Rx buffers dynamically as well, and keep them within arm's reach for the lifetime
     of the driver.
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的摘录中，我们不仅展示了如何使用动态的消息和传输分配，还展示了如何使用`spi_async()`。这个示例其实没多大用处，因为分配的消息和传输在完成后立即被释放。使用动态分配的最佳实践是动态分配发送和接收缓冲区，并将它们保持在驱动程序生命周期内易于访问的位置。
 - en: 'Note however that the device driver is responsible for organizing the messages
     and transfer in the most appropriate way for the device, as follows:'
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 但请注意，设备驱动程序负责以最合适的方式组织消息和传输，如下所示：
 - en: When bidirectional reads and writes start and how its sequence of `spi_transfer`
     requests are arranged
+  id: totrans-153
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 何时开始双向读写，以及如何安排其一系列 `spi_transfer` 请求
 - en: I/O buffer preparation, knowing that each `spi_transfer` wraps a buffer for
     each transfer direction, supporting full duplex transfers (even if one pointer
     is `NULL`, in which case the controller will use one of its dummy buffers)
+  id: totrans-154
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: I/O 缓冲区准备，了解每个 `spi_transfer` 都为每个传输方向包装一个缓冲区，支持全双工传输（即使一个指针为 `NULL`，在这种情况下控制器将使用其中一个虚拟缓冲区）
 - en: Optionally using `spi_transfer.delay_usecs` to define short delays after transfers
+  id: totrans-155
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 可选地使用 `spi_transfer.delay_usecs` 来定义传输后的短延迟
 - en: Whether CS should change (becoming inactive) after a transfer and any delay
     by using the `spi_transfer.cs_change` flag
+  id: totrans-156
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 是否在传输后通过使用 `spi_transfer.cs_change` 标志来改变（使之不活跃）CS 信号
 - en: With `spi_async`, the device driver queues the messages, registers a completion
     callback, wakes the message pump, and immediately returns. The completion callback
     will be invoked when the transfers are complete. Because neither message queuing
@@ -794,49 +1132,72 @@
     where, when there is nothing in the queue, the message pump will get executed
     in the context of the caller instead of the message pump thread, which avoids
     the cost of a context switch.
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 `spi_async` 时，设备驱动程序将消息排队，注册完成回调，唤醒消息泵并立即返回。完成回调将在传输完成时被调用。由于消息排队和消息泵调度都不能阻塞，`spi_async`
+    函数被认为是与上下文无关的。然而，它要求你在访问提交的 `spi_transfer` 指针中的缓冲区之前等待完成回调。另一方面，`spi_sync` 排队消息并在完成之前阻塞。它不需要完成回调。当
+    `spi_sync` 返回时，访问数据缓冲区是安全的。如果你查看 `drivers/spi/spi.c` 中的实现，你会看到它使用 `spi_async`
+    将调用线程置于休眠状态，直到完成回调被调用。自 4.0 内核以来，`spi_sync` 有了改进，当队列中没有内容时，消息泵将在调用者的上下文中执行，而不是在消息泵线程中执行，从而避免了上下文切换的开销。
 - en: After the most important data structures and APIs of the SPI framework have
     been introduced, we can discuss the real driver implementation.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 在介绍了 SPI 框架的最重要数据结构和 API 之后，我们可以讨论实际的驱动程序实现。
 - en: Dealing with the SPI driver abstraction and architecture
+  id: totrans-159
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理 SPI 驱动程序抽象和架构
 - en: This is where the driver logic takes place. It consists of filling `struct spi_driver`
     with a set of driving functions that allow probing and controlling the underlying
     device.
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是驱动程序逻辑发生的地方。它包括用一组驱动函数填充 `struct spi_driver`，这些函数允许探测并控制底层设备。
 - en: Probing the device
+  id: totrans-161
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 探测设备
 - en: 'The SPI device is probed by the `spi_driver.probe` callback. The probe callback
     is responsible for making sure the driver recognizes the given device before they
     can be bound together. This callback has the following prototype:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: SPI 设备由 `spi_driver.probe` 回调函数探测。该探测回调函数负责确保驱动程序在设备绑定之前能够识别该设备。此回调函数具有以下原型：
 - en: '[PRE15]'
+  id: totrans-163
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: This method must return `0` on success, or a negative error number otherwise.
     The only argument is the SPI device to be probed, whose structure has been pre-initialized
     by the core according to its description in the device tree.
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 该方法在成功时必须返回 `0`，否则返回负数错误码。唯一的参数是要探测的 SPI 设备，其结构已由内核根据设备树中的描述进行预初始化。
 - en: 'However, most (if not all) of the properties of the SPI device can be overridden,
     as we have seen while describing its data structure. SPI protocol drivers may
     need to update the transfer mode if the device doesn''t work with its default.
     They may likewise need to update clock rates or word sizes from their initial
     values. This is possible thanks to the `spi_setup()` helper, which has the following
     prototype:'
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，正如我们在描述其数据结构时所看到的，大多数（如果不是所有）SPI设备的属性都可以被覆盖。SPI协议驱动可能需要更新传输模式，如果设备无法使用其默认设置。它们也可能需要根据初始值更新时钟频率或字长。这是通过`spi_setup()`辅助函数实现的，原型如下：
 - en: '[PRE16]'
+  id: totrans-166
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: This function must be called from a context that can sleep exclusively. It expects
     as a parameter an SPI device structure whose properties to override must have
     been set in their respective fields. Changes will be effective at the next device
@@ -848,263 +1209,382 @@
     by the underlying controller or its driver. For instance, some hardware handles
     wire transfers using nine-bit words, **least significant bit** (**LSB**)-first
     wire encoding, or active-high CS, and others do not.
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 此函数必须在能够独占休眠的上下文中调用。它期望传入一个SPI设备结构体，该结构体的属性必须在各自的字段中设置，以便进行覆盖。更改将在下次访问设备时生效（无论是读取操作还是写入操作，前提是该设备已被选中），但`SPI_CS_HIGH`会立即生效。此函数在返回时会取消选择SPI设备。此函数成功时返回`0`，失败时返回负值。值得注意的是，它的返回值，因为如果驱动程序提供了底层控制器或其驱动程序不支持的选项，则该调用将不会成功。例如，一些硬件使用九位字、**最低有效位**（**LSB**）优先的线编码或高电平有效的CS来处理线传输，而其他硬件则不支持。
 - en: You likely want to call `spi_setup()`from `probe()` before submitting any I/O
     request to the device. However, it can be called anywhere in the code provided
     no message is pending for that device.
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可能希望在`probe()`中调用`spi_setup()`，在向设备提交任何I/O请求之前。然而，只要该设备没有挂起的消息，它可以在代码中的任何位置被调用。
 - en: 'The following is a probing example that sets up the SPI device, checks its
     family ID, and returns `0` (device recognized) on success:'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是一个探测示例，它设置SPI设备，检查其家庭ID，并在成功时返回`0`（设备已识别）：
 - en: '[PRE17]'
+  id: totrans-170
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'A real probing method would also probably deal with some driver state data
     structures or other per-device data structures. Regarding the `get_chip_version()`
     function, it may have the following body:'
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个实际的探测方法可能还需要处理一些驱动状态数据结构或其他每个设备的特定数据结构。关于`get_chip_version()`函数，它可能有以下实现：
 - en: '[PRE18]'
+  id: totrans-172
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: Now that we have seen how to probe an SPI device, it will be useful to discuss
     how to tell the SPI core which devices the driver can support.
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经了解了如何探测SPI设备，接下来讨论如何告诉SPI核心驱动程序可以支持哪些设备将会很有用。
 - en: Note
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: The SPI core allows setting/getting driver state data using `spi_get_drvdata()`
     and `spi_set_drvdata()` in the same way as we did while discussing I2C device
     drivers in [*Chapter 8*](B17934_08_Epub.xhtml#_idTextAnchor117)*, Writing I2C
     Device Drivers*.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: SPI核心允许使用`spi_get_drvdata()`和`spi_set_drvdata()`来设置/获取驱动程序状态数据，就像我们在讨论I2C设备驱动时在[*第8章*](B17934_08_Epub.xhtml#_idTextAnchor117)*，编写I2C设备驱动*中所做的那样。
 - en: Provisioning devices in the driver
+  id: totrans-176
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 在驱动中配置设备
 - en: 'As we need a list of i`2c_device_id` to tell I2C core what devices an I2C driver
     can support, we must provide an array of `spi_device_id` to inform the SPI core
     what devices our SPI driver supports. After that array has been filled, it must
     be assigned to the `spi_driver.id_table` field. Additionally, for device matching
     and module loading purposes, this same array needs to be given to the `MODULE_DEVICE_TABLE`
     macro. `struct spi_device_id` has the following declaration in `include/linux/mod_devicetable.h`:'
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们需要一个`i2c_device_id`列表来告知I2C核心我们的I2C驱动可以支持哪些设备一样，我们也必须提供一个`spi_device_id`数组来通知SPI核心我们的SPI驱动支持哪些设备。填充该数组后，必须将其分配给`spi_driver.id_table`字段。此外，为了设备匹配和模块加载目的，这个数组还需要传递给`MODULE_DEVICE_TABLE`宏。`struct
+    spi_device_id`在`include/linux/mod_devicetable.h`中有如下声明：
 - en: '[PRE19]'
+  id: totrans-178
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'In the preceding data structure, `name` is a descriptive name for the device,
     and `driver_data` is the driver state value. It can be set with a pointer to a
     per-device data structure. The following is an example:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的数据结构中，`name`是设备的描述性名称，`driver_data`是驱动程序的状态值。它可以通过指向每个设备数据结构的指针来设置。以下是一个示例：
 - en: '[PRE20]'
+  id: totrans-180
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'To be able to match the devices declared in the device tree, we need to define
     an array of `struct of_device_id` elements and both assign it to `spi_driver.of_match_table`
     and call the `MODULE_DEVICE_TABLE` macro on it. The following is an example, which
     also shows what the final `spi_driver` structure would look like when it is set
     up:'
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了能够匹配设备树中声明的设备，我们需要定义一个`struct of_device_id`元素的数组，并将其赋值给`spi_driver.of_match_table`，同时在其上调用`MODULE_DEVICE_TABLE`宏。以下是一个示例，示例还展示了在设置好后的`spi_driver`结构体的样子：
 - en: '[PRE21]'
+  id: totrans-182
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'The following excerpt shows the final `spi_driver` content:'
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下摘录展示了最终的`spi_driver`内容：
 - en: '[PRE22]'
+  id: totrans-184
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: In the preceding, we can see what an SPI driver structure looks like after it
     has been set up. There is however a missing element, the `spi_driver.remove` callback,
     which is used to undo what was done in the probing function.
+  id: totrans-185
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面，我们可以看到设置好的SPI驱动结构是怎样的。然而，还有一个缺失的元素——`spi_driver.remove`回调，它用于撤销探测函数中所做的操作。
 - en: Implementing the spi_driver.remove method
+  id: totrans-186
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 实现`spi_driver.remove`方法
 - en: 'The `remove` callback must be used to release every resource grabbed and undo
     what was done at probing. This callback has the following prototype:'
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: '`remove`回调必须用于释放所有获取的资源，并撤销探测时所做的操作。该回调有以下原型：'
 - en: '[PRE23]'
+  id: totrans-188
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'In the preceding snippet, `spi` is the SPI device data structure, the same
     given to the `probe` callback, which simplifies device state data structure tracking
     between the probing and the removal of the device. This method returns `0` on
     success or a negative error code on failure. You must make sure that the device
     is left in a coherent and stable state as well. The following is an example implementation:'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，`spi`是SPI设备数据结构，和传递给`probe`回调的结构相同，这简化了设备状态数据结构在探测和设备移除之间的跟踪。该方法成功时返回`0`，失败时返回负的错误码。你必须确保设备保持一致且稳定的状态。以下是一个示例实现：
 - en: '[PRE24]'
+  id: totrans-190
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: In the preceding example, the code dealt with unregistering from the frameworks
     and releasing the resources. This is the classic case that you will face in 90%
     of cases.
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的示例中，代码处理了从框架中注销和释放资源的工作。这是你在90%的情况下会遇到的经典场景。
 - en: Driver initialization and registration
+  id: totrans-192
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 驱动初始化和注册
 - en: 'At this step of implementation, your code is almost ready, and you would like
     to inform the SPI core of your SPI driver. This is driver registration. For SPI
     device drivers, the SPI core provides `spi_register_driver()` and `spi_unregister_driver()`
     both to register and unregister and SPI device driver with the SPI core. Those
     methods have the following prototypes:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个实现步骤中，你的代码几乎完成了，并且你希望通知SPI核心你的SPI驱动。这就是驱动注册。对于SPI设备驱动，SPI核心提供了`spi_register_driver()`和`spi_unregister_driver()`来分别注册和注销SPI设备驱动。它们的原型如下：
 - en: '[PRE25]'
+  id: totrans-194
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: In both functions, `sdrv` is the SPI driver structure that has been previously
     set up. The registration API returns zero on success or a negative error code
     on failure.
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这两个函数中，`sdrv`是先前设置好的SPI驱动结构。注册API成功时返回0，失败时返回负的错误码。
 - en: 'Driver registration and unregistering usually take place in the module initialization
     and module exit method. The following is a typical demonstration of SPI driver
     registration:'
+  id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: 驱动注册和注销通常发生在模块初始化和模块退出方法中。以下是一个典型的SPI驱动注册示例：
 - en: '[PRE26]'
+  id: totrans-197
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'If you do nothing at module initialization other than registering/unregistering
     the driver, you can use `module_spi_driver()` to factor your code as follows:'
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你在模块初始化时仅进行驱动的注册/注销操作，你可以像下面这样使用`module_spi_driver()`来简化代码：
 - en: '[PRE27]'
+  id: totrans-199
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: This macro will populate module initialization and cleanup functions and will
     call `spi_register_driver` and `spi_unregister_driver` inside.
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 该宏将填充模块初始化和清理函数，并会在其中调用`spi_register_driver`和`spi_unregister_driver`。
 - en: Instantiating SPI devices
+  id: totrans-201
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 实例化SPI设备
 - en: SPI slave nodes must be children of the SPI controller node. In master mode,
     one or more slave nodes (up to the number of CSs) can be present.
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: SPI从节点必须是SPI控制器节点的子节点。在主模式下，可以有一个或多个从节点（最多与CS数量相同）。
 - en: 'The required properties are the following:'
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 所需的属性如下：
 - en: '`compatible`: The compatible string as defined in the driver for matching'
+  id: totrans-204
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`compatible`：在驱动中定义的用于匹配的兼容字符串'
 - en: '`reg`: The CS index of the device relative to the controller'
+  id: totrans-205
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`reg`：设备相对于控制器的CS索引'
 - en: '`spi-max-frequency`: The maximum SPI clocking speed of the device in Hz'
+  id: totrans-206
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-max-frequency`：设备的最大SPI时钟速度（单位：Hz）'
 - en: 'All slave nodes can contain the following optional properties:'
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有从属节点都可以包含以下可选属性：
 - en: '`spi-cpol`: Boolean property which, if present, indicates that the device requires
     inverse **clock polarity** (**CPOL**) mode.'
+  id: totrans-208
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-cpol`：布尔属性，如果存在，表示设备需要反向**时钟极性**（**CPOL**）模式。'
 - en: '`spi-cpha`: Boolean property indicating that this device requires shifted **clock
     phase** (**CPHA**) mode.'
+  id: totrans-209
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-cpha`：布尔属性，表示该设备需要偏移的**时钟相位**（**CPHA**）模式。'
 - en: '`spi-cs-hi–h`: Empty property indicating that the device requires CS active
     high.'
+  id: totrans-210
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-cs-hi–h`：空属性，表示设备需要CS高电平激活。'
 - en: '`spi-3wire`: This is a Boolean property that indicates that this device requires
     3-wire mode to work properly.'
+  id: totrans-211
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-3wire`：布尔属性，表示该设备需要3线模式才能正常工作。'
 - en: '`spi-lsb-first`: This is a Boolean property that indicates that this device
     requires LSB first mode.'
+  id: totrans-212
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-lsb-first`：布尔属性，表示该设备需要LSB优先模式。'
 - en: '`spi-tx-bus-width`: This property indicates the bus width used for MOSI. If
     not present, it defaults to `1`.'
+  id: totrans-213
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-tx-bus-width`：该属性表示用于MOSI的总线宽度。如果没有该属性，则默认为`1`。'
 - en: '`spi-rx-bus-width`: This property is used to indicate the bus width used for
     MISO. If not present, it defaults to `1`.'
+  id: totrans-214
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-rx-bus-width`：该属性用于表示用于MISO的总线宽度。如果没有该属性，则默认为`1`。'
 - en: '`spi-rx-delay-–s`: This is used to specify a delay in microseconds after a
     read transfer.'
+  id: totrans-215
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-rx-delay-–s`：用于指定读取传输后的微秒延迟。'
 - en: '`spi-tx-delay-us`: This is used to specify a delay in microseconds after a
     write transfer.'
+  id: totrans-216
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spi-tx-delay-us`：用于指定写入传输后的微秒延迟。'
 - en: 'The following is a real device tree listing for SPI devices:'
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是SPI设备的实际设备树列表：
 - en: '[PRE28]'
+  id: totrans-218
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: In the preceding device tree excerpt, `ecspi1` represents the master SPI controller.
     `fake_spi_device` and `mcp2515can` represent SPI slave devices, and their `reg`
     properties represents their respective CS indices relative to the master.
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的设备树片段中，`ecspi1`表示主SPI控制器。`fake_spi_device`和`mcp2515can`表示SPI从设备，它们的`reg`属性表示相对于主设备的CS索引。
 - en: Now that we are familiar with all the kernel aspects of the SPI slave-oriented
     framework, let's see how we might avoid dealing with the kernel and try to implement
     everything in the user space.
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经熟悉了SPI从设备框架的所有内核方面，接下来让我们看看如何避免处理内核并尝试在用户空间实现所有功能。
 - en: Learning how not to write SPI device drivers
+  id: totrans-221
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 学习如何避免编写SPI设备驱动程序
 - en: The usual way to deal with SPI devices is to write kernel code to drive this
     device. Nowadays the `spidev` interface makes it possible to deal with such devices
     without even writing a line of kernel code. The use of this interface should be
     limited, however, to simple use cases such as talking to a slave microcontroller
     or for prototyping. Using this interface, you will not be able to deal with various
     **interrupts** (**IRQs**) the device may support nor leverage other kernel frameworks.
+  id: totrans-222
   prefs: []
   type: TYPE_NORMAL
+  zh: 处理SPI设备的常见方法是编写内核代码来驱动该设备。如今，`spidev`接口使得即使不编写一行内核代码，也可以处理此类设备。然而，使用此接口应仅限于简单的用例，例如与从属微控制器通信或原型开发。使用此接口时，您将无法处理设备可能支持的各种**中断**（**IRQ**），也无法利用其他内核框架。
 - en: The `spidev` interface exposes a character device node in the form `/dev/spidevX.Y`
     where `X` represents the bus our device sits on, and `Y` represents the CS index
     (relative to the controller) assigned to the device node in the device tree. For
     example, `/dev/spidev1.0` means device `0` on SPI bus `1`. The same applies to
     the sysfs directory entry, which would be in the form `/sys/class/spidev/spidevX.Y`.
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: '`spidev`接口以`/dev/spidevX.Y`的形式暴露字符设备节点，其中`X`表示设备所在的总线，`Y`表示在设备树中分配给该设备节点的CS索引（相对于控制器）。例如，`/dev/spidev1.0`表示SPI总线`1`上的设备`0`。同样适用于sysfs目录条目，其形式为`/sys/class/spidev/spidevX.Y`。'
 - en: 'Prior to the character device appearing in the user space, the device node
     must be declared in the device tree as a child of the SPI controller node. The
     following is an example:'
+  id: totrans-224
   prefs: []
   type: TYPE_NORMAL
+  zh: 在字符设备出现在用户空间之前，设备节点必须在设备树中声明为SPI控制器节点的子节点。以下是一个示例：
 - en: '[PRE29]'
+  id: totrans-225
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: In the preceding snippet, `spidev@0` corresponds to our SPI device node. `reg
     = <0>` tells the controller that this device is using the first CS line (index
     starting from 0). The `compatible="semtech,sx1301"` property is used to match
@@ -1112,24 +1592,38 @@
     as a compatible string – you'll get a warning if you try. Finally, `spi-max-frequency
     = <20000000>` sets the default clock speed (20 MHz in this case) that our device
     will operate at, unless it is changed using the appropriate API.
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，`spidev@0` 对应我们的 SPI 设备节点。`reg = <0>` 告诉控制器该设备使用的是第一个 CS 引脚（索引从 0
+    开始）。`compatible="semtech,sx1301"` 属性用于匹配 `spidev` 驱动程序中的一个条目。现在不再推荐使用 `"spidev"`
+    作为兼容字符串——如果尝试使用它，你会收到警告。最后，`spi-max-frequency = <20000000>` 设置了我们设备的默认时钟频率（此处为
+    20 MHz），除非通过相应的 API 进行更改。
 - en: 'From the user space, the required header files to deal with the `spidev` interface
     are as follows:'
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 从用户空间开始，处理 `spidev` 接口所需的头文件如下：
 - en: '[PRE30]'
+  id: totrans-228
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'Because it is a character device, it is allowed (this is the only option, in
     fact) to use basic system calls such as `open()`, `read()`, `write()`, `ioctl()`,
     and `close()`. The following example shows some basic usage, with `read()` and
     `write()` operations only:'
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于它是一个字符设备，允许（事实上这是唯一的选择）使用基本的系统调用，如 `open()`、`read()`、`write()`、`ioctl()` 和
+    `close()`。以下示例展示了一些基本用法，仅使用 `read()` 和 `write()` 操作：
 - en: '[PRE31]'
+  id: totrans-230
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: In the preceding code, you should note that the standard `read()` and `write()`
     operations are half-duplex only, and that the CS is deactivated between each operation.
     To be able to work in full duplex, you have no choice but to use the `ioctl()`
@@ -1138,53 +1632,81 @@
     `SPI_IOC_WR_*` commands to get `RD` and set `WR` to override the device's current
     setting. The complete list and documentation for this can be found in `Documentation/spi/spidev`
     in the kernel sources.
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，需要注意的是，标准的 `read()` 和 `write()` 操作仅支持半双工，而且每次操作之间都会禁用 CS。要实现全双工工作，唯一的选择是使用
+    `ioctl()` 接口，在该接口中可以随意传递输入和输出缓冲区。此外，借助 `ioctl()` 接口，你可以使用一组 `SPI_IOC_RD_*` 和 `SPI_IOC_WR_*`
+    命令来获取 `RD` 并设置 `WR`，从而覆盖设备的当前设置。有关这些命令的完整列表和文档，可以在内核源码中的 `Documentation/spi/spidev`
+    找到。
 - en: 'The `ioctl()` interface allows composite operations without CS deactivation
     and is available using the `SPI_IOC_MESSAGE(N)` request. A new data structure
     takes place, the `struct spi_ioc_transfer`, which is the user space equivalent
     of `struct spi_transfer`. The following is an example of the ioctl commands:'
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ioctl()` 接口允许在不禁用 CS 的情况下执行复合操作，并通过 `SPI_IOC_MESSAGE(N)` 请求实现。一个新的数据结构被引入，即
+    `struct spi_ioc_transfer`，它是用户空间中 `struct spi_transfer` 的等效结构。以下是 ioctl 命令的示例：'
 - en: '[PRE32]'
+  id: totrans-233
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'In the preceding example, getters are used for demonstration purposes only.
     It is not mandatory to issue the `SPI_IOC_RD_*` command after you have executed
     its `SPI_IOC_WR_*` equivalent. Now that we have seen most of those ioctl commands,
     let''s see how to start transfers:'
+  id: totrans-234
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的例子中，getter 仅用于演示目的。执行 `SPI_IOC_WR_*` 命令后，使用 `SPI_IOC_RD_*` 命令并非强制性的。现在我们已经了解了大多数这些
+    ioctl 命令，接下来我们来看看如何开始传输：
 - en: '[PRE33]'
+  id: totrans-235
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'The preceding shows the concept of message and transfer transactions in the
     user space. Now that our helpers have been defined, we can write the main code
     to use them as follows:'
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述内容展示了用户空间中消息和传输事务的概念。现在我们的帮助程序已定义，我们可以编写主代码来使用它们，如下所示：
 - en: '[PRE34]'
+  id: totrans-237
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: We are now done with the main function. This section taught us to use the user
     space SPI APIs and commands to interact with the device. We are limited, however,
     in that we can't take advantage of device interrupt lines or other kernel frameworks.
+  id: totrans-238
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们现在已经完成了主函数的部分。本节内容教我们如何使用用户空间的 SPI API 和命令与设备进行交互。然而，我们受到一些限制，无法利用设备中断线或其他内核框架。
 - en: Summary
+  id: totrans-239
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: In this chapter, we tackled SPI drivers and can now take the advantage of this
     serial (and full duplex) bus, which is way faster than I2C. We walked through
     all the data structures in this framework and discussed transferring over SPI,
     which is the most important section we covered. That said, the memory we accessed
     over those buses was off-chip – we may need more abstraction in order to avoid
     the SPI and I2C APIs.
+  id: totrans-240
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们处理了 SPI 驱动程序，并且现在可以利用这个比 I2C 快得多的串行（全双工）总线。我们走遍了这个框架中的所有数据结构，并讨论了如何通过
+    SPI 进行数据传输，这是我们涵盖的最重要部分。也就是说，我们通过这些总线访问的内存是外部存储器——为了避免 SPI 和 I2C API 的使用，我们可能需要更多的抽象层。
 - en: This is where the next chapter comes in, dealing with the regmap API, which
     offers a higher and more unified level of abstraction so that SPI (and I2C) commands
     will become transparent to you.
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 这就是下一章的内容，它讲解了 regmap API，该 API 提供了更高、更统一的抽象层次，使得 SPI（和 I2C）命令对你变得透明。

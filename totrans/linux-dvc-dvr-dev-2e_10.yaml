@@ -3,6 +3,7 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '*第8章*：编写I2C设备驱动程序'
 - en: '**I2C** stands for **Inter-Integrated Circuit**. It is a serial, multi-master,
     and asynchronous bus invented by Philips (now NXP), though multi-master mode is
     not widely used. I2C is a two-wire bus, respectively named **Serial Data** (**SDA**)
@@ -20,28 +21,34 @@
   id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: '**I2C**代表**集成电路互联**。它是由Philips（现在是NXP）发明的串行、支持多主机的异步总线，尽管多主机模式并不广泛使用。I2C是一个双线总线，分别称为**串行数据**（**SDA**）和**串行时钟**（**SCL**，或**SCK**）。I2C设备是通过I2C总线与其他设备进行交互的芯片。在此总线上，SDA和SCL都是开漏/开集电极，这意味着每个设备可以将其输出拉低，但都不能将输出拉高，而是需要上拉电阻。SCL由主设备生成，用于同步数据（通过SDA传输）在总线上的传输。主设备和从设备都可以发送数据（当然不是同时），因此SDA是双向线。也就是说，SCL信号也是双向的，因为从设备可以通过保持SCL线低电平来*拉伸*时钟。总线由主设备控制，在我们的案例中，主设备是**系统级芯片**（**SoC**）的一部分。该总线在嵌入式系统中广泛使用，用于连接串行EEPROM、RTC芯片、GPIO扩展器、温度传感器等设备。'
 - en: 'The following diagram shows various devices (also known as slaves) connected
     to an I2C bus:'
   id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下图示展示了连接到I2C总线的各种设备（也称为从设备）：
 - en: '![Figure 8.1 – I2C bus and device representation'
   id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图8.1 – I2C总线和设备表示'
 - en: '](img/B17934_08.jpg)'
   id: totrans-4
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_08.jpg)'
 - en: Figure 8.1 – I2C bus and device representation
   id: totrans-5
   prefs: []
   type: TYPE_NORMAL
+  zh: 图8.1 – I2C总线和设备表示
 - en: 'From the preceding diagram, we can represent the Linux kernel I2C framework
     as follows:'
   id: totrans-6
   prefs: []
   type: TYPE_NORMAL
+  zh: 从上面的示意图来看，我们可以将Linux内核的I2C框架表示如下：
 - en: '[PRE0]'
   id: totrans-7
   prefs: []
@@ -56,6 +63,7 @@
   id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: CPU是主机，负责管理I2C控制器，也叫做I2C适配器，它实现了I2C协议，并管理承载I2C设备的总线段。在内核I2C框架中，适配器由平台驱动管理，而从设备由I2C驱动管理。然而，两个驱动程序都使用I2C核心提供的API。在本章中，我们将重点介绍I2C（从设备）驱动程序，尽管如果有需要，也会提到适配器。
 - en: Back to the hardware, I2C clock speed varies from 10 kHz to 100 kHz, and from
     400 kHz to 2 MHz. There are no strict data transfer speed requirements for I2C,
     and all the slaves sitting on a given bus will use the same clock speed that the
@@ -64,42 +72,50 @@
   id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 回到硬件，I2C时钟速度从10 kHz到100 kHz不等，也可以从400 kHz到2 MHz。I2C没有严格的数据传输速度要求，所有连接在特定总线上的从设备将使用该总线配置的相同时钟速度。这与内核源代码中的`drivers/i2c/busses/i2c-imx.c`不同，I2C的规范可以在[https://www.nxp.com/docs/en/user-guide/UM10204.pdf](https://www.nxp.com/docs/en/user-guide/UM10204.pdf)找到。
 - en: 'Now that we know that we will be dealing with an I2C device driver, in this
     chapter, we will cover the following topics:'
   id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们知道将要处理I2C设备驱动程序，本章将涉及以下主题：
 - en: I2c framework abstraction in the Linux kernel
   id: totrans-11
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Linux内核中的I2C框架抽象
 - en: The I2C driver abstraction and architecture
   id: totrans-12
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: I2C驱动程序的抽象和架构
 - en: How not to write I2C device drivers
   id: totrans-13
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如何不编写I2C设备驱动程序
 - en: I2C framework abstractions in the Linux kernel
   id: totrans-14
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: Linux内核中的I2C框架抽象
 - en: 'The Linux kernel I2C framework is made up of a few data structures, with the
     most important being as follows:'
   id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux内核I2C框架由几个数据结构组成，其中最重要的是以下内容：
 - en: '`i2c_adapter`: Used to abstract the I2C master device. It is used to identify
     a physical I2C bus.'
   id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`i2c_adapter`：用于抽象I2C主设备。它用于标识一个物理I2C总线。'
 - en: '`i2c_algorithm`: This abstracts the I2C bus transaction interface. Here, transaction
     means to transfer, such as read or write operations.'
   id: totrans-17
@@ -1078,21 +1094,25 @@
   id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了需要编写代码的 API，你还可以使用 CLI 包 `i2ctools`，它附带了以下工具：
 - en: '`i2cdetect`: A command that enumerates the I2C devices sitting on a given adapter.'
   id: totrans-159
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`i2cdetect`：一个命令，用于列举给定适配器上的 I2C 设备。'
 - en: '`i2cget`: This is used to dump the content of device registers.'
   id: totrans-160
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`i2cget`：用于转储设备寄存器的内容。'
 - en: '`i2cset`: This is used to set the content of device registers.'
   id: totrans-161
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`i2cset`：用于设置设备寄存器的内容。'
 - en: In this section, we learned how to use user space APIs and commands or command-line
     tools to communicate with I2C devices. While all these may be useful for prototyping,
     it could be difficult to handle devices that support interrupts or other kernel-based
@@ -1100,11 +1120,13 @@
   id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这一节中，我们学习了如何使用用户空间的 API 和命令行工具与 I2C 设备进行通信。尽管这些方法对于原型开发非常有用，但处理支持中断或其他基于内核的资源（如时钟）的设备可能会变得比较困难。
 - en: Summary
   id: totrans-163
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: In this chapter, we looked at I2C device drivers. Now, it's time for you to
     pick any I2C device on the market and write the corresponding driver, along with
     the necessary device tree support. This chapter talked about the kernel I2C core
@@ -1114,8 +1136,11 @@
   id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这一章中，我们讨论了 I2C 设备驱动程序。现在，是时候选择市场上的任何 I2C 设备，并编写相应的驱动程序以及必要的设备树支持了。本章讲解了内核 I2C
+    核心及其相关 API，包括设备树支持，帮助你掌握与 I2C 设备通信所需的技能。你现在应该能够编写高效的探测函数并将其注册到内核 I2C 核心中。
 - en: In the next chapter, we will use the skills we have learned in this chapter
     to develop an SPI device driver.
   id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章中，我们将使用本章所学的技能来开发一个 SPI 设备驱动程序。
