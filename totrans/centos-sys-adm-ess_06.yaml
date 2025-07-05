@@ -1,75 +1,104 @@
 - en: Chapter 6. Users – Do We Really Want Them?
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第 6 章。用户——我们真的想要他们吗？
 - en: The question, I admit, is more than a little rhetorical but there are times
     when we dream of how great our lives would be without pesky users getting in the
     way and gumming up the cogs that make our systems run; however, the better we
     manage the user base on our Linux systems, the better CentOS will be to us. In
     reality, the more control we have over the users, the more life is better for
     them as they can continue their work uninterrupted by system downtime.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 我承认，这个问题有点儿反问的意味，但有时候我们会幻想，如果没有麻烦的用户干扰，生活会有多么美好，系统的运作也会更加顺畅；然而，我们越是有效地管理 Linux
+    系统上的用户，CentOS 对我们来说就越好。实际上，我们对用户的控制越多，他们的工作就越不受系统停机的干扰，生活也就越好。
 - en: 'In this chapter, we will develop techniques to maintain unobtrusive control
     of our systems, keeping ourselves sane and the users happy. This will include:'
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章中，我们将开发一些技巧来保持对系统的低调控制，让我们保持理智，同时让用户感到满意。这将包括：
 - en: '**Managing public and private groups**: Understanding how we can use public
     groups and overriding the CentOS default of private groups can give us more scope
     in assigning permissions to users. We have to be aware of the potential pitfalls
     to each solution.'
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**管理公共组和私有组**：了解如何使用公共组以及覆盖 CentOS 默认的私有组，可以让我们在为用户分配权限时有更多选择。我们需要注意每种解决方案的潜在陷阱。'
 - en: '**Getent**: This can provide us with a global view of our users and groups
     and will open up to us in this chapter the understanding of the name services
     switch file: `nsswitch.conf`.'
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**Getent**：它可以为我们提供关于用户和组的全局视图，并在本章中为我们打开 `nsswitch.conf` 文件（名称服务切换文件）的理解之门。'
 - en: '**Quotas**: Using quotas can allow us to both monitor and if required, restrict
     users'' space to a partition, and is truly important where users'' home directories
     are located.'
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**配额**：使用配额可以让我们监控并在必要时限制用户的空间分配，这在用户的主目录所在位置尤为重要。'
 - en: '**Scripting user creation**: When creating a user, we will need to set the
     password and possibly user''s disk quota limits; it makes sense then to combine
     all these activities into a script so that nothing is forgotten.'
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**脚本化用户创建**：在创建用户时，我们需要设置密码，并可能设置用户的磁盘配额限制；因此，将这些活动组合成一个脚本是有意义的，这样就不会遗漏任何内容。'
 - en: Managing public and private groups
+  id: totrans-7
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 管理公共组和私有组
 - en: The Red Hat and, therefore, the CentOS user management systems deploy a private
     user group system. Each user created will also belong to an eponymous primary
     group; in other words, creating a user bob will also create a group bob, to which
     the user will be the only member.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: Red Hat 和因此也包括 CentOS 的用户管理系统采用了私有用户组系统。每个创建的用户都会属于一个同名的主组；换句话说，创建用户 bob 时，也会创建一个名为
+    bob 的组，而该用户是唯一的成员。
 - en: Linux groups
+  id: totrans-9
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: Linux 组
 - en: Firstly, we have to understand a little about Linux groups. A user has both
     a primary group and secondary groups.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们需要了解一些关于 Linux 组的知识。每个用户有一个主组和多个次级组。
 - en: '**User ID and group ID** (**UID/GID**) are used with the permission management
     structure in Linux. Every file in any filesystem will be owned by a user and a
     group by means of storing the UID and GID in the files metadata. Permissions can
     be assigned to the user, group, or others.'
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: '**用户 ID 和组 ID**（**UID/GID**）用于 Linux 的权限管理结构。任何文件的所有者和所属组都是通过将 UID 和 GID 存储在文件的元数据中来实现的。权限可以分配给用户、组或其他人。'
 - en: Each user has one UID and GID but belongs to just one group, which is a little
     restrictive, so users additionally have secondary groups. Users can change their
     current GID to one from their secondary groups using the `/usr/bin/newgrp` command,
     effectively switching their GID. In practice, this is not required and leads us
     to describing the differences between the users' primary group and secondary groups.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个用户都有一个 UID 和 GID，但只能属于一个组，这有些限制，因此用户还可以加入次级组。用户可以使用`/usr/bin/newgrp`命令将当前的
+    GID 改为其次级组中的一个，从而有效地切换他们的 GID。在实际操作中，这并不是必需的，接下来我们将描述用户的主组和次级组之间的区别。
 - en: When creating a new file, the users UID and their current GID are used to create
     the ownership of the new file. If a user creates a new file, he/she will be the
     owner of that file and the file will be group owned by his/her own private group,
@@ -79,416 +108,611 @@
     In this way, a file that is readable by the `users` group but not to `others`
     will be accessible to a user whose GID is set to his/her own private group, but
     the list of secondary groups to which they belong includes the `users` group.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 创建新文件时，用户的UID和当前的GID用于创建新文件的所有权。如果用户创建新文件，用户将是该文件的所有者，并且该文件将由其自己的私有组作为组所有。这样就能创建一个固有安全的系统，无需用户干预。次级组在访问*当前*存在的资源时被使用。用户在访问资源时会显示其所有的次级组。因此，一个对`users`组可读但对`others`不可读的文件，将能够被其GID设置为私有组的用户访问，但他们所属的次级组列表中包括了`users`组。
 - en: 'When assessing a user''s ID, setting the `/usr/bin/id` command can be very
     useful. Run without any options or arguments and the output will display your
     own associated IDs. In the following screenshot, we can see that the user `andrew`
     belongs to only the private user group and has no additional secondary group memberships:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 在评估用户的ID时，设置`/usr/bin/id`命令非常有用。若不带任何选项或参数运行，输出将显示与您关联的ID。在下图中，我们可以看到用户`andrew`仅属于私有用户组，并没有额外的次级组成员资格：
 - en: '[PRE0]'
+  id: totrans-15
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: '![Linux groups](img/5920OS_06_01.jpg)'
+  id: totrans-16
   prefs: []
   type: TYPE_IMG
+  zh: '![Linux 组](img/5920OS_06_01.jpg)'
 - en: 'We will use the same command but this time we will use the user, `u1`, as an
     argument. The output will show the associated IDs of that account; this command
     can be run as a standard user:'
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将使用相同的命令，但这次我们将使用用户`u1`作为参数。输出将显示该帐户的关联ID；此命令可以作为标准用户运行：
 - en: '[PRE1]'
+  id: totrans-18
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: From the following screenshot, we can see that the user, `u1`, has the primary
     group or GID assigned to the private group `u1`; however, `u1` additionally belongs
     to the `users` group.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 从下图中，我们可以看到用户`u1`的主组或GID被分配给私有组`u1`；然而，`u1`还属于`users`组。
 - en: '![Linux groups](img/5920OS_06_02.jpg)'
+  id: totrans-20
   prefs: []
   type: TYPE_IMG
+  zh: '![Linux 组](img/5920OS_06_02.jpg)'
 - en: With the current IDs in place for the user `u1`, any new file created will be
     group owned by GID 501 (`u1`), but `u1` can access any resource accessible to
     the `users` and `u1` groups without any additional action on `u1`'s part. From
     an administrative perspective, we need to make sure we assign the correct secondary
     IDs to our users.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于当前设置的`u1`用户ID，任何新创建的文件将由GID 501（`u1`）作为组所有；但`u1`可以访问任何`users`和`u1`组可访问的资源，无需`u1`做任何额外操作。从管理员的角度来看，我们需要确保为用户分配正确的次级ID。
 - en: 'The same cannot be said for the first example that we looked at. The user,
     `andrew`, currently belongs only to `andrew`''s private group, so he can only
     access resources where permissions are set to:'
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 这点与我们查看的第一个例子不同。用户`andrew`目前仅属于`andrew`的私有组，因此他只能访问权限设置为：
 - en: Their UID (`andrew`)
+  id: totrans-23
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 他们的UID（`andrew`）
 - en: Their private GID (`andrew`)
+  id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 他们的私有GID（`andrew`）
 - en: Others
+  id: totrans-25
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 其他
 - en: The user account `andrew` does not have access to permissions assigned to the
     `users` group in the same way that the user `u1` does.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 用户帐户`andrew`无法像用户`u1`那样访问`users`组分配的权限。
 - en: Adding users to groups
+  id: totrans-27
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 将用户添加到组中
 - en: We can now see that the user `u1` has the desired access to resources shared
     with the `users` groups, but what about `andrew`? How can we help here?
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们可以看到用户`u1`已经获得了共享给`users`组的资源访问权限，那么`andrew`呢？我们该如何帮助他呢？
 - en: If the user already exists and we need to add him/her to a public group, then
     we can use the `usermod` command to add the user to an additional group. When
     we add `andrew` to the `users` group, we will also want to maintain any existing
     secondary groups' memberships.
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果用户已存在，并且我们需要将其添加到一个公共组中，那么可以使用`usermod`命令将用户添加到额外的组中。当我们将`andrew`添加到`users`组时，我们还需要保持其任何现有的次级组成员资格。
 - en: 'Run the following command:'
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 运行以下命令：
 - en: '[PRE2]'
+  id: totrans-31
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: If we choose to run the preceding command, then `andrew` would be added to the
     `users` groups but, along with his primary group, this would be his only secondary
     group membership. In other words, if `andrew` belongs to multiple secondary groups,
     the `-G` option overwrites this group list, which is not a good thing.
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们选择运行上述命令，那么`andrew`将被添加到`users`组中，但与他的主要组一起，这将是他唯一的二级组成员。换句话说，如果`andrew`属于多个二级组，`-G`选项会覆盖这个组列表，这是不好的做法。
 - en: 'The command ID can display current secondary groups with the `-G` option:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: '`id`命令可以通过`-G`选项显示当前的二级组：'
 - en: '[PRE3]'
+  id: totrans-34
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'If we combine the two commands together, then we can effectively append the
     `users` groups to the current group list of `andrew`. To do this, additionally,
     we have to translate the spaces in the group list supplied by the command ID into
     commas:'
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们将这两个命令结合在一起，那么我们可以有效地将`users`组附加到`andrew`当前的组列表中。为此，我们还需要将`id`命令提供的组列表中的空格转换为逗号：
 - en: '[PRE4]'
+  id: totrans-36
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'The commands in the parenthesis are evaluated first. The `id` command creates
     a space-separated list of secondary groups, and the `tr` command will translate
     the spaces to commas (in this case). The group list we supply to `usermod` needs
     to be comma delimited but can use group names or IDs. More simply though, we can
     use the append option to usermod as shown in the following code example:'
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 括号中的命令首先会被评估。`id`命令会生成一个由空格分隔的二级组列表，`tr`命令会将空格转换为逗号（在这种情况下）。我们提供给`usermod`的组列表需要用逗号分隔，但可以使用组名或ID。不过，更简单的方法是使用`usermod`的附加选项，如下所示的代码示例：
 - en: '[PRE5]'
+  id: totrans-38
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'When creating new users, we can simply specify the secondary groups the user
     should belong to. We don''t need to concern ourselves with the existing group
     membership:'
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 创建新用户时，我们只需指定用户应属于的二级组。我们无需关注现有的组成员身份：
 - en: '[PRE6]'
+  id: totrans-40
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: From the following output, we can see that the new user, `u4`, is created and
     added to the secondary group users.
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 从以下输出可以看出，新用户`u4`已被创建并添加到二级组`users`中。
 - en: '![Adding users to groups](img/5920OS_06_03.jpg)'
+  id: totrans-42
   prefs: []
   type: TYPE_IMG
+  zh: '![添加用户到组](img/5920OS_06_03.jpg)'
 - en: Evaluating private group usage
+  id: totrans-43
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 评估私有组使用情况
 - en: 'You do not need to use private `groups` schemes. They are the default, but
     as with all defaults, we can specify options to modify this. Using the `-N` option
     with `useradd` will not create the private groups and, if not specified, the user''s
     primary group or GID will be the `users` groups. Let''s execute the following
     commands:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 你不需要使用私有`groups`方案。它们是默认的，但与所有默认设置一样，我们可以指定选项来修改它。使用`useradd`命令的`-N`选项将不会创建私有组，并且如果未指定，用户的主要组或GID将是`users`组。让我们执行以下命令：
 - en: '[PRE7]'
+  id: totrans-45
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'The output is shown in the following screenshot, and we see that the users''
     primary group is the `users` group:'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 输出结果显示在下面的截图中，我们可以看到用户的主要组是`users`组：
 - en: '![Evaluating private group usage](img/5920OS_06_04.jpg)'
+  id: totrans-47
   prefs: []
   type: TYPE_IMG
+  zh: '![评估私有组使用情况](img/5920OS_06_04.jpg)'
 - en: The only security issue that we may need to contend with is that now, by default,
     any file created by the user `u5` will be group owned by a shared group. Depending
     on the circumstances, this may be not desirable; however, having all files private
     to the user by default is no more desirable either. This is up to the administration
     team deciding which model suits the organizational needs best.
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可能需要面对的唯一安全问题是，现在默认情况下，用户`u5`创建的任何文件将由一个共享组拥有。根据具体情况，这可能是不希望的；然而，默认将所有文件设为用户私有也并不是理想选择。最终，由管理员团队决定哪种模型最适合组织的需求。
 - en: Getent
+  id: totrans-49
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: Getent
 - en: The `/usr/bin/getent` command will display a list of entries, *Get Entries*.
     The entries are resolved by *Name Service Switch Libraries*, which are configured
     in the `/etc/nsswitch.conf` file. This file has a list of databases and libraries
     that will be used to access those databases.
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: '`/usr/bin/getent`命令将显示一个条目列表，*获取条目*。这些条目由*名称服务切换库*解析，这些库在`/etc/nsswitch.conf`文件中进行配置。该文件包含一个数据库和库的列表，用于访问这些数据库。'
 - en: For example, we could use the `getent passwd` command to display all users,
     or `getent group` to display all groups. We could extend this though to commands
     such as `getent hosts` to display host file entries and `getent aliases` to display
     user aliases on the system.
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，我们可以使用`getent passwd`命令显示所有用户，或者使用`getent group`显示所有组。然而，我们也可以将其扩展到诸如`getent
+    hosts`来显示主机文件条目，和`getent aliases`来显示系统上的用户别名等命令。
 - en: The `nsswitch.conf` file will define the libraries used to access the `passwd`
     database. On a standard CentOS system, `/etc/passwd` is often the only local file,
     but an enterprise system could include **Lightweight Directory Access Protocol**
     (**LDAP**) modules. In the next chapter, we will learn more using directory services.
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: '`nsswitch.conf`文件将定义用于访问`passwd`数据库的库。在标准CentOS系统上，`/etc/passwd`通常是唯一的本地文件，但企业系统可能包括**轻量级目录访问协议**（**LDAP**）模块。在下一章中，我们将学习如何使用目录服务。'
 - en: 'We search the `/etc/nsswitch` file for the `passwd` database using `grep`:'
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们使用`grep`命令在`/etc/nsswitch`文件中搜索`passwd`数据库：
 - en: '[PRE8]'
+  id: totrans-54
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'We can see that on my system, we just use the local files to resolve user names:'
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以看到在我的系统上，我们只是使用本地文件来解析用户名：
 - en: '![Getent](img/5920OS_06_05.jpg)'
+  id: totrans-56
   prefs: []
   type: TYPE_IMG
+  zh: '![Getent](img/5920OS_06_05.jpg)'
 - en: 'The `getent` command is a very useful way to quickly list users or groups on
     your system, and the output can be filtered or sorted as required with the `grep`
     and `sort` commands. For example, if we want to see all configured groups on our
     system that start with the letter `u` and have only one additional character in
     their names, we can use the following command:'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: '`getent`命令是一个非常有用的工具，可以快速列出系统中的用户或组，输出可以根据需要通过`grep`和`sort`命令进行过滤或排序。例如，如果我们想查看系统中所有以字母`u`开头并且名称中只有一个额外字符的组，可以使用以下命令：'
 - en: '[PRE9]'
+  id: totrans-58
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'The following screenshot shows this command:'
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下截图展示了这个命令：
 - en: '![Getent](img/5920OS_06_06.jpg)'
+  id: totrans-60
   prefs: []
   type: TYPE_IMG
+  zh: '![Getent](img/5920OS_06_06.jpg)'
 - en: Quotas
+  id: totrans-61
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 配额
 - en: In almost all areas of user management, we have to assign disk space quotas
     of some description in order to give the responsibility of disk space management
     back to the user. If we do not, then the user would never know the struggles that
     we have to face in providing them with unlimited disk space. Allowing the user
     to see that their space is filling up then may prompt them to carry out a little
     housekeeping.
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 在几乎所有用户管理的领域，我们都必须为磁盘空间分配某种配额，以便将磁盘空间管理的责任交还给用户。如果我们不这么做，用户将永远无法了解我们在为他们提供无限磁盘空间时所面临的困难。让用户看到他们的空间正在填满，可能会促使他们进行一些清理工作。
 - en: In Linux, disk quotas are applied to the mount points; if you want to limit
     a user's space in their home directory, then the `/home` directory will need to
     be in its own partition. If it is part of the root filesystem, then a user's space
     will be restricted to all directories within that partition.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Linux中，磁盘配额应用于挂载点；如果你想限制用户在其主目录中的空间，则`/home`目录需要有自己的分区。如果它是根文件系统的一部分，那么用户的空间将被限制在该分区内的所有目录中。
 - en: 'Quota restrictions are implemented using tools from the `quota` package. You
     can use the `yum` command to verify that it is installed:'
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 配额限制是通过`quota`包中的工具实现的。你可以使用`yum`命令来验证它是否已安装：
 - en: '[PRE10]'
+  id: totrans-65
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'If the output of the command indicates that it is available rather than installed,
     then install the quota with:'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果命令的输出显示它可用而不是已安装，那么请使用以下命令安装配额：
 - en: '[PRE11]'
+  id: totrans-67
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: Setting quotas
+  id: totrans-68
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 设置配额
 - en: My system includes a partition for `/home` and has the `quota` package installed.
     We now need to set the correct mount options for the `/home` partition. Currently,
     it does not include quotas.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 我的系统包含一个`/home`分区并安装了`quota`包。现在，我们需要为`/home`分区设置正确的挂载选项。目前，它没有启用配额。
 - en: 'To enable this, we will edit the `/etc/fstab` file and mount options for the
     `/home` partition. The following two mount options should be added to enable journal
     quotas for a selected partition:'
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了启用此功能，我们需要编辑`/etc/fstab`文件并为`/home`分区设置挂载选项。以下两个挂载选项应该被添加以启用选定分区的日志配额：
 - en: '[PRE12]'
+  id: totrans-71
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: The `usrjquota=aquota.user` part specifies the quota file, and `jqfmt=vfsv0`
     specifies the quota format.
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: '`usrjquota=aquota.user`部分指定了配额文件，而`jqfmt=vfsv0`指定了配额格式。'
 - en: 'The line in question is shown in the following screenshot:'
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 问题行在以下截图中显示：
 - en: '![Setting quotas](img/5920OS_06_07.jpg)'
+  id: totrans-74
   prefs: []
   type: TYPE_IMG
+  zh: '![Setting quotas](img/5920OS_06_07.jpg)'
 - en: We have enabled journal-based user quotas as we are using `ext4`, a journal-based
     filesystem. User space restriction is checked when writing the journal rather
     than waiting until the changes are flushed to disk. We also set the format of
     the journal quotas.
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们已启用基于日志的用户配额，因为我们使用的是`ext4`，一种基于日志的文件系统。用户空间限制是在写入日志时检查的，而不是等到更改刷新到磁盘时才检查。我们还设置了日志配额的格式。
 - en: 'To make these settings effective, we can remount the `/home` partition using
     the following command:'
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了使这些设置生效，我们可以使用以下命令重新挂载`/home`分区：
 - en: '[PRE13]'
+  id: totrans-77
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'We will now need to initialize the quota database; this was referenced in the
     mount options as `aquota.user` and will reside at the root of the partition where
     quotas are enabled. Enabling quotas on a filesystem may take some time, depending
     on the amount of data in the filesystem:'
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们需要初始化配额数据库；它在挂载选项中被引用为`aquota.user`，并将位于启用配额的分区根目录下。启用文件系统的配额可能需要一些时间，具体取决于文件系统中的数据量：
 - en: '[PRE14]'
+  id: totrans-79
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'Using these options with the `/sbin/quotacheck` command, we can set the following
     options:'
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用这些选项和`/sbin/quotacheck`命令，我们可以设置以下选项：
 - en: '`-m`: This indicates not to remount as read-only during an operation'
+  id: totrans-81
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-m`：这表示在操作过程中不重新挂载为只读模式'
 - en: '`-u`: This is for user quotas'
+  id: totrans-82
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-u`：这是用于用户配额的选项'
 - en: '`-v`: This is the verbose output'
+  id: totrans-83
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-v`：这是详细输出'
 - en: '`/home`: This is the partition to work with, or use `-a` for all quota-enabled
     partitions'
+  id: totrans-84
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`/home`：这是要操作的分区，或者使用`-a`来处理所有启用配额的分区'
 - en: It may be worth adding the `quotacheck` commands and options into your `crontab`
     to ensure that `quotacheck` is run perhaps once a day. Even though journal quotas
     are more reliable than traditional quotas, there is no harm in re-evaluating file
     space used to ensure that the data maintained is accurate.
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 可能值得将`quotacheck`命令和选项添加到你的`crontab`中，以确保`quotacheck`命令每天至少执行一次。尽管日志配额比传统配额更可靠，但定期重新评估文件空间的使用情况仍然有助于确保维护的数据准确。
 - en: 'Quotas can be set with the `edquota` or `setquota` command; I prefer the `setquota`
     command, but traditionally `edquota` is taught to new administrators. The `/usr/sbin/edquota`
     command takes you into your editor to make the changes, whereas `/usr/sbin/setquota`
     sets the quota directly from the command line:'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 配额可以通过`edquota`或`setquota`命令设置；我更喜欢`setquota`命令，但传统上`edquota`会教授给新管理员。`/usr/sbin/edquota`命令将带你进入编辑器进行更改，而`/usr/sbin/setquota`命令则直接在命令行中设置配额：
 - en: '[PRE15]'
+  id: totrans-87
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: The preceding command will set the quota for the user `u1`. Giving the user
     a soft limit, just a warning when they exceed 20 M (20 x 1k blocks) and implementing
     a hard limit of 25 M, where the user cannot save any more data in `/home`. I have
     not limited the user `u1` with either soft or hard limits to the number of files
     they may have, just the space they use.
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述命令将为用户`u1`设置配额。为该用户设置软限制，当超过20 M（20 x 1k块）时仅给出警告，并设置硬限制为25 M，超出此限制时用户将无法再在`/home`目录中保存数据。我没有限制用户`u1`的文件数量，只限制了他们使用的磁盘空间。
 - en: 'The `/usr/sbin/repquota` command can be used to display disk usage:'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: '`/usr/sbin/repquota`命令可以用来显示磁盘使用情况：'
 - en: '[PRE16]'
+  id: totrans-90
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'The output from my system is shown in the following screenshot:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 我的系统输出如下所示的屏幕截图：
 - en: '![Setting quotas](img/5920OS_06_08.jpg)'
+  id: totrans-92
   prefs: []
   type: TYPE_IMG
+  zh: '![设置配额](img/5920OS_06_08.jpg)'
 - en: Scripting user creation
+  id: totrans-93
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 脚本化用户创建
 - en: 'User creation will now consist of three steps:'
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 用户创建现在将包括三个步骤：
 - en: '`useradd`: This creates the user'
+  id: totrans-95
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`useradd`：这用来创建用户'
 - en: '`passwd`: This sets the password'
+  id: totrans-96
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`passwd`：这用于设置密码'
 - en: '`setquota`: This sets the disk limits'
+  id: totrans-97
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`setquota`：这用于设置磁盘配额'
 - en: 'We can ensure that all this happens correctly and uniformly using scripts to
     ensure the procedural integrity of the user creation process. It is also going
     to save you time. As a very quick solution, the following script provides all
     that we need:'
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过脚本确保这些操作的正确性和一致性，以确保用户创建过程的程序完整性。这还将节省时间。作为一种非常快速的解决方案，以下脚本提供了我们所需的一切：
 - en: '[PRE17]'
+  id: totrans-99
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'We will need to run the script with the new username as the argument, as shown
     in the following example:'
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们需要使用新用户名作为参数来运行脚本，如下例所示：
 - en: '[PRE18]'
+  id: totrans-101
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'Reading the script though line by line can explain the script contents as follows:'
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 按行阅读脚本可以解释脚本内容如下：
 - en: '`#!/bin/bash`: This is the script interpreter to use'
+  id: totrans-103
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`#!/bin/bash`：这是要使用的脚本解释器'
 - en: '`useradd -m -G users $1`: This creates the user supplied as the first argument
     to the script, `$1`. The user''s home directory will be created, and it will be
     added to the `users` group.'
+  id: totrans-104
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`useradd -m -G users $1`：这将创建作为脚本第一个参数`$1`传入的用户。用户的主目录将被创建，并且会被加入到`users`组。'
 - en: '`echo Password123 | passwd --stdin $1`: This sets the user''s password to a
     standard password.'
+  id: totrans-105
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`echo Password123 | passwd --stdin $1`：这将用户的密码设置为一个标准密码。'
 - en: '`passwd -e $1`: The password is expired so the user will need to set their
     own password when they first login.'
+  id: totrans-106
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`passwd -e $1`：密码已过期，因此用户在第一次登录时需要设置自己的密码。'
 - en: '`setquota -u $1 20000 25000 0 0 /home`: Finally, the quotas are implemented
     for the user.'
+  id: totrans-107
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`setquota -u $1 20000 25000 0 0 /home`：最后，配额将为用户实现。'
 - en: We can, of course, allow more functionality in the script to set different groups
     and quotas; however, as an example of procedural integrity and a functional script,
     this is a great start.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 当然，我们可以在脚本中加入更多功能来设置不同的群组和配额；然而，作为程序完整性和功能脚本的示范，这已经是一个很好的起步。
 - en: Summary
+  id: totrans-109
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: As we close another chapter, we can take stock of all that we have acquainted
     ourselves with in the process. The big task for this section was to become more
     accustomed to the vagaries of CentOS group management and being able to properly
@@ -496,16 +720,23 @@
     this process, we took the time to evaluate the use of public and private group
     schemes and the use of the `-N` option to disable the user's private group during
     user creation.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们结束这一章节时，可以总结一下我们在过程中学到的所有内容。本节的主要任务是更加熟悉CentOS群组管理的变化，并能够正确区分用户的主群组和次群组。在此过程中，我们花时间评估了公共和私人群组方案的使用，以及在用户创建时使用`-N`选项禁用用户的私人群组。
 - en: It was not long before we found ourselves in the depths of `/etc/nsswitch.conf`
     and the `getent` command (get entries). From here, we got down straight to business
     implementing user disk limits or quotas before seeing how to link all of this
     together with scripts.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 不久后，我们便深入到了`/etc/nsswitch.conf`和`getent`命令（获取条目）。从这里，我们直接开始实施用户磁盘限制或配额，然后再通过脚本将这一切串联起来。
 - en: In the next chapter, we stick to the theme of users, but look at centralizing
     our accounts in a central LDAP directory, using the open source code from Red
     Hat's directory server by implementing the 389 Directory Server on CentOS 6.5.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章中，我们仍然围绕用户这一主题，但将目光投向将我们的账户集中在一个中央LDAP目录中，通过实现CentOS 6.5上的389目录服务器，使用来自Red
+    Hat目录服务器的开源代码。
