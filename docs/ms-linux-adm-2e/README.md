@@ -1,6 +1,6 @@
-# Github DevOps 加速指南
+# 精通 Linux 管理第二版
 
-> 原文：[`annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e`](https://annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e)
+> 原文：[`annas-archive.org/md5/b0d103ad273f12a8dd45f31bf23f85fb`](https://annas-archive.org/md5/b0d103ad273f12a8dd45f31bf23f85fb)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

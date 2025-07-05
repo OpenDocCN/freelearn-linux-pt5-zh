@@ -1,6 +1,6 @@
-# Github DevOps 加速指南
+# Linux 设备驱动开发第二版
 
-> 原文：[`annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e`](https://annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e)
+> 原文：[`annas-archive.org/md5/e409561761c67e6644a54ed53a248850`](https://annas-archive.org/md5/e409561761c67e6644a54ed53a248850)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

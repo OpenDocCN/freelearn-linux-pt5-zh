@@ -1,6 +1,6 @@
-# Github DevOps 加速指南
+# Varnish Cache 即时入门
 
-> 原文：[`annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e`](https://annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e)
+> 原文：[`annas-archive.org/md5/f81da1e9af8cdd537b8a928d1946755d`](https://annas-archive.org/md5/f81da1e9af8cdd537b8a928d1946755d)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

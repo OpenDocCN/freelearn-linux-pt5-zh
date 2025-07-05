@@ -1,6 +1,6 @@
-# Github DevOps 加速指南
+# FreeNAS 学习指南
 
-> 原文：[`annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e`](https://annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e)
+> 原文：[`annas-archive.org/md5/4a7b61ae51a9e14fe0caa74e9b849e52`](https://annas-archive.org/md5/4a7b61ae51a9e14fe0caa74e9b849e52)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

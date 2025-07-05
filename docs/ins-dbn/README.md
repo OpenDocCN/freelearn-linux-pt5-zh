@@ -1,6 +1,6 @@
-# Github DevOps 加速指南
+# Debian 即时入门
 
-> 原文：[`annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e`](https://annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e)
+> 原文：[`annas-archive.org/md5/4cd8cf68ef447f1e022d6d78aa573abe`](https://annas-archive.org/md5/4cd8cf68ef447f1e022d6d78aa573abe)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

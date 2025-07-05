@@ -1,6 +1,6 @@
-# Github DevOps 加速指南
+# Nagios 核心管理秘籍
 
-> 原文：[`annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e`](https://annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e)
+> 原文：[`annas-archive.org/md5/2a65ba8acd5ecd8eabef27310d48a8a3`](https://annas-archive.org/md5/2a65ba8acd5ecd8eabef27310d48a8a3)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 
