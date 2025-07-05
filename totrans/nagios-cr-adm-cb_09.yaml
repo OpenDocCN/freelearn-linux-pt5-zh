@@ -1,50 +1,73 @@
 - en: Chapter 9. Managing Configuration
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第9章 配置管理
 - en: 'In this chapter, we will cover the following recipes:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章中，我们将覆盖以下配方：
 - en: Grouping configuration files in directories
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 将配置文件分组到目录中
 - en: Keeping configuration under version control
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 保持配置在版本控制下
 - en: Configuring host roles using groups
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用组配置主机角色
 - en: Building groups using regular expressions
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用正则表达式构建组
 - en: Using inheritance to simplify configuration
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用继承简化配置
 - en: Defining macros in a resource file
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在资源文件中定义宏
 - en: Dynamically building host definitions
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 动态构建主机定义
 - en: Introduction
+  id: totrans-9
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 介绍
 - en: A major downside of Nagios Core's configuration being so flexible is that without
     proper management, a configuration can easily balloon out into hundreds of files
     with thousands of objects, all having unclear dependencies. This can be frustrating
     when attempting to make significant changes to a configuration, or even for something
     as simple as removing a host, sifting through dependencies to find what's causing
     errors in the configuration and prevents you from restarting Nagios Core.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: Nagios Core配置灵活性的一个主要缺点是，如果没有适当的管理，配置很容易膨胀成成百上千个文件，包含数千个对象，且所有对象之间的依赖关系不明确。当尝试对配置进行重大更改时，或者即使只是像删除主机这样简单的操作时，这种情况会令人沮丧，因为你需要筛选出依赖关系，找出导致配置错误并阻止你重新启动Nagios
+    Core的原因。
 - en: It's therefore important to build your configuration carefully using as much
     abstraction as possible, to allow adding, changing, and removing hosts and service
     definitions from the configuration painlessly, and to avoid duplication of configuration.
@@ -52,26 +75,34 @@
     use of groups and templates for the fundamental objects. Duplication of network-specific
     and volatile data, such as passwords, is also to be avoided; it's best done with
     the use of custom macros defined in a resource file.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，仔细构建配置非常重要，尽可能多地使用抽象，以便能够轻松地添加、更改和删除主机和服务定义，并避免配置的重复。Nagios Core提供了几种方法来处理此问题，最显著的就是明智地使用组和模板来管理基本对象。还应避免重复网络特定的和易变的数据，例如密码；最好的做法是使用在资源文件中定义的自定义宏来处理。
 - en: This chapter's recipes will run through some examples of good practice for the
     configuration of a large network. The most important recipes are the first two,
     *Grouping configuration files in directories* and *Configuring host roles using
     groups*. If you're looking to untangle and revamp a messy configuration, then
     these two recipes would be the best place to start.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章的配方将展示一些大规模网络配置的最佳实践。最重要的配方是前两个，*将配置文件分组到目录中*和*使用组配置主机角色*。如果你希望理顺并重构一个杂乱的配置，那么这两个配方是最好的起点。
 - en: At the end of the chapter, the final recipe, *Dynamically building host definitions*,
     will show one of the primary advantages of a tidy configuration in being able
     to easily generate configuration according to a list of hosts and services kept
     in some other external information source, such as a **Configuration Management
     Database** (**CMDB**).
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章的最后一个配方，*动态构建主机定义*，将展示整洁配置的主要优势之一，即能够根据保存在其他外部信息源中的主机和服务列表，轻松生成配置，如**配置管理数据库**（**CMDB**）。
 - en: Grouping configuration files in directories
+  id: totrans-14
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 将配置文件分组到目录中
 - en: In this recipe, we'll learn to group configuration files in directories to greatly
     ease the management of configuration. We'll do this by configuring Nagios Core
     to load every file it can find ending with a `.cfg` extension in a given directory,
@@ -79,150 +110,217 @@
     Nagios Core load a file, we only need to include it somewhere in that directory
     with an appropriate extension; we don't need to define exactly which files are
     being loaded in `nagios.cfg`.
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个配方中，我们将学习如何将配置文件分组到目录中，以极大地简化配置的管理。我们将通过配置Nagios Core加载给定目录中所有以`.cfg`扩展名结尾的文件，包括递归遍历子目录来实现。最终结果是，要让Nagios
+    Core加载一个文件，我们只需要在该目录中包含它，并使用适当的扩展名；我们不需要在`nagios.cfg`中精确指定加载了哪些文件。
 - en: Getting ready
+  id: totrans-16
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need to have a server running Nagios Core 3.0 or later, and have access
     to the command line to change its configuration. You should be familiar with the
     loading of individual configuration files using the `cfg_file` directive in `/usr/local/nagios/etc/nagios.cfg`.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要一台运行Nagios Core 3.0或更高版本的服务器，并且需要有命令行权限来修改其配置。你应该熟悉使用`cfg_file`指令在`/usr/local/nagios/etc/nagios.cfg`中加载单独的配置文件。
 - en: 'In particular, you should have a directory prepared that contains all of the
     configuration files you would like to be loaded by Nagios Core. In this example,
     we''ll prepare a new directory called `/usr/local/nagios/etc/naginet`, which will
     contain three configuration files, each defining information for one host:'
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 特别是，你应该准备一个目录，包含你希望被Nagios Core加载的所有配置文件。在这个例子中，我们将准备一个名为`/usr/local/nagios/etc/naginet`的新目录，它将包含三个配置文件，每个文件定义一个主机的信息：
 - en: '[PRE0]'
+  id: totrans-19
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: You will need to ensure that the directory, files, and subdirectories within
     it are all readable (though not necessarily owned) by the `nagios` user.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要确保目录、文件和其中的子目录对`nagios`用户是可读的（尽管不一定是该用户拥有的）。
 - en: How to do it...
+  id: totrans-21
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何执行...
 - en: 'We can arrange for Nagios Core to include all the files in a directory as follows:'
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按以下方式安排Nagios Core包含目录中的所有文件：
 - en: Change to the directory containing the `nagios.cfg` file. In the default installation,
     it is located at `/usr/local/nagios/etc/nagios.cfg`.
+  id: totrans-23
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到包含`nagios.cfg`文件的目录。在默认安装中，它位于`/usr/local/nagios/etc/nagios.cfg`。
 - en: '[PRE1]'
+  id: totrans-24
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Edit the file, and below any other `cfg_file` or `cfg_dir` directives, add
     the following line referring to the absolute path of the directory containing
     your `.cfg` files:'
+  id: totrans-25
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑文件，并在任何其他`cfg_file`或`cfg_dir`指令下面，添加以下一行，指向包含`.cfg`文件的目录的绝对路径：
 - en: '[PRE2]'
+  id: totrans-26
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: Note that this directive is `cfg_dir`, rather than `cfg_file`.
+  id: totrans-27
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 请注意，此指令是`cfg_dir`，而不是`cfg_file`。
 - en: 'Remove any `cfg_file` definitions pointing to `.cfg` files in the new directory.
     This is to prevent loading the same objects twice. In our example, we would need
     to comment out our previous rules loading these files individually:'
+  id: totrans-28
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 删除指向新目录中`.cfg`文件的任何`cfg_file`定义。这样可以防止加载相同的对象两次。在我们的例子中，我们需要注释掉之前加载这些文件的规则：
 - en: '[PRE3]'
+  id: totrans-29
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-30
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启Nagios Core服务器：
 - en: '[PRE4]'
+  id: totrans-31
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: With this done, Nagios Core should have loaded all of the files with the extension
     `.cfg` found in the `naginet` directory or any of its subdirectories, saving us
     the burden of specifying them individually.
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，Nagios Core应该已加载`naginet`目录或其任何子目录中找到的所有`.cfg`扩展名的文件，从而省去我们单独指定它们的麻烦。
 - en: How it works...
+  id: totrans-33
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: At load time, Nagios Core interprets the `cfg_dir` directive to mean that it
     should identify all of the `.cfg` files in a particular directory, including recursing
     through its subdirectories. It ignores the files that do not have that extension,
     allowing us to include metadata or other file types (such as version control information
     directories) without causing problems.
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 在加载时，Nagios Core解释`cfg_dir`指令的意思是它应该识别特定目录中所有的`.cfg`文件，包括递归遍历其子目录。它会忽略没有该扩展名的文件，允许我们包括元数据或其他文件类型（例如版本控制信息目录），而不会引起问题。
 - en: As a result, defining a new host or service becomes as simple as adding the
     file in an appropriate included directory, without needing to edit `nagios.cfg`.
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 结果是，定义一个新主机或服务变得像将文件添加到合适的包含目录一样简单，无需编辑`nagios.cfg`。
 - en: There's more...
+  id: totrans-36
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'It''s important to note that this directive will include all the `.cfg` files
     in subdirectories as well. This might allow us to meaningfully group the configuration
     files:'
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要注意的是，此指令也会包含子目录中的所有`.cfg`文件。这可能允许我们对配置文件进行有意义的分组：
 - en: '[PRE5]'
+  id: totrans-38
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: For large networks, it's worth deciding on some suitable organizing principle
     for directories. One common approach is having a separate directory for hosts,
     services, and command definitions, relevant to a particular **Domain Name System**
     (**DNS**) zone or larger subnet.
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于大型网络，值得为目录决定一个合适的组织原则。一种常见的方法是为主机、服务和命令定义分别创建独立的目录，这些目录与特定的**域名系统**（**DNS**）区域或较大子网相关。
 - en: 'If you want to prevent a file from being included at any point, all you need
     to do is either move it out of the directory, or rename it so that it no longer
     has a `.cfg` extension. One possibility is adding the suffix `.exclude`:'
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想防止某个文件在任何时候被包含，你只需要将其移出目录，或者将其重命名，使其不再具有`.cfg`扩展名。一个可能的做法是添加后缀`.exclude`：
 - en: '[PRE6]'
+  id: totrans-41
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: This will prevent Nagios Core from picking it up as part of its `cfg_dir` searching
     algorithm.
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将防止Nagios Core将其作为`cfg_dir`搜索算法的一部分加载。
 - en: See also
+  id: totrans-43
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Using inheritance to simplify configuration* and *Keeping configuration
     under version control* recipes in this chapter
+  id: totrans-44
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*使用继承简化配置*和*将配置保留在版本控制下*的实例
 - en: Keeping configuration under version control
+  id: totrans-45
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 将配置保留在版本控制下
 - en: In this recipe, we'll place a Nagios Core configuration directory under version
     control, in an attempt to keep track of changes made to it, and to enable us to
     reverse changes if there are problems.
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本教程中，我们将把Nagios Core配置目录置于版本控制之下，目的是跟踪对其所做的更改，并使我们能够在出现问题时撤销更改。
 - en: Getting ready
+  id: totrans-47
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should choose an appropriate version control system. The recipe will vary
     considerably depending on which system you use; there are too many options to
     demonstrate here, so we'll use the popular open source content tracker **Git**,
@@ -230,112 +328,164 @@
     do not require an external server. However, there's no reason you can't use **Subversion**
     or **Mercurial**, if you'd prefer. You should have the client for your chosen
     system (`git`, `hg`, `svn`, and so on) installed on your server.
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该选择一个合适的版本控制系统。根据你选择的系统，具体步骤会有所不同；这里无法演示所有的选项，因此我们将使用流行的开源内容管理工具**Git**，它非常适合进行这种类型的版本控制，并且不需要外部服务器。不过，如果你更喜欢使用**Subversion**或**Mercurial**也是完全可以的。你需要在服务器上安装所选系统的客户端（如`git`、`hg`、`svn`等）。
 - en: This will all work with any version of Nagios Core. It does not involve directly
     changing any part of the Nagios Core configuration, only keeping track of the
     files in it.
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将适用于任何版本的Nagios Core。它不涉及直接更改任何Nagios Core配置的部分，仅仅是跟踪其中的文件。
 - en: How to do it...
+  id: totrans-50
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can place our configuration directory under version control as follows:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按如下方式将配置目录放入版本控制：
 - en: 'Change to the root of the configuration directory. In the default installation,
     this is `/usr/local/nagios/etc`:'
+  id: totrans-52
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到配置目录的根目录。在默认安装中，该目录为`/usr/local/nagios/etc`：
 - en: '[PRE7]'
+  id: totrans-53
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'Run `git init` to start a repository in the current directory:'
+  id: totrans-54
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 运行`git init`以在当前目录中初始化一个仓库：
 - en: '[PRE8]'
+  id: totrans-55
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'Add all the files in the configuration directory with `git add`:'
+  id: totrans-56
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`git add`将配置目录中的所有文件添加到版本控制中：
 - en: '[PRE9]'
+  id: totrans-57
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'Commit the files with `git commit`:'
+  id: totrans-58
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`git commit`提交文件：
 - en: '[PRE10]'
+  id: totrans-59
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: With this done, we should now have a `.git` repository in `/usr/local/nagios/etc`,
     tracking all the changes made to the configuration files.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成后，我们应该在`/usr/local/nagios/etc`下拥有一个`.git`仓库，跟踪所有对配置文件的更改。
 - en: How it works...
+  id: totrans-61
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: 'Changes to the configuration files in this directory can now be reviewed for
     commit with `git status`. For example, if we changed the IP addresses of one of
     our hosts, we might check the changes by typing the following:'
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在可以使用`git status`查看对该目录中配置文件的更改。例如，如果我们更改了其中一个主机的IP地址，我们可以通过输入以下命令来检查更改：
 - en: '[PRE11]'
+  id: totrans-63
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'We could then commit this change with an explanatory message:'
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后我们可以提交这个更改并附上说明信息：
 - en: '[PRE12]'
+  id: totrans-65
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'We can review the change with `git log`:'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以使用`git log`查看更改记录：
 - en: '[PRE13]'
+  id: totrans-67
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'If we want to inspect exactly what was changed later on, we can use `git diff`
     followed by the short commit ID given in the first column of the preceding output:'
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们稍后想检查到底做了哪些更改，可以使用`git diff`，后跟前一输出中的第一列短提交 ID：
 - en: '[PRE14]'
+  id: totrans-69
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: The full functionality of Git for managing these changes, including reverting
     to older revisions, is out of scope here. You can read more about how to use Git
     in general in Scott Chacon's excellent book entitled *Pro Git*, free to read online
     at [http://git-scm.com/book](http://git-scm.com/book).
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: Git的完整功能，包括回退到旧版本，并不在本教程的范围内。你可以通过Scott Chacon的精彩著作《*Pro Git*》了解更多关于如何使用Git的内容，该书可以在[http://git-scm.com/book](http://git-scm.com/book)免费在线阅读。
 - en: There's more...
+  id: totrans-71
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: Version control is particularly useful in this way when more than one person
     is editing a configuration, because it allows us to determine who made a change
     and when. It also allows us to see the exact changeset to review why it was changed,
     and to undo or edit it if it is causing problems.
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 版本控制在多人编辑配置时特别有用，因为它能帮助我们确定是谁在什么时候做了更改。它还允许我们查看确切的变更集，审查为什么会做出这些更改，并在发生问题时撤销或修改这些更改。
 - en: If you're going to use this method, it's a good idea to keep your configuration
     reasonably granular, using at least several files rather than just one or two.
     It will still work if you have two big files such as `hosts.cfg` and `services.cfg`
     for your network, but the differences between each commit will not be as clear.
     This is therefore a very good recipe to combine with the *Grouping configuration
     files in directories* recipe, also in this chapter.
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你打算使用此方法，最好保持配置的适当粒度，使用多个文件而不是仅使用一两个文件。即使你只有两个大文件，如`hosts.cfg`和`services.cfg`，它也能正常工作，但每次提交之间的差异就不那么清晰了。因此，这是一个与本章中的*将配置文件分组到目录中*教程结合使用的非常好的做法。
 - en: Rather than merely the configuration directory, you may prefer to keep the entire
     Nagios Core directory under version control, including the plugins and other scripts
     and binaries. This could be particularly handy if you upgrade your installation
@@ -343,128 +493,182 @@
     anything. In this case, be careful to use your chosen version control system's
     "ignore" functionality to prevent tracking temporary files or log files. For Git,
     take a look at the output of `git help ignore`.
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 与其仅仅将配置目录纳入版本控制，你可能更愿意将整个Nagios Core目录都纳入版本控制，包括插件和其他脚本与二进制文件。如果你在安装中升级到新版本并希望查看文件中发生了哪些更改，以防止出现问题，这样做会特别有用。在这种情况下，请小心使用你所选择的版本控制系统的“忽略”功能，以防止跟踪临时文件或日志文件。对于Git，可以查看`git
+    help ignore`的输出。
 - en: See also
+  id: totrans-75
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Grouping configuration files in directories* recipe in this chapter
+  id: totrans-76
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*将配置文件分组到目录中*教程
 - en: Configuring host roles using groups
+  id: totrans-77
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用组配置主机角色
 - en: In this recipe, we'll learn how to use the abstraction of host and service groups
     to our advantage in order to build a configuration where hosts and services can
     be added or removed more easily. We'll do this by defining roles for hosts by
     using a hostgroup structure, and then assigning relevant services to the hostgroup,
     rather than to the hosts individually.
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本教程中，我们将学习如何利用主机和服务组的抽象化，以便构建一个配置，使得主机和服务能够更轻松地添加或移除。我们将通过使用主机组结构为主机定义角色，然后将相关服务分配给主机组，而不是单独分配给各个主机。
 - en: Getting ready
+  id: totrans-79
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need to have a server running Nagios Core 3.0 or later, have access
     to the command line to change its directories, and understand the basics of how
     host and service groups work. These are covered in the *Creating a new hostgroup*
     and *Creating a new servicegroup* recipes in [Chapter 1](ch01.html "Chapter 1. Understanding
     Hosts, Services, and Contacts").
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要一台运行Nagios Core 3.0或更高版本的服务器，能够访问命令行以更改其目录，并理解主机和服务组的基本工作原理。这些内容可以在[第1章](ch01.html
+    "第1章. 理解主机、服务和联系人")中的*创建新主机组*和*创建新服务组*教程中找到。
 - en: In this example, we'll create two simple hostgroups; one called `servers`, for
     which a `PING` check should be made for its member hosts, and another called `webservers`,
     which should include `HTTP` checks for its member hosts. Once this is set up,
     we'll then add an example host `sparta.naginet` to both groups, thereby easily
     assigning all the appropriate services to the host in one definition, which we
     can cleanly remove simply by deleting the host.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，我们将创建两个简单的主机组：一个叫做`servers`，它的成员主机应进行`PING`检查，另一个叫做`webservers`，它的成员主机应进行`HTTP`检查。一旦完成设置，我们将向两个组中添加一个示例主机`sparta.naginet`，从而将所有适当的服务在一个定义中轻松分配给该主机，我们可以通过删除主机来干净地移除它。
 - en: How to do it...
+  id: totrans-82
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做到这一点…
 - en: 'We can create our group-based roles for hosts as follows:'
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以如下创建基于组的主机角色：
 - en: Change to the `objects` configuration directory. In the default installation,
     this is `/usr/local/nagios/etc/objects`. If you have already followed the *Grouping
     configuration files in directories* recipe in this chapter, then your own directory
     may differ.
+  id: totrans-84
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到`objects`配置目录。在默认安装中，该目录为`/usr/local/nagios/etc/objects`。如果你已经按照本章中的*将配置文件分组到目录中*这一教程操作，那么你的目录可能会有所不同。
 - en: '[PRE15]'
+  id: totrans-85
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: In an appropriate file, perhaps `hostgroups.cfg`, define new hostgroups with
     names corresponding to the roles for the hosts. Do not assign them any members
     just yet.
+  id: totrans-86
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在一个适当的文件中，也许是`hostgroups.cfg`，定义新主机组，名称应与主机的角色相对应。暂时不要为它们分配任何成员。
 - en: '[PRE16]'
+  id: totrans-87
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'In a second appropriate file, perhaps `services.cfg`, define new services and
     assign them `hostgroup_name` values, corresponding to the hostgroups added in
     the previous step:'
+  id: totrans-88
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在另一个适当的文件中，也许是`services.cfg`，定义新服务并为它们分配`hostgroup_name`值，值应与上一步骤中添加的主机组相对应：
 - en: '[PRE17]'
+  id: totrans-89
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: Note that the use of the `generic-service` template is an example only; you
     will probably want to inherit from your own particular service template.
+  id: totrans-90
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 请注意，`generic-service` 模板的使用仅是一个示例；你可能更希望从你自己特定的服务模板中继承。
 - en: 'Add or edit your existing hosts to make them a part of the appropriate hostgroups,
     using the `hostgroups` directive:'
+  id: totrans-91
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用 `hostgroups` 指令，添加或编辑现有主机，使其成为适当主机组的一部分：
 - en: '[PRE18]'
+  id: totrans-92
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: If you already had services with the same value for their `service_description`
     directives as the ones you're adding in this recipe, you will need to remove them,
     as this may cause a conflict with the services added in the previous step.
+  id: totrans-93
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果你已经有与此配方中添加的服务相同的 `service_description` 指令的服务，你需要删除它们，因为这可能会与前一步添加的服务发生冲突。
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-94
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启 Nagios Core 服务器：
 - en: '[PRE19]'
+  id: totrans-95
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'With this done, you should now find that all of the services you defined for
     the hostgroups you created have been attached to the appropriate hosts:'
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成这一步后，你应该会发现你为所创建的主机组定义的所有服务都已附加到相应的主机上：
 - en: '![How to do it...](img/5566_09_01.jpg)'
+  id: totrans-97
   prefs: []
   type: TYPE_IMG
+  zh: '![如何做...](img/5566_09_01.jpg)'
 - en: How it works...
+  id: totrans-98
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The configuration added in the preceding section avoids assigning services directly
     to hosts, instead assigning them to hostgroups, thereby creating roles for services
     that hosts can adopt or discard simply by becoming part of or leaving the group.
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面部分添加的配置避免了直接将服务分配给主机，而是将它们分配给主机组，从而为服务创建了角色，主机可以通过成为组的一部分或离开该组来采纳或丢弃这些角色。
 - en: Apart from making the configuration shorter, another advantage to this approach
     is that if services are added this way, adding or deleting a host from the Nagios
     Core configuration requires nothing but the adding or removing of the host definition.
@@ -472,757 +676,1112 @@
     database functionality), then we can modify the services being checked on it simply
     by modifying its hostgroups. This ends up being much easier than adding dependencies
     in other files.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了使配置更简洁之外，这种方法的另一个优点是，如果以这种方式添加服务，添加或删除 Nagios Core 配置中的主机只需要添加或删除主机定义。类似地，如果主机承担了其他角色（例如，一个
+    web 服务器添加了数据库功能），我们只需通过修改其主机组来修改其检查的服务。这比在其他文件中添加依赖关系要容易得多。
 - en: 'Another advantage is that having hostgroups organized by host function is helpful
     for applying batch operations such as scheduled downtime in one easy action, or
     for checking all the services for one particular type of host. Once a hostgroup
     is defined, we can run operations on all the hosts within it by clicking on its
     name in the brackets, in any of the hostgroup views:'
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一个优点是，通过主机功能组织主机组有助于进行批量操作，比如在一个简单的操作中安排计划的停机时间，或者检查某种特定类型主机的所有服务。一旦定义了主机组，我们可以通过点击其名称，在任何主机组视图中对其中的所有主机执行操作：
 - en: '![How it works...](img/5566_09_02.jpg)'
+  id: totrans-102
   prefs: []
   type: TYPE_IMG
+  zh: '![它是如何工作的...](img/5566_09_02.jpg)'
 - en: If we had twenty web servers that we knew were going to be down, for example,
     this would be much easier than scheduling downtime for each of them individually!
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，如果我们有二十台即将停机的 web 服务器，这比为每台服务器单独安排停机时间要容易得多！
 - en: There's more...
+  id: totrans-104
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: It's worth noting that hostgroups can have subgroups, meaning that all of the
     hosts added to any of their subgroups are implicitly added to the parent group.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 值得注意的是，主机组可以有子组，这意味着添加到任何子组中的所有主机都会隐式地添加到父组中。
 - en: 'For example, we could define the hostgroup web servers as a subgroup of the
     `servers` hostgroup, using the `hostgroup_members` directive:'
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，我们可以使用 `hostgroup_members` 指令，将 web 服务器定义为 `servers` 主机组的子组：
 - en: '[PRE20]'
+  id: totrans-107
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'This would allow us to implicitly add hosts to both groups, without needing
     to refer to the parent group, and with all the services assigned to both groups
     assigned to the host:'
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将允许我们隐式地将主机添加到两个组中，而无需引用父组，并且将所有分配给这两个组的服务也分配给主机：
 - en: '[PRE21]'
+  id: totrans-109
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: This can be very useful for sorting "subcategories" of services. Other examples
     might include a `dns-servers` group with subgroups `dns-authoritative-servers`
     and `dns-recursive-servers`, or a `database-servers` group with subgroups `oracle-servers`
     and `mysql-servers`.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 这对于排序“子类别”服务非常有用。其他示例可能包括一个 `dns-servers` 组，带有子组 `dns-authoritative-servers`
+    和 `dns-recursive-servers`，或者一个 `database-servers` 组，带有子组 `oracle-servers` 和 `mysql-servers`。
 - en: See also
+  id: totrans-111
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Building groups using regular expressions* and *Using inheritance to simplify
     configuration* recipes in this chapter
+  id: totrans-112
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的 *使用正则表达式构建组* 和 *利用继承简化配置* 配方
 - en: The *Creating a new hostgroup*, *Creating a new servicegroup*, and *Running
     a service on all hosts in a hostgroup* recipes in [Chapter 1](ch01.html "Chapter 1. Understanding
     Hosts, Services, and Contacts"), *Understanding Hosts, Services, and Contacts*
+  id: totrans-113
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在[第1章](ch01.html "第1章. 了解主机、服务和联系人")中的*创建新主机组*、*创建新服务组*和*在主机组中的所有主机上运行服务*的食谱中，*了解主机、服务和联系人*
 - en: Building groups using regular expressions
+  id: totrans-114
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用正则表达式构建主机组
 - en: In this recipe, we'll learn a shortcut for building groups of hosts using regular
     expressions tested against their hostnames.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我们将学习如何使用正则表达式快速构建主机组，通过与主机名进行匹配来实现。
 - en: This recipe is likely only of use to you if you use a naming convention for
     your hosts that allows them to be reasonably grouped by location, function, or
     some other useful metric by a common string in their hostnames.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的主机采用了命名规范，允许根据位置、功能或其他有用的标准通过主机名中的公共字符串合理分组，那么这个食谱可能会对你有用。
 - en: Getting ready
+  id: totrans-117
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need to have a server running Nagios Core 3.0 or later, have access
     to the command line to change its configuration, and understand the basics of
     how hostgroups and servicegroups work. These are covered in the *Creating a new
     hostgroup* and *Creating a new servicegroup* recipes in [Chapter 1](ch01.html
     "Chapter 1. Understanding Hosts, Services, and Contacts").
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要有一台运行Nagios Core 3.0或更高版本的服务器，能够访问命令行以更改其配置，并理解主机组和服务组的基本原理。这些内容在[第1章](ch01.html
+    "第1章. 了解主机、服务和联系人")中的*创建新主机组*和*创建新服务组*食谱中有涉及。
 - en: In this example, we'll group three existing hosts named `web-server-01`, `web-server-02`,
     and `web-server-03` into a new hostgroup, `web-servers`, based only on their hostnames.
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们将把三个已有的主机`web-server-01`、`web-server-02`和`web-server-03`仅通过它们的主机名分组到一个新的主机组`web-servers`中。
 - en: It would help to have some familiarity with regular expressions, but the recipe
     includes a simple example, which should meet many use cases for this trick. An
     excellent site about regular expressions including tutorials can be found at [http://www.regular-expressions.info/](http://www.regular-expressions.info/).
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 对正则表达式有一定了解会有所帮助，但本食谱包括了一个简单的示例，应该能满足许多使用场景。关于正则表达式的一个优秀网站，包括教程，可以参考[http://www.regular-expressions.info/](http://www.regular-expressions.info/)。
 - en: How to do it...
+  id: totrans-121
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can build a hostgroup by matching regular expressions to hostnames as follows:'
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过将正则表达式与主机名匹配来构建主机组，如下所示：
 - en: Change to the Nagios configuration directory. In the default installation, this
     is `/usr/local/nagios/etc`. Edit the `nagios.cfg` file in this directory.
+  id: totrans-123
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到Nagios配置目录。在默认安装中，该目录是`/usr/local/nagios/etc`。编辑该目录中的`nagios.cfg`文件。
 - en: '[PRE22]'
+  id: totrans-124
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: Search for the `use_regexp_matching` directive. Uncomment it if necessary and
     set it to `1`.
+  id: totrans-125
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 搜索`use_regexp_matching`指令。如有必要，取消注释该指令并设置为`1`。
 - en: '[PRE23]'
+  id: totrans-126
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: Search for the `use_true_regexp_matching` directive. Uncomment it if necessary,
     and ensure it's set to `0`, which it should be by default.
+  id: totrans-127
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 搜索`use_true_regexp_matching`指令。如有必要，取消注释该指令，并确保它设置为`0`，默认情况下应该是这样。
 - en: '[PRE24]'
+  id: totrans-128
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: Change to the `objects` configuration directory. In the default installation,
     this is `/usr/local/nagios/etc/objects`. If you have already followed the *Grouping
     configuration files in directories* recipe in this chapter, then your own directory
     may differ.
+  id: totrans-129
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到`objects`配置目录。在默认安装中，该目录是`/usr/local/nagios/etc/objects`。如果你已经按照本章中的*将配置文件分组到目录中*的食谱操作过，则你的目录可能有所不同。
 - en: '[PRE25]'
+  id: totrans-130
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: In an appropriate file, perhaps `hostgroups.cfg`, add a definition similar to
     the following. In this case, `.+` means "any string at least one character in
     length"; you will probably want a pattern of your own, devising appropriate to
     your own host names.
+  id: totrans-131
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在适当的文件中，可能是`hostgroups.cfg`，添加类似以下的定义。在此例中，`.+`表示“任何长度至少为一个字符的字符串”；你可能需要根据自己的主机名设计一个合适的模式。
 - en: '[PRE26]'
+  id: totrans-132
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-133
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启Nagios Core服务器：
 - en: '[PRE27]'
+  id: totrans-134
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'With this done, if your regular expression was correctly formed to match all
     the appropriate hostnames, then you should find that the hosts become part of
     the group:'
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，如果你的正则表达式正确匹配了所有适当的主机名，那么你应该发现这些主机已经成为该组的一部分：
 - en: '![How to do it...](img/5566_09_03.jpg)'
+  id: totrans-136
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_09_03.jpg)'
 - en: How it works...
+  id: totrans-137
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 工作原理...
 - en: With the `use_regexp_matching` directive set to `1`, Nagios Core will attempt
     to use hostname strings containing the strings `*`, `?`, `+`, or `\.` as regular
     expressions to match against hostnames. Because `web-server-01`, `web-server-02`,
     and `web-server-03` all match the regular expression `web-server-.+` given in
     the `members` directive for the `web-servers` hostgroup, all three hosts are added
     to the group.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 当`use_regexp_matching`指令设置为`1`时，Nagios Core 将尝试将包含 `*`、`?`、`+` 或 `\.` 的主机名字符串作为正则表达式来匹配主机名。因为
+    `web-server-01`、`web-server-02` 和 `web-server-03` 都匹配在 `web-servers` 主机组的 `members`
+    指令中给出的正则表达式 `web-server-.+`，所以这三个主机都被添加到该组中。
 - en: We keep `use_true_regexp_matching` off. If it were on, it would use every hostname
     pattern as a regular expression, whether or not it had any special regular expression
     characters. This is probably not what you want for most configurations.
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将`use_true_regexp_matching`关闭。如果它开启，它将把每个主机名模式都当作正则表达式来匹配，不管其中是否包含特殊的正则表达式字符。对于大多数配置，这显然不是你想要的。
 - en: There's more...
+  id: totrans-140
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'This matching works in other places aside from hostgroup definitions; for example,
     you can also use it in the `host_name` definitions for services:'
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种匹配不仅适用于主机组定义；例如，你也可以在服务的 `host_name` 定义中使用它：
 - en: '[PRE28]'
+  id: totrans-142
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'This is one of a number of very good suggestions for simplifying object definitions
     suggested in the Nagios Core manual: [http://nagios.sourceforge.net/docs/3_0/objecttricks.html](http://nagios.sourceforge.net/docs/3_0/objecttricks.html).'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是 Nagios Core 手册中为简化对象定义提出的一些非常好的建议之一：[http://nagios.sourceforge.net/docs/3_0/objecttricks.html](http://nagios.sourceforge.net/docs/3_0/objecttricks.html)。
 - en: See also
+  id: totrans-144
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参见
 - en: The *Building groups using regular expressions* and *Using inheritance to simplify
     configuration* recipes in this chapter
+  id: totrans-145
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*使用正则表达式构建组*和*利用继承简化配置*教程
 - en: The *Creating a new hostgroup* and *Creating a new servicegroup* recipes in
     [Chapter 1](ch01.html "Chapter 1. Understanding Hosts, Services, and Contacts"),
     *Understanding Hosts, Services, and Contacts*
+  id: totrans-146
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第 1 章](ch01.html "第 1 章. 理解主机、服务和联系人")中的*创建新主机组*和*创建新服务组*教程，*理解主机、服务和联系人*'
 - en: Using inheritance to simplify configuration
+  id: totrans-147
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用继承简化配置
 - en: In this recipe, we'll learn how to use inheritance to handle the situation where
     hosts and services share a lot of values in common, amounting to a large amount
     of undesirable redundancy in configuration.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个教程中，我们将学习如何使用继承来处理主机和服务共享大量相同值的情况，从而避免配置中的冗余。
 - en: Some Nagios Core objects, particularly hosts and services, have a rather long
     list of possible directives, and the default values for these are not always suitable.
     It's therefore worthwhile to be able to declare the values you want for these
     directives once, and then spend only a few lines on the actual host definition
     by copying those values from a template, making the configuration shorter and
     easier to read.
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些 Nagios Core 对象，特别是主机和服务，有一个相当长的可能指令列表，这些指令的默认值并不总是合适的。因此，能够声明你想要的指令值，并通过从模板复制这些值，仅用几行代码定义实际主机，会使配置变得更加简洁、易读。
 - en: Previous examples in this book have already demonstrated the use of this in
     suggesting you inherit from the `linux-server` host template or the `generic-service`
     service template, for the sake of brevity; in this example, we'll define our own
     templates, and show how these can be used to streamline a configuration.
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 本书中的前面示例已经演示了如何通过继承 `linux-server` 主机模板或 `generic-service` 服务模板来简化配置，为了简洁起见；在这个例子中，我们将定义自己的模板，并展示如何使用这些模板来简化配置。
 - en: Getting ready
+  id: totrans-151
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need to have a server running Nagios Core 3.0 or later, have access
     to the command line to change its configuration, and be familiar with how to define
     hosts and services. These are covered in the *Creating a new host* and *Creating
     a new service* recipes in [Chapter 1](ch01.html "Chapter 1. Understanding Hosts,
     Services, and Contacts").
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要运行 Nagios Core 3.0 或更高版本的服务器，能够访问命令行来更改配置，并且熟悉如何定义主机和服务。这些内容在[第 1 章](ch01.html
+    "第 1 章. 理解主机、服务和联系人")的*创建新主机*和*创建新服务*教程中有介绍。
 - en: In this example, we'll define a template, `critical-host`, which we'll use as
     the basis for any host that needs to be checked and notified around the clock,
     with a very stringent value for its `check_command` directive, and with all notification
     types enabled. We'll also define two hosts named `phobos.naginet` and `deimos.naginet`
     that inherit from this template.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们将定义一个模板 `critical-host`，作为任何需要全天候检查和通知的主机的基础，设置一个非常严格的 `check_command`
+    指令，并启用所有通知类型。我们还将定义两个名为 `phobos.naginet` 和 `deimos.naginet` 的主机，它们继承自这个模板。
 - en: How to do it...
+  id: totrans-154
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can define a host template and then define hosts to inherit from it as follows:'
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以定义一个主机模板，然后定义主机从中继承，如下所示：
 - en: Change to the `objects` configuration directory. In the default installation,
     this `is /usr/local/nagios/etc/objects`. If you have already followed the *Grouping
     configuration files in directories* recipe in this chapter, then your own directory
     may differ.
+  id: totrans-156
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到 `objects` 配置目录。在默认安装中，这个目录是 `/usr/local/nagios/etc/objects`。如果你已经按照本章中的
+    *按目录分组配置文件* 配方进行操作，那么你的目录可能有所不同。
 - en: '[PRE29]'
+  id: totrans-157
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'In an appropriate file, perhaps `templates.cfg`, add the following definition.
     Note the use of the special directives `name` and `register`:'
+  id: totrans-158
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在一个合适的文件中，可能是 `templates.cfg`，添加以下定义。注意使用了特殊的指令 `name` 和 `register`：
 - en: '[PRE30]'
+  id: totrans-159
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'In another file, or separate files if you prefer to keep your hosts to one
     per file, define hosts to inherit from this template. Add in the remaining required
     directives for hosts, and include a `use` directive referring to the established
     template:'
+  id: totrans-160
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在另一个文件中，或者如果你更喜欢每个文件只包含一个主机，可以定义从这个模板继承的主机。添加其余所需的主机指令，并包含一个 `use` 指令，引用已建立的模板：
 - en: '[PRE31]'
+  id: totrans-161
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-162
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启 Nagios Core 服务器：
 - en: '[PRE32]'
+  id: totrans-163
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: You might receive warnings about no services being defined for the hosts, but
     you can ignore those for now.
+  id: totrans-164
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你可能会收到关于主机没有定义服务的警告，但现在可以忽略这些警告。
 - en: 'With this done, two new hosts should be registered in your configuration, **phobos.naginet**
     and **deimos.naginet**:'
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此步骤后，应该有两个新主机被注册到你的配置中，**phobos.naginet** 和 **deimos.naginet**：
 - en: '![How to do it...](img/5566_09_04.jpg)'
+  id: totrans-166
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_09_04.jpg)'
 - en: No other new hosts should be added, as the template itself was explicitly not
     registered as an object with the `register` directive.
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 不应添加其他新主机，因为模板本身显式未作为对象通过 `register` 指令注册。
 - en: How it works...
+  id: totrans-168
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The configuration added in the preceding section defines a new template with
     the `name` directive of `critical-host`. Because the value for the host's register
     directive is `0`, where it normally defaults to `1`, the host is not registered
     as an object with Nagios Core. Instead, it becomes a snippet of configuration
     that can be referenced by real objects of the same type, by referring to its name.
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面章节中添加的配置定义了一个新的模板，`name` 指令为 `critical-host`。由于主机的 `register` 指令的值为 `0`，而通常默认为
+    `1`，所以该主机并未作为对象注册到 Nagios Core 中。相反，它变成了一个配置片段，可以通过引用其名称，供相同类型的真实对象使用。
 - en: Note that in the template, the normally required values of `host_name`, `alias`,
     and `address` are missing; this means that the host is not complete and wouldn't
     work if we tried to register it as an actual host anyway.
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，在模板中，通常需要的 `host_name`、`alias` 和 `address` 值缺失；这意味着该主机是不完整的，如果我们尝试将其注册为实际主机，它将无法工作。
 - en: Instead, we use its values as the basis for other hosts, `phobos.naginet` and
     `deimos.naginet`. Both of these hosts inherit from `critical-host`, and fill in
     the rest of the missing values in their own definitions. This frees us from having
     to repeat the same directives in two different hosts.
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 相反，我们使用它的值作为其他主机的基础，`phobos.naginet` 和 `deimos.naginet`。这两个主机都继承自 `critical-host`，并在自己的定义中补充其余缺失的值。这使得我们无需在两个不同的主机中重复相同的指令。
 - en: 'If an object inherits a value for a directive from its parent, it''s possible
     to override that directive by redefining it in the inheriting object definition.
     For example, if we wanted `phobos.naginet` to have a different value for `max_check_attempts`,
     we can add that to its definition:'
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果一个对象从其父对象继承了某个指令的值，可以通过在继承对象定义中重新定义该指令来覆盖它。例如，如果我们希望 `phobos.naginet` 的 `max_check_attempts`
+    值不同，我们可以在其定义中添加：
 - en: '[PRE33]'
+  id: totrans-173
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: There's more...
+  id: totrans-174
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'The most important thing to note about templates is that they work for a variety
     of Nagios Core objects, most importantly including hosts, services, and contacts.
     You can therefore set up and inherit from a service template in the same way:'
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 模板最重要的注意事项是它们适用于各种 Nagios Core 对象，最重要的包括主机、服务和联系人。因此，你可以以相同的方式设置并继承一个服务模板：
 - en: '[PRE34]'
+  id: totrans-176
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'Or a contact template:'
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 或者是联系人模板：
 - en: '[PRE35]'
+  id: totrans-178
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'Note that inheritance can stack. For example, `critical-host` could itself
     inherit from a template, perhaps `generic-host`, by adding its own `use` directive:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，继承是可以堆叠的。例如，`critical-host` 可以通过添加自己的 `use` 指令来继承自模板，可能是 `generic-host`：
 - en: '[PRE36]'
+  id: totrans-180
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: This allows the setting up of an inheritance structure of arbitrary complexity,
     but you should avoid too much depth to prevent confusing yourself or anyone else
     trying to read your configuration. Two levels is probably a sensible limit.
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 这允许设置一个任意复杂度的继承结构，但你应避免过多的深度，以免自己或其他人阅读配置时感到困惑。两级深度可能是一个合适的限制。
 - en: 'The rules around how inheritance is handled are discussed in more depth in
     the Nagios Core manual, including a treatment of multiple inheritance. It''s useful
     to know about this, but in the interests of keeping configuration clear, it''s
     best used sparingly: [http://nagios.sourceforge.net/docs/3_0/objectinheritance.html](http://nagios.sourceforge.net/docs/3_0/objectinheritance.html).'
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于继承处理的规则在 Nagios Core 手册中有更详细的讨论，包括多重继承的处理。了解这些规则是有用的，但为了保持配置清晰，最好谨慎使用： [http://nagios.sourceforge.net/docs/3_0/objectinheritance.html](http://nagios.sourceforge.net/docs/3_0/objectinheritance.html)。
 - en: See also
+  id: totrans-183
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Configuring host roles using groups* recipe in this chapter
+  id: totrans-184
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的 *使用组配置主机角色* 配方
 - en: The *Creating a new host*, *Creating a new service*, and *Creating a new contact*
     recipes in [Chapter 1](ch01.html "Chapter 1. Understanding Hosts, Services, and
     Contacts"), *Understanding Hosts, Services, and Contacts*
+  id: totrans-185
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第1章](ch01.html "第1章. 理解主机、服务和联系人") 中的 *创建新主机*、*创建新服务* 和 *创建新联系人* 配方，*理解主机、服务和联系人*'
 - en: Defining macros in a resource file
+  id: totrans-186
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 在资源文件中定义宏
 - en: 'In this recipe, we''ll learn how to define custom user macros in resource files.
     This is good practice for strings used in `check_command` definitions or other
     directives that are shared by more than one host or service. For example, in lieu
     of writing the full path in a `command_name` directive as follows:'
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们将学习如何在资源文件中定义自定义用户宏。这是用于 `check_command` 定义或其他由多个主机或服务共享的指令中的字符串的良好实践。例如，代替在
+    `command_name` 指令中写出完整路径，如下所示：
 - en: '[PRE37]'
+  id: totrans-188
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'We could instead write:'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们也可以改为写成：
 - en: '[PRE38]'
+  id: totrans-190
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: As a result, if the location of the `check_ssh` script changes, we only need
     to change the value of `$USER1$` in the appropriate resource file to update all
     of its uses throughout the configuration.
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 结果是，如果 `check_ssh` 脚本的位置发生变化，我们只需要在适当的资源文件中更改 `$USER1$` 的值，以更新配置中所有的引用。
 - en: Most of the macros in Nagios Core are defined automatically by the monitoring
     server, but up to 32 user-defined macros can be used as well, in the form `$USERn$`.
+  id: totrans-192
   prefs: []
   type: TYPE_NORMAL
+  zh: Nagios Core 中的大多数宏是由监控服务器自动定义的，但最多可以使用 32 个用户定义的宏，形式为 `$USERn$`。
 - en: Getting ready
+  id: totrans-193
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need to have a server running Nagios Core 3.0 or later, and have access
     to the command line to change its configuration, in particular the `resource.cfg`
     file.
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要运行 Nagios Core 3.0 或更高版本的服务器，并且需要有命令行访问权限以更改其配置，特别是 `resource.cfg` 文件。
 - en: In this example, we'll add a new macro, `$USER2$`, to contain the SNMP community
     name `snagmp`, as used for various `check_snmp` requests.
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们将添加一个新的宏，`$USER2$`，用于包含 SNMP 社区名 `snagmp`，如在各种 `check_snmp` 请求中使用的那样。
 - en: How to do it...
+  id: totrans-196
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'We can define our user macro as follows:'
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按如下方式定义我们的用户宏：
 - en: Change to the Nagios configuration directory. In the default installation, this
     is `/usr/local/nagios/etc`. Edit the `resource.cfg` file in this directory.
+  id: totrans-198
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到 Nagios 配置目录。在默认安装中，该目录为 `/usr/local/nagios/etc`。编辑该目录中的 `resource.cfg` 文件。
 - en: '[PRE39]'
+  id: totrans-199
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: Ensure that the `$USER2$` macro is not already defined in the file. If it is,
     we could define `$USER3$` instead, and so on.
+  id: totrans-200
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确保 `$USER2$` 宏尚未在文件中定义。如果已经定义，我们可以改为定义 `$USER3$`，依此类推。
 - en: 'Add the following definition to the end of the file:'
+  id: totrans-201
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将以下定义添加到文件末尾：
 - en: '[PRE40]'
+  id: totrans-202
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: Change to the `objects` configuration directory for Nagios Core. In the default
     installation, this is `/usr/local/nagios/etc/objects`.
+  id: totrans-203
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到 Nagios Core 的 `objects` 配置目录。在默认安装中，该目录为 `/usr/local/nagios/etc/objects`。
 - en: '[PRE41]'
+  id: totrans-204
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: 'Edit any of the `object` configuration files in which you wish to use the value
     of the macro, and replace the inline values with `$USER2$`. In our example, we
     might find various uses of the literal `checksnmp` community string:'
+  id: totrans-205
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑你希望使用宏值的任何`object`配置文件，并将内联值替换为`$USER2$`。在我们的示例中，我们可能会发现多个地方使用了字面值`checksnmp`社区字符串：
 - en: '[PRE42]'
+  id: totrans-206
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'We could swap these out to use the macro instead:'
+  id: totrans-207
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 我们可以将这些替换为使用宏：
 - en: '[PRE43]'
+  id: totrans-208
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-209
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启Nagios Core服务器：
 - en: '[PRE44]'
+  id: totrans-210
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: With this done, all the monitoring should be working the same as it was before,
     but we're now using macro expansion to centralize configuration.
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，所有监控应与之前相同，但我们现在使用宏展开来集中配置。
 - en: How it works...
+  id: totrans-212
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: Before Nagios Core processes directives such as `command_line` and `check_command`,
     it will first expand all the macros referenced, including the user-defined macros
     we added in the `resource.cfg` resource file.
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Nagios Core处理像`command_line`和`check_command`这样的指令之前，它会首先展开所有引用的宏，包括我们在`resource.cfg`资源文件中添加的用户定义宏。
 - en: One common use for the `$USERn$` macros is for defining the full path of directories
     where Nagios Core resources such as plugins or event handler scripts are located—
     in fact, the sample configuration included in Nagios Core defines `$USER1$` in
     `resource.cfg` as `/usr/local/nagios/libexec`, the default location for plugin
     scripts and binaries.
+  id: totrans-214
   prefs: []
   type: TYPE_NORMAL
+  zh: '`$USERn$`宏的一个常见用途是定义Nagios Core资源（如插件或事件处理脚本）所在目录的完整路径——事实上，Nagios Core中包含的示例配置将`resource.cfg`中的`$USER1$`定义为`/usr/local/nagios/libexec`，这是插件脚本和二进制文件的默认位置。'
 - en: 'It''s worth noting that you can load more than one resource file by adding
     more `resource_file` directives in `/usr/local/nagios/etc/nagios.cfg`. For example,
     to load another file called `resource-extra.cfg`, we could add a second line as
     follows:'
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
+  zh: 值得注意的是，你可以通过在`/usr/local/nagios/etc/nagios.cfg`中添加更多的`resource_file`指令来加载多个资源文件。例如，要加载另一个名为`resource-extra.cfg`的文件，我们可以添加第二行，如下所示：
 - en: '[PRE45]'
+  id: totrans-216
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: There's more...
+  id: totrans-217
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: 'There''s also a security benefit to using resource files—for sensitive information,
     we can prevent users other than `nagios` from reading them by making them readable
     only to the `nagios` user:'
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用资源文件还有安全性上的好处——对于敏感信息，我们可以通过将其设置为仅对`nagios`用户可读，来防止其他用户读取它们：
 - en: '[PRE46]'
+  id: totrans-219
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: 'This makes it a decent way to store credentials, such as usernames and passwords,
     for example to be used in `check_command` for MySQL:'
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 这使得它成为存储凭据的一个不错方式，例如用户名和密码，用于在`check_command`中对MySQL进行验证：
 - en: '[PRE47]'
+  id: totrans-221
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'You can also define per-host macros, by using custom directives preceded with
     an underscore in the host definition:'
+  id: totrans-222
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还可以通过在主机定义中使用以下划线开头的自定义指令来定义每个主机的宏：
 - en: '[PRE48]'
+  id: totrans-223
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'In the preceding example, we''re able to include the host''s MAC address in
     a custom directive; this can be referenced in services as `$_HOSTMAC_ADDRESS$`:'
+  id: totrans-224
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的示例中，我们能够在自定义指令中包含主机的MAC地址；这可以在服务中引用为`$_HOSTMAC_ADDRESS$`：
 - en: '[PRE49]'
+  id: totrans-225
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: The same trick can also apply for contacts and services. This special use of
     custom macros is discussed in the *Custom Object Variables* chapter of the Nagios
     documentation at [http://nagios.sourceforge.net/docs/3_0/cu](http://nagios.sourceforge.net/docs/3_0/customobjectvars.html).
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样的技巧也可以应用于联系人和服务。这种自定义宏的特殊用法在Nagios文档的*自定义对象变量*章节中有讨论，地址是[http://nagios.sourceforge.net/docs/3_0/cu](http://nagios.sourceforge.net/docs/3_0/customobjectvars.html)。
 - en: See also
+  id: totrans-227
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参见
 - en: The *Monitoring the output of an SNMP query* recipe in [Chapter 5](ch05.html
     "Chapter 5. Monitoring Methods"), *Monitoring Methods*
+  id: totrans-228
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第5章](ch05.html "第5章. 监控方法")中的*监控SNMP查询输出*配方，*监控方法*'
 - en: The *Monitoring individual nodes in a cluster* recipe in [Chapter 8](ch08.html
     "Chapter 8. Managing Network Layout"), *Understanding the Network Layout*
+  id: totrans-229
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第8章](ch08.html "第8章. 网络布局管理")中的*集群中单个节点的监控*配方，*理解网络布局*'
 - en: Dynamically building host definitions
+  id: totrans-230
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 动态构建主机定义
 - en: In this recipe, we'll learn one possible method of building Nagios configuration
     dynamically, to avoid having to compose or copy-paste a lot of directives for
     new hosts or services. In other words, this recipe is about generating configuration
     using templates.
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本配方中，我们将学习构建Nagios配置的一个可能方法，以避免为新主机或服务编写或复制大量指令。换句话说，本配方是关于使用模板生成配置的。
 - en: To demonstrate how this is useful, we'll use the `m4` macro language utility,
     which should be available on virtually any UNIX-like system, including GNU/Linux
     and BSD. As a tool designed for macro expansion, `m4` is particularly well-suited
     to creating verbose plain text configuration files such as the ones used by Nagios
     Core.
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了演示这个工具的用途，我们将使用 `m4` 宏语言工具，它应该在几乎所有类 UNIX 系统上都可用，包括 GNU/Linux 和 BSD。作为一个设计用于宏展开的工具，`m4`
+    特别适合创建冗长的纯文本配置文件，如 Nagios Core 使用的文件。
 - en: The principles here should apply just as easily to your favored programming
     or templating language, perhaps Python or Perl, or shell scripts.
+  id: totrans-233
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里的原则同样适用于你偏好的编程语言或模板语言，可能是 Python 或 Perl，或是 shell 脚本。
 - en: Getting ready
+  id: totrans-234
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: You will need to have the `m4` macro language tool available to you, preferably
     but not necessarily on the same system as the one running Nagios Core. It is a
     very standard tool and should be already installed, or available as part of a
     package. The version used in this example is **GNU m4**, documented at [http://www.gnu.org/software/m4/manual/m4.html](http://www.gnu.org/software/m4/manual/m4.html).
     This recipe does not assume any familiarity with `m4`, and will show you the basics.
+  id: totrans-235
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要确保你有 `m4` 宏语言工具，最好但不一定是与运行 Nagios Core 的系统相同的系统。它是一个非常标准的工具，应该已经安装，或者作为包的一部分提供。这个例子使用的版本是
+    **GNU m4**，文档请参见 [http://www.gnu.org/software/m4/manual/m4.html](http://www.gnu.org/software/m4/manual/m4.html)。这个示例不假定你对
+    `m4` 有任何了解，它将向你展示基础知识。
 - en: 'You may like to work in a new subdirectory in your home directory:'
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可能希望在你的主目录中创建一个新的子目录：
 - en: '[PRE50]'
+  id: totrans-237
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: How to do it...
+  id: totrans-238
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can create and apply an example Nagios Core configuration template as follows:'
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按照以下方式创建并应用一个示例 Nagios Core 配置模板：
 - en: 'Create a new file `host-service-template.m4` with the following contents:'
+  id: totrans-240
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个新的文件 `host-service-template.m4`，内容如下：
 - en: '[PRE51]'
+  id: totrans-241
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'Create a second file in the same directory called `sparta.host.m4` with the
     following contents:'
+  id: totrans-242
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在相同目录中创建一个名为 `sparta.host.m4` 的第二个文件，内容如下：
 - en: '[PRE52]'
+  id: totrans-243
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: 'Create a third file in the same directory called `athens.host.m4` with the
     following contents:'
+  id: totrans-244
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在相同目录中创建一个名为 `athens.host.m4` 的第三个文件，内容如下：
 - en: '[PRE53]'
+  id: totrans-245
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: 'Run the following commands and note the output:'
+  id: totrans-246
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 运行以下命令并记录输出：
 - en: '[PRE54]'
+  id: totrans-247
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'As seen in the preceding output, we can now generate a basic host and service
     configuration with a two-line `m4` script referring to a template, simply by writing
     the output to a `.cfg` file:'
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
+  zh: 如前面的输出所示，我们现在可以使用一个两行的 `m4` 脚本，引用一个模板，通过简单地将输出写入 `.cfg` 文件来生成一个基本的主机和服务配置：
 - en: '[PRE55]'
+  id: totrans-249
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: How it works...
+  id: totrans-250
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: 'The files `sparta.host.m4` and `athens.host.m4` both called an `m4` macro with
     arguments, after including the template for the host and service in the `host-service-template.m4`
     file. This was expanded into the full definition, and the arguments given were
     substituted as follows:'
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件 `sparta.host.m4` 和 `athens.host.m4` 都调用了一个带有参数的 `m4` 宏，在包含了主机和服务模板的 `host-service-template.m4`
+    文件后。这些被展开为完整的定义，并按以下方式替换了给定的参数：
 - en: '`$1` was replaced with the first argument, `host_name`'
+  id: totrans-252
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$1` 被替换为第一个参数，`host_name`'
 - en: '`$2` was replaced with the second argument, `alias`'
+  id: totrans-253
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$2` 被替换为第二个参数，`alias`'
 - en: '`$3` was replaced with the third argument, `address`'
+  id: totrans-254
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$3` 被替换为第三个参数，`address`'
 - en: '`$4` was replaced with the fourth argument, `contact_group`'
+  id: totrans-255
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$4` 被替换为第四个参数，`contact_group`'
 - en: Note that two of these values, `$1` and `$4`, were used in both the host and
     the `PING` service definitions.
+  id: totrans-256
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，这两个值，`$1` 和 `$4`，在主机和 `PING` 服务定义中都有使用。
 - en: Also note that the argument `$4` is optional; the `if-else` construct tests
     the number of arguments, and if it finds there are four, it uses the value of
     the fourth argument; for `athens.naginet`, this is the contact group `ops`. If
     there is no fourth argument, it defaults instead to the value `admins`. This allows
     us to set default values for arguments if we so choose.
+  id: totrans-257
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样注意，参数 `$4` 是可选的；`if-else` 结构会测试参数的数量，如果发现有四个参数，则使用第四个参数的值；对于 `athens.naginet`，这是联系组
+    `ops`。如果没有第四个参数，则默认使用 `admins` 的值。这允许我们在需要时为参数设置默认值。
 - en: The rest of the directives are all written directly into the template. The configuration
     made by this process is valid for Nagios Core, assuming that the `check_command`
     and `contact_groups` used are defined.
+  id: totrans-258
   prefs: []
   type: TYPE_NORMAL
+  zh: 其余的指令都直接写入模板中。通过这个过程生成的配置对于 Nagios Core 是有效的，前提是所使用的 `check_command` 和 `contact_groups`
+    已定义。
 - en: There's more...
+  id: totrans-259
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'To automate things even further, we could use `make` to automatically generate
     `.cfg` files from anything with the extension `.host.m4` with the following `Makefile`:'
+  id: totrans-260
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了进一步自动化，我们可以使用`make`命令根据以下`Makefile`，自动生成所有扩展名为`.host.m4`的`.cfg`文件：
 - en: '[PRE56]'
+  id: totrans-261
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: Note that correct `Makefile` syntax usually requires a literal *Tab* character
     to indent the second line, not four spaces.
+  id: totrans-262
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，正确的`Makefile`语法通常需要使用一个实际的*Tab*字符来缩进第二行，而不是四个空格。
 - en: 'With this in the same directory as all the preceding files, in order to build
     the configuration for the `sparta.naginet` host, we would only need to use a `make`
     call to generate the file:'
+  id: totrans-263
   prefs: []
   type: TYPE_NORMAL
+  zh: 将所有前述文件与此文件放在同一目录下，为了构建`sparta.naginet`主机的配置，我们只需要使用`make`命令来生成文件：
 - en: '[PRE57]'
+  id: totrans-264
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: Note that it's better practice to avoid repeating directives, and instead to
     use hostgroups and host and service templates to define "roles" for new hosts.
     This makes adding and removing the hosts much easier, and both processes are explained
     in this chapter, in the *Configuring host roles using groups* and *Using inheritance
     to simplify configuration* recipes.
+  id: totrans-265
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，最好避免重复指令，而是使用主机组、主机和服务模板来为新主机定义“角色”。这样可以更轻松地添加和删除主机，这两个过程将在本章的*使用组配置主机角色*和*利用继承简化配置*部分进行讲解。
 - en: David Douthitt goes into considerably more depth about the possibilities of
     using `m4` for Nagios configuration at [http://administratosphere.wordpress.com/2009/02/19/configuring-nagios-with-m4/](http://administratosphere.wordpress.com/2009/02/19/configuring-nagios-with-m4/).
+  id: totrans-266
   prefs: []
   type: TYPE_NORMAL
+  zh: David Douthitt在[http://administratosphere.wordpress.com/2009/02/19/configuring-nagios-with-m4/](http://administratosphere.wordpress.com/2009/02/19/configuring-nagios-with-m4/)中更深入地探讨了使用`m4`进行Nagios配置的可能性。
 - en: See also
+  id: totrans-267
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Configuring host roles using groups* and *Using inheritance to simplify
     configuration* recipes in this chapter
+  id: totrans-268
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*使用组配置主机角色*和*利用继承简化配置*部分
