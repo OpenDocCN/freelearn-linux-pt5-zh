@@ -1,497 +1,705 @@
 - en: Chapter 10. Security and Performance
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第10章 安全性与性能
 - en: 'In this chapter, we will cover the following recipes:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将介绍以下内容：
 - en: Requiring authentication for the web interface
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 要求 Web 界面进行身份验证
 - en: Using authenticated contacts
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用认证联系人
 - en: Writing debugging information to the Nagios log file
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 将调试信息写入 Nagios 日志文件
 - en: Monitoring Nagios performance with Nagiostats
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 Nagiostats 监控 Nagios 性能
 - en: Improving startup times with pre-cached object files
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过预缓存对象文件来提高启动时间
 - en: Setting up a redundant monitoring host
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置冗余监控主机
 - en: Introduction
+  id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 介绍
 - en: 'Most administrators of even mid-size networks will choose to dedicate an entire
     server to monitoring software, and sometimes a whole server just for Nagios Core.
     This is because of two main factors common to most comprehensive Nagios Core setups:'
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 即使是中型网络的大多数管理员，也会选择为监控软件专门分配一台服务器，有时甚至为 Nagios Core 配置一台独立服务器。这主要是因为大多数综合性 Nagios
+    Core 设置都有两个主要因素：
 - en: They have a lot of privileges, because in order to inspect the running state
     of so many different hosts and services, they need to be conferred appropriate
     network access. This often means that their IP addresses are whitelisted all over
     the network. A user who is able to assume that privilege could potentially do
     a lot of damage.
+  id: totrans-10
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它们拥有很多特权，因为为了检查如此多不同主机和服务的运行状态，它们需要被授予适当的网络访问权限。这通常意味着它们的 IP 地址在整个网络中都被列为白名单。能够获得这些特权的用户可能会造成很大损害。
 - en: They have a lot of work to do, and hence ideally have dedicated software and
     hardware resources to run what can be thousands of host and service checks smoothly
     and to promptly notice problems and recoveries. If a Nagios Core server is not
     able to keep up with its check schedule, it could cause delays in notifications
     about very important services.
+  id: totrans-11
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它们有大量工作要做，因此理想情况下需要专用的软件和硬件资源来顺利运行数千个主机和服务检查，并及时发现问题和恢复。如果 Nagios Core 服务器无法跟上检查计划，可能会导致对非常重要的服务的通知延迟。
 - en: It's therefore very important to take into account the security and performance
     of your Nagios Core server when building your configuration.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，在构建配置时，非常重要的一点是要考虑到你的 Nagios Core 服务器的安全性和性能。
 - en: 'General best network security practices apply to Nagios Core management and
     will not be discussed in depth here. The following general guidelines are just
     as relevant to securing a Nagios Core server as they are any other kind of server:'
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 一般的最佳网络安全实践适用于 Nagios Core 管理，这些内容在此不再详细讨论。以下通用指南对于保护 Nagios Core 服务器与保护任何其他类型的服务器同样重要：
 - en: '**Don''t run the server as root**: This is probably not a concern unless you''ve
     changed it yourself, as if you''ve installed using the Quick Start Guides the
     server should be set up to run as the unprivileged `nagios` user. Nagios Core
     should not need `root` privileges under most circumstances.'
+  id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**不要以 root 用户运行服务器**：除非你自己修改了配置，否则这通常不是一个问题，因为如果你按照快速入门指南安装，服务器应该已设置为以非特权的`nagios`用户运行。在大多数情况下，Nagios
+    Core 不需要 `root` 权限。'
 - en: '**Use a firewall**: The protections offered by Nagios Core, NSCA, and NRPE''s
     host checking are very basic and are not a replacement for a software or hardware
     firewall policy. Even a simple `iptables` or `pf` software firewall would be a
     very good idea to protect a monitoring server.'
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**使用防火墙**：Nagios Core、NSCA 和 NRPE 的主机检查所提供的保护非常基础，不能替代软件或硬件防火墙策略。即便是一个简单的`iptables`或`pf`软件防火墙，也非常有助于保护监控服务器。'
 - en: '**Use the principle of least privilege**: Don''t confer Nagios Core or any
     of its plugins or processes more privileges than they need, and lock down writable
     files, such as `logs`, and state information only to appropriate users. Similarly,
     only allow Nagios Core access through firewalls for what it needs to check, and
     nothing else.'
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**使用最小特权原则**：不要给予 Nagios Core 或其任何插件或进程超过所需的权限，且应将可写文件（如`logs`）和状态信息限制为仅对适当的用户可写。类似地，仅允许通过防火墙让
+    Nagios Core 访问它所需检查的内容，其他的不要开放。'
 - en: '**Encrypt sensitive information**: Don''t put credentials in plain text in
     any of the configuration files if you can avoid it, and if you can''t avoid it,
     define them in resource files that are only readable by the `nagios` user.'
+  id: totrans-17
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**加密敏感信息**：如果可以避免，尽量不要将凭证以明文形式写入任何配置文件中；如果无法避免，请将它们定义在只有 `nagios` 用户可读的资源文件中。'
 - en: 'You should therefore not consider this chapter a complete guide to securing
     and optimizing your Nagios Core server. For a more comprehensive treatment of
     security and optimization procedures, be sure to take a look at these pages in
     the Nagios Core documentation:'
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，你不应将本章视为一个完整的Nagios Core服务器安全和优化指南。有关安全性和优化程序的更全面内容，务必查阅Nagios Core文档中的以下页面：
 - en: '**Security Considerations**: [http://nagios.sourceforge.net/docs/3_0/security.html](http://nagios.sourceforge.net/docs/3_0/security.html)'
+  id: totrans-19
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**安全性考虑**：[http://nagios.sourceforge.net/docs/3_0/security.html](http://nagios.sourceforge.net/docs/3_0/security.html)'
 - en: '**Enhanced CGI Security and** **Authentication**: [http://nagios.sourceforge.net/docs/3_0/cgisecurity.html](http://nagios.sourceforge.net/docs/3_0/cgisecurity.html)'
+  id: totrans-20
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**增强CGI安全性和** **认证**：[http://nagios.sourceforge.net/docs/3_0/cgisecurity.html](http://nagios.sourceforge.net/docs/3_0/cgisecurity.html)'
 - en: '**Tuning Nagios for Maximum** **Performance**: [http://nagios.sourceforge.net/docs/3_0/tuning.html](http://nagios.sourceforge.net/docs/3_0/tuning.html)'
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**调优Nagios以获得最大** **性能**：[http://nagios.sourceforge.net/docs/3_0/tuning.html](http://nagios.sourceforge.net/docs/3_0/tuning.html)'
 - en: In particular, this chapter will focus on securing the CGIs, as the web interface
     is readily exposing Nagios Core's information to the world, and is particularly
     vulnerable to abuse if misconfigured. It will also include methods to assess how
     Nagios Core is performing.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章特别关注保护CGI，因为web界面会将Nagios Core的信息暴露给外界，如果配置不当，容易受到滥用攻击。本章还将包括评估Nagios Core性能的方法。
 - en: Requiring authentication for the web interface
+  id: totrans-23
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 为web界面要求认证
 - en: In this recipe, we'll explore the use of basic authentication for the Nagios
     Core web interface, probably the single most important configuration step in preventing
     abuse of the software by malicious users.
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本教程中，我们将探讨为Nagios Core web界面使用基本认证的方法，这可能是防止恶意用户滥用软件的最重要配置步骤。
 - en: By default, the Nagios Core installation process takes the sensible step of
     locking down the authentication by default in its recommended Apache configuration
     file, with standard HTTP authentication for a default user named `nagiosadmin`,
     with full privileges.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，Nagios Core的安装过程采取了一个明智的步骤，即在其推荐的Apache配置文件中默认锁定认证，使用标准的HTTP认证，并为名为`nagiosadmin`的默认用户设置了完全权限。
 - en: Unfortunately, some administrators take the step of removing this authentication
     or never installing it, in spite of the recommendations in the installation guide.
     It's a good idea to install it and keep it in place even on private networks,
     and especially if the server running Nagios Core is open to the Internet in any
     way (generally not advised).
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 不幸的是，一些管理员会删除此认证或从不安装它，尽管安装指南中已有推荐。即便在私人网络上，也建议安装并保留认证，特别是当运行Nagios Core的服务器以任何方式连接到互联网时（通常不推荐这样做）。
 - en: This is not just because of the security benefits, but also because it allows
     you to set up basic access control, allowing certain users the permission to read
     state or run commands on certain resources, but not on others. It also has other
     more subtle benefits, such as recording the names of users that carry out actions
     for logging purposes.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 这样做不仅是因为安全性方面的好处，还因为它允许你设置基本的访问控制，赋予特定用户在某些资源上读取状态或执行命令的权限，但对其他资源则没有权限。它还有其他更微妙的好处，比如记录执行操作的用户姓名，以便日志记录。
 - en: Getting ready
+  id: totrans-28
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'You''ll need access to the backend of a Nagios Core server with version 3.0
     or greater, to change its configuration and restart it. You''ll also need a functioning
     web interface. Much of this recipe will assume the web interface is running on
     the recommended **Apache HTTPD server**; you may also need to be able to edit
     this configuration. Some familiarity with Apache HTTPD is assumed here; the documentation
     available online is excellent if you need to consult it:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要访问Nagios Core服务器的后台，版本要求为3.0或更高，以便更改其配置并重启服务器。你还需要一个正常工作的web界面。本教程大部分内容假设web界面运行在推荐的**Apache
+    HTTPD服务器**上；你可能还需要能够编辑该配置。这里假定你对Apache HTTPD有一定的了解；如果需要查阅，网上的文档非常详细：
 - en: '[https://httpd.apache.org/docs/](https://httpd.apache.org/docs/)'
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://httpd.apache.org/docs/](https://httpd.apache.org/docs/)'
 - en: 'This recipe will be in two parts: we''ll first ensure that all the recommended
     settings are in place to properly require authentication, and we''ll then demonstrate
     adding a user named `helpdesk` with read-only permissions for the server''s web
     interface. This user will be able to read the states of all the hosts and services,
     but will not be able to (for example) issue commands, or submit passive check
     results.'
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 本教程分为两部分：首先，我们将确保所有推荐的设置已到位，以正确要求身份验证；接着，我们将演示如何添加一个名为`helpdesk`的用户，该用户拥有只读权限，用于访问服务器的Web界面。该用户将能够查看所有主机和服务的状态，但无法执行（例如）命令或提交被动检查结果。
 - en: How to do it...
+  id: totrans-32
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做...
 - en: 'We can ensure proper authentication is in place for the Nagios Core web interface
     as follows:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以确保Nagios Core Web界面已正确启用身份验证，如下所示：
 - en: Clear your browser of all cookies and saved authentication data, and try to
     visit the web interface. If your browser does not challenge you for a username
     or password as follows, then it's likely that your authentication is disabled
     or not working correctly:![How to do it...](img/5566_10_01.jpg)
+  id: totrans-34
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 清除浏览器中的所有cookie和已保存的身份验证数据，然后尝试访问Web界面。如果浏览器没有像下面那样要求您输入用户名或密码，那么可能是您的身份验证已被禁用或未正常工作：![如何操作...](img/5566_10_01.jpg)
 - en: On the server, move to the Nagios Core configuration directory and open the
     `cgi.cfg` file. In the default installation, this is saved in `/usr/local/nagios/etc/cgi.cfg`.
+  id: totrans-35
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在服务器上，进入Nagios Core配置目录并打开`cgi.cfg`文件。在默认安装中，该文件保存在`/usr/local/nagios/etc/cgi.cfg`中。
 - en: '[PRE0]'
+  id: totrans-36
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Ensure that the value for `use_authentication` is uncommented and set to `1`:'
+  id: totrans-37
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确保`use_authentication`的值未被注释掉并设置为`1`：
 - en: '[PRE1]'
+  id: totrans-38
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Ensure that the `default_user_name` directive is commented out:'
+  id: totrans-39
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确保`default_user_name`指令已被注释掉：
 - en: '[PRE2]'
+  id: totrans-40
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'In the `nagios.conf` file in your Apache configuration, check that the following
     lines are included to refer to the `htpasswd.users` file:'
+  id: totrans-41
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在Apache配置中的`nagios.conf`文件中，检查以下行是否包含，指向`htpasswd.users`文件：
 - en: '[PRE3]'
+  id: totrans-42
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: This file should be somewhere in the configuration directory for Apache, for
     example `/etc/apache/conf.d/nagios.conf`. If you need to make changes to Apache's
     configuration to fix this, you will need to restart Apache to have the changes
     take effect.
+  id: totrans-43
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 此文件应位于Apache的配置目录中，例如`/etc/apache/conf.d/nagios.conf`。如果需要更改Apache的配置来修复此问题，您需要重启Apache使更改生效。
 - en: 'We can add a read-only user named `helpdesk` as follows:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按如下方式添加一个名为`helpdesk`的只读用户：
 - en: Add the user to the `htpasswd.users` file using `htpasswd`, the Apache HTTPD
     password manager. Its location will vary depending on your system; common locations
     are `/usr/bin` and `/usr/local/apache/bin`.
+  id: totrans-45
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`htpasswd`（Apache HTTPD密码管理器）将用户添加到`htpasswd.users`文件中。其位置会根据系统的不同而有所变化；常见的位置有`/usr/bin`和`/usr/local/apache/bin`。
 - en: '[PRE4]'
+  id: totrans-46
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: You may like to make the `htpasswd.users` file only readable by the web server
     user if you are concerned about the hashes being stolen by users on the system.
+  id: totrans-47
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果您担心系统上的用户会窃取哈希值，可以将`htpasswd.users`文件设置为仅Web服务器用户可读。
 - en: 'In `cgi.cfg`, uncomment the `authorized_for_read_only` directive and add the
     new `helpdesk` user to its value:'
+  id: totrans-48
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在`cgi.cfg`中，取消注释`authorized_for_read_only`指令，并将新添加的`helpdesk`用户添加到其值中：
 - en: '[PRE5]'
+  id: totrans-49
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'Add the user to the values for the `authorized_for_all_services` and `authorized_for_all_hosts`
     directives:'
+  id: totrans-50
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将该用户添加到`authorized_for_all_services`和`authorized_for_all_hosts`指令的值中：
 - en: '[PRE6]'
+  id: totrans-51
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: Be careful not to confuse these with the `authorized_for_all_service_commands`
     and `authorized_for_all_host_commands` directives.
+  id: totrans-52
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 小心不要将这些与`authorized_for_all_service_commands`和`authorized_for_all_host_commands`指令混淆。
 - en: You should not need to restart the Nagios Core server for these changes to take
     effect as you normally would with other `.cfg` files.
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 您通常不需要像其他`.cfg`文件一样重启Nagios Core服务器来使这些更改生效。
 - en: With this done, you should only be able to access the Nagios Core web interface
     with a valid username and password. The default `nagiosadmin` user created on
     installation should have full privileges, and the `helpdesk` user added in this
     recipe should be able to view host and service states, but will be unable to issue
     any commands such as rescheduling checks or submitting passive check results.
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成这些设置后，您应该只能使用有效的用户名和密码访问Nagios Core Web界面。安装时创建的默认`nagiosadmin`用户应具有完全权限，而在本教程中添加的`helpdesk`用户应能够查看主机和服务的状态，但无法执行任何命令，如重新调度检查或提交被动检查结果。
 - en: How it works...
+  id: totrans-55
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: It's important to note that it isn't actually Nagios Core itself prompting for
     the username and password and running the authentication check; this is a function
     performed by the web server, as specified in the `nagios.conf` file recommended
     for installation with Apache HTTPD.
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要注意的是，实际上并不是 Nagios Core 自身在提示用户名和密码并执行认证检查；这项功能由 Web 服务器执行，如 `nagios.conf`
+    文件所指定，推荐与 Apache HTTPD 一起安装使用。
 - en: After login, however, Nagios Core uses the permissions defined in the `cgi.cfg`
     file each time one of the CGI scripts in the web interface is accessed, to ensure
     that the user as authenticated with the web server has permissions to view the
     requested page, or execute the requested action.
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，在登录后，Nagios Core 会每次访问 Web 界面中的 CGI 脚本时，使用 `cgi.cfg` 文件中定义的权限，以确保通过 Web 服务器身份验证的用户具有查看请求页面或执行请求操作的权限。
 - en: We disable the `default_user_name` directive by commenting it out, because this
     specifies a user that Nagios Core will "assume" for users who access the CGIs
     without authenticating. This is a potentially dangerous setting and is best avoided
     in most circumstances, particularly with a server with publicly accessible addresses.
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们通过注释掉 `default_user_name` 指令来禁用它，因为该指令指定了 Nagios Core 在没有身份验证的情况下访问 CGI 的用户。这是一个潜在的危险设置，在大多数情况下最好避免，尤其是对于具有公开可访问地址的服务器。
 - en: 'The following directives in `cgi.cfg` allow refining permissions for using
     the CGIs, to form a simple kind of access control list:'
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下 `cgi.cfg` 文件中的指令允许细化使用 CGI 的权限，形成一种简单的访问控制列表：
 - en: '`authorized_for_configuration_information`: The specified users are allowed
     to view configuration information for hosts in the web interface'
+  id: totrans-60
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`authorized_for_configuration_information`: 指定的用户允许在 Web 界面中查看主机的配置信息'
 - en: '`authorized_for_system_information`: The specified users are allowed to view
     Nagios Core process and performance information'
+  id: totrans-61
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`authorized_for_system_information`: 指定的用户允许查看 Nagios Core 的进程和性能信息'
 - en: '`authorized_for_system_commands`: The specified users are allowed to run commands
     affecting the Nagios Core process, such as shutdowns and restarts'
+  id: totrans-62
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`authorized_for_system_commands`: 指定的用户允许运行影响 Nagios Core 进程的命令，如关机和重启'
 - en: '`authorized_for_all_services`: The specified users are allowed to view status
     information and history for all services'
+  id: totrans-63
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`authorized_for_all_services`: 指定的用户允许查看所有服务的状态信息和历史记录'
 - en: '`authorized_for_all_hosts`: The specified users are allowed to view status
     information and history for all hosts'
+  id: totrans-64
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`authorized_for_all_hosts`: 指定的用户允许查看所有主机的状态信息和历史记录'
 - en: '`authorized_for_all_service_commands`: The specified users are allowed to run
     commands on all services, such as rescheduling checks or submitting passive check
     results'
+  id: totrans-65
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`authorized_for_all_service_commands`: 指定的用户允许在所有服务上运行命令，如重新安排检查或提交被动检查结果'
 - en: '`authorized_for_all_host_commands`: The specified users are allowed to run
     commands on all hosts, such as rescheduling checks or submitting passive check
     results'
+  id: totrans-66
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`authorized_for_all_host_commands`: 指定的用户允许在所有主机上运行命令，如重新安排检查或提交被动检查结果'
 - en: Further refining access per-service and per-host is done with authenticated
     contacts, demonstrated in the *Using authenticated contacts* recipe in this chapter.
     This is highly recommended for teams with mixed responsibilities that all require
     access to the same Nagios Core web interface.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 进一步细化每项服务和每台主机的访问权限可以通过认证联系人完成，在本章的*使用认证联系人*示例中有展示。这对于职责混合、需要访问相同 Nagios Core
+    Web 界面的团队非常推荐。
 - en: There's more...
+  id: totrans-68
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'Besides authentication via Apache HTTPD, it''s also often sensible to limit
     the IP addresses allowed access to the Nagios Core instance, using `Order` and
     `Allow` Apache directives. We could extend the `nagios.conf` file loaded by Apache
     as follows:'
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了通过 Apache HTTPD 进行身份验证外，通常也可以限制允许访问 Nagios Core 实例的 IP 地址，使用 `Order` 和 `Allow`
+    Apache 指令。我们可以如下扩展由 Apache 加载的 `nagios.conf` 文件：
 - en: '[PRE7]'
+  id: totrans-70
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: This would only allow local addresses and `10.128.0.1` to access the CGIs, denying
     access with `403 Forbidden` to anyone else. Similarly, we could arrange to only
     allow connections over HTTPS, perhaps with an `SSLRequireSSL` directive; in general,
     we can configure Apache to carefully control even accessing the CGIs, let alone
     abusing them.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将只允许本地地址和 `10.128.0.1` 访问 CGI，其他任何人都会被拒绝访问并返回 `403 Forbidden`。类似地，我们也可以安排只允许通过
+    HTTPS 连接，或许使用 `SSLRequireSSL` 指令；一般来说，我们可以配置 Apache 来严格控制访问 CGI，何况是滥用它们。
 - en: Note that none of this should take the place of an appropriate firewall solution
     and policy. A monitoring server should be protected as carefully as any other
     mission-critical server.
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，这一切不应替代适当的防火墙解决方案和策略。监控服务器应像任何其他关键任务服务器一样得到保护。
 - en: See also
+  id: totrans-73
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Using authenticated contacts* recipe in this chapter
+  id: totrans-74
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*使用经过身份验证的联系人*示例
 - en: The *Viewing configuration in the web interface* and *Scheduling checks from
     the web interface* recipes in [Chapter 7](ch07.html "Chapter 7. Using the Web
     Interface"), *Working With the Web Interface*
+  id: totrans-75
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第7章](ch07.html "第7章。使用Web界面")中的*Web界面中的查看配置*和*Web界面中调度检查*示例，*使用Web界面*'
 - en: Using authenticated contacts
+  id: totrans-76
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用经过身份验证的联系人
 - en: In this recipe, we'll learn how to use authenticated contacts to refine our
     control of access to information in the Nagios Core web interface. This recipe
     is useful in situations where a particular user requires information on the status
     of certain hosts and services but should not be allowed to view others, a setup
     which can't be managed with the directives in `cgi.cfg`.
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们将学习如何使用经过身份验证的联系人来精细控制Nagios Core Web界面中信息的访问权限。这个示例适用于某个用户需要查看特定主机和服务的状态，但不应被允许查看其他主机和服务的情况，这种设置无法通过`cgi.cfg`中的指令进行管理。
 - en: 'As a simple example, on a given monitoring server, we might have two hosts
     configured thus:'
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 作为一个简单示例，在某个监控服务器上，我们可能配置了如下两个主机：
 - en: '[PRE8]'
+  id: totrans-79
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: We might like to add a new user `athensadmin` with permissions to view the status
     of and run commands on the `athens.naginet` host and its services, but not the
     `sparta.naginet` host or its services.
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可能想要添加一个新用户`athensadmin`，使其能够查看`athens.naginet`主机及其服务的状态，并对其执行命令，但不能查看`sparta.naginet`主机或其服务。
 - en: Getting ready
+  id: totrans-81
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You'll need access to the backend of a Nagios Core server with version 3.0 or
     greater, to change its configuration and restart it. You'll also need a functioning
     web interface with authentication running, and be familiar with how it works;
     the *Requiring authentication for the web interface* recipe in this chapter explains
     how to do this.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要访问Nagios Core服务器的后台，版本为3.0或更高，以更改其配置并重新启动它。你还需要一个运行身份验证的有效Web界面，并熟悉其工作原理；本章中的*要求Web界面进行身份验证*示例说明了如何操作。
 - en: How to do it...
+  id: totrans-83
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can add an authenticated contact as follows:'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过以下方式添加一个经过身份验证的联系人：
 - en: 'Create a new user in the `htpasswd.users` file named `athensadmin`, using the
     `htpasswd` tool:'
+  id: totrans-85
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在`htpasswd.users`文件中使用`htpasswd`工具创建一个名为`athensadmin`的新用户：
 - en: '[PRE9]'
+  id: totrans-86
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: Log in to the Nagios Core web interface with the credentials you just added,
     and click on **Hosts** in the left menu to verify that you are not able to view
     any information yet:![How to do it...](img/5566_10_02.jpg)
+  id: totrans-87
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用刚刚添加的凭据登录到Nagios Core Web界面，点击左侧菜单中的**主机**，验证你暂时无法查看任何信息：![如何操作...](img/5566_10_02.jpg)
 - en: Back on the command line, change to the Nagios Core objects configuration directory.
     In the quick start guide installation, this is `/usr/local/nagios/etc/objects`.
+  id: totrans-88
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 回到命令行，切换到Nagios Core对象配置目录。在快速入门安装指南中，这个目录是`/usr/local/nagios/etc/objects`。
 - en: '[PRE10]'
+  id: totrans-89
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Edit the `contacts.cfg` file to include a definition for a new contact object,
     `athensadmin`. Here, we''ve used the `generic-contact` template. You can use your
     own template or values if you prefer; the value for `contact_name` is the important
     part:'
+  id: totrans-90
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`contacts.cfg`文件，添加一个新的联系人对象定义`athensadmin`。在这里，我们使用了`generic-contact`模板。如果你愿意，也可以使用你自己的模板或值；`contact_name`的值是最重要的部分：
 - en: '[PRE11]'
+  id: totrans-91
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'Edit the hosts or services to which you want to allow the `athensadmin` user
     access, and add `athensadmin` to its list of contacts. For our example, this means
     the definition for `athens.naginet` looks similar to the following code snippet:'
+  id: totrans-92
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑你希望`athensadmin`用户访问的主机或服务，并将`athensadmin`添加到其联系人列表中。以我们的示例为例，这意味着`athens.naginet`的定义类似于以下代码片段：
 - en: '[PRE12]'
+  id: totrans-93
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-94
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启Nagios Core服务器：
 - en: '[PRE13]'
+  id: totrans-95
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'With this done, logging in as the `athensadmin` user should allow you to view
     the details of the `athens.naginet` host, but nothing else:'
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成这些步骤后，使用`athensadmin`用户登录应该能查看`athens.naginet`主机的详细信息，但不能查看其他信息：
 - en: '![How to do it...](img/5566_10_03.jpg)'
+  id: totrans-97
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_10_03.jpg)'
 - en: You should also be able to issue commands related to that host, such as rescheduling
     checks and acknowledging issues.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还应该能够执行与该主机相关的命令，例如重新调度检查和确认问题。
 - en: How it works...
+  id: totrans-99
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 工作原理...
 - en: When logging in as an authenticated user with Apache HTTPD, Nagios Core checks
     the username to see if it matches the `contact_name` directive of any configured
     contacts. If it does, then privileges to inspect the state of that contact's associated
@@ -499,958 +707,1396 @@
     those hosts and services. The web interface otherwise works in just the same way.
     To the authenticated contact, it appears as if no other hosts or services are
     being monitored.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 当以经过身份验证的用户身份通过 Apache HTTPD 登录时，Nagios Core 会检查用户名是否与任何配置联系人中的 `contact_name`
+    指令匹配。如果匹配，则会授予检查该联系人关联的主机和服务状态的权限，并且只能对这些主机和服务执行命令。Web 界面其他方面的功能保持不变。对于经过身份验证的联系人而言，似乎没有其他主机或服务正在被监控。
 - en: If your network includes co-located equipment or teams with mixed monitoring
     responsibilities, this will allow you to restrict the Nagios Core interface to
     certain hosts for certain users. This can be very useful for confidentiality,
     transparency, and delegation purposes.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的网络包含同一位置的设备或具有混合监控职责的团队，这将允许你将 Nagios Core 界面限制为特定用户的某些主机。这对于保密性、透明性和委托目的非常有用。
 - en: There's more...
+  id: totrans-102
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: 'If you want to allow an authenticated user read-only access to the details
     for their associated hosts or services, you can arrange that by adding their username
     to the values of the `authorized_for_read_only` directive in `cgi.cfg`:'
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你希望允许经过身份验证的用户只读访问他们关联的主机或服务的详细信息，你可以通过将其用户名添加到 `cgi.cfg` 中 `authorized_for_read_only`
+    指令的值来实现：
 - en: '[PRE14]'
+  id: totrans-104
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'The `athensadmin` user will then still be able to view the same host and service
     information, but will not be able to issue any commands:'
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，`athensadmin` 用户仍然可以查看相同的主机和服务信息，但不能执行任何命令：
 - en: '![There''s more...](img/5566_10_04.jpg)'
+  id: totrans-106
   prefs: []
   type: TYPE_IMG
+  zh: '![还有更多…](img/5566_10_04.jpg)'
 - en: See also
+  id: totrans-107
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Requiring authentication for the web interface* recipe in this chapter
+  id: totrans-108
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的 *要求 Web 界面进行身份验证* 食谱
 - en: The *Creating a new contact* recipe in [Chapter 1](ch01.html "Chapter 1. Understanding
     Hosts, Services, and Contacts"), *Understanding Hosts, Services, and Contacts*
+  id: totrans-109
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章节中 [第 1 章](ch01.html "第 1 章：理解主机、服务和联系人") 中的 *创建新联系人* 食谱，*理解主机、服务和联系人*
 - en: Writing debugging information to a Nagios log file
+  id: totrans-110
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 将调试信息写入 Nagios 日志文件
 - en: In this recipe, we'll learn how to use the debugging log file in Nagios Core
     to get various kinds of process information from the running program, considerably
     more than available in the file specified by the standard `log_file` directive.
     This is useful not just for debugging purposes when Nagios Core is doing something
     unexpected at runtime, but also to get a better idea of how the server is working
     in general and with your particular configuration.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我们将学习如何使用 Nagios Core 中的调试日志文件，从运行中的程序中获取各种进程信息，比标准 `log_file` 指令指定的文件中提供的信息多得多。这不仅对调试有用，特别是在
+    Nagios Core 在运行时执行了意外操作时，还能帮助你更好地了解服务器如何工作，特别是与你的配置相关的部分。
 - en: Getting ready
+  id: totrans-112
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: You will need a Nagios Core server with version 3.0 or greater. More debugging
     options are available in versions after 3.0, but these will be noted in the recipe.
     You will need access to change the `nagios.cfg` file and to restart the server.
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 你将需要一个版本为 3.0 或更高版本的 Nagios Core 服务器。3.0 之后的版本提供了更多调试选项，但这些将在本食谱中提到。你需要能够修改
+    `nagios.cfg` 文件并重启服务器。
 - en: In this example, we'll simply log everything we possibly can, and then explain
     how to refine the logging behavior if necessary in the *How it works…* section.
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本示例中，我们将简单地记录尽可能多的内容，然后在 *工作原理……* 部分解释如何在必要时调整日志记录行为。
 - en: How to do it...
+  id: totrans-115
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'We can enable very verbose debugging for our monitoring server as follows:'
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过以下方式为我们的监控服务器启用非常详细的调试：
 - en: 'Change to the configuration directory for Nagios Core. In the default installation,
     this is `/usr/local/nagios/etc`. Edit the file `nagios.cfg`:'
+  id: totrans-117
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到 Nagios Core 的配置目录。在默认安装中，这是 `/usr/local/nagios/etc`。编辑 `nagios.cfg` 文件：
 - en: '[PRE15]'
+  id: totrans-118
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'Look for the `debug_level`, `debug_verbosity`, and `debug_file` directives.
     Ensure they are uncommented or add them to the end of the file if they don''t
     exist, and define them as follows:'
+  id: totrans-119
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查找 `debug_level`、`debug_verbosity` 和 `debug_file` 指令。确保它们没有被注释掉，或者如果它们不存在，则将其添加到文件末尾，并按如下定义：
 - en: '[PRE16]'
+  id: totrans-120
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-121
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启 Nagios Core 服务器：
 - en: '[PRE17]'
+  id: totrans-122
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'With this done, the `/usr/local/nagios/var/nagios.debug` file should start
     filling with information about the running process quite quickly. You may find
     it instructive to watch it for a while with `tail -f`, which will show you the
     contents of the file as it updates:'
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，`/usr/local/nagios/var/nagios.debug`文件应该会很快开始填充有关运行进程的信息。你可能会发现，使用`tail
+    -f`监视它一段时间很有帮助，这样你可以实时看到文件内容的更新：
 - en: '[PRE18]'
+  id: totrans-124
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: How it works...
+  id: totrans-125
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The `debug_level` directive specifies how much information (and of what kind)
     should be written to the debugging log. Here we've used the value `-1`, which
     is a shortcut for specifying that all debugging information should be written
     to the debugging log file.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: '`debug_level`指令指定应该写入调试日志的信息量（及其种类）。在这里，我们使用了值`-1`，这是指定所有调试信息写入调试日志文件的快捷方式。'
 - en: In practice, however, we often only want to get information about particular
     kinds of Nagios Core tasks. In this case, we can use `OR` values for `debug_level`
     to specify which ones.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，在实践中，我们通常只希望获取有关特定类型的Nagios Core任务的信息。在这种情况下，我们可以使用`debug_level`的`OR`值来指定需要的任务。
 - en: 'The different kinds of debugging information can be specified with the following
     numbers:'
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以通过以下数字指定不同种类的调试信息：
 - en: '`1`: Function enter and exit debugging'
+  id: totrans-129
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`1`：功能进入和退出调试'
 - en: '`2`: Configuration debugging'
+  id: totrans-130
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`2`：配置调试'
 - en: '`4`: Process debugging'
+  id: totrans-131
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`4`：进程调试'
 - en: '`8`: Scheduled event debugging'
+  id: totrans-132
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`8`：计划事件调试'
 - en: '`16`: Host and service check debugging'
+  id: totrans-133
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`16`：主机和服务检查调试'
 - en: '`32`: Notification debugging'
+  id: totrans-134
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`32`：通知调试'
 - en: '`64`: Event broker debugging'
+  id: totrans-135
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`64`：事件代理调试'
 - en: 'In version 3.3 and later of Nagios Core, the following can also be specified.
     There may be even more added in subsequent versions:'
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Nagios Core 3.3及以后的版本中，还可以指定以下内容。后续版本中可能会有更多新增内容：
 - en: '`128`: External commands debugging'
+  id: totrans-137
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`128`：外部命令调试'
 - en: '`256`: Commands debugging'
+  id: totrans-138
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`256`：命令调试'
 - en: '`512`: Scheduled downtime debugging'
+  id: totrans-139
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`512`：计划停机调试'
 - en: '`1024`: Comments debugging'
+  id: totrans-140
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`1024`：注释调试'
 - en: '`2048`: Macros debugging'
+  id: totrans-141
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`2048`：宏调试'
 - en: 'Rather than comma-separating these values to specify more than one, they are
     added together. For example, if we wanted to save process and scheduled event
     debugging information and nothing else, we would use `4 + 8 = 12`:'
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了指定多个调试类型，而不是用逗号分隔这些值，它们是相加的。例如，如果我们只想保存进程和计划事件的调试信息，而不包含其他内容，我们将使用`4 + 8 =
+    12`：
 - en: '[PRE19]'
+  id: totrans-143
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: We can turn the debugging off completely by changing `debug_level` back to `0`,
     its default value.
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过将`debug_level`重新设置为`0`，即其默认值，完全关闭调试功能。
 - en: There's more...
+  id: totrans-145
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: 'Nagios Core generates a great deal of information at the highest level of debugging,
     with over 30 lines per second even on minimal configurations, so be careful not
     to leave this running permanently if you don''t always need it, as it can slowly
     fill a disk. You can avoid this situation by using the `max_debug_file_size` directive
     to specify a maximum size in bytes for the file. For example, to restrict the
     file to one megabyte, we could define the following:'
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: Nagios Core在最高调试级别下生成大量信息，即使在最小配置下，每秒也会产生超过30行的信息，因此如果不总是需要它，最好不要永久运行调试，因为它可能会逐渐占满磁盘。你可以通过使用`max_debug_file_size`指令指定文件的最大字节数来避免这种情况。例如，如果希望限制文件大小为1MB，我们可以定义如下：
 - en: '[PRE20]'
+  id: totrans-147
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: Nagios Core will "roll" an existing debugging log by adding the extension `.old`
     when it exceeds this size, and will start a new one. It will also automatically
     delete any previous logs with the `.old` extension when it does this.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 当调试日志的大小超过设定限制时，Nagios Core将通过添加`.old`扩展名来“滚动”现有的调试日志，并开始新的日志。它还会在这样做时自动删除任何以前带有`.old`扩展名的日志文件。
 - en: See also
+  id: totrans-149
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Monitoring Nagios performance with Nagiostats* recipe in this chapter
+  id: totrans-150
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*使用Nagiostats监控Nagios性能*方法
 - en: The *Viewing and interpreting notification history* recipe in [Chapter 7](ch07.html
     "Chapter 7. Using the Web Interface"), *Working With the Web Interface*
+  id: totrans-151
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第7章](ch07.html "第7章. 使用Web接口")中的*查看和解释通知历史记录*方法，*使用Web接口*'
 - en: Monitoring Nagios performance with Nagiostats
+  id: totrans-152
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用Nagiostats监控Nagios性能
 - en: In this recipe, we'll learn how to use the `nagiostats` utility to get some
     statistics about the performance of a Nagios Core process, and the states of the
     hosts and services that it monitors.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本教程中，我们将学习如何使用`nagiostats`工具获取有关Nagios Core进程性能以及其监视的主机和服务状态的一些统计信息。
 - en: Optionally, we'll also show how to use the `mrtg.cfg` file built in the Nagios
     Core source distribution at `./configure` time to set up graphs built by `mrtg`
     (**Multi-Router Traffic Grapher**), and link to the graphs in the menu of the
     web interface. The Nagios Core source distribution includes some files to assist
     with this, which we'll use here.
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 可选地，我们还将展示如何使用Nagios Core源代码分发中构建的`mrtg.cfg`文件，设置由`mrtg`（多路由器流量图形化器）构建的图表，并在Web界面的菜单中链接到这些图表。Nagios
+    Core源代码分发包含一些文件来帮助此操作，我们将在这里使用。
 - en: Getting ready
+  id: totrans-155
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need a Nagios Core 3.0 or newer server installed and running to invoke
     `nagiostats`. Older versions do include the utility, but there is not quite as
     much information returned.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要安装并运行Nagios Core 3.0或更新版本服务器来调用`nagiostats`。旧版本包含此实用程序，但返回的信息可能不如新版本详细。
 - en: If you would like to run the `mrtg` graphing as well, which is highly recommended,
     you should have `mrtg` and its helper program, `indexmaker`, installed on your
     system. If you are already graphing other things with `mrtg`, don't worry, this
     recipe should not interfere with that.
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你希望运行`mrtg`图表，这是强烈推荐的，你应该在系统上安装`mrtg`及其辅助程序`indexmaker`。如果你已经使用`mrtg`图表其他内容，不用担心，这个操作不会影响它们。
 - en: The recipe does not assume any familiarity with `mrtg`, but if you have any
     problems with it, you may like to consult its documentation online at [http://oss.oetiker.ch/mrtg/doc/index.en.html](http://oss.oetiker.ch/mrtg/doc/index.en.html).
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 此操作不假设您对`mrtg`有任何熟悉程度，但如果您在使用中遇到任何问题，可以在线查阅其文档：[http://oss.oetiker.ch/mrtg/doc/index.en.html](http://oss.oetiker.ch/mrtg/doc/index.en.html)。
 - en: You should also have access to the sources from which your installation of Nagios
     Core was compiled. If you need to retrieve the sources again, you can download
     them from the Nagios Core website ([http://www.nagios.org/](http://www.nagios.org/)).
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还应该可以访问Nagios Core安装时编译的源代码。如果需要重新获取源代码，可以从Nagios Core网站下载（[http://www.nagios.org/](http://www.nagios.org/)）。
 - en: In this case, you will need to run `./configure` again to generate the file
     required, `sample-config/mrtg.cfg`.
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，您需要再次运行`./configure`来生成所需的文件`sample-config/mrtg.cfg`。
 - en: How to do it...
+  id: totrans-161
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 操作步骤...
 - en: 'We can invoke `nagiostats` itself in one step whenever we want to get some
     statistics about the server''s performance:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以随时在一步中调用`nagiostats`本身，以获取有关服务器性能的统计信息：
 - en: 'Run the following command:'
+  id: totrans-163
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 执行以下命令：
 - en: '[PRE21]'
+  id: totrans-164
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'This should give you output beginning with the following:'
+  id: totrans-165
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这将给你输出，从以下开始：
 - en: '[PRE22]'
+  id: totrans-166
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'Run the following command:'
+  id: totrans-167
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 执行以下命令：
 - en: '[PRE23]'
+  id: totrans-168
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: This should give you a complete list of the names and meanings of all the fields
     returned by the output of `nagiostats`.
+  id: totrans-169
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这将为您提供所有字段的名称和含义的完整列表，由`nagiostats`输出返回。
 - en: If you would like to include `mrtg` graphs of this data, a good starting point
     is using the sample configuration included in the Nagios Core source distribution,
     in `sample-config/mrtg.cfg`.
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您希望包含此数据的`mrtg`图表，一个很好的起点是使用Nagios Core源代码分发中包含的示例配置，在`sample-config/mrtg.cfg`中。
 - en: 'Copy `sample-config/mrtg.cfg` into `/usr/local/nagios/etc`:'
+  id: totrans-171
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将`sample-config/mrtg.cfg`复制到`/usr/local/nagios/etc`：
 - en: '[PRE24]'
+  id: totrans-172
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'Create a directory to store the `mrtg` pages and graphs, so that they can be
     viewed in the Nagios Core web interface:'
+  id: totrans-173
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个目录来存储`mrtg`页面和图表，以便在Nagios Core Web界面中查看：
 - en: '[PRE25]'
+  id: totrans-174
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'Edit `/usr/local/nagios/etc/mrtg.cfg` to include a `WorkDir` declaration at
     the top of the file:'
+  id: totrans-175
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`/usr/local/nagios/etc/mrtg.cfg`，在文件顶部包含一个`WorkDir`声明：
 - en: '[PRE26]'
+  id: totrans-176
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Run `mrtg` to create the graphs:'
+  id: totrans-177
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 运行`mrtg`以创建图表：
 - en: '[PRE27]'
+  id: totrans-178
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'For this first run, we can safely ignore any errors about missing prior data,
     or backup log files:'
+  id: totrans-179
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 对于第一次运行，我们可以安全地忽略任何关于缺少先前数据或备份日志文件的错误：
 - en: '[PRE28]'
+  id: totrans-180
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'If you are using a UTF-8 locale in your shell, `mrtg` may fail to run. You
     can run it in a standard C locale with an `env` prefix:'
+  id: totrans-181
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果您的shell中使用UTF-8语言环境，可能会导致`mrtg`运行失败。您可以使用`env`前缀在标准C语言环境中运行它：
 - en: '[PRE29]'
+  id: totrans-182
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Run the `indexmaker` helper installed with `mrtg` to create an index to the
     graphs:'
+  id: totrans-183
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用安装的`mrtg`中的`indexmaker`辅助程序运行，创建一个指向图表的索引：
 - en: '[PRE30]'
+  id: totrans-184
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: You should only need to do this once, unless you add or remove graph definitions
     from `mrtg.cfg` later on.
+  id: totrans-185
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 除非以后向`mrtg.cfg`添加或删除图表定义，否则只需要执行一次此操作。
 - en: Visit `http://olympus.naginet/nagios/stats`, substituting your own Nagios Core
     server's hostname for `olympus.naginet`. After authenticating (if necessary),
     we should be able to see some empty `mrtg` graphs:![How to do it...](img/5566_10_05_full.jpg)
+  id: totrans-186
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 访问`http://olympus.naginet/nagios/stats`，用你自己的Nagios Core服务器主机名替换`olympus.naginet`。在认证后（如果需要），我们应该能够看到一些空的`mrtg`图表：![操作步骤...](img/5566_10_05_full.jpg)
 - en: Don't worry that they're empty; we expect that, as we only have one data point
     for each graph at the moment.
+  id: totrans-187
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 不用担心它们为空；我们预计会是这样，因为目前每个图表只有一个数据点。
 - en: 'If everything has worked up to this point, we can probably add a `cron` task
     to run every five minutes to add new data points to the graph. Here, we are assuming
     the `mrtg` program is saved in `/usr/bin`:'
+  id: totrans-188
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果到目前为止一切顺利，我们可能需要添加一个每五分钟运行一次的 `cron` 任务，以向图表添加新的数据点。在这里，我们假设 `mrtg` 程序保存在
+    `/usr/bin`：
 - en: '[PRE31]'
+  id: totrans-189
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: The best way to do this will vary between systems. You could put this in `/etc/crontab`,
     or in its own file in `/etc/cron.d/nagiostats` if you want to be a little tidier.
+  id: totrans-190
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 执行此操作的最佳方法因系统而异。您可以将其放入 `/etc/crontab`，或者如果您希望更整洁，可以将其放入 `/etc/cron.d/nagiostats`
+    中。
 - en: 'It is probably safe to leave it running as `root`, but if you are concerned
     about this, you should also be able to run it as the `nagios` user by including
     a `--lock-file` option:'
+  id: totrans-191
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 作为 `root` 用户运行它可能是安全的，但如果您对此有所担心，您也可以通过包括 `--lock-file` 选项，以 `nagios` 用户身份运行它：
 - en: '[PRE32]'
+  id: totrans-192
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'That might require correcting permissions on the graphs already generated:'
+  id: totrans-193
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这可能需要修正已生成图表的权限：
 - en: '[PRE33]'
+  id: totrans-194
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'With this done, if the `cron` task is installed correctly, we should start
     seeing data being plotted over the next few hours:'
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，如果 `cron` 任务安装正确，我们应该会在接下来的几个小时内开始看到数据被绘制：
 - en: '![How to do it...](img/5566_10_06_full.jpg)'
+  id: totrans-196
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_10_06_full.jpg)'
 - en: How it works...
+  id: totrans-197
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The statistics provided by `nagiostats` provide both performance data about
     Nagios Core itself, how long it's taking to complete its round of checks of all
     objects and the average time it's taking per check, as well as data such as the
     number of hosts in various states. By default, running it will return the data
     in a terse but human-readable format; you can get a good idea of the meaning of
     each of the fields by running it with `--help` as suggested in the recipe.
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: '`nagiostats` 提供的统计信息既包含了 Nagios Core 本身的性能数据，如完成对所有对象检查所需的时间，以及每次检查所需的平均时间，还包括主机在不同状态下的数量等数据。默认情况下，运行它将以简洁但易读的格式返回数据；通过运行
+    `--help`，您可以更好地理解每个字段的含义，正如配方中所建议的。'
 - en: The `mrtg.cfg` file included in the Nagios source distribution, which is tailored
     to your particular system at `./configure` time, contains example definitions
     of `mrtg` graphs that parse the data retrieved from `nagiostats`. These are not
     the only possible graphs using the information provided by `nagiostats`, but they
     are useful examples.
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: '`mrtg.cfg` 文件包含在 Nagios 源代码分发包中，该文件在 `./configure` 阶段根据您的特定系统进行定制，包含了 `mrtg`
+    图表的示例定义，这些图表解析了从 `nagiostats` 获取的数据。这些图表并不是使用 `nagiostats` 提供的数据的唯一可能图表，但它们是有用的示例。'
 - en: 'The data used is the same as the data you read if you invoked `nagiostats`
     from the shell, but the format is slightly different. If you want to see the data
     being passed to `mrtg` by `nagiostats`, you can run it with the `--mrtg` option
     and nominate fields to be included in the output with `--data`; for example:'
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用的数据与您从 shell 中调用 `nagiostats` 时读取的数据相同，但格式略有不同。如果您想查看传递给 `mrtg` 的数据，可以使用 `--mrtg`
+    选项运行它，并通过 `--data` 提供字段以包含在输出中；例如：
 - en: '[PRE34]'
+  id: totrans-201
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: The recipe's call to `indexmaker` is a separate program that builds an `index.html`
     file with links to all the graphs, just for convenience. Like the `mrtg` call,
     it refers to the configuration file `/usr/local/nagios/etc/mrtg.cfg` to figure
     out what it needs to do.
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: 配方中调用的 `indexmaker` 是一个独立的程序，它会生成一个包含所有图表链接的 `index.html` 文件，仅仅是为了方便。与 `mrtg`
+    调用一样，它会引用配置文件 `/usr/local/nagios/etc/mrtg.cfg` 来确定需要执行的操作。
 - en: There's more...
+  id: totrans-203
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'Once you''re happy with the way your graph''s web pages are being displayed,
     you might like to consider including them in your Nagios Core sidebar. This can
     be done by editing `/usr/local/nagios/share/side.php`, and adding a new link to
     the **System** section, perhaps named **Performance Reports**, below the **Performance
     Info** link. The new line might look similar to the following code snippet:'
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦您对图表网页的显示方式满意，您可能希望将它们添加到 Nagios Core 的侧边栏中。这可以通过编辑 `/usr/local/nagios/share/side.php`
+    并在 **性能信息** 链接下方添加一个名为 **性能报告** 的新链接来实现。新行可能类似于以下代码片段：
 - en: '[PRE35]'
+  id: totrans-205
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'This would make a link to the graphs show up in the web interface as follows:'
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将使图表的链接在 Web 界面中显示如下：
 - en: '![There''s more...](img/5566_10_07.jpg)'
+  id: totrans-207
   prefs: []
   type: TYPE_IMG
+  zh: '![还有更多...](img/5566_10_07.jpg)'
 - en: Note that customizations to the menu like this will be overwritten if you reinstall
     Nagios Core.
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，像这样的菜单自定义将在重新安装 Nagios Core 时被覆盖。
 - en: If you like what `mrtg` does with this data, you might like to look at **Cacti**,
     a very helpful frontend to `rrdtool`, which is similar to `mrtg`. It will allow
     you a lot of flexibility in defining graphs, although it takes a while to learn
     ([http://www.cacti.net/](http://www.cacti.net/)).
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你喜欢 `mrtg` 处理这些数据的方式，你可能会喜欢看看**Cacti**，它是 `rrdtool` 的一个非常有用的前端，类似于 `mrtg`。它允许你在定义图表时拥有很大的灵活性，尽管学习起来需要一些时间（[http://www.cacti.net/](http://www.cacti.net/)）。
 - en: If you're interested in more graphing for Nagios Core performance and state
     data you may like the Nagiosgraph extension, which is discussed in the *Tracking
     host and service states with NagiosGraph* recipe in [Chapter 11](ch11.html "Chapter 11. Automating
     and Extending Nagios Core"), *Automating and Extending Nagios*.
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你对 Nagios Core 性能和状态数据的更多图表感兴趣，你可能会喜欢 Nagiosgraph 扩展，该扩展在[第 11 章](ch11.html
+    "第 11 章。自动化和扩展 Nagios Core")的*使用 NagiosGraph 跟踪主机和服务状态*食谱中进行了讨论，*自动化和扩展 Nagios*。
 - en: Finally, note that Nagios Core includes some built-in graphing of hosts and
     states in its reports, so be sure to check those out as well before you try to
     build a graph for a report that already exists! These are all also discussed in
     [Chapter 7](ch07.html "Chapter 7. Using the Web Interface"), *Working With the
     Web Interface*. Check out the references in the *See also* section for this recipe.
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，请注意，Nagios Core 在其报告中包含了一些内置的主机和状态图表，因此在尝试为已经存在的报告构建图表之前，请务必查看这些内容！这些内容也在[第
+    7 章](ch07.html "第 7 章。使用 Web 界面")的*与 Web 界面协作*中进行了讨论。请查看本食谱中*另见*部分中的参考资料。
 - en: See also
+  id: totrans-212
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Using the tactical overview*, *Viewing and interpreting availability reports*,
     *Viewing and interpreting trends*, and *Viewing and interpreting notification
     history* recipes in [Chapter 7](ch07.html "Chapter 7. Using the Web Interface"),
     *Working With the Web Interface*
+  id: totrans-213
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第 7 章](ch07.html "第 7 章。使用 Web 界面")的*使用战术概览*、*查看和解读可用性报告*、*查看和解读趋势*、*查看和解读通知历史*食谱，*与
+    Web 界面协作*。'
 - en: The *Tracking host and service states with Nagiosgraph* recipe in [Chapter 11](ch11.html
     "Chapter 11. Automating and Extending Nagios Core"), *Automating and Extending
     Nagios*
+  id: totrans-214
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在[第 11 章](ch11.html "第 11 章。自动化和扩展 Nagios Core")的*使用 Nagiosgraph 跟踪主机和服务状态*食谱中，*自动化和扩展
+    Nagios*。
 - en: Improving startup times with pre-cached object files
+  id: totrans-215
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 通过预缓存对象文件来提高启动时间
 - en: In this recipe, we'll learn how to shorten startup times for large and/or complex
     Nagios Core configurations. This is done by pre-caching the Nagios Core objects
     from the configuration, applying all appropriate template and group expansions
     into a single file that Nagios Core can read much more quickly than a more modular
     and human-readable configuration.
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我们将学习如何缩短大型和/或复杂的 Nagios Core 配置的启动时间。这是通过预缓存来自配置的 Nagios Core 对象，应用所有适当的模板和组扩展到一个文件中，这样
+    Nagios Core 就能比更模块化、更具可读性的配置更快地读取。
 - en: This will likely only be of interest to you if you are monitoring more than
     a hundred hosts or services with a reasonably complex template and grouping layout,
     as suggested by some of the recipes in [Chapter 1](ch01.html "Chapter 1. Understanding
     Hosts, Services, and Contacts") and [Chapter 9](ch09.html "Chapter 9. Managing
     Configuration"). It will still work on smaller installations, but the gains in
     startup speed are likely to be minimal.
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你监控的主机或服务数量超过一百个，并且有一个相对复杂的模板和分组布局（如[第 1 章](ch01.html "第 1 章。理解主机、服务和联系人")和[第
+    9 章](ch09.html "第 9 章。管理配置")中一些食谱所建议的那样），这可能会对你有兴趣。它在较小的安装上也能运行，但启动速度的提升可能非常有限。
 - en: If you are only running a small setup, then this recipe might be of interest
     if you want to better understand how Nagios Core expands a configuration that
     uses a lot of templates and other configuration tricks.
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你只运行一个小型设置，那么如果你想更好地理解 Nagios Core 如何扩展使用大量模板和其他配置技巧的配置，本食谱可能会对你有兴趣。
 - en: Getting ready
+  id: totrans-219
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should be running a Nagios Core 3.0 or newer server, and have access to
     the server to change its configuration.
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该运行 Nagios Core 3.0 或更新版本的服务器，并且可以访问服务器以更改其配置。
 - en: 'You should check that the `precached_object_file` directive in `/usr/local/nagios/etc/nagios.cfg`
     is uncommented and defined to an accessible file. The setting in the Quick Start
     configuration is sensible:'
+  id: totrans-221
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该检查 `/usr/local/nagios/etc/nagios.cfg` 中的 `precached_object_file` 指令是否已取消注释，并定义为一个可访问的文件。快速启动配置中的设置是合理的：
 - en: '[PRE36]'
+  id: totrans-222
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: Having this directive uncommented doesn't actually generate or use the pre-cached
     objects file; that needs to be done explicitly, as will be explained in the recipe.
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 取消注释此指令并不会实际生成或使用预缓存对象文件；这需要明确执行，具体操作将在后面的步骤中解释。
 - en: Don't confuse this with the `object_cache_file` directive in the same file,
     which should be left untouched at its current setting.
+  id: totrans-224
   prefs: []
   type: TYPE_NORMAL
+  zh: 不要将其与同一文件中的`object_cache_file`指令混淆，该指令应该保持当前设置不变。
 - en: For this example, we'll use a fairly large configuration with some 20,000 objects
     defined on a rather slow machine.
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，我们将使用一个相当大的配置，定义了大约20,000个对象，且运行在一台较慢的机器上。
 - en: How to do it...
+  id: totrans-226
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何实现...
 - en: 'We can get some idea of possible performance improvement from using pre-cached
     object files as follows:'
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过使用预缓存的对象文件来获得一些性能提升的想法，如下所示：
 - en: Run `nagios` with the `-s` option, and inspect the output. This will print a
     profile of the processes normally involved in building complete object definitions
     from the configuration files.
+  id: totrans-228
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 运行`nagios`并使用`-s`选项，检查输出。这将打印出通常参与从配置文件构建完整对象定义的进程的概要。
 - en: '[PRE37]'
+  id: totrans-229
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'In this case, we''re particularly interested in the sections of output marked
     with asterisks, in the section titled `OBJECT CONFIG PROCESSING TIMES`, which
     denote times that could be improved by pre-cached object files, including an estimate
     of the saved time at the end of the `TOTAL` field:'
+  id: totrans-230
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在这种情况下，我们特别关注输出中用星号标记的部分，位于`OBJECT CONFIG PROCESSING TIMES`标题下，表示可以通过预缓存对象文件来提升的时间，包括在`TOTAL`字段末尾的节省时间估算：
 - en: '[PRE38]'
+  id: totrans-231
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: We might decide that `2.3` seconds is a worthwhile saving from our restart time.
     Perhaps we really don't want to miss any important checks!
+  id: totrans-232
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 我们可能会决定，`2.3`秒的节省时间对于我们的重启时间来说是值得的。也许我们真的不想错过任何重要的检查！
 - en: 'Run `nagios` with the `-p` and `-v` options, to verify the configuration and
     also write a pre-cached object file:'
+  id: totrans-233
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`-p`和`-v`选项运行`nagios`，验证配置并同时写入预缓存对象文件：
 - en: '[PRE39]'
+  id: totrans-234
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: 'Run `nagios` with the `-u` and `-s` options to see how long the startup and
     scheduling test takes when instructed to use the pre-cached object file:'
+  id: totrans-235
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`-u`和`-s`选项运行`nagios`，查看在指示使用预缓存对象文件时，启动和调度测试的耗时：
 - en: '[PRE40]'
+  id: totrans-236
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'We may note that the `TOTAL` time taken is now significantly less (even more
     of an improvement than estimated), and that many of the times are now zero seconds,
     as Nagios Core did not have to do that step at all:'
+  id: totrans-237
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们可能会注意到，`TOTAL`所需时间现在明显减少（比预估的改进还要多），并且许多时间已经为零秒，因为Nagios Core完全没有执行那个步骤：
 - en: '[PRE41]'
+  id: totrans-238
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: With this done, we should find that restarting Nagios Core with both the `-d`
     and the `-u` flags should be faster than before. This can be incorporated into
     any startup scripts (for example, `/etc/init.d/nagios`). It also means that if
     we make changes to the configuration, we must remember to run `nagios -pv` again
     to validate and regenerate the pre-cached object file.
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，我们应该会发现，使用`-d`和`-u`标志重新启动Nagios Core的速度比以前更快。这个过程可以融入到任何启动脚本中（例如`/etc/init.d/nagios`）。这也意味着如果我们对配置进行了更改，我们必须记得再次运行`nagios
+    -pv`来验证并重新生成预缓存对象文件。
 - en: How it works...
+  id: totrans-240
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: When run with the `-p` option, Nagios Core parses the configuration as normal
     into objects with which it can work, expanding out the `hostgroups`, `templates`,
     and other configuration shortcuts. It writes this information into a single file
     as specified by the `precached_object_file` directive.
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 当使用`-p`选项运行时，Nagios Core将正常解析配置，将其转化为可以使用的对象，扩展`hostgroups`、`templates`和其他配置快捷方式。它会将这些信息写入由`precached_object_file`指令指定的单一文件。
 - en: The configuration file is human-readable; if you view it in a text editor, you'll
     see the expanded definitions that have been built from your configuration, with
     all of the object inheritance, regular expression hostgroups, and multi-host service
     definitions expanded.
+  id: totrans-242
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置文件是人类可读的；如果你在文本编辑器中查看它，你将看到从配置中构建的扩展定义，包含所有对象继承、正则表达式的主机组和多主机服务定义。
 - en: When next restarted, Nagios Core can be instructed to use this file instead
     of re-parsing the configuration all over again by including the `-u` option. You
     may need to incorporate this in any `init.d` scripts you are using.
+  id: totrans-243
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一次重启时，可以通过包括`-u`选项指示Nagios Core使用这个文件，而不是重新解析整个配置。你可能需要在任何正在使用的`init.d`脚本中加入这个选项。
 - en: There's more...
+  id: totrans-244
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: If you don't really have speed problems on Nagios Core restarting, it's best
     to avoid making this permanent, as it adds another layer of complexity to building
     configuration; if you forget to rebuild the pre-cached object file after making
     configuration changes and before restarting Nagios Core, it will continue using
     the previous configuration, not realizing the difference. Use this with caution!
+  id: totrans-245
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果在Nagios Core重启时你没有速度问题，最好避免让这成为永久配置，因为这会给配置构建添加额外的复杂性；如果你在更改配置后忘记重建预缓存对象文件并重启Nagios
+    Core，它将继续使用先前的配置，而没有意识到差异。请谨慎使用！
 - en: See also
+  id: totrans-246
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Running a service on all hosts in a group* recipe in [Chapter 1](ch01.html
     "Chapter 1. Understanding Hosts, Services, and Contacts"), *Understanding Hosts,
     Services, and Contacts*
+  id: totrans-247
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第1章](ch01.html "第1章. 理解主机、服务和联系人")中的*在组内所有主机上运行服务*食谱，*理解主机、服务和联系人*。'
 - en: The *Configuring host roles using groups* and the *Using inheritance to simplify
     configuration* recipes in [Chapter 9](ch09.html "Chapter 9. Managing Configuration"),
     *Configuration Management*
+  id: totrans-248
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第9章](ch09.html "第9章. 配置管理")中的*使用组配置主机角色*和*使用继承简化配置*的食谱，*配置管理*。'
 - en: Setting up a redundant monitoring host
+  id: totrans-249
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 设置冗余监控主机
 - en: In this recipe, we'll learn how to implement a simple kind of redundancy for
     Nagios Core, by running a second Nagios Core instance with a near-identical configuration
     on another machine.
+  id: totrans-250
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我们将学习如何通过在另一台机器上运行第二个配置几乎相同的Nagios Core实例来实现Nagios Core的简单冗余。
 - en: 'This may seem like it would not need a recipe to implement. It should be reasonably
     straightforward to simply copy over the configuration for a Nagios Core system
     and run it concurrently. There are two main problems with this:'
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: 这看起来好像不需要食谱就能实现。只需简单地复制Nagios Core系统的配置并同时运行，应该是比较直接的。然而，这里有两个主要问题：
 - en: Every problem detected on the network will fire notifications events twice.
     The administrator charged with looking after the pager might well find this unbearable!
+  id: totrans-252
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 网络上检测到的每个问题都会触发两次通知事件。负责看护传呼机的管理员可能会觉得这难以忍受！
 - en: Everything will be checked twice. On smaller networks with simple checks, this
     may not be too much of a concern, but it could be an issue on larger, busier networks.
+  id: totrans-253
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一切都会被检查两次。在较小的网络中，如果检查较简单，这可能不会成为问题，但在更大、繁忙的网络中，可能会成为问题。
 - en: This recipe will solve the first problem by configuring the slave monitoring
     server to suppress notifications until it detects an issue with the master server.
     In the *There's more…* section, we'll discuss extending this solution to solve
     the second problem as well, by preventing the slave server from making checks
     as well as sending notifications while the master server is active.
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: 本食谱将通过配置从属监控服务器来抑制通知，直到它检测到主服务器的问题，从而解决第一个问题。在*更多内容…*部分中，我们将讨论如何扩展这个解决方案以解决第二个问题，通过防止从属服务器在主服务器活动时进行检查以及发送通知。
 - en: Getting ready
+  id: totrans-255
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'This is the most complex recipe in this book, and one of the longest, tying
     in concepts from many other recipes and chapters. To follow it, you will likely
     need to have a good working knowledge of the following:'
+  id: totrans-256
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是本书中最复杂的食谱之一，也是最长的，涉及许多其他食谱和章节中的概念。要跟随这个食谱，你可能需要对以下内容有一定的工作知识：
 - en: The building blocks of Nagios Core ­hosts, services, contacts, commands, plugins,
     and notifications ­explained in all recipes in Chapters 1 through 4.
+  id: totrans-257
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Nagios Core的构建模块——主机、服务、联系人、命令、插件和通知——在第1到第4章的所有食谱中都有解释。
 - en: Remote execution via `check_nrpe` ­explained in all recipes in [Chapter 6](ch06.html
     "Chapter 6. Enabling Remote Execution"), *Enabling Remote Execution*. The recipe
     will at one point tell you to install NRPE on the master server to run a specific
     plugin, so you should learn how to do this first.
+  id: totrans-258
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过`check_nrpe`进行远程执行——在[第6章](ch06.html "第6章. 启用远程执行")中的所有食谱中都有解释，*启用远程执行*。该食谱将在某个时刻告诉你需要在主服务器上安装NRPE以运行特定插件，因此你应该先学习如何做这一步。
 - en: Event handlers and writing to the command file with them, ­explained in the
     *Setting up an event handler script* recipe in [Chapter 11](ch11.html "Chapter 11. Automating
     and Extending Nagios Core").
+  id: totrans-259
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 事件处理程序及其写入命令文件的方法——在[第11章](ch11.html "第11章. 自动化和扩展Nagios Core")的*设置事件处理程序脚本*食谱中解释。
 - en: The event handler scripts, the most complex part of this setup, are fortunately
     already written for us; we'll show how to implement them by copying them out of
     the Nagios Core source package. You'll therefore need to have the sources available
     for your particular version of Nagios Core. If you need to retrieve the sources
     again, you can download them again from Nagios Core's website at [http://www.nagios.org/](http://www.nagios.org/).
+  id: totrans-260
   prefs: []
   type: TYPE_NORMAL
+  zh: 事件处理程序脚本是这个配置中最复杂的部分，幸运的是它们已经为我们写好了；我们将通过从 Nagios Core 源代码包中复制它们来展示如何实现。你需要确保有适用于你版本的
+    Nagios Core 的源代码。如果需要重新获取源代码，可以从 Nagios Core 的官网 [http://www.nagios.org/](http://www.nagios.org/)
+    重新下载。
 - en: 'The recipe will start by assuming we have two monitoring servers: `olympus.naginet`
     (`10.128.0.11`), which will be the master monitoring server, and `everest.naginet`
     (`10.128.0.12`), which will be the slave. The two servers are configured to monitor
     the same three hosts, with PING service checks:'
+  id: totrans-261
   prefs: []
   type: TYPE_NORMAL
+  zh: 本配方假设我们有两台监控服务器：`olympus.naginet` (`10.128.0.11`)，它将作为主监控服务器，和 `everest.naginet`
+    (`10.128.0.12`)，它将作为从属服务器。这两台服务器配置为监控相同的三个主机，并进行 PING 服务检查：
 - en: '`sparta.naginet`'
+  id: totrans-262
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`sparta.naginet`'
 - en: '`athens.naginet`'
+  id: totrans-263
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`athens.naginet`'
 - en: '`ithaca.naginet`'
+  id: totrans-264
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ithaca.naginet`'
 - en: The Nagios Core configuration of the two servers is completely identical to
     start with, and both are sending notifications to an appropriate contact group.
     However, note that the servers are not yet monitoring one another; this will be
     an important part of the recipe.
+  id: totrans-265
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两台服务器的 Nagios Core 配置最初完全相同，且两者都将通知发送到适当的联系人组。然而，请注意，这两台服务器尚未互相监控；这是本配方中的一个重要部分。
 - en: How to do it...
+  id: totrans-266
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何执行...
 - en: 'We can arrange a simple redundancy setup for our two Nagios Core servers as
     follows:'
+  id: totrans-267
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以为两台 Nagios Core 服务器安排一个简单的冗余设置，如下所示：
 - en: 'Confirm that the `check_nagios` plugin is available on the `master` server,
     and try running it:'
+  id: totrans-268
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确认 `check_nagios` 插件在主服务器上可用，并尝试运行它：
 - en: '[PRE42]'
+  id: totrans-269
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: Install the NRPE daemon on the master server, and define a command `check_nagios`
     in `nrpe.cfg` (see [Chapter 6](ch06.html "Chapter 6. Enabling Remote Execution")).
+  id: totrans-270
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在主服务器上安装 NRPE 守护进程，并在 `nrpe.cfg` 文件中定义命令 `check_nagios`（详见 [第6章](ch06.html "第6章：启用远程执行")）。
 - en: '[PRE43]'
+  id: totrans-271
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Include the slave server''s address in the `allowed_hosts` directive for `nrpe`,
     in the file `/usr/local/nagios/etc/nrpe.cfg`:'
+  id: totrans-272
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在 `/usr/local/nagios/etc/nrpe.cfg` 文件中，将从属服务器的地址包含在 `allowed_hosts` 指令中：
 - en: '[PRE44]'
+  id: totrans-273
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: Don't forget to restart NRPE to include this change to the configuration.
+  id: totrans-274
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 不要忘记重启 NRPE 以将此更改包含到配置中。
 - en: 'On the slave server, verify that a call to `check_nrpe` can retrieve the results
     of `check_nagios` on the master server:'
+  id: totrans-275
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在从属服务器上，验证通过 `check_nrpe` 调用是否能够获取主服务器上 `check_nagios` 的结果：
 - en: '[PRE45]'
+  id: totrans-276
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: You will have to install the `check_nrpe` plugin on the slave server to do this.
     This is explained in the *Monitoring local services on a remote machine with NRPE*
     recipe in [Chapter 6](ch06.html "Chapter 6. Enabling Remote Execution").
+  id: totrans-277
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你需要在从属服务器上安装 `check_nrpe` 插件来实现这一点。这个过程在 *使用 NRPE 监控远程机器上的本地服务* 这一配方中进行了说明，详见
+    [第6章](ch06.html "第6章：启用远程执行")。
 - en: 'On the slave server, copy four files (two event handlers and two helper scripts)
     from the source distribution into the `/usr/local/nagios/libexec/eventhandlers`
     directory (which you may need to create first):'
+  id: totrans-278
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在从属服务器上，将源代码包中的四个文件（两个事件处理程序和两个辅助脚本）复制到 `/usr/local/nagios/libexec/eventhandlers`
+    目录（你可能需要先创建这个目录）：
 - en: '[PRE46]'
+  id: totrans-279
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: The preceding command assumes you are keeping the sources for your Nagios Core
     distribution in `/usr/local/src`. We define and use the shell variable `$EHD`
     to refer to the event handlers directory for convenience.
+  id: totrans-280
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 前面的命令假设你将 Nagios Core 分发包的源代码保存在 `/usr/local/src` 目录下。我们定义并使用 shell 变量 `$EHD`
+    来方便地引用事件处理程序目录。
 - en: 'In the installed `handle-master-proc-event` script, find and replace `active_service_checks`
     with `notifications`. The command line tool `sed` works well for this:'
+  id: totrans-281
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在已安装的 `handle-master-proc-event` 脚本中，找到并将 `active_service_checks` 替换为 `notifications`。命令行工具
+    `sed` 非常适合这个操作：
 - en: '[PRE47]'
+  id: totrans-282
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'This is because the script as provided issues a command to toggle active checks,
     rather than notifications. At the time of writing, in Nagios 3.3.1 there is also
     a bug in `handle-master-proc-event` that may need to be corrected, on line 49:'
+  id: totrans-283
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这是因为提供的脚本发出的命令是切换活动检查，而不是通知。写作时，在 Nagios 3.3.1 中，`handle-master-proc-event`
+    脚本的第49行可能存在一个 bug，需要修正：
 - en: '[PRE48]'
+  id: totrans-284
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'It should have a dollar sign added after the first backtick:'
+  id: totrans-285
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 它应该在第一个反引号后面加上一个美元符号：
 - en: '[PRE49]'
+  id: totrans-286
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'Ensure the event handlers are owned and executable by the `nagios` user:'
+  id: totrans-287
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确保事件处理程序由 `nagios` 用户拥有并且具有可执行权限：
 - en: '[PRE50]'
+  id: totrans-288
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: 'In `/usr/local/nagios/etc/objects/commands.cfg`, define two new event handler
     commands:'
+  id: totrans-289
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在`/usr/local/nagios/etc/objects/commands.cfg`中，定义两个新的事件处理程序命令：
 - en: '[PRE51]'
+  id: totrans-290
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: Make a host and service definition on the slave server to monitor the master
     server. It might look something similar to the following code snippet; change
     your `host_name`, `alias`, and `address` values as appropriate. The templates
     used are only examples; you will probably want to choose templates that are defined
     to run checks often, and during a 24x7 interval.
+  id: totrans-291
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在从属服务器上创建主机和服务定义来监控主服务器。它可能类似于以下代码片段；根据需要更改`host_name`、`alias`和`address`的值。所使用的模板仅为示例；你可能希望选择已定义的模板，以便频繁地进行检查，并在24x7的时间段内运行。
 - en: '[PRE52]'
+  id: totrans-292
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: You can make the master server monitor the slave server as well if you wish.
+  id: totrans-293
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果愿意，你可以让主服务器也监控从属服务器。
 - en: 'Note that you will need to have the `check_nrpe` command defined, which the
     *Monitoring local services on a remote machine with NRPE* recipe in [Chapter 6](ch06.html
     "Chapter 6. Enabling Remote Execution") explains. If you have followed that recipe
     then you have probably already done this. If not, the following definition works:'
+  id: totrans-294
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 请注意，你需要定义`check_nrpe`命令，正如[第6章](ch06.html "第6章。启用远程执行")中*使用NRPE监控远程机器上的本地服务*配方所解释的那样。如果你已经按照该配方操作，那么你可能已经完成了此操作。如果没有，以下定义适用：
 - en: '[PRE53]'
+  id: totrans-295
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: 'Finally, in `nagios.cfg` on the slave server, change `enable_notifications`
     to `0`:'
+  id: totrans-296
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 最后，在从属服务器的`nagios.cfg`中，将`enable_notifications`更改为`0`：
 - en: '[PRE54]'
+  id: totrans-297
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-298
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启Nagios Core服务器：
 - en: '[PRE55]'
+  id: totrans-299
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'With this done, the two Nagios Core servers should both be running, but importantly,
     notifications on the slave server start out as disabled, as visible in the **Tactical
     Overview**:'
+  id: totrans-300
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，两个Nagios Core服务器应该都在运行，但需要注意的是，从属服务器上的通知默认是禁用的，正如**战术概览**中所示：
 - en: '![How to do it...](img/5566_10_10.jpg)'
+  id: totrans-301
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_10_10.jpg)'
 - en: 'However, all the systems are still being monitored, as visible in the **Services**
     screen, including the **NAGIOS** service on the host machine:'
+  id: totrans-302
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，所有系统仍然在被监控，正如**服务**界面中所见，包括主机上的**NAGIOS**服务：
 - en: '![How to do it...](img/5566_10_11.jpg)'
+  id: totrans-303
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_10_11.jpg)'
 - en: This means that notifications will only be sent by the master server, since
     it still has its notifications enabled. However, if the master server goes down
     or its Nagios process stops working, the event handlers should be called, and
@@ -1461,154 +2107,217 @@
     you should test it thoroughly to make sure that the slave Nagios Core server will
     enable and disable its notifications for each contingency (host goes down, service
     goes down, service comes back, and so on.)
+  id: totrans-304
   prefs: []
   type: TYPE_NORMAL
+  zh: 这意味着通知只会由主服务器发送，因为主服务器仍然启用了通知。然而，如果主服务器宕机或其Nagios进程停止工作，应该会调用事件处理程序，从属服务器上的通知会自动启用。当主服务器或其`NAGIOS`服务恢复时，通知将再次禁用，并且检查和状态变更将继续不中断地进行。因此，我们已经建立了一种简单的冗余。如果你使用此设置，应该彻底测试它，以确保从属Nagios
+    Core服务器能根据每种情况（如主机宕机、服务宕机、服务恢复等）启用或禁用通知。
 - en: How it works...
+  id: totrans-305
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The event handlers included in the Nagios Core distribution, which we copied
     into the `eventhandlers` directory, are designed to handle toggling notifications
     and active checks based on the status of a given service or host. They are included
     for the purposes of demonstrating event handlers and redundancy situations like
     this one.
+  id: totrans-306
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Nagios Core分发包中包含的事件处理程序，我们将其复制到`eventhandlers`目录中，旨在根据给定服务或主机的状态处理通知和主动检查的切换。它们是为了演示事件处理程序和像这样的冗余情况而提供的。
 - en: We start by setting up the slave server to monitor not just the host on which
     the master Nagios Core server is running, but also the Nagios Core service itself,
     using the `check_nagios` plugin. This plugin checks the age of the log file and
     the system's process tables to ensure that a Nagios Core service is actually running
     on the system. Because it's a local plugin that doesn't work for remote checks,
     we check it from the slave server via NRPE.
+  id: totrans-307
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们首先设置从属服务器，不仅监控运行主服务器的主机，还要监控Nagios Core服务本身，使用`check_nagios`插件。该插件检查日志文件的年龄和系统的进程表，以确保系统上确实在运行Nagios
+    Core服务。由于这是一个本地插件，不适用于远程检查，因此我们通过NRPE从从属服务器进行检查。
 - en: The slave server checks the status of the master server and its `NAGIOS` service
     as part of its normal routine of active checks. When the master server's host
     or its `NAGIOS` service change state, both call their respective event handlers,
     the two shell scripts `handle-master-host-event` and `handle-master-proc-event`,
     defined in the commands of the same name.
+  id: totrans-308
   prefs: []
   type: TYPE_NORMAL
+  zh: 从服务器会检查主服务器及其`NAGIOS`服务的状态，作为其正常的主动检查例程的一部分。当主服务器的主机或其`NAGIOS`服务状态发生变化时，两个事件处理程序`handle-master-host-event`和`handle-master-proc-event`都会被调用，这些事件处理程序在相应的命令中定义。
 - en: 'Each time the event handlers are called, they are passed three arguments, in
     macro form. For `handle-master-host-event`, these are:'
+  id: totrans-309
   prefs: []
   type: TYPE_NORMAL
+  zh: 每次调用事件处理程序时，它们都会传递三个宏形式的参数。对于`handle-master-host-event`，这些参数是：
 - en: '`$HOSTSTATE$`: This is the new state of the master server'
+  id: totrans-310
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$HOSTSTATE$`：这是主服务器的新状态。'
 - en: '`$HOSTSTATETYPE$`: This specifies whether the state is `SOFT` or `HARD`'
+  id: totrans-311
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$HOSTSTATETYPE$`：这指定状态是`SOFT`还是`HARD`。'
 - en: '`$HOSTATTEMPT$`: This is the number of host checks attempted, up to the value
     of `max_check_attempts` for the host'
+  id: totrans-312
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$HOSTATTEMPT$`：这是尝试的主机检查次数，最大值为主机的`max_check_attempts`。'
 - en: '`handle-master-proc-event` is passed three analogous arguments, the only difference
     being they refer to service states rather than host states:'
+  id: totrans-313
   prefs: []
   type: TYPE_NORMAL
+  zh: '`handle-master-proc-event`传递三个类似的参数，唯一的区别是它们引用的是服务状态，而不是主机状态：'
 - en: '`$SERVICESTATE$`: This is the new state of the `NAGIOS` service on the master
     server'
+  id: totrans-314
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$SERVICESTATE$`：这是主服务器上`NAGIOS`服务的新状态。'
 - en: '`$SERVICESTATETYPE$`: This specifies whether the service state is `SOFT` or
     `HARD`'
+  id: totrans-315
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$SERVICESTATETYPE$`：这指定服务状态是`SOFT`还是`HARD`。'
 - en: '`$SERVICEATTEMPT$`: This is the number of host checks attempted, up to the
     value of `max_check_attempts` for the host'
+  id: totrans-316
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$SERVICEATTEMPT$`：这是尝试的主机检查次数，最大值为主机的`max_check_attempts`。'
 - en: The event handlers are written in such a way that they only do anything if the
     new state is `HARD`; that is, if the number of `max_check_attempts` has been reached.
     It ignores `SOFT` state changes until enough consecutive checks have failed that
     it can be reasonably confident in concluding that the monitored host or service
     is suffering a problem.
+  id: totrans-317
   prefs: []
   type: TYPE_NORMAL
+  zh: 事件处理程序的编写方式是，只有当新状态为`HARD`时才会执行操作；也就是说，只有当`max_check_attempts`的次数达到时才会生效。在足够多次连续检查失败之前，它会忽略`SOFT`状态的变化，直到它能够合理地确认被监控的主机或服务出现了问题。
 - en: 'If the host or service enters a `HARD CRITICAL` state, the event handlers call
     the helper script `enable-notifications` to write a command to the `commands`
     file at `/usr/local/nagios/var/rw/nagios.cmd` for the server to process. This
     command takes the following form, including the UNIX timestamp for when the command
     was written:'
+  id: totrans-318
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果主机或服务进入`HARD CRITICAL`状态，事件处理程序会调用辅助脚本`enable-notifications`，在`/usr/local/nagios/var/rw/nagios.cmd`的`commands`文件中写入命令以供服务器处理。此命令的形式如下，其中包括写入命令时的UNIX时间戳：
 - en: '[PRE56]'
+  id: totrans-319
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: When Nagios Core processes this command, the effect is that the previously disabled
     notifications are enabled, and all subsequent notifications generated as a result
     of checks will be sent.
+  id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: 当Nagios Core处理此命令时，其效果是先前禁用的通知被启用，所有由于检查而生成的后续通知都会被发送。
 - en: 'Similarly, when the host or service recovers from the `HARD CRITICAL` state,
     entering a `HARD UP` or `HARD OK` state, the `disable-notifications` helper script
     is called, writing a command in the same manner:'
+  id: totrans-321
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样，当主机或服务从`HARD CRITICAL`状态恢复，进入`HARD UP`或`HARD OK`状态时，会调用`disable-notifications`辅助脚本，并以相同的方式写入命令：
 - en: '[PRE57]'
+  id: totrans-322
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: The effect is that when the master server is noted to be down, the slave server
     notices and assumes its notification behavior, and when it recovers, it stops
     its own notifications again, allowing the master server to resume its role.
+  id: totrans-323
   prefs: []
   type: TYPE_NORMAL
+  zh: 其效果是，当主服务器被标记为宕机时，从服务器会注意到并采取相同的通知行为，而当主服务器恢复时，从服务器会停止自己的通知，再次允许主服务器恢复其角色。
 - en: There's more...
+  id: totrans-324
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: If network bandwidth is a concern, we can arrange to leave the slave server
     more or less idle when not in use, by keeping not only notifications but also
     service checks off by default. Helper scripts for this are also included in the
     Nagios Core distribution, in the `disable_active_service_checks` and `enable_active_service_checks`
     scripts.
+  id: totrans-325
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果网络带宽是一个问题，我们可以安排在不使用时让从服务器基本处于闲置状态，不仅默认关闭通知，还关闭服务检查。Nagios Core发行版中也包含了相关的辅助脚本，分别是`disable_active_service_checks`和`enable_active_service_checks`脚本。
 - en: The primary issue with this change is the loss of state information as the slave
     server makes its initial round of checks; this can also be worked around, as explained
     in the Nagios Core documentation on redundancy at [http://nagios.sourceforge.net/docs/3_0/redundancy.html](http://nagios.sourceforge.net/docs/3_0/redundancy.html).
+  id: totrans-326
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个变更的主要问题是从属服务器在进行初始检查时丧失状态信息；这也可以绕过，正如Nagios核心文档中关于冗余的解释：[http://nagios.sourceforge.net/docs/3_0/redundancy.html](http://nagios.sourceforge.net/docs/3_0/redundancy.html)。
 - en: Once these steps are implemented, the main annoyance with this setup is having
     to keep the two configuration directories in sync. It's undesirable and error-prone
     to have to make changes on two servers each time the configuration needs to change,
     so you may like to consider using a snapshot tool such as `rsync` to keep the
     two directories the same. More information about `rsync` can be found at [http://en.wikipedia.org/wiki/Rsync](http://en.wikipedia.org/wiki/Rsync).
+  id: totrans-327
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦这些步骤完成，设置的主要麻烦就是必须保持两个配置目录同步。每次配置需要更改时必须在两台服务器上进行更改，这既不理想又容易出错，因此你可能想考虑使用如`rsync`这样的快照工具来保持两个目录一致。更多关于`rsync`的信息可以在[http://en.wikipedia.org/wiki/Rsync](http://en.wikipedia.org/wiki/Rsync)上找到。
 - en: A configuration managed with version control is also help here, as recommended
     in the *Keeping configuration under version control* recipe in [Chapter 9](ch09.html
     "Chapter 9. Managing Configuration"). That way you can use `git clone` or `svn
     checkout` to quickly copy and update configuration files on multiple machines.
+  id: totrans-328
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用版本控制管理的配置也在这里有所帮助，如[第9章](ch09.html "第9章。管理配置")中的*将配置纳入版本控制*的示例所推荐。这样，你可以使用`git
+    clone`或`svn checkout`快速复制并更新多个机器上的配置文件。
 - en: See also
+  id: totrans-329
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Writing debugging information to Nagios log file* recipe in this chapter
+  id: totrans-330
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*将调试信息写入Nagios日志文件*的示例
 - en: The *Monitoring local services on a remote machine with NRPE* recipe in [Chapter
     6](ch06.html "Chapter 6. Enabling Remote Execution"), *Enabling Remote Execution*
+  id: totrans-331
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第6章](ch06.html "第6章。启用远程执行")中的*在远程机器上监控本地服务与NRPE*的示例，*启用远程执行*'
 - en: The *Keeping configuration under version control* recipe in [Chapter 9](ch09.html
     "Chapter 9. Managing Configuration"), *Configuration Management*
+  id: totrans-332
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第9章](ch09.html "第9章。管理配置")中的*将配置纳入版本控制*的示例，*配置管理*'
 - en: The *Setting up an event handler script* recipe in [Chapter 11](ch11.html "Chapter 11. Automating
     and Extending Nagios Core"), *Automating and Extending Nagios*
+  id: totrans-333
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第11章](ch11.html "第11章。自动化与扩展Nagios核心")中的*设置事件处理脚本*的示例，*自动化与扩展Nagios*'

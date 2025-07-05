@@ -1,57 +1,83 @@
 - en: Chapter 11. Automating and Extending Nagios Core
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第11章 自动化与扩展Nagios Core
 - en: 'In this chapter, we will cover the following recipes:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将覆盖以下内容：
 - en: Allowing and submitting passive checks
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 允许并提交被动检查
 - en: Submitting passive checks from a remote host with NSCA
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用NSCA从远程主机提交被动检查
 - en: Submitting passive checks in response to SNMP traps
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 响应SNMP陷阱提交被动检查
 - en: Setting up an event handler script
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置事件处理脚本
 - en: Tracking host and service states with Nagiosgraph
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用Nagiosgraph跟踪主机和服务状态
 - en: Reading status into a MySQL database with NDOUtils
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用NDOUtils将状态读入MySQL数据库
 - en: Writing customized Nagios Core reports
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 编写定制化的Nagios Core报告
 - en: Getting extra visualizations with NagVis
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 获取额外的可视化效果与NagVis
 - en: Introduction
+  id: totrans-10
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 引言
 - en: In addition to being useful as a standalone monitoring framework, Nagios Core
     has a modular design that allows both interaction with and extension by other
     programs and tools, predominantly using its external command file for controlling
     the behavior of the server.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了作为独立的监控框架有用外，Nagios Core还具有模块化设计，允许与其他程序和工具进行交互并进行扩展，主要是通过其外部命令文件来控制服务器的行为。
 - en: 'One of the most useful ways of interacting with the Nagios Core server in this
     way is through the use of passive checks: submitting check results to the server
     directly, rather than as the result of the server''s own active checks.'
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 与Nagios Core服务器进行交互的最有用方式之一是通过使用被动检查：将检查结果直接提交给服务器，而不是作为服务器自身主动检查的结果。
 - en: The simplest application of the idea of passive checks is for monitoring some
     process that might take an indeterminate amount of time to run, and hence resists
     active checking; instead of the service making active checks of its own, it accepts
@@ -65,567 +91,820 @@
     such as restarting a remote server. We also saw event handlers used in the *Setting
     up a redundant monitoring host* recipe in [Chapter 10](ch10.html "Chapter 10. Security
     and Performance"), *Security and Performance*.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 被动检查的最简单应用是在监控一些可能需要不确定时间才能运行的过程，因此不适合主动检查；服务不进行主动检查，而是接受由另一个应用提交的检查结果，可能是在备份脚本完成后提交的结果。这些检查可以通过一个名为**Nagios
+    Service Check Acceptor**（**NSCA**）的附加组件进行发送和接收。同样，插件和通知实际上是对外部命令的脚本化调用，如`check_http`和`mail`，事件处理程序也可以配置为每次主机或服务状态变化时执行指定的命令。这可以用于补充记录状态变化数据，或自动化地尝试解决问题，如重启远程服务器。我们还在[第10章](ch10.html
+    "第10章 安全性与性能")的*设置冗余监控主机*部分中看到事件处理程序的使用。
 - en: 'Finally, this chapter also includes installation procedures and discussion
     of a few of the more popular extensions to Nagios Core:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，本章还包括了安装程序和对一些流行的Nagios Core扩展的讨论：
 - en: '**Nagiosgraph**: This is an advanced web-based graphing solution for Nagios
     Core, graphing both server performance and host and service status metrics.'
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**Nagiosgraph**：这是一个先进的基于Web的图表解决方案，用于Nagios Core，能够绘制服务器性能、主机和服务状态的指标。'
 - en: '**NagVis**: This is an advanced web-based visualization extension for Nagios
     Core data, especially well-suited for administrators who need something more comprehensive
     than Nagios Core''s built-in networking mapping.'
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**NagVis**：这是一个高级的基于Web的可视化扩展，适用于Nagios Core数据，尤其适合那些需要比Nagios Core内置网络映射更全面功能的管理员。'
 - en: '**NDOUtils**: This applies the translations of Nagios Core data into a standard
     database system such as MySQL; very useful for performing advanced queries of
     the Nagios Core data for custom systems such as monitoring displays, or logging
     with change control systems.'
+  id: totrans-17
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**NDOUtils**：该工具将Nagios Core数据转换为标准数据库系统，如MySQL；对于执行Nagios Core数据的高级查询非常有用，适用于定制系统，如监控显示或与变更控制系统的日志记录。'
 - en: We'll discuss NDOUtils, perhaps the most versatile Nagios Core extension of
     all, in two separate recipes; first by showing how to install it, and then some
     ideas on how to apply it to make custom Nagios Core reporting applications of
     our own, in the form of a **CLI report** written in **Perl**, and an **RSS feed**
     written in **PHP**.
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将通过两个单独的步骤来讨论 NDOUtils，它可能是所有 Nagios Core 扩展中最通用的；首先展示如何安装它，然后提供一些如何应用它的想法，创建我们自己的自定义
+    Nagios Core 报告应用程序，形式为用**Perl**编写的**CLI报告**和用**PHP**编写的**RSS订阅**。
 - en: Allowing and submitting passive checks
+  id: totrans-19
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 允许并提交被动检查
 - en: In this recipe, we'll learn how to configure Nagios Core to accept passive checks
     for a service. This allows both users and external applications to directly submit
     the results of checks to Nagios Core, rather than having the application seek
     them out itself through polling with active checks, performed via plugins such
     as `check_http` or `check_ping`.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本步骤中，我们将学习如何配置 Nagios Core 接受服务的被动检查。这允许用户和外部应用程序直接向 Nagios Core 提交检查结果，而不是让应用程序通过插件（如
+    `check_http` 或 `check_ping`）执行轮询来主动获取结果。
 - en: We'll show one simple example of a passive check, flagging a service called
     `BACKUP` for an existing host. We'll show how to do this via the web interface,
     which is very easy, and via the external commands file, which is slightly more
     complex but much more flexible and open to automation.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将展示一个简单的被动检查示例，标记一个名为 `BACKUP` 的服务，该服务对应于现有主机。我们将展示如何通过 Web 界面操作，这非常简单，并通过外部命令文件操作，虽然稍微复杂一些，但更加灵活且易于自动化。
 - en: The idea is that when a user or process receives confirmation that the backup
     process on a host has completed correctly, they are able to supply a check result
     of `OK` directly to the service, without Nagios Core needing to poll anything
     itself.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个想法是，当用户或进程确认主机上的备份过程已正确完成时，他们能够直接向服务提供 `OK` 检查结果，而不需要 Nagios Core 自己进行轮询。
 - en: Getting ready
+  id: totrans-23
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'You should be running a Nagios Core 3.0 or newer server. You should also already
     have a host configured for which you want to define a service that will accept
     passive checks. In this example, we''ll use the host `ithaca.naginet`, which might
     be defined as follows:'
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该运行 Nagios Core 3.0 或更新版本的服务器。你还应该已经配置了一个主机，在该主机上你希望定义一个接受被动检查的服务。在这个示例中，我们将使用主机
+    `ithaca.naginet`，它可能如下所示：
 - en: '[PRE0]'
+  id: totrans-25
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: You will also need a working Nagios Core web interface to check that passive
     checks are enabled, and to try out the recipe's method of submitting passive checks.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还需要一个工作的 Nagios Core Web 界面，以检查被动检查是否已启用，并尝试使用此步骤中的方法提交被动检查。
 - en: 'The recipe will be in two parts: enabling and configuring the service for passive
     checks only, and actually submitting a passive check via the web interface. In
     the *There''s more...* section, we''ll show how to submit a check result via the
     external commands file, which is a little more complicated, but allows advanced
     automation behavior.'
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 本步骤将分为两部分：仅启用并配置服务以接受被动检查，以及通过 Web 界面实际提交被动检查。在*更多内容...*部分，我们将展示如何通过外部命令文件提交检查结果，尽管这有点复杂，但它支持高级自动化行为。
 - en: How to do it...
+  id: totrans-28
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can define a new `BACKUP` service that accepts passive checks only, as follows:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以定义一个只接受被动检查的新 `BACKUP` 服务，如下所示：
 - en: Log in to the web interface and ensure that passive checks are enabled. The
     **Tactical Overview** section shows a panel for it near the bottom. Check that
     it's green:![How to do it...](img/5566_11_01.jpg)
+  id: totrans-30
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 登录到 Web 界面，确保已启用被动检查。在**战术概览**部分，底部附近会有一个面板显示相关信息。检查它是否为绿色：![如何操作...](img/5566_11_01.jpg)
 - en: If it's not green, you should be able to enable the checks again by clicking
     on the **Disabled** bar. In this case, you should also check the `/usr/local/nagios/etc/nagios.cfg`
     file to make sure that the `accept_passive_service_checks` option is set to `1`
     as well, so that Nagios Core allows passive checks on startup.
+  id: totrans-31
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果它不是绿色，你应该能够通过点击**禁用**栏再次启用检查。在这种情况下，你还应检查 `/usr/local/nagios/etc/nagios.cfg`
+    文件，确保 `accept_passive_service_checks` 选项设置为 `1`，以便 Nagios Core 在启动时允许被动检查。
 - en: Change to the Nagios Core `objects` configuration directory. If you're using
     the sample configuration, this will likely be `/usr/local/nagios/etc/objects`.
+  id: totrans-32
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到 Nagios Core 的 `objects` 配置目录。如果你使用的是示例配置，这通常会是 `/usr/local/nagios/etc/objects`。
 - en: '[PRE1]'
+  id: totrans-33
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Edit the `commands.cfg` file, and add a definition for the `check_dummy` command:'
+  id: totrans-34
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑 `commands.cfg` 文件，并为 `check_dummy` 命令添加定义：
 - en: '[PRE2]'
+  id: totrans-35
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: If you already followed the *Monitoring individual nodes in a cluster* recipe
     in [Chapter 8](ch08.html "Chapter 8. Managing Network Layout"), *Understanding
     the Network Layout*, then you may already have defined this command, in which
     case you can skip this step, as the definition is the same.
+  id: totrans-36
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果你已经按照[第8章](ch08.html "第8章. 管理网络布局")中*监控集群中的各个节点*的教程操作过，那么你可能已经定义了这个命令，在这种情况下，你可以跳过此步骤，因为定义是相同的。
 - en: Edit the file containing the definition for the existing host. In this example,
     the host is defined in a file called `ithaca.naginet.cfg`.
+  id: totrans-37
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑包含现有主机定义的文件。在此示例中，主机定义在名为`ithaca.naginet.cfg`的文件中。
 - en: '[PRE3]'
+  id: totrans-38
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: Add the following service definition to the end of the file, substituting the
     appropriate value for `host_name`.
+  id: totrans-39
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在文件末尾添加以下服务定义，替换`host_name`为适当的值。
 - en: '[PRE4]'
+  id: totrans-40
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: This example uses the `generic-service` template. You can use any service template
     you like; the important directives are `active_checks_enabled`, `passive_checks_enabled`,
     and `check_command`.
+  id: totrans-41
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这个示例使用了`generic-service`模板。你可以使用任何你喜欢的服务模板；重要的指令是`active_checks_enabled`、`passive_checks_enabled`和`check_command`。
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-42
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重新启动Nagios Core服务器：
 - en: '[PRE5]'
+  id: totrans-43
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'With this done, the Nagios Core web interface should show the service as accepting
     passive checks only in the **Services** listing:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，Nagios Core网页界面应显示该服务仅接受被动检查，具体在**服务**列表中：
 - en: '![How to do it...](img/5566_11_02.jpg)'
+  id: totrans-45
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_11_02.jpg)'
 - en: It will remain in the `PENDING` state until a passive check result is submitted
     for it.
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 它将保持在`PENDING`状态，直到为其提交了被动检查结果。
 - en: 'We can submit a passive check result via the web interface as follows:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过网页界面提交被动检查结果，具体步骤如下：
 - en: Click on the service's name in the **Services** listing, and click on **Submit
     passive check result for this service** menu item:![How to do it...](img/5566_11_03.jpg)
+  id: totrans-48
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 点击**服务**列表中的服务名称，然后点击**提交该服务的被动检查结果**菜单项：![如何操作...](img/5566_11_03.jpg)
 - en: 'Complete the resulting form, with the following values:'
+  id: totrans-49
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 完成结果表单，输入以下值：
 - en: '**Host Name**: This is the host name for which the passive check result should
     be submitted. This should already be filled out for us.'
+  id: totrans-50
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**主机名**：这是应该提交被动检查结果的主机名。这个信息应该已经为我们填写好。'
 - en: '**Service**: This is the service description for which the passive check result
     should be submitted. This should also already be filled out with `BACKUP`.'
+  id: totrans-51
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**服务**：这是应该提交被动检查结果的服务描述。这个信息也应该已经填写为`BACKUP`。'
 - en: '**Check Result**: This is the particular result you would like to submit for
     the check. In this case, we choose `OK` to signal that the backup completed successfully.
     We could just as easily submit a `CRITICAL` result if we wished.'
+  id: totrans-52
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**检查结果**：这是你希望为检查提交的特定结果。在本例中，我们选择`OK`来表示备份成功完成。如果需要，我们也可以选择提交`CRITICAL`结果。'
 - en: '**Check Output**: This is a message to attach to the status. In this case,
     we choose the simple message **Nightly backups were successful**.'
+  id: totrans-53
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**检查输出**：这是附加到状态的消息。在本例中，我们选择简单的消息**夜间备份成功**。'
 - en: '**Performance Data**: This is the optional extra detail about how the service
     being checked is performing. We can leave this blank.'
+  id: totrans-54
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**性能数据**：这是关于被检查服务执行情况的可选额外细节。我们可以留空此项。'
 - en: Click on **Commit** to submit the passive check result:![How to do it...](img/5566_11_04.jpg)
+  id: totrans-55
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 点击**提交**以提交被动检查结果：![如何操作...](img/5566_11_04.jpg)
 - en: 'After a short delay, the detail for the service should show it as reflecting
     the result of the passive check, along with explicitly showing that active checks
     are disabled:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 稍等片刻后，服务的详细信息应显示反映被动检查结果，并明确显示已禁用主动检查：
 - en: '![How to do it...](img/5566_11_05.jpg)'
+  id: totrans-57
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_11_05.jpg)'
 - en: How it works...
+  id: totrans-58
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它的工作原理...
 - en: The configuration added in the preceding section adds a new service called `BACKUP`
     to the existing `ithaca.naginet` host, and is designed to manage and report the
     status of backups for this host. In our example, this isn't something Nagios Core
     can check manually; no network service on `ithaca.naginet` can be checked to see
     if the backups have succeeded.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面一节中添加的配置将一个名为`BACKUP`的新服务添加到现有的`ithaca.naginet`主机，并旨在管理和报告该主机的备份状态。在我们的示例中，这不是Nagios
+    Core可以手动检查的内容；`ithaca.naginet`上没有任何网络服务可以检查备份是否成功。
 - en: However, suppose as administrators we do receive a backup report in our inbox
     every morning, so we know whether the backups have succeeded or failed and would
     like to register that status in Nagios Core, perhaps for record-keeping purposes
     or to alert other administrators to problems.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，假设作为管理员，我们每天早晨的确会收到一个备份报告，这样我们就能知道备份是成功还是失败，并希望将该状态注册到 Nagios Core，可能是为了记录存档或提醒其他管理员出现问题。
 - en: To that end, we disable active checks for the service, and put in place a dummy
     check command, `check_dummy`, which we never expect to run. If for whatever reason
     an active check is run, it will always flag a `WARNING` state, with the message
     **Unwanted active check!**. The `check_dummy` command never actually checks anything;
     it is configured to always return the state and output defined in its two arguments.
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 为此，我们禁用该服务的主动检查，并设置一个虚拟检查命令 `check_dummy`，我们不希望它运行。如果由于某种原因运行了主动检查，它将始终标记为 `WARNING`
+    状态，消息为 **不需要的主动检查！**。`check_dummy` 命令实际上不会检查任何内容，它被配置为始终返回其两个参数定义的状态和输出。
 - en: Instead, we enable passive checks for the service and submit the results manually.
     If the backups failed, we could just as easily record that with a passive check
     result of `WARNING` or `CRITICAL`.
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 相反，我们为该服务启用被动检查并手动提交结果。如果备份失败，我们也可以轻松地记录一个 `WARNING` 或 `CRITICAL` 的被动检查结果。
 - en: There's more...
+  id: totrans-63
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: 'It''s also possible (and often desirable) to submit active checks via the external
     commands file, which is useful for automation purposes. We write details for the
     check in a single line into the commands file in the following format:'
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 也可以（并且通常是理想的）通过外部命令文件提交主动检查，这对于自动化非常有用。我们将检查的详细信息以单行格式写入命令文件，如下所示：
 - en: '[PRE6]'
+  id: totrans-65
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'For our example, the line would be similar to the following code snippet:'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于我们的示例，这一行类似于以下代码片段：
 - en: '[PRE7]'
+  id: totrans-67
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'We can write this directly to the external commands file as follows:'
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以如下所示直接将其写入外部命令文件：
 - en: '[PRE8]'
+  id: totrans-69
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: In this context, the `<service_status>` field needs to be an integer corresponding
     to the appropriate state. If you use the text value `OK` or `WARNING`, the command
     will not work as expected.
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此情况下，`<service_status>` 字段需要是一个整数，表示相应的状态。如果使用文本值 `OK` 或 `WARNING`，命令将无法按预期工作。
 - en: '`0` for `OK`'
+  id: totrans-71
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`0` 表示 `OK`'
 - en: '`1` for `WARNING`'
+  id: totrans-72
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`1` 表示 `WARNING`'
 - en: '`2` for `CRITICAL`'
+  id: totrans-73
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`2` 表示 `CRITICAL`'
 - en: '`3` for `UNKNOWN`'
+  id: totrans-74
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`3` 表示 `UNKNOWN`'
 - en: If the syntax is correct, then the passive check will be registered just the
     same way as if it were submitted via the web interface. Writing to the command
     file thus allows us to submit passive check results with scripts and automated
     systems, with a little knowledge of an appropriate shell scripting language such
     as Bash or Perl.
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果语法正确，那么被动检查将以与通过网页界面提交时相同的方式注册。因此，写入命令文件使我们能够通过脚本和自动化系统提交被动检查结果，只需了解合适的 Shell
+    脚本语言，如 Bash 或 Perl。
 - en: We go into a little more detail about using external commands for passive check
     results, including a common application with the NSCA add-on, in the *Submitting
     passive checks from a remote host with NSCA* recipe in this chapter. If you don't
     want to input your passive checks manually, then you will most likely find this
     recipe of interest, along with its accompanying explanation of freshness checks.
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将更详细地讨论如何使用外部命令来获取被动检查结果，包括在本章的 *通过 NSCA 从远程主机提交被动检查* 配方中提到的与 NSCA 插件的常见应用。如果你不希望手动输入被动检查结果，那么你很可能会对这个配方感兴趣，并且它也包括了新鲜度检查的相关解释。
 - en: See also
+  id: totrans-77
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Submitting passive checks from a remote host with NSCA*, *Submitting passive
     checks in response to SNMP traps*, and *Setting up an event handler script* recipes
     in this chapter
+  id: totrans-78
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的 *通过 NSCA 从远程主机提交被动检查*、*响应 SNMP trap 提交被动检查* 和 *设置事件处理脚本* 配方
 - en: Submitting passive checks from a remote host with NSCA
+  id: totrans-79
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 通过 NSCA 从远程主机提交被动检查
 - en: In this recipe, we'll show how to automate the submission of passive checks
     by a remote host, using the example of a monitored host, `ithaca.naginet`, submitting
     a passive check to a Nagios Core server with information about how its `BACKUP`
     service is performing.
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本配方中，我们将展示如何通过远程主机自动提交被动检查，使用一个被监控主机 `ithaca.naginet` 提交其 `BACKUP` 服务性能的被动检查到
+    Nagios Core 服务器的例子。
 - en: For example, if the backup process completed successfully, we configure the
     monitored host to submit a passive check result specifying that the `BACKUP` service
     should have the status `OK`. However, if there were a problem with the backup,
     the monitored host could send a passive check result with a `WARNING` or `CRITICAL`
     status.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，如果备份过程成功完成，我们会配置被监控主机提交一个被动检查结果，指定 `BACKUP` 服务的状态应该是 `OK`。然而，如果备份出现问题，被监控主机可以发送一个带有
+    `WARNING` 或 `CRITICAL` 状态的被动检查结果。
 - en: In both cases, Nagios Core does no checking of its own; it trusts the results
     submitted by its target host.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这两种情况下，Nagios Core 不进行自己的检查；它信任目标主机提交的结果。
 - en: To do this, we'll use the NSCA add-on. We'll install the NSCA server on the
     Nagios Core server, and the NSCA client program `send_nsca` on the monitored host.
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了实现这一点，我们将使用 NSCA 插件。我们将在 Nagios Core 服务器上安装 NSCA 服务器，并在被监控的主机上安装 NSCA 客户端程序
+    `send_nsca`。
 - en: Getting ready
+  id: totrans-84
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should already have followed the *Allowing and submitting passive checks*
     recipe in this chapter. In this recipe, we will be building on the configuration
     established in that recipe; specifically, we will assume that you already have
     a host with a service configured only to accept passive checks.
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该已经按照本章中的*允许并提交被动检查*教程进行操作。在本教程中，我们将基于该教程中建立的配置进行操作；具体来说，我们假设你已经有一个只接受被动检查的服务配置的主机。
 - en: You will need to be able to install the software on both the monitoring server
     (the NSCA server) and on the server that will submit passive checks (the NSCA
     client), and ideally be generally familiar with the `./configure`, `make`, and
     `make install` process for installing software from source on UNIX-like systems.
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要能够在监控服务器（NSCA 服务器）和将提交被动检查的服务器（NSCA 客户端）上安装软件，并且理想情况下，对在类 UNIX 系统上从源代码安装软件的`./configure`、`make`和`make
+    install`过程有一般性的了解。
 - en: You should also be able to define any necessary firewall configuration to allow
     the NSCA client to send information to TCP port `5667` on the NSCA server. A firewall
     is absolutely necessary to protect the `nsca` daemon from abuse.
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还应该能够定义任何必要的防火墙配置，以允许 NSCA 客户端将信息发送到 NSCA 服务器上的 TCP 端口`5667`。防火墙对于保护`nsca`守护进程免受滥用是绝对必要的。
 - en: How to do it...
+  id: totrans-88
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 操作步骤...
 - en: 'We can set up the NSCA server on the monitoring server (in this example, `olympus.naginet`)
     as follows:'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以在监控服务器（本例中为`olympus.naginet`）上设置 NSCA 服务器，如下所示：
 - en: Download the latest version of NSCA using `wget` or a similar tool. You can
     find download links on the Nagios Exchange page for NSCA at [http://exchange.nagios.org/directory/Addons/Passive-Checks/NSCA--2D-Nagios-Service-Check-Acceptor/details](http://exchange.nagios.org/directory/Addons/Passive-Checks/NSCA--2D-Nagios-Service-Check-Acceptor/details).
+  id: totrans-90
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用 `wget` 或类似工具下载最新版本的 NSCA。你可以在 Nagios Exchange 页面找到 NSCA 的下载链接：[http://exchange.nagios.org/directory/Addons/Passive-Checks/NSCA--2D-Nagios-Service-Check-Acceptor/details](http://exchange.nagios.org/directory/Addons/Passive-Checks/NSCA--2D-Nagios-Service-Check-Acceptor/details)。
 - en: In this example, we're downloading and compiling it in our home directory on
     the monitoring server.
+  id: totrans-91
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在这个例子中，我们将在监控服务器的主目录中下载并编译它。
 - en: '[PRE9]'
+  id: totrans-92
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'Inflate the `.tar.gz` file:'
+  id: totrans-93
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 解压 `.tar.gz` 文件：
 - en: '[PRE10]'
+  id: totrans-94
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Move into the new `nsca-2.7.2` directory, and configure and compile the `nsca`
     daemon. Note that this process may prompt you to install the `libmcrypt` library
     and its headers, perhaps in `libmcrypt` and `libmcrypt-dev` packages in your system''s
     package manager:'
+  id: totrans-95
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 进入新的 `nsca-2.7.2` 目录，配置并编译 `nsca` 守护进程。请注意，此过程可能会提示你安装`libmcrypt`库及其头文件，这些文件可能在系统的软件包管理器中的`libmcrypt`和`libmcrypt-dev`包中：
 - en: '[PRE11]'
+  id: totrans-96
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'Install the NSCA server files manually; you will likely need `root` privileges
     for this:'
+  id: totrans-97
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 手动安装 NSCA 服务器文件；你可能需要 `root` 权限：
 - en: '[PRE12]'
+  id: totrans-98
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Edit the new file `/usr/local/nagios/etc/nsca.cfg`:'
+  id: totrans-99
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑新文件 `/usr/local/nagios/etc/nsca.cfg`：
 - en: '[PRE13]'
+  id: totrans-100
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: Uncomment the `password` directive, and define it. A random password generated
     by a tool such as `pwgen` or `makepasswd` will work fine. Don't use the one below;
     it's just an example!
+  id: totrans-101
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 取消注释 `password` 指令，并定义它。使用像 `pwgen` 或 `makepasswd` 之类的工具生成的随机密码就可以。不要使用下面的密码，它只是一个示例！
 - en: '[PRE14]'
+  id: totrans-102
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'Check that the NSCA daemon runs with no errors:'
+  id: totrans-103
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 检查 NSCA 守护进程是否正常运行且没有错误：
 - en: '[PRE15]'
+  id: totrans-104
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: If it does, you should add this command to an appropriate startup script, perhaps
     in `/etc/rc.local`, so that the daemon starts when the monitoring server boots.
     You should consult your system's documentation to find out the best place to add
     this.
+  id: totrans-105
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果是这样，你应该将此命令添加到适当的启动脚本中，可能是在`/etc/rc.local`中，以便守护进程在监控服务器启动时启动。你应该查阅系统文档以找到添加此命令的最佳位置。
 - en: 'We can set up the NSCA client on the monitored server (in this example, `ithaca.naginet`)
     as follows:'
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按如下方式在被监控的服务器（在此示例中为`ithaca.naginet`）上设置NSCA客户端：
 - en: 'Again, download and expand the latest version of NSCA, and configure and compile
     it:'
+  id: totrans-107
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 同样，下载并解压最新版本的NSCA，然后配置和编译它：
 - en: '[PRE16]'
+  id: totrans-108
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'Install the NSCA client files manually; you will likely need `root` privileges
     for this, and may need to create the `/usr/local/bin` and `/usr/local/etc` directories
     beforehand:'
+  id: totrans-109
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 手动安装NSCA客户端文件；你可能需要`root`权限，并且可能需要提前创建`/usr/local/bin`和`/usr/local/etc`目录：
 - en: '[PRE17]'
+  id: totrans-110
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'Edit the new file `/usr/local/etc/send_nsca.cfg`:'
+  id: totrans-111
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑新文件`/usr/local/etc/send_nsca.cfg`：
 - en: '[PRE18]'
+  id: totrans-112
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'Uncomment the `password` directive, and define it to be the same as the password
     given in `nsca.cfg` on the monitoring server:'
+  id: totrans-113
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 取消注释`password`指令，并将其定义为与监控服务器上的`nsca.cfg`中给定的密码相同：
 - en: '[PRE19]'
+  id: totrans-114
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'Run the `send_nsca` program to try and submit a passive check result:'
+  id: totrans-115
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 运行`send_nsca`程序，尝试提交一个被动检查结果：
 - en: '[PRE20]'
+  id: totrans-116
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: Substitute the appropriate host names for the monitoring server (`olympus.naginet`),
     the monitored server (`ithaca.naginet`), and the service description `BACKUP`.
+  id: totrans-117
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 用适当的主机名替换监控服务器（`olympus.naginet`）、被监控服务器（`ithaca.naginet`）和服务描述`BACKUP`。
 - en: Note that the fields are separated by `\t` characters, which expand to literal
     *Tab* characters with `echo -en`.
+  id: totrans-118
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 请注意，字段之间由`\t`字符分隔，该字符通过`echo -en`扩展为字面上的*Tab*字符。
 - en: 'If this worked correctly, you should see that the passive check result in the
     web interface was successfully read by the monitoring server and applied appropriately:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果这工作正常，你应该看到被动检查结果已经成功通过Web界面读取，并被监控服务器正确应用：
 - en: '![How to do it...](img/5566_11_06.jpg)'
+  id: totrans-120
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_11_06.jpg)'
 - en: How it works...
+  id: totrans-121
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: 'The `nsca` daemon installed on the monitoring server is designed to listen
     for submitted service checks from the `send_nsca` client, provided that the password
     is correct and the data is in the appropriate format:'
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 安装在监控服务器上的`nsca`守护进程旨在监听来自`send_nsca`客户端提交的服务检查，前提是密码正确且数据格式正确：
 - en: '[PRE21]'
+  id: totrans-123
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'Our example passive check took this form:'
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的示例被动检查采用了以下形式：
 - en: '[PRE22]'
+  id: totrans-125
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'Here, as with locally submitted passive checks, `check_result` corresponds
     to a numeric value, to one of the following:'
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，就像本地提交的被动检查一样，`check_result`对应于一个数值，表示以下之一：
 - en: '`0` for `OK`'
+  id: totrans-127
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`0`表示`OK`'
 - en: '`1` for `WARNING`'
+  id: totrans-128
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`1`表示`WARNING`'
 - en: '`2` for `CRITICAL`'
+  id: totrans-129
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`2`表示`CRITICAL`'
 - en: '`3` for `UNKNOWN`'
+  id: totrans-130
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`3`表示`UNKNOWN`'
 - en: Once received by the `nsca` daemon on the monitoring server, this is translated
     into a passive check result command, written to the Nagios Core external commands
     file at `/usr/local/nagios/var/rw/nagios.cmd`, and processed in the same way as
     a locally submitted passive check would be.
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦`nsca`守护进程在监控服务器上接收到此信息，它将转换为一个被动检查结果命令，写入Nagios Core的外部命令文件`/usr/local/nagios/var/rw/nagios.cmd`，并以与本地提交的被动检查相同的方式处理。
 - en: This allows us to include calls to `send_nsca` at the end of scripts such as
     those managing backups, to immediately and automatically send a passive check
     result corresponding to whether the backup script succeeded.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 这使我们能够在脚本的末尾（例如管理备份的脚本）中包含对`send_nsca`的调用，以立即并自动发送与备份脚本是否成功对应的被动检查结果。
 - en: Because of the NSCA daemon's very simple design and very basic security checks,
     it's important to apply a firewall policy to ensure that only the appropriate
     hosts can write to the NSCA port on the host monitoring system. A password as
@@ -634,127 +913,175 @@
     your configuration for the daemon is secure. Similar security guidelines apply
     to the installation of NRPE as discussed in [Chapter 6](ch06.html "Chapter 6. Enabling
     Remote Execution").
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于NSCA守护进程设计非常简单，并且安全检查也非常基础，因此需要应用防火墙策略，以确保只有适当的主机能够写入监控系统上的NSCA端口。此处实现的密码是一个好的第一步，但不足以确保安全。确保阅读NSCA源代码中包含的`SECURITY`文件，以确保守护进程的配置是安全的。类似的安全指南适用于NRPE的安装，详细内容请参见[第6章](ch06.html
+    "第6章. 启用远程执行")。
 - en: There's more...
+  id: totrans-134
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: To supplement this setup, it's often a good idea to also have Nagios Core check
     the freshness of its services. If we have a process that needs to run regularly,
     such as backups, we will likely want to be notified if we haven't received any
     passive checks from the host in a given period of time.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了补充此设置，通常一个好主意是让Nagios Core检查其服务的时效性。如果我们有一个需要定期运行的进程，例如备份，我们可能希望在特定时间内没有收到来自主机的被动检查时得到通知。
 - en: 'This can be managed by configuring the service to run an active check after
     a certain period of time has elapsed with no passive checks. The configuration
     might look similar to the following code snippet, adding values for `check_freshness`
     and `freshness_threshold`:'
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 这可以通过配置服务，在一段时间内没有被动检查后运行主动检查来管理。配置可能类似于以下代码片段，添加`check_freshness`和`freshness_threshold`的值：
 - en: '[PRE23]'
+  id: totrans-137
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: In this case, `freshness_threshold` is 86400 seconds, or 24 hours; if there
     have been no passive checks submitted for 24 hours, `check_command` will be run,
     even though active checks are disabled. `check_command` is defined to flag a `WARNING`
     state for the service with an appropriate explanatory message using the `check_dummy`
     command and plugin, whenever it is actually run.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，`freshness_threshold`为86400秒，即24小时；如果24小时内没有提交任何被动检查，则会运行`check_command`，即使主动检查被禁用。`check_command`的定义是，当它实际运行时，通过`check_dummy`命令和插件为该服务标记`WARNING`状态，并附上适当的解释信息。
 - en: Check freshness is discussed in more detail in the Nagios Core documentation,
     in the section entitled *Service and Host Freshness Checks* at [http://nagios.sourceforge.net/docs/3_0/freshness.html](http://nagios.sourceforge.net/docs/3_0/freshness.html).
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关检查新鲜度的更多信息，请参阅Nagios Core文档中的《服务和主机新鲜度检查》部分，地址是[http://nagios.sourceforge.net/docs/3_0/freshness.html](http://nagios.sourceforge.net/docs/3_0/freshness.html)。
 - en: Note that there's no reason that the status of a service has to come from the
     same host. You can send a passive check from one host to submit information about
     another. In fact, this is the basis of a distributed monitoring setup; one host
     can submit check results for any number of other hosts.
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，服务的状态不一定非要来自同一主机。你可以从一台主机发送被动检查，以提交关于另一台主机的信息。实际上，这正是分布式监控设置的基础；一台主机可以提交其他任何数量主机的检查结果。
 - en: This can be particularly useful for working around network connectivity or routing
     problems; if Nagios Core has no connectivity at all to a host it needs to monitor,
     but does have connectivity to an intermediate host, that host can be configured
     to submit checks on behalf of the unreachable host, a slightly complex but often
     necessary setup.
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种方法对于解决网络连接或路由问题尤其有用；如果Nagios Core与需要监控的主机完全没有连接，但与一个中间主机有连接，可以配置该主机代表无法访问的主机提交检查，这是一种稍显复杂但常常必要的设置。
 - en: See also
+  id: totrans-142
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参阅。
 - en: The *Allowing and submitting passive checks*, *Submitting passive checks in
     response to SNMP traps*, and *Setting up an event handler script* recipes in this
     chapter
+  id: totrans-143
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*允许并提交被动检查*、*响应SNMP陷阱提交被动检查*和*设置事件处理脚本*的配方。
 - en: The *Using an alternative check command* recipe in [Chapter 2](ch02.html "Chapter 2. Working
     with Commands and Plugins"), *Working with Commands and Plugins*
+  id: totrans-144
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第2章](ch02.html "第2章：与命令和插件一起工作")中的*使用替代检查命令*配方，*与命令和插件一起工作*。'
 - en: Submitting passive checks in response to SNMP traps
+  id: totrans-145
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 响应SNMP陷阱提交被动检查。
 - en: In this recipe, we'll learn how to configure Nagios Core to process **Simple
     Network Management Protocol** (**SNMP**) traps, information sent by monitored
     network devices to a central monitoring server.
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本配方中，我们将学习如何配置Nagios Core来处理**简单网络管理协议**（**SNMP**）陷阱，这是由被监控的网络设备发送到中央监控服务器的信息。
 - en: Because SNMP traps often contain useful or urgent information about how a host
     is working, processing them in at least some way can be very helpful, particularly
     for firmware network devices that can't use `send_nsca` to submit a passive check
     result in a standard form, as explained in the *Submitting passive checks from
     a remote host with NSCA* recipe.
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 因为SNMP陷阱通常包含有关主机工作状态的有用或紧急信息，至少以某种方式处理它们会非常有帮助，特别是对于那些无法使用`send_nsca`以标准形式提交被动检查结果的固件网络设备，如*从远程主机使用NSCA提交被动检查*配方中所述。
 - en: As an example, most SNMP-capable hosts can be configured to send SNMP traps
     when one of their network interfaces changes state, perhaps due to a pulled network
     cable. These are known as `linkUp` and `linkDown` traps. Monitoring this particular
     kind of trap is especially useful for devices with a large number of interfaces,
     such as switches or routers.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 举个例子，大多数支持SNMP的主机可以配置为在其某个网络接口的状态变化时发送SNMP陷阱，可能是由于网络电缆被拔掉。这些被称为`linkUp`和`linkDown`陷阱。监控这种特定类型的陷阱对具有大量接口的设备特别有用，例如交换机或路由器。
 - en: Keeping track of these events in Nagios Core is valuable for keeping a unified
     monitoring interface, rather than having to monitor SNMP traps with a separate
     application.
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Nagios Core中跟踪这些事件对于保持统一的监控界面非常有价值，而不必使用单独的应用程序来监控SNMP陷阱。
 - en: Getting ready
+  id: totrans-150
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: There are quite a few prerequisites for getting this recipe to work. It is among
     the most powerful but also most complex methods of Nagios Core monitoring.
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 要使这个方法有效，首先有一些前提条件。它是Nagios Core监控中最强大但也是最复杂的方法之一。
 - en: First of all, the recipe assumes some knowledge of SNMP. Unfortunately, SNMP
     is not very simple, despite its name! You should be familiar with the concepts
     of **SNMP checks** and **SNMP traps**. The documentation for **Net-SNMP** (the
     implementation of SNMP used for this example) may help ([http://www.net-snmp.org/docs/readmefiles.html](http://www.net-snmp.org/docs/readmefiles.html)).
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，这个方法假设你有一定的SNMP知识。尽管SNMP的名字中有“简单”一词，但它实际上并不简单！你应该熟悉**SNMP检查**和**SNMP陷阱**的概念。**Net-SNMP**（本示例中使用的SNMP实现）的文档可能会有所帮助：[http://www.net-snmp.org/docs/readmefiles.html](http://www.net-snmp.org/docs/readmefiles.html)。
 - en: On the same host as your Nagios Core server with version 3.0 or greater, you
     should have `snmptrapd` installed to collect `trap` information, and `snmptt`,
     the **SNMP Trap Translator** , to filter useful information from the traps and
     submit the information to Nagios Core in a workable format. Documentation for
     SNMPTT is available at [http://snmptt.sourceforge.net/docs/snmptt.shtml](http://snmptt.sourceforge.net/docs/snmptt.shtml).
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 在与Nagios Core服务器（版本3.0或更高版本）相同的主机上，你应该安装`snmptrapd`来收集`trap`信息，以及`snmptt`，即**SNMP陷阱翻译器**，用于从陷阱中过滤出有用的信息，并以可操作的格式将信息提交给Nagios
+    Core。SNMPTT的文档可在[http://snmptt.sourceforge.net/docs/snmptt.shtml](http://snmptt.sourceforge.net/docs/snmptt.shtml)找到。
 - en: Both systems are free software and relatively popular, so check to see if there
     are packages available for your particular system to save the hassle of compiling
     them from source. On Debian-derived systems such as Ubuntu, for example, they
     are available in the `snmpd` and `snmptt` packages.
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两个系统都是免费软件并且相对流行，因此你可以检查一下是否有适用于你的系统的安装包，以免麻烦地从源代码进行编译。例如，在像Ubuntu这样的Debian衍生系统中，它们可以在`snmpd`和`snmptt`软件包中找到。
 - en: 'We will use an event handler called `submit_check_result`, available in the
     Nagios Core distribution. You will therefore need to have access to the original
     sources handy. If you have misplaced them, you can download them again from Nagios''
     website: [http://www.nagios.org/download](http://www.nagios.org/download).'
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将使用一个名为`submit_check_result`的事件处理程序，它在Nagios Core发行版中可用。因此，你需要能够访问原始的源代码。如果你丢失了它们，可以从Nagios网站再次下载：[http://www.nagios.org/download](http://www.nagios.org/download)。
 - en: 'It''s also necessary to use values of `host_name` for your hosts that actually
     correspond to host names resolvable by DNS from the monitoring server. This is
     because when the SNMP trap is received by SNMPTT, the only way it can translate
@@ -762,775 +1089,1120 @@
     but the trap will arrive from an IP address such as `10.128.0.27`. The system
     will therefore need to be able to resolve this with reverse DNS lookup. An easy
     way to test this is working is to use `host` or `dig`:'
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 还需要确保你为主机使用的`host_name`值能够与监控服务器通过DNS解析的主机名相对应。这是因为当SNMP陷阱被SNMPTT接收时，它只能通过DNS将其转换为主机名。你的主机的`host_name`可能是`crete.naginet`，但陷阱将来自像`10.128.0.27`这样的IP地址。因此，系统需要能够通过反向DNS查找解析它。测试这个是否有效的一个简单方法是使用`host`或`dig`：
 - en: '[PRE24]'
+  id: totrans-157
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: Finally, you should, of course, actually have a device configured to send SNMP
     traps to your monitoring server, which in turn is configured to listen for SNMP
     traps with the `snmpd` daemon. I don't really want to encourage you to unplug
     one of your core switches to test this, so we'll generate a trap manually with
     `snmptrap` on the monitored server to demonstrate the principle.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，你当然需要有一个已配置的设备，将SNMP陷阱发送到你的监控服务器，而监控服务器则配置为通过`snmpd`守护进程来监听SNMP陷阱。我并不想鼓励你拔掉一个核心交换机来测试这个，所以我们将通过在被监控的服务器上手动生成一个陷阱，使用`snmptrap`来演示这个原理。
 - en: How to do it...
+  id: totrans-159
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'We can configure a new service to receive SNMP traps for an existing host as
     follows:'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按照以下步骤为现有主机配置一个新的服务，以接收SNMP陷阱：
 - en: Copy the event handler script `contrib/eventhandlers/submit_check_result` from
     the Nagios Core source files into `/usr/local/nagios/libexec/eventhandlers`. You
     may need to create the target directory first. Your source files need not be in
     `/usr/local/src/nagios`; this is just an example.
+  id: totrans-161
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将事件处理脚本 `contrib/eventhandlers/submit_check_result` 从 Nagios Core 源文件复制到 `/usr/local/nagios/libexec/eventhandlers`。你可能需要先创建目标目录。你的源文件不一定要放在
+    `/usr/local/src/nagios`，这只是一个示例。
 - en: '[PRE25]'
+  id: totrans-162
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: This script should be made executable as whatever user the `snmptrapd` user
     runs as.
+  id: totrans-163
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 此脚本应设置为可执行，执行用户为 `snmptrapd` 用户。
 - en: Change to the Nagios Core `objects` configuration directory on the monitoring
     server. For the default configuration, this is `/usr/local/nagios/etc/objects`.
+  id: totrans-164
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到监控服务器上的 Nagios Core `objects` 配置目录。默认配置的路径是 `/usr/local/nagios/etc/objects`。
 - en: '[PRE26]'
+  id: totrans-165
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Edit the file containing the definition for the SNMP-enabled monitored host.
     In this example, the definition for `crete.naginet` is in its own file, `crete.naginet.cfg`:'
+  id: totrans-166
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑包含 SNMP 启用监控主机定义的文件。在此示例中，`crete.naginet` 的定义在其独立的文件 `crete.naginet.cfg` 中：
 - en: '[PRE27]'
+  id: totrans-167
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'The host definition might look similar to the following code snippet:'
+  id: totrans-168
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 主机定义可能类似于以下代码片段：
 - en: '[PRE28]'
+  id: totrans-169
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: Add a service definition for your existing host that accepts only passive checks,
     and is flagged as `volatile`. Here we have used the `generic-service` template
     included in the sample configuration. You may prefer to use a different template,
     but all of the values defined here are important.
+  id: totrans-170
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 为现有主机添加一个仅接受被动检查并标记为 `volatile` 的服务定义。在此，我们使用了示例配置中包含的 `generic-service` 模板。你也可以使用其他模板，但此处定义的所有值都很重要。
 - en: '[PRE29]'
+  id: totrans-171
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-172
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启 Nagios Core 服务器：
 - en: '[PRE30]'
+  id: totrans-173
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'In the web interface, this service should now be visible in the **Services**
     section:'
+  id: totrans-174
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在 Web 界面中，当前该服务应显示在 **Services** 部分：
 - en: '![How to do it...](img/5566_11_07.jpg)'
+  id: totrans-175
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_11_07.jpg)'
 - en: 'Check that the `submit_check_result` script actually works, by invoking it
     with a test string on the monitoring server:'
+  id: totrans-176
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过在监控服务器上使用测试字符串调用 `submit_check_result` 脚本，检查它是否正常工作：
 - en: '[PRE31]'
+  id: totrans-177
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'After a short delay, if this has worked correctly, we should see the service
     change state in the web interface to reflect the test:'
+  id: totrans-178
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果一切正常，经过短暂的延迟后，我们应该能看到 Web 界面中的服务状态发生变化，反映测试结果：
 - en: '![How to do it...](img/5566_11_08.jpg)'
+  id: totrans-179
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_11_08.jpg)'
 - en: 'We now need to configure `snmptrapd` and `snmpd` to receive traps, and call
     the `submit_check_result` script for us:'
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们需要配置 `snmptrapd` 和 `snmpd` 来接收陷阱，并为我们调用 `submit_check_result` 脚本：
 - en: 'Configure `snmpd` to pass received traps to `snmptt` by changing its configuration
     file `/etc/snmp/snmptrapd.conf`. The following configuration may work:'
+  id: totrans-181
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 配置 `snmpd` 通过修改其配置文件 `/etc/snmp/snmptrapd.conf` 来将接收到的陷阱传递给 `snmptt`。以下配置可能有效：
 - en: '[PRE32]'
+  id: totrans-182
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'Restart `snmpd` to apply this change:'
+  id: totrans-183
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重启 `snmpd` 以应用此更改：
 - en: '[PRE33]'
+  id: totrans-184
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'Configure `snmptt` to convert the IP addresses to hostnames, by changing the
     value for `dns-enable` to `1` in `/etc/snmp/snmptt.ini`:'
+  id: totrans-185
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 配置 `snmptt` 将 IP 地址转换为主机名，在 `/etc/snmp/snmptt.ini` 中将 `dns-enable` 的值更改为 `1`：
 - en: '[PRE34]'
+  id: totrans-186
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'Configure `snmptt` to use Net-SNMP at startup in `/etc/snmp/snmptt.ini`:'
+  id: totrans-187
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 配置 `snmptt` 在启动时使用 Net-SNMP，方法是在 `/etc/snmp/snmptt.ini` 中设置：
 - en: '[PRE35]'
+  id: totrans-188
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'Configure `snmptt` to respond to an SNMP event by defining it in `/etc/snmp/snmptt.conf`.
     Here we''ve used the generic `linkDown` event defined by the OID `.1.3.t6.1.6.3.1.1.5.3`:'
+  id: totrans-189
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 配置 `snmptt` 响应 SNMP 事件，在 `/etc/snmp/snmptt.conf` 中进行定义。这里我们使用了 OID `.1.3.t6.1.6.3.1.1.5.3`
+    定义的通用 `linkDown` 事件：
 - en: '[PRE36]'
+  id: totrans-190
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: Depending on your distribution, there may already be a definition for a `linkDown`
     event, in which case you may only need to change the `EXEC` field.
+  id: totrans-191
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 根据你的发行版，可能已经定义了一个 `linkDown` 事件，在这种情况下，你可能只需要更改 `EXEC` 字段。
 - en: From the monitored host, fire a test trap for a `linkDown` event. Substitute
     `olympus.naginet` for the name or IP address of your monitoring host. This will
     require the `snmptrap` utility to be installed on that host, and may require `root`
     privileges.
+  id: totrans-192
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 从监控主机发送一个 `linkDown` 事件的测试陷阱。将 `olympus.naginet` 替换为你的监控主机的名称或 IP 地址。这需要在该主机上安装
+    `snmptrap` 工具，并可能需要 `root` 权限。
 - en: '[PRE37]'
+  id: totrans-193
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: Note that we use the `public` community string here; your own will likely differ.
+  id: totrans-194
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 请注意，我们在此使用的是 `public` 社区字符串；你自己的可能会不同。
 - en: 'Check the Nagios Core log file located at `/usr/local/nagios/var/nagios.log`
     to see if there''s new output from the event handler:'
+  id: totrans-195
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 检查位于 `/usr/local/nagios/var/nagios.log` 的 Nagios Core 日志文件，查看事件处理器是否有新的输出：
 - en: '[PRE38]'
+  id: totrans-196
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'If so, the same state should be reflected for the `TRAP` service in the web
     interface:'
+  id: totrans-197
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果是这样，`TRAP` 服务的相同状态应该在 Web 界面中反映出来：
 - en: '![How to do it...](img/5566_11_09.jpg)'
+  id: totrans-198
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_11_09.jpg)'
 - en: With this done, we've confirmed that SNMP traps from the `crete.naginet` host
     can be received and processed by the `olympus.naginet` server. We can apply the
     same setup for other hosts that generate SNMP traps in our network by configuring
     them to send their traps to the Nagios Core monitoring server, and adding appropriate
     handlers for the expected traps.
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成这一步后，我们已经确认来自`crete.naginet`主机的SNMP陷阱能够被`olympus.naginet`服务器接收并处理。我们可以通过将其他在网络中生成SNMP陷阱的主机配置为将其陷阱发送到Nagios
+    Core监控服务器，并为预期的陷阱添加适当的处理程序，应用相同的设置。
 - en: If this didn't work, the first thing to check should be that your monitoring
     server is actually listening for checks on the relevant IP address, as `snmptrap`
     does not throw errors when it can not deliver traps. On Debian-derived systems,
     you should check that the `snmptrapd` process is actually running; it may require
     a change to `/etc/defaults/snmp` and a restart of `snmpd`.
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果这不起作用，首先要检查的是监控服务器是否实际上在相关的IP地址上监听检查请求，因为`snmptrap`在无法传送陷阱时不会抛出错误。在基于Debian的系统上，你应该检查`snmptrapd`进程是否实际在运行；可能需要修改`/etc/defaults/snmp`文件并重启`snmpd`。
 - en: How it works...
+  id: totrans-201
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: When an SNMP trap is generated and delivered to the monitoring server by whatever
     means, the `snmpd` daemon will pass it to the `snmptt` program for processing.
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: 当一个SNMP陷阱生成并通过任意方式传送到监控服务器时，`snmpd`守护进程将它传递给`snmptt`程序进行处理。
 - en: The `snmptt` handler checks if the event OID matches any of the traps for which
     it has defined events in `snmptt.conf`. In our example, it finds a handler defined
     for the OID `.1.3.6.1.6.3.1.1.5.3`, which corresponds to the `linkDown` event,
     with the number of the relevant interface as an additional argument in `$1`.
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: '`snmptt`处理程序检查事件OID是否与其在`snmptt.conf`中定义的任何陷阱匹配。在我们的示例中，它找到一个为OID`.1.3.6.1.6.3.1.1.5.3`定义的处理器，它对应于`linkDown`事件，相关接口的编号作为额外参数`$1`。'
 - en: Using this information, it fires the `submit_check_result` handler that we installed
     in the first part of the recipe, setting the state of the `TRAP` service to `WARNING`,
     and including the information `linkDown` for interface `1`, as specified by the
     final argument to `submit_check_result` in the `EXEC` handler. The service can
     be set to notify the appropriate contacts or contact groups, just as it would
     for an actively monitored service.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用这些信息，它会触发我们在教程第一部分安装的`submit_check_result`处理程序，将`TRAP`服务的状态设置为`WARNING`，并将`linkDown`信息（对于接口`1`）包含在`submit_check_result`的最终参数中，如`EXEC`处理程序所指定。服务可以设置为通知适当的联系人或联系人组，就像它监控一个主动监控的服务一样。
 - en: If a trap arrives on the Nagios Core server for a host that Nagios Core doesn't
     know about, even if it has an event handler defined for `snmptt`, it will simply
     ignore it.
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果一个陷阱到达Nagios Core服务器，而Nagios Core并不认识该主机，即使它已经为`snmptt`定义了事件处理器，它也会忽略该陷阱。
 - en: There's more...
+  id: totrans-206
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: 'In order to "clear" the state of the service and return it to `OK`, we can
     simply schedule an active check for it from the web interface, with **Force Check**
     selected:'
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了“清除”服务的状态并将其恢复为`OK`，我们可以简单地通过Web界面调度一个主动检查，选择**强制检查**：
 - en: '![There''s more...](img/5566_11_10.jpg)'
+  id: totrans-208
   prefs: []
   type: TYPE_IMG
+  zh: '![更多内容...](img/5566_11_10.jpg)'
 - en: 'Because `check_command` is defined as `check-host-alive`, as long as the monitoring
     host is actually responding to `PING`, the service should assume an `OK` state:'
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: 因为`check_command`定义为`check-host-alive`，只要监控主机实际响应`PING`，服务应该处于`OK`状态：
 - en: '![There''s more...](img/5566_11_11.jpg)'
+  id: totrans-210
   prefs: []
   type: TYPE_IMG
+  zh: '![更多内容...](img/5566_11_11.jpg)'
 - en: See also
+  id: totrans-211
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Submitting passive checks from a remote host with NSCA*, *Allowing and
     submitting passive checks*, and *Setting up an event handler scripts* recipes
     in this chapter
+  id: totrans-212
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*从远程主机提交被动检查使用NSCA*、*允许并提交被动检查*和*设置事件处理器脚本*教程
 - en: The *Monitoring the output of an SNMP query* and *Creating an SNMP OID to monitor*
     recipes in [Chapter 5](ch05.html "Chapter 5. Monitoring Methods"), *Monitoring
     Methods*
+  id: totrans-213
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第5章](ch05.html "第5章 监控方法")中的*监控SNMP查询的输出*和*创建一个SNMP OID进行监控*教程，*监控方法*'
 - en: Setting up an event handler script
+  id: totrans-214
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 设置事件处理器脚本
 - en: In this recipe, we'll learn how to set up an event handler script for Nagios
     Core. Event handlers are commands that are run on every state change for a host
     or service (whether for all hosts or services, or just particular ones). They
     are defined in a similar way to notification commands and check commands for plugins.
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个教程中，我们将学习如何为Nagios Core设置事件处理脚本。事件处理器是在每次主机或服务状态变化时执行的命令（无论是对所有主机或服务，还是仅对特定的主机或服务）。它们的定义方式与通知命令和插件的检查命令类似。
 - en: In this example, we'll implement a simple event handler that writes the date,
     the host state, and the number of check attempts to a separate file for a single
     host. This is a trivial example to demonstrate the concept; a more practical and
     complex application for the use of event handlers is given in the *Setting up
     a redundant monitoring host* recipe, in [Chapter 10](ch10.html "Chapter 10. Security
     and Performance").
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们将实现一个简单的事件处理程序，将日期、主机状态和检查尝试次数写入单个主机的单独文件。这是一个简单的示例，用于演示该概念；关于事件处理程序更实用和复杂的应用程序，参考[第10章](ch10.html
+    "第10章：安全性与性能")中的*设置冗余监控主机*示例。
 - en: Getting ready
+  id: totrans-217
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need a server running Nagios Core 3.0 or higher. You should be familiar
     with defining new commands, as per the *Creating a new command* recipe in [Chapter
     2](ch02.html "Chapter 2. Working with Commands and Plugins") and the *Writing
     low-priority notifications to an MOTD* recipe in [Chapter 4](ch04.html "Chapter 4. Configuring
     Notifications"), *Configuring Notifications*.
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要一台运行Nagios Core 3.0或更高版本的服务器。你应该熟悉如何定义新命令，具体可参考[第2章](ch02.html "第2章：工作与命令和插件")中的*创建新命令*示例和[第4章](ch04.html
+    "第4章：配置通知")中的*写入低优先级通知到MOTD*示例，*配置通知*部分。
 - en: How to do it...
+  id: totrans-219
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can set up a new event handler for the Nagios Core server as follows:'
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按如下方式为Nagios Core服务器设置一个新的事件处理程序：
 - en: 'Change to the `objects` configuration directory for Nagios Core. In the quick
     start guide installation, this is `/usr/local/nagios/etc/objects`. Edit the file
     `commands.cfg`:'
+  id: totrans-221
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到Nagios Core的`objects`配置目录。在快速启动指南安装中，该目录为`/usr/local/nagios/etc/objects`。编辑文件`commands.cfg`：
 - en: '[PRE39]'
+  id: totrans-222
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: 'Add the following command definition:'
+  id: totrans-223
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 添加以下命令定义：
 - en: '[PRE40]'
+  id: totrans-224
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'Edit the file containing the definition for an existing host, in this example
     `delphi.naginet`. Add the `event_handler` directive with the value `record_host_data`
     to your host definition:'
+  id: totrans-225
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑包含现有主机定义的文件，在此示例中为`delphi.naginet`。将`event_handler`指令与值`record_host_data`添加到你的主机定义中：
 - en: '[PRE41]'
+  id: totrans-226
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-227
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启Nagios Core服务器：
 - en: '[PRE42]'
+  id: totrans-228
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'With this done, the next time the host changes state (whether to a `SOFT` or
     `HARD` state) it should log the information in the `/usr/local/nagios/var/states-delphi.naginet.log`
     file:'
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成后，下次主机状态发生变化（无论是`SOFT`还是`HARD`状态），它应该会将信息记录在`/usr/local/nagios/var/states-delphi.naginet.log`文件中：
 - en: '[PRE43]'
+  id: totrans-230
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: How it works...
+  id: totrans-231
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: 'The `event_handler` command we defined is configured to use `printf` to write
     a line of text to a file named after the host. Its definition is built out of
     four macros:'
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们定义的`event_handler`命令配置为使用`printf`将一行文本写入一个以主机名命名的文件。其定义由四个宏组成：
 - en: '`$LONGDATETIME$`: This specifies the date and time, in a human-readable format'
+  id: totrans-233
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$LONGDATETIME$`：这指定了日期和时间，采用易读的格式'
 - en: '`$HOSTSTATE$`: This specifies the state of the host (`UP`, `DOWN`, or `UNREACHABLE`)'
+  id: totrans-234
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$HOSTSTATE$`：这指定了主机的状态（`UP`、`DOWN`或`UNREACHABLE`）'
 - en: '`$HOSTATTEMPT$`: This specifies the number of check attempts made so far for
     a host in a problem state'
+  id: totrans-235
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$HOSTATTEMPT$`：这指定了在问题状态下，已对主机进行的检查尝试次数'
 - en: '`$HOSTNAME$`: This is the hostname itself (used to build the name of the file)'
+  id: totrans-236
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$HOSTNAME$`：这是主机名本身（用于构建文件名）'
 - en: Note that this behavior is slightly different from notifications. Notification
     commands are only run when the number of `max_check_attempts` for a host or service
     has been exceeded, to alert somebody to the problem. Event handlers are run on
     `SOFT` changes as well as `HARD` changes, and hence can be used to keep more information
     about host performance that might be missed by the routine notifications.
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，这种行为与通知略有不同。通知命令仅在主机或服务的`max_check_attempts`次数被超出时运行，用于警告问题。而事件处理程序则在`SOFT`和`HARD`状态变更时都运行，因此可以用来记录主机性能的更多信息，这些信息可能会被常规通知忽略。
 - en: 'Service event handlers can be defined in just the same way, by adding the `event_handler`
     directive to their definitions:'
+  id: totrans-238
   prefs: []
   type: TYPE_NORMAL
+  zh: 服务事件处理程序可以通过向其定义中添加`event_handler`指令来以相同的方式定义：
 - en: '[PRE44]'
+  id: totrans-239
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: 'In this case, we would probably want to use the macros for service states instead:'
+  id: totrans-240
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，我们可能希望使用服务状态的宏：
 - en: '[PRE45]'
+  id: totrans-241
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: There's more...
+  id: totrans-242
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'As a shortcut, if there''s an event handler we want to run on all hosts or
     all services, we can use the `global_host_event_handler` and `global_service_event_handler`
     directives in `nagios.cfg`:'
+  id: totrans-243
   prefs: []
   type: TYPE_NORMAL
+  zh: 作为快捷方式，如果我们想在所有主机或所有服务上运行事件处理程序，可以在`nagios.cfg`中使用`global_host_event_handler`和`global_service_event_handler`指令：
 - en: '[PRE46]'
+  id: totrans-244
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: This will apply the appropriate event handlers to all hosts and services, therefore
     running whenever a host or service changes state.
+  id: totrans-245
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将为所有主机和服务应用适当的事件处理器，因此每当主机或服务状态发生变化时，都会运行。
 - en: A specialized case of event handler for recording detailed performance data
     of plugins and checks is also possible using Nagios Core's Performance Data feature,
     as documented in the manual at [http://nagios.sourceforge.net/docs/3_0/perfdata.html](http://nagios.sourceforge.net/docs/3_0/perfdata.html).
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 还可以使用 Nagios Core 的性能数据功能，作为记录插件和检查的详细性能数据的事件处理器的专门案例，手册中有相关文档，网址为：[http://nagios.sourceforge.net/docs/3_0/perfdata.html](http://nagios.sourceforge.net/docs/3_0/perfdata.html)。
 - en: Performance data is written on every check rather than every state change, and
     is hence useful for assessing the performance of plugins and checks. Performance
     data is used by the **Nagiosgraph** utility, for example, discussed in the *Tracking
     host and service states with Nagiosgraph* recipe in this chapter.
+  id: totrans-247
   prefs: []
   type: TYPE_NORMAL
+  zh: 性能数据在每次检查时都会被写入，而不是在每次状态变化时写入，因此它对于评估插件和检查的性能非常有用。例如，**Nagiosgraph** 工具会使用性能数据，详见本章中的*使用
+    Nagiosgraph 跟踪主机和服务状态*食谱。
 - en: See also
+  id: totrans-248
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参见
 - en: The *Tracking host and service states with Nagiosgraph* recipe in this chapter
+  id: totrans-249
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*使用 Nagiosgraph 跟踪主机和服务状态*食谱
 - en: The *Creating a new command* recipe in [Chapter 2](ch02.html "Chapter 2. Working
     with Commands and Plugins"), *Working with Commands and Plugins*
+  id: totrans-250
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第2章](ch02.html "第2章 与命令和插件的配合")中的*创建新命令*食谱，*与命令和插件配合使用*'
 - en: The *Writing low-priority notifications to an MOTD* recipe in [Chapter 4](ch04.html
     "Chapter 4. Configuring Notifications"), *Configuring Notifications*
+  id: totrans-251
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第4章](ch04.html "第4章 配置通知")中的*将低优先级通知写入 MOTD*食谱，*配置通知*'
 - en: Tracking host and service states with Nagiosgraph
+  id: totrans-252
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 Nagiosgraph 跟踪主机和服务状态
 - en: In this recipe, we'll learn how to install and configure Nagiosgraph, a program
     that integrates with Nagios Core's performance data tools to produce graphs showing
     long-term information about how checks for hosts and services are performing.
+  id: totrans-253
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我们将学习如何安装和配置 Nagiosgraph，这个程序与 Nagios Core 的性能数据工具集成，生成显示有关主机和服务检查长期表现的图表。
 - en: Getting ready
+  id: totrans-254
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need to be running a Nagios Core 3.0 or later server. Nagiosgraph will
     probably still work with older versions of Nagios Core, but the configuration
     may be slightly different. The `INSTALL` document included in the source for Nagiosgraph
     explains the differences in detail.
+  id: totrans-255
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要运行 Nagios Core 3.0 或更高版本的服务器。Nagiosgraph 可能仍然可以与旧版本的 Nagios Core 一起工作，但配置可能会有所不同。源代码中包含的
+    `INSTALL` 文档详细解释了这些差异。
 - en: You should have a thorough understanding of defining hosts, services, and commands,
     and be able to install new software as the `root` user on the monitoring server.
     You should also be at least familiar with the layout of your Apache HTTPD server
     on the monitoring system; this recipe will assume it is installed in `/usr/local/apache`.
+  id: totrans-256
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该对定义主机、服务和命令有透彻的理解，并能够以 `root` 用户身份在监控服务器上安装新软件。你还应该至少熟悉监控系统中 Apache HTTPD
+    服务器的布局；本食谱假设它安装在 `/usr/local/apache`。
 - en: 'Because Nagiosgraph has many Perl dependencies, you will need to have Perl
     installed on your server, and you will likely also need to install a few Perl
     modules as dependencies. The package manager for your system may include them,
     or you may need to download them using the **Comprehensive Perl Archive Network**
     (**CPAN**): [http://www.cpan.org/modules/INSTALL.html](http://www.cpan.org/modules/INSTALL.html).'
+  id: totrans-257
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于 Nagiosgraph 依赖于许多 Perl 库，你需要在服务器上安装 Perl，并且可能还需要安装一些 Perl 模块作为依赖项。你的系统包管理器可能包含它们，或者你可能需要通过**综合
+    Perl 存档网络**（**CPAN**）下载它们：[http://www.cpan.org/modules/INSTALL.html](http://www.cpan.org/modules/INSTALL.html)。
 - en: The server will need to already be monitoring at least one host with at least
     one service for the graphs to be any use. Nagiosgraph includes rule sets that
     translate known performance data strings into usable statistics. This means that
     graphing will work well for familiar plugins with a predictable output format
     such as `check_ping` or `check_http`, but might not graph data for less commonly
     used plugins without a little custom configuration.
+  id: totrans-258
   prefs: []
   type: TYPE_NORMAL
+  zh: 服务器需要已监控至少一个主机和至少一个服务，图表才会有用。Nagiosgraph 包含规则集，可以将已知的性能数据字符串转换为可用的统计信息。这意味着，对于输出格式可预测的熟悉插件，如
+    `check_ping` 或 `check_http`，图表生成将运行得很好，但对于较少使用的插件，可能需要进行一些自定义配置才能生成图表。
 - en: This recipe is not a comprehensive survey of everything you can do with Nagiosgraph;
     if you like what this does, make sure to check out Nagiosgraph's documentation
     online at [http://nagiosgraph.sourceforge.net/](http://nagiosgraph.sourceforge.net/).
+  id: totrans-259
   prefs: []
   type: TYPE_NORMAL
+  zh: 本食谱并不是对Nagiosgraph所有功能的全面概述；如果你喜欢这个功能，确保查看Nagiosgraph的在线文档：[http://nagiosgraph.sourceforge.net/](http://nagiosgraph.sourceforge.net/)。
 - en: How to do it...
+  id: totrans-260
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can get some basic Nagiosgraph functionality for our monitoring server as
     follows:'
+  id: totrans-261
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以为监控服务器获取一些基本的Nagiosgraph功能，方法如下：
 - en: 'Download the latest version of Nagiosgraph from its website at [http://nagiosgraph.sourceforge.net/](http://nagiosgraph.sourceforge.net/),
     directly onto your monitoring server, using a tool such as `wget`:'
+  id: totrans-262
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 从其网站[http://nagiosgraph.sourceforge.net/](http://nagiosgraph.sourceforge.net/)下载最新版的Nagiosgraph，直接使用`wget`等工具下载到您的监控服务器：
 - en: '[PRE47]'
+  id: totrans-263
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'Inflate the `.tar.gz` file and change to the directory within it:'
+  id: totrans-264
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 解压`.tar.gz`文件并切换到其中的目录：
 - en: '[PRE48]'
+  id: totrans-265
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'As the `root` user, run the `install.pl` script with the `--check-prereq` option.
     This will give you a survey of any dependencies you may need to install via packages
     or CPAN. When you have installed all the prerequisites, the output should look
     similar to the following code snippet:'
+  id: totrans-266
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 以`root`用户身份运行`install.pl`脚本，并使用`--check-prereq`选项。这将为您提供一个依赖项的调查，您可能需要通过软件包或CPAN安装它们。当您安装完所有先决条件后，输出应该类似于以下代码片段：
 - en: '[PRE49]'
+  id: totrans-267
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'These are all reasonably standard Perl libraries, so don''t forget to check
     if packages are available for them before you resort to using CPAN. For example,
     I was able to install the RRDs and GD modules on my Debian system as follows:'
+  id: totrans-268
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这些都是比较标准的Perl库，因此在使用CPAN之前，不要忘记检查是否有可用的相关软件包。例如，我在我的Debian系统上能够按照以下方式安装RRDs和GD模块：
 - en: '[PRE50]'
+  id: totrans-269
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: If you are having trouble getting `install.pl` to find your Nagios Core or Apache
     HTTPD instances, then take a look at the output of `install.pl --help` to run
     an installation specific to your kind of system. This is documented in more detail
     in the `INSTALL` file.
+  id: totrans-270
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果在运行`install.pl`时无法找到Nagios Core或Apache HTTPD实例，可以查看`install.pl --help`的输出，以运行适合您系统类型的安装程序。有关详细信息，请参阅`INSTALL`文件。
 - en: As the `root` user, run the `install.pl` script with the `--install` argument.
     You will be prompted many times for directory layout options. The default is shown
     in square brackets and should be correct for a typical Nagios Core installation,
     so to start with, simply press *Enter* on each option.
+  id: totrans-271
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 以`root`用户身份运行`install.pl`脚本，并使用`--install`参数。安装过程中会多次提示您选择目录布局选项。默认选项以方括号显示，对于典型的Nagios
+    Core安装应该是正确的，因此开始时只需在每个选项上按*Enter*键即可。
 - en: '[PRE51]'
+  id: totrans-272
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: After the preceding selections are all made, the files should be installed with
     appropriate permissions set. The final part of the output gives instructions for
     adding configuration to Nagios Core and Apache HTTPD, which we'll do next.
+  id: totrans-273
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在完成上述选择后，文件应已安装并设置了适当的权限。输出的最后部分提供了将配置添加到Nagios Core和Apache HTTPD的说明，接下来我们将进行这些操作。
 - en: Change to the Nagios Core configuration directory. In the quick start guide
     installation, this is `/usr/local/nagios/etc`.
+  id: totrans-274
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到Nagios Core的配置目录。在快速入门指南安装中，该目录为`/usr/local/nagios/etc`。
 - en: '[PRE52]'
+  id: totrans-275
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: 'Edit the core configuration file `nagios.cfg`, and add the following directives
     at the end of the file:'
+  id: totrans-276
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑核心配置文件`nagios.cfg`，并在文件末尾添加以下指令：
 - en: '[PRE53]'
+  id: totrans-277
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: Change to the Nagios Core `objects` configuration directory. In the quick start
     guide installation, this is `/usr/local/nagios/etc/objects`.
+  id: totrans-278
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 切换到Nagios Core的`objects`配置目录。在快速入门指南安装中，该目录为`/usr/local/nagios/etc/objects`。
 - en: '[PRE54]'
+  id: totrans-279
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'Edit the `commands.cfg` file, and add the following command definition:'
+  id: totrans-280
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`commands.cfg`文件，添加以下命令定义：
 - en: '[PRE55]'
+  id: totrans-281
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'Edit the `httpd.conf` file for your Apache HTTPD server to include the following
     line at the end:'
+  id: totrans-282
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑Apache HTTPD服务器的`httpd.conf`文件，在文件末尾添加以下行：
 - en: '[PRE56]'
+  id: totrans-283
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: In a local install of Apache HTTPD, this file is normally in `/usr/local/apache/conf/httpd.conf`,
     but its location varies by system. On Debian-derived systems it may be `/etc/apache2/apache2.conf`.
+  id: totrans-284
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在Apache HTTPD的本地安装中，该文件通常位于`/usr/local/apache/conf/httpd.conf`，但其位置因系统而异。在Debian衍生的系统中，它可能位于`/etc/apache2/apache2.conf`。
 - en: 'Validate the configuration of both the Apache HTTPD server and the Nagios Core
     server, and restart them both:'
+  id: totrans-285
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证Apache HTTPD服务器和Nagios Core服务器的配置，并重新启动这两个服务：
 - en: '[PRE57]'
+  id: totrans-286
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: Visit [http://olympus.naginet/nagiosgraph/cgi-bin/showconfig.cgi](http://olympus.naginet/nagiosgraph/cgi-bin/showconfig.cgi)
     in your browser, substituting your own Nagios Core server's hostname, to test
     that everything's working. You should see a long page with configuration information
     for Nagiosgraph:![How to do it...](img/5566_11_12.jpg)
+  id: totrans-287
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在浏览器中访问[http://olympus.naginet/nagiosgraph/cgi-bin/showconfig.cgi](http://olympus.naginet/nagiosgraph/cgi-bin/showconfig.cgi)，将你的Nagios
+    Core服务器的主机名替换其中，测试一切是否正常工作。你应该看到一个包含Nagiosgraph配置的长页面：![如何操作...](img/5566_11_12.jpg)
 - en: If everything is working up to this point, the only thing left to do is to define
     an action URL for the services that you want to graph, so that you can click to
     go directly to the graphs for that service from the Nagios Core web interface.
+  id: totrans-288
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果到此为止一切正常，剩下的就是为你想要生成图表的服务定义一个操作URL，这样你就可以从Nagios Core Web界面点击直接跳转到该服务的图表。
 - en: 'The tidiest and most straightforward way to do this is to define a service
     template:'
+  id: totrans-289
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 最整洁且最直接的做法是定义一个服务模板：
 - en: '[PRE58]'
+  id: totrans-290
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: 'Then, you can have the services you want graphed inherit from it, as well as
     from any other templates they use, by adding `nagiosgraph` to the value for the
     `use` directive:'
+  id: totrans-291
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 然后，你可以通过将`nagiosgraph`添加到`use`指令的值中，使你想要生成图表的服务继承它以及它们所使用的其他模板。
 - en: '[PRE59]'
+  id: totrans-292
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: You should do this for all the services for which you want graphing.
+  id: totrans-293
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你应该对所有需要生成图表的服务执行此操作。
 - en: 'Validate the configuration and restart the Nagios Core server again:'
+  id: totrans-294
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重新启动Nagios Core服务器：
 - en: '[PRE60]'
+  id: totrans-295
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: 'With this done, visiting the **Service** section of the web interface should
     include action icons after each graphed service:'
+  id: totrans-296
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，访问Web界面的**服务**部分，应该会在每个已生成图表的服务后面看到操作图标：
 - en: '![How to do it...](img/5566_11_13.jpg)'
+  id: totrans-297
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_11_13.jpg)'
 - en: 'Clicking one of these should bring up a graph interface; for example, a service
     using `check_ping` might show something similar to the following screenshot:'
+  id: totrans-298
   prefs: []
   type: TYPE_NORMAL
+  zh: 点击其中一个应该会弹出一个图表界面；例如，使用`check_ping`的服务可能会显示类似以下截图的内容：
 - en: '![How to do it...](img/5566_11_14.jpg)'
+  id: totrans-299
   prefs: []
   type: TYPE_IMG
+  zh: '![如何操作...](img/5566_11_14.jpg)'
 - en: Note that it includes two line bars to show the thresholds for `CRITICAL` and
     `WARNING` state as well as the actual response time. Also note that the preceding
     graph is several days old; it will take a while to build up enough data to see
     a perceptible line, and you may not see any graphs until performance data has
     actually been received from Nagios by Nagiosgraph.
+  id: totrans-300
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，它包含两条线条以显示`CRITICAL`和`WARNING`状态的阈值，以及实际响应时间。同样请注意，前面的图表是几天前的；需要一段时间来积累足够的数据，以便看到明显的线条，直到Nagiosgraph从Nagios接收到性能数据之前，你可能看不到任何图表。
 - en: Don't forget that graphs won't work out of the box for every service. If Nagiosgraph
     doesn't know how to parse the performance data for a check, it will show a red
     error text instead of graphs. We'll mention an approach to fixing this in the
     *There's more...* section.
+  id: totrans-301
   prefs: []
   type: TYPE_NORMAL
+  zh: 别忘了，图表不会对每个服务开箱即用。如果Nagiosgraph无法解析某个检查的性能数据，它会显示红色错误文本，而不是图表。我们将在*更多内容...*部分提到修复这个问题的方法。
 - en: How it works...
+  id: totrans-302
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The configuration changes in the preceding section prompt Nagios Core to log
     performance data for every check on every service, using the `service_perfdata_file_processing_command`
     directive. This command, named `process-service-perfdata-for-nagiosgraph`, is
     defined to pass data to the `bin/insert.pl` script included in the new `/usr/local/nagiosgraph`
     directory.
+  id: totrans-303
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面部分的配置更改会促使Nagios Core记录每个服务每次检查的性能数据，使用`service_perfdata_file_processing_command`指令。这个命令名为`process-service-perfdata-for-nagiosgraph`，其定义是将数据传递给新`/usr/local/nagiosgraph`目录中包含的`bin/insert.pl`脚本。
 - en: 'This script in turn parses performance output, such as the following output
     from a typical service using `check_ping`:'
+  id: totrans-304
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个脚本进一步解析性能输出，比如以下来自使用`check_ping`的典型服务的输出：
 - en: '[PRE61]'
+  id: totrans-305
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: Nagiosgraph extracts numeric information from the performance data, according
     to the templates defined in `/usr/local/nagiosgraph/etc/map`, using Perl regular
     expressions. This data is recorded using Perl's bindings for the RRD library,
     and graphed using the GD2 library, with an appearance similar to graphs produced
     by MRTG.
+  id: totrans-306
   prefs: []
   type: TYPE_NORMAL
+  zh: Nagiosgraph根据在`/usr/local/nagiosgraph/etc/map`中定义的模板，使用Perl正则表达式从性能数据中提取数值信息。这些数据使用Perl的RRD库绑定记录，并使用GD2库生成图表，外观类似于MRTG生成的图表。
 - en: 'The `action_url` directive uses macros for each service to define a URL for
     each service that shows its graphs. In our example, for a service PING on host
     `corinth.naginet`, `action_url` would expand to the following:'
+  id: totrans-307
   prefs: []
   type: TYPE_NORMAL
+  zh: '`action_url` 指令使用宏为每个服务定义一个 URL，显示其图形。在我们的示例中，对于主机 `corinth.naginet` 上的服务 PING，`action_url`
+    会展开为以下内容：'
 - en: '[PRE62]'
+  id: totrans-308
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: This isn't the only possible use of `action_url`, of course; it just happens
     to be a useful one in our case. You can make `action_url` go anywhere you'd like
     for a given host or service.
+  id: totrans-309
   prefs: []
   type: TYPE_NORMAL
+  zh: 当然，`action_url` 不仅仅有这种用法；它恰好在我们这种情况下非常有用。你可以让 `action_url` 定向到你希望的任何地方，用于指定的主机或服务。
 - en: There's more...
+  id: totrans-310
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: If you don't intend to define any other kind of action for services, you may
     like to change the `action.gif` image to something more descriptive than the default
     red splotch. The Nagiosgraph sources include a possible alternative icon, but
     you can use any GIF image you wish.
+  id: totrans-311
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你不打算为服务定义其他操作，可能希望将 `action.gif` 图像更改为比默认的红色污点更具描述性的内容。Nagiosgraph 源文件中包含了一个可能的替代图标，但你可以使用任何你想要的
+    GIF 图像。
 - en: '[PRE63]'
+  id: totrans-312
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: You may well be running some kind of check that Nagiosgraph isn't able to graph,
     because it doesn't understand the format of the performance output, and can't
     extract numeric information from it. The default mapping rules cover output from
     quite a few standard plugins, but if you know a little about Perl, then you may
     be able to add more rules to `/usr/local/nagiosgraph/etc/map` to process other
     kinds of plugin output.
+  id: totrans-313
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可能正在运行某种 Nagiosgraph 无法绘制的检查，因为它无法理解性能输出的格式，也无法从中提取数值信息。默认的映射规则涵盖了许多标准插件的输出，但如果你对
+    Perl 有一定了解，你可能能够向 `/usr/local/nagiosgraph/etc/map` 中添加更多规则，以处理其他类型的插件输出。
 - en: Besides the examples in the map file, which include instructions for writing
     new output checks, there are more examples of such definitions included in the
     `/usr/local/nagiosgraph/examples/map_examples` file.
+  id: totrans-314
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了映射文件中的示例外（包括编写新输出检查的说明），`/usr/local/nagiosgraph/examples/map_examples` 文件中还包含了更多此类定义的示例。
 - en: If you're comparing Nagios graphing solutions, another popular solution to try
     could be **PNP4Nagios**, available at [http://docs.pnp4nagios.org/pnp-0.6/start](http://docs.pnp4nagios.org/pnp-0.6/start).
+  id: totrans-315
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你在比较 Nagios 的图形解决方案，另一个值得尝试的流行解决方案是 **PNP4Nagios**，可在 [http://docs.pnp4nagios.org/pnp-0.6/start](http://docs.pnp4nagios.org/pnp-0.6/start)
+    获取。
 - en: See also
+  id: totrans-316
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Getting extra visualizations with NagVis* recipe in this chapter
+  id: totrans-317
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*使用 NagVis 获取额外可视化效果*配方
 - en: The *Monitoring Nagios performance with Nagiostats* recipe in [Chapter 10](ch10.html
     "Chapter 10. Security and Performance"), *Security and Performance*
+  id: totrans-318
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第10章](ch10.html "第10章 安全与性能")中的*使用 Nagiostats 监控 Nagios 性能*配方，*安全与性能*'
 - en: Reading status into a MySQL database with NDOUtils
+  id: totrans-319
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 NDOUtils 将状态读入 MySQL 数据库
 - en: In this recipe, we'll learn how to install the **NDOUtils** extension to Nagios
     Core, in order to have all of Nagios Core's configuration and data written into
     a MySQL database. This allows easy development of custom reports and interfaces
@@ -1538,29 +2210,44 @@
     interfaces to the popular MySQL server, rather than needing to interact with Nagios
     Core's own logs or its data format. Some plugins, such as NagVis, use this format
     to read information about Nagios Core configuration and objects.
+  id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本配方中，我们将学习如何安装 **NDOUtils** 扩展到 Nagios Core，以便将 Nagios Core 的所有配置和数据写入 MySQL
+    数据库。这使得使用 Perl 和 PHP 等语言及其与流行的 MySQL 服务器的标准接口，轻松开发定制的报告和界面，而不必与 Nagios Core 的日志或其数据格式交互。一些插件，如
+    NagVis，使用这种格式来读取有关 Nagios Core 配置和对象的信息。
 - en: Getting ready
+  id: totrans-321
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need a Nagios Core server version 3.0 or later. NDOUtils will probably
     still install and work on older versions of Nagios Core, but the installation
     process is slightly different; see the `INSTALL` file included in the NDO source
     for information on this.
+  id: totrans-322
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要一个版本为 3.0 或更高的 Nagios Core 服务器。NDOUtils 可能仍然可以在旧版本的 Nagios Core 上安装并正常工作，但安装过程略有不同；有关此信息，请参见
+    NDO 源中的 `INSTALL` 文件。
 - en: 'Nagios Core uses its event broker functionality to write information to the
     socket for the MySQL database to pick up. You will need to have compiled Nagios
     Core with the `--enable-event-broker` flag:'
+  id: totrans-323
   prefs: []
   type: TYPE_NORMAL
+  zh: Nagios Core 使用其事件代理功能将信息写入 MySQL 数据库的套接字中。你需要使用 `--enable-event-broker` 标志编译
+    Nagios Core：
 - en: '[PRE64]'
+  id: totrans-324
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: If you are unsure whether you compiled with this flag, it is probably a good
     idea to recompile and reinstall Nagios Core from your original sources with this
     installed. Don't forget to back up your previous installation in case of problems.
+  id: totrans-325
   prefs: []
   type: TYPE_NORMAL
 - en: In order to compile the `ndomod` part of NDOUtils, you will need to have the
@@ -1568,6 +2255,7 @@
     also need to have a MySQL server ready to store the data. The MySQL server does
     not have to be running on the same host as Nagios Core, but the Nagios Core server
     should be able to connect to it.
+  id: totrans-326
   prefs: []
   type: TYPE_NORMAL
 - en: Finally, you should take note of the opening paragraph of `README`, which at
@@ -1576,216 +2264,286 @@
     In my own experience, however, the code is very stable. There are also no guarantees
     at the time of writing that this procedure will work correctly with the unreleased
     Nagios 4.0.
+  id: totrans-327
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it...
+  id: totrans-328
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'We can install the NDOUtils package for Nagios Core as follows:'
+  id: totrans-329
   prefs: []
   type: TYPE_NORMAL
 - en: Download the latest NDOUtils `.tar.gz` from its Sourceforge site at [http://sourceforge.net/projects/nagios/files/ndoutils-1.x/](http://sourceforge.net/projects/nagios/files/ndoutils-1.x/).
+  id: totrans-330
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE65]'
+  id: totrans-331
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: Unpack the `.tar.gz` file and change directory into it.
+  id: totrans-332
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE66]'
+  id: totrans-333
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: Run `./configure` and build the software. Note that there is no install target;
     we will be performing the installation manually.
+  id: totrans-334
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE67]'
+  id: totrans-335
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: 'Read the output of `./configure` carefully if the build fails, to determine
     if you are missing any dependencies on your system. The output of `./configure`
     should end with something similar to the following code snippet:'
+  id: totrans-336
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE68]'
+  id: totrans-337
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: On the MySQL server, create a database to store the Nagios Core information,
     and a user to access it. In this example, the MySQL server is running on the same
     host as the Nagios Core server (`olympus.naginet`), so the access will be done
     from `localhost`.
+  id: totrans-338
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE69]'
+  id: totrans-339
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: We have used a random password after `IDENTIFIED BY`. You should generate your
     own secure password.
+  id: totrans-340
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: 'Run the `installdb` script in the source to create the various tables Nagios
     Core will use. Use the database details established in the previous step:'
+  id: totrans-341
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE70]'
+  id: totrans-342
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE70]'
 - en: 'Don''t be concerned about the following error message; it is because you are
     installing the extension for the first time:'
+  id: totrans-343
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: '[PRE71]'
+  id: totrans-344
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE71]'
 - en: 'Copy the compiled `ndomod` module into the `/usr/local/nagios/bin` directory:'
+  id: totrans-345
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE72]'
+  id: totrans-346
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE72]'
 - en: 'Copy the sample configuration for the module into `/usr/local/nagios/etc`:'
+  id: totrans-347
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE73]'
+  id: totrans-348
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE73]'
 - en: 'Make sure it is readable only by the `nagios` user:'
+  id: totrans-349
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE74]'
+  id: totrans-350
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE74]'
 - en: 'Edit your `nagios.cfg` file:'
+  id: totrans-351
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE75]'
+  id: totrans-352
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE75]'
 - en: 'Add a `broker_module` definition to the file, and check that the `event_broker_options`
     directive is set to `-1`:'
+  id: totrans-353
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE76]'
+  id: totrans-354
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE76]'
 - en: Note that the `broker_module` and `config_file` definitions should be on the
     same line, but `event_broker_options` should be on its own line.
+  id: totrans-355
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: With this done, the broker module ought to be successfully installed, and we
     can move on to installing the `ndo2db` daemon.
+  id: totrans-356
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: 'Copy the `ndo2db` binary into the `/usr/local/nagios/bin` directory:'
+  id: totrans-357
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE77]'
+  id: totrans-358
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE77]'
 - en: 'Copy the sample configuration for the daemon into `/usr/local/nagios/etc`:'
+  id: totrans-359
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE78]'
+  id: totrans-360
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE78]'
 - en: 'Make sure it is readable only by the `nagios` user:'
+  id: totrans-361
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE79]'
+  id: totrans-362
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE79]'
 - en: 'Edit the configuration file as installed:'
+  id: totrans-363
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE80]'
+  id: totrans-364
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE80]'
 - en: 'Change the values in `ndo2db.cfg` to reflect the database details:'
+  id: totrans-365
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE81]'
+  id: totrans-366
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE81]'
 - en: 'Test the `ndo2db` daemon by starting it and verifying it is running with `ps
     -e` or `pgrep`:'
+  id: totrans-367
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE82]'
+  id: totrans-368
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE82]'
 - en: If it works, you should add this command into your system's `init` scripts,
     so that the daemon is started at boot time.
+  id: totrans-369
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-370
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE83]'
+  id: totrans-371
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE83]'
 - en: 'With this done, inspecting the database tables in MySQL should show they have
     been filled with information from Nagios Core, for example the `nagios_services`
     table:'
+  id: totrans-372
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE84]'
+  id: totrans-373
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE84]'
 - en: How it works...
+  id: totrans-374
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'NDOUtils is in fact a collection of components, two of which we installed in
     the previous sections:'
+  id: totrans-375
   prefs: []
   type: TYPE_NORMAL
 - en: '`ndomod` is used as a broker module, for writing events and data from Nagios
     Core to a UNIX socket in `/usr/local/nagios/var/ndo.sock`. It runs as a module
     of the Nagios Core server.'
+  id: totrans-376
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -1793,31 +2551,38 @@
     the UNIX socket to which `ndomod` writes, and applying them as MySQL database
     operations. It runs independently as a daemon on the system, and performs the
     MySQL connection and transactions.'
+  id: totrans-377
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`broker_module` updates these tables as plugins are run, hosts and services
     change state, notifications are issued, and other Nagios Core behavior takes place.
     It covers most data of interest quite comprehensively. Note that it includes:'
+  id: totrans-378
   prefs: []
   type: TYPE_NORMAL
 - en: Configuration directives
+  id: totrans-379
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Details for types of Nagios Core objects
+  id: totrans-380
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Properties and current states of hosts
+  id: totrans-381
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Acknowledgement and scheduled downtime information
+  id: totrans-382
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Notification history and complete logging
+  id: totrans-383
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -1826,9 +2591,11 @@
     in simple table-style reports or completely new application interfaces to the
     Nagios Core data. This tends to be much easier than custom building a Nagios Core
     CGI of your own!
+  id: totrans-384
   prefs: []
   type: TYPE_NORMAL
 - en: There's more...
+  id: totrans-385
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1836,31 +2603,38 @@
     NDOUtils after its installation by demonstrating some example MySQL queries for
     retrieving useful data and summaries from its tables, including an example of
     writing a report in Perl, and a simple RSS feed in PHP.
+  id: totrans-386
   prefs: []
   type: TYPE_NORMAL
 - en: 'To get the most out of NDOUtils, it''s a good idea to take a look at its documentation,
     which includes a complete breakdown of the contents of the MySQL tables: [http://nagios.sourceforge.net/docs/ndoutils/NDOUtils.pdf](http://nagios.sourceforge.net/docs/ndoutils/NDOUtils.pdf).'
+  id: totrans-387
   prefs: []
   type: TYPE_NORMAL
 - en: See also
+  id: totrans-388
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: The *Writing customized Nagios Core reports* and *Getting extra visualizations
     with NagVis* recipes in this chapter
+  id: totrans-389
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Writing customized Nagios Core reports
+  id: totrans-390
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
 - en: In this recipe, we'll explore some simple applications of the NDOUtils database
     by trying out some queries, and change one of them into both a simple report in
     Perl, and also into a PHP-based RSS feed.
+  id: totrans-391
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-392
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1870,119 +2644,157 @@
     of executing MySQL queries on the database server. The `mysql` command-line client
     will work just fine; a tool such as phpMyAdmin might make the data a little easier
     to explore.
+  id: totrans-393
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it...
+  id: totrans-394
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'We can explore some queries against the NDOUtils databases as follows:'
+  id: totrans-395
   prefs: []
   type: TYPE_NORMAL
 - en: 'Retrieve the content and date/time of the latest ten notifications:'
+  id: totrans-396
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE85]'
+  id: totrans-397
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE85]'
 - en: 'Retrieve the content and date/time of the latest ten host or service comments:'
+  id: totrans-398
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE86]'
+  id: totrans-399
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE86]'
 - en: 'Count the number of hosts currently in the `OK` state:'
+  id: totrans-400
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE87]'
+  id: totrans-401
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE87]'
 - en: 'Retrieve the names of all hosts currently in scheduled downtime:'
+  id: totrans-402
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE88]'
+  id: totrans-403
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE88]'
 - en: Note that the syntax of this query assumes a MySQL version of at least 5.0.12.
+  id: totrans-404
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: 'Return a list of all host names and the number of services associated with
     them:'
+  id: totrans-405
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE89]'
+  id: totrans-406
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE89]'
 - en: 'We could implement a Perl script to print the latest ten notifications using
     the DBI module as follows:'
+  id: totrans-407
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE90]'
+  id: totrans-408
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE90]'
 - en: 'Saved into a file `latest-notifications.pl`, we could run it as follows:'
+  id: totrans-409
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE91]'
+  id: totrans-410
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE91]'
 - en: 'Similarly, we could implement a crude RSS feed for notifications using PHP5
     with PDO MySQL as follows:'
+  id: totrans-411
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE92]'
+  id: totrans-412
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE92]'
 - en: 'Saved in a file named `latest-notifications.php`, we could subscribe to this
     in our favorite RSS reader, such as **Life** **rea** ([http://liferea.sourceforge.net/](http://liferea.sourceforge.net/)):'
+  id: totrans-413
   prefs: []
   type: TYPE_NORMAL
 - en: '![How to do it...](img/5566_11_15.jpg)'
+  id: totrans-414
   prefs: []
   type: TYPE_IMG
 - en: How it works...
+  id: totrans-415
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'The examples given in the preceding section are just to get you started with
     very simple reports; there is a wealth of data available in the NDOUtils database
     to explore. Here are some other possibilities:'
+  id: totrans-416
   prefs: []
   type: TYPE_NORMAL
 - en: A breakdown of all the hosts in your system and their states, ordered by name,
     presented in an HTML table
+  id: totrans-417
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: A list of all the hosts that have been down more than once in a month
+  id: totrans-418
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: The percentage of uptime for all hosts
+  id: totrans-419
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: See also
+  id: totrans-420
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: The *Reading status into a MySQL database with NDOUtils* and *Getting extra
     visualizations with NagVis* recipes in this chapter
+  id: totrans-421
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Getting extra visualizations with NagVis
+  id: totrans-422
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -1990,6 +2802,7 @@
     in [Chapter 8](ch08.html "Chapter 8. Managing Network Layout"), to get a lot of
     visualization power with the extension NagVis. NagVis can use the NDOUtils backend
     to build custom maps in various styles.
+  id: totrans-423
   prefs: []
   type: TYPE_NORMAL
 - en: '**NagVis** is most likely of interest to you if you''re interested in visualizing
@@ -1997,14 +2810,17 @@
     scalability of the included Nagios Core status map. The default status map works
     well for smaller networks, but can struggle with rendering larger ones in a timely
     fashion.'
+  id: totrans-424
   prefs: []
   type: TYPE_NORMAL
 - en: A complete survey of NagVis' functions would not be possible in one recipe,
     but this one will walk you through downloading, installing, and configuring the
     extension to give you a simple **automap**, in order to get you started.
+  id: totrans-425
   prefs: []
   type: TYPE_NORMAL
 - en: Getting ready
+  id: totrans-426
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -2012,243 +2828,311 @@
     have the NDOUtils backend successfully installed and populating a MySQL database
     to which you have administrative access. This is discussed in the *Reading status
     into a MySQL database with NDOUtils* recipe in this chapter.
+  id: totrans-427
   prefs: []
   type: TYPE_NORMAL
 - en: In order for the automap to be much use, you will need a network with at least
     a few parent-child relationships—see the *Creating a network host hierarchy* recipe
     in [Chapter 8](ch08.html "Chapter 8. Managing Network Layout") for details on
     how this is done.
+  id: totrans-428
   prefs: []
   type: TYPE_NORMAL
 - en: 'NagVis includes an installation script that deals quite well with different
     systems'' installations of Nagios Core. However, it still requires certain dependencies,
     specifically:'
+  id: totrans-429
   prefs: []
   type: TYPE_NORMAL
 - en: Apache with `mod_php` on the same server as Nagios Core
+  id: totrans-430
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'PHP 5.3 or newer, with the following modules: `gd`, `gettext`, `mbstring`,
     `mysql`, `pdo`, `session`, `sqlite`, and `xml`'
+  id: totrans-431
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'The Graphviz graph visualization software, with the following modules: `circo`,
     `dot`, `fdp`, `neato`, `twopi`'
+  id: totrans-432
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: SQLite 3
+  id: totrans-433
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'You may need to consult your system''s documentation to install all these dependencies;
     check your system''s package manager, if there is one. For Ubuntu and other Debian-derived
     systems, the following packages generally suffice:'
+  id: totrans-434
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE93]'
+  id: totrans-435
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE93]'
 - en: 'On systems such as CentOS and Fedora, the following packages may work:'
+  id: totrans-436
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE94]'
+  id: totrans-437
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE94]'
 - en: It is difficult to anticipate the exact packages needed for all systems; searching
     your package manager for keywords (for example `php sqlite`) may help.
+  id: totrans-438
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it...
+  id: totrans-439
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'We can install NagVis with an NDO backend as follows:'
+  id: totrans-440
   prefs: []
   type: TYPE_NORMAL
 - en: 'Download the latest sources for NagVis from [http://www.nagvis.org/downloads](http://www.nagvis.org/downloads):'
+  id: totrans-441
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE95]'
+  id: totrans-442
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE95]'
 - en: 'Inflate `.tar.gz` and change directory to within it:'
+  id: totrans-443
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE96]'
+  id: totrans-444
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE96]'
 - en: 'Run the `install.sh` script as `root`:'
+  id: totrans-445
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE97]'
+  id: totrans-446
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE97]'
 - en: The script will attempt to find your Nagios Core installation, and will ask
     you to specify a location for the new NagVis files. In our case, the defaults
     are correct and acceptable, so we can simply press *Enter*.
+  id: totrans-447
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE98]'
+  id: totrans-448
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE98]'
 - en: The script will attempt to find all of the prerequisites needed and will alert
     you if any are not found. If this is the case, you should abort the installation
     with *Ctrl* + *C* and install them before trying again.
+  id: totrans-449
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE99]'
+  id: totrans-450
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE99]'
 - en: The script will prompt you for an appropriate backend to configure as NagVis'
     data source. In this example, the only one we want is the `ndo2db` backend. Press
     *n* for all the others.
+  id: totrans-451
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE100]'
+  id: totrans-452
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE100]'
 - en: The script will attempt to detect your Apache HTTPD settings. It does a good
     job with most systems, but you should check the results are correct before you
     press *Enter*. It should also be safe to allow it to create an Apache configuration
     file for you.
+  id: totrans-453
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE101]'
+  id: totrans-454
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE101]'
 - en: 'The script will give you a summary of its intentions for installing the software,
     and will ask you to confirm. Do so by pressing *Enter*:'
+  id: totrans-455
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE102]'
+  id: totrans-456
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE102]'
 - en: 'Restart the Apache HTTPD server:'
+  id: totrans-457
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE103]'
+  id: totrans-458
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE103]'
 - en: 'If all of the above goes correctly, once the installation is finished, you
     should be able to visit the NagVis configuration page on [http://olympus.naginet/nagvis/](http://olympus.naginet/nagvis/),
     substituting the hostname for your own Nagios Core server:'
+  id: totrans-459
   prefs: []
   type: TYPE_NORMAL
 - en: '![How to do it...](img/5566_11_16.jpg)'
+  id: totrans-460
   prefs: []
   type: TYPE_IMG
 - en: You can log in with the default username `admin` and the password `admin` to
     take a look at some of the demo maps.
+  id: totrans-461
   prefs: []
   type: TYPE_NORMAL
 - en: 'There is a little more to go yet before we can get our automap working:'
+  id: totrans-462
   prefs: []
   type: TYPE_NORMAL
 - en: 'On the server, edit the `/usr/local/nagvis/etc/nagvis.ini.php` file:'
+  id: totrans-463
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE104]'
+  id: totrans-464
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE104]'
 - en: 'Find and change the following directives under the `backend_ndomy_1` section,
     adding the values you used for your `ndo2db` installation:'
+  id: totrans-465
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE105]'
+  id: totrans-466
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE105]'
 - en: Make sure that all the preceding values are uncommented (they should not be
     preceded by a semicolon).
+  id: totrans-467
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: Log in to the NagVis web interface, and click on **Manage Maps** under the **Options**
     menu:![How to do it...](img/5566_11_17.jpg)
+  id: totrans-468
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: 'Under **Create Map**:'
+  id: totrans-469
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: For **Map name**, enter the value `Automap`.
+  id: totrans-470
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: For **Map iconset**, choose **std_small**.
+  id: totrans-471
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Leave **Background** blank.
+  id: totrans-472
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Click on **Create**.
+  id: totrans-473
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '![How to do it...](img/5566_11_18.jpg)'
+  id: totrans-474
   prefs:
   - PREF_IND
   type: TYPE_IMG
 - en: The page should refresh to a blank screen, because we have not yet elected a
     data source for the map.
+  id: totrans-475
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: Click on **Map Options** under the **Edit Map** menu.![How to do it...](img/5566_11_19.jpg)
+  id: totrans-476
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: 'In the resulting dialog:'
+  id: totrans-477
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: Check the **sources** checkbox, and change the value to `automap`.
+  id: totrans-478
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Check the **backend_id** checkbox, and choose the value **ndomy_1**.
+  id: totrans-479
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Scroll down to the bottom and click on **Save**.
+  id: totrans-480
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '![How to do it...](img/5566_11_20.jpg)'
+  id: totrans-481
   prefs:
   - PREF_IND
   type: TYPE_IMG
@@ -2256,12 +3140,15 @@
     automatically generated from your configuration, in a similar style to the Nagios
     Core web interface status map. You should also be able to hover over individual
     nodes to see their details.
+  id: totrans-482
   prefs: []
   type: TYPE_NORMAL
 - en: '![How to do it...](img/5566_11_21.jpg)'
+  id: totrans-483
   prefs: []
   type: TYPE_IMG
 - en: How it works...
+  id: totrans-484
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -2270,9 +3157,11 @@
     status map does, but is more scalable for larger networks. The parent and child
     relationships defined in the configuration are included, to make a tree-style
     map.
+  id: totrans-485
   prefs: []
   type: TYPE_NORMAL
 - en: There's more...
+  id: totrans-486
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -2280,20 +3169,24 @@
     one of many possible maps, including defining one's own backgrounds, icons, labels,
     and hover behavior. For more detail on how to make customized maps as well as
     other styles of automaps, consult the NagVis documentation at [http://www.nagvis.org/doc](http://www.nagvis.org/doc).
+  id: totrans-487
   prefs: []
   type: TYPE_NORMAL
 - en: See also
+  id: totrans-488
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: The *Reading status into a MySQL database with NDOUtils* and *Writing customized
     Nagios Core reports* recipes in this chapter
+  id: totrans-489
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: The *Creating a network host hierarchy* and *Using the network map* recipes
     in [Chapter 8](ch08.html "Chapter 8. Managing Network Layout"), *Understanding
     the Network Layout*
+  id: totrans-490
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
