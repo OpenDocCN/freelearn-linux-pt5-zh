@@ -1,82 +1,117 @@
 - en: '*Chapter 11*: Implementing Direct Memory Access (DMA) Support'
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '*第11章*：实现直接内存访问（DMA）支持'
 - en: '**Direct Memory Access** (**DMA**) is a feature of computer systems that allows
     devices to access the main system memory without CPU intervention, allowing the
     CPU to focus on other tasks. Examples of its usage include network traffic acceleration,
     audio data, or video frame grabbing, and its use is not limited to a particular
     domain. The peripheral responsible for managing the DMA transactions is the DMA
     controller, which is present in the majority of modern processors and microcontrollers.'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: '**直接内存访问**（**DMA**）是计算机系统的一项功能，允许设备在无需 CPU 干预的情况下访问主系统内存，从而使 CPU 能专注于其他任务。它的应用包括网络流量加速、音频数据或视频帧抓取，其使用范围不限于特定领域。负责管理
+    DMA 事务的外设是 DMA 控制器，现代大多数处理器和微控制器中都有该控制器。'
 - en: 'The feature works in the following manner: When the driver needs to transfer
     a block of data, the driver sets up the DMA controller with the source address,
     the destination address, and the total number of bytes to copy. The DMA controller
     then transfers the data from the source to the destination automatically, without
     stealing CPU cycles. When the number of bytes remaining reaches zero, the block
     transfer ends, and the driver is notified.'
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 该功能的工作原理如下：当驱动程序需要传输一块数据时，驱动程序设置 DMA 控制器，指定源地址、目标地址以及需要复制的字节总数。然后，DMA 控制器会自动将数据从源地址传输到目标地址，而无需占用
+    CPU 的周期。当剩余的字节数达到零时，数据块传输结束，驱动程序会收到通知。
 - en: Note
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: DMA does not always mean copy is going to be faster. It does not bring direct
     speed performance gains, but first, a true background operation, which leaves
     the CPU available to do other stuff, and then, performance gains due to sustaining
     the CPU cache/prefetcher state during DMA operation (which likely would be garbled
     when using plain old memcpy, executed on the CPU itself).
+  id: totrans-4
   prefs: []
   type: TYPE_NORMAL
+  zh: DMA 并不总是意味着复制操作会更快。它不会直接带来性能提升，但首先，它提供了一个真正的后台操作，释放 CPU 去处理其他任务；其次，在 DMA 操作过程中，由于保持了
+    CPU 缓存/预取器的状态，性能上会有所提升（如果使用普通的 memcpy，并由 CPU 执行，可能会导致状态紊乱）。
 - en: 'This chapter will deal with coherent and non-coherent DMA mappings, as well
     as coherency issues, the DMA engine''s API, and DMA and DT bindings. More precisely,
     we will cover the following topics:'
+  id: totrans-5
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将处理一致性和非一致性 DMA 映射，以及一致性问题、DMA 引擎的 API 和 DMA 与 DT 绑定。更具体地说，我们将涵盖以下主题：
 - en: Setting up DMA mappings
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置 DMA 映射
 - en: Introduction to the concept of completion
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 完成概念介绍
 - en: Working with the DMA engine's API
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 DMA 引擎的 API
 - en: Putting it all together – Single-buffer DMA mapping
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 综合起来——单缓冲区 DMA 映射
 - en: A word on cyclic DMA
+  id: totrans-10
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 关于循环 DMA 的说明
 - en: Understanding DMA and DT bindings
+  id: totrans-11
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 理解 DMA 和 DT 绑定
 - en: Setting up DMA mappings
+  id: totrans-12
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 设置 DMA 映射
 - en: For any type of DMA transfer, you need to provide source and destination addresses,
     as well as the number of words to transfer. In the case of peripheral DMA, this
     peripheral's FIFO acts as either the source or the destination, depending on the
     transfer direction. When the peripheral acts as the source, the destination address
     is a memory location (internal or external). When the peripheral acts as the destination,
     the source address is a memory location (internal or external).
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于任何类型的 DMA 传输，您需要提供源地址、目标地址以及要传输的字数。在外设 DMA 的情况下，这个外设的 FIFO 会作为源或目标，取决于传输方向。当外设作为源时，目标地址是一个内存位置（内部或外部）。当外设作为目标时，源地址是一个内存位置（内部或外部）。
 - en: In other words, a DMA transfer requires suitable memory mappings. This is what
     we will discuss in the following sections.
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 换句话说，DMA 传输需要适当的内存映射。接下来的章节将详细讨论这一点。
 - en: The concept of cache coherency and DMA
+  id: totrans-15
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 缓存一致性与 DMA 的概念
 - en: On a CPU equipped with a cache, copies of recently accessed memory areas are
     cached, even memory areas mapped for DMA. The reality is that memory shared between
     two independent devices is generally the source of cache coherency issues. Cache
@@ -84,10 +119,12 @@
     from another device writing. On the other hand, cache coherency ensures that every
     write operation appears to occur instantaneously, meaning that all devices sharing
     the same memory region see exactly the same sequence of changes.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
 - en: 'A well-explained situation of coherency issues is illustrated in the following
     excerpt from the third edition of *Linux Device Drivers (LDD3)*:'
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
 - en: '"Let us imagine a CPU equipped with a cache and an external memory that can
@@ -98,31 +135,38 @@
     the next time a device tries to access X, the device will receive a stale value
     of X. Similarly, if the cached copy of X is not invalidated when a device writes
     a new value to the memory, then the CPU will operate on a stale value of X."'
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
 - en: 'There are two ways to address this issue:'
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
 - en: A hardware-based solution. Such systems are coherent systems.
+  id: totrans-20
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: A software-based solution, where the OS is responsible for ensuring cache coherency.
     Such systems are non-coherent systems.
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Now that we are aware of the caching aspects of DMA, let's move a step forward
     and learn how to perform memory mappings for DMA.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
 - en: Memory mappings for DMA
+  id: totrans-23
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: Memory buffers allocated for DMA purposes must be mapped accordingly. A DMA
     mapping consists of allocating a memory buffer suitable for DMA and generating
     a bus address for this buffer.
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
 - en: We distinguish between two types of DMA mappings – **coherent DMA mappings**
@@ -135,9 +179,11 @@
     calls between each transfer. Coherent mapping usually exists for the life of the
     driver, whereas one streaming mapping is usually unmapped once the DMA transfer
     completes.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
 - en: It is recommended to use streaming mapping when you can, and coherent mapping
@@ -146,78 +192,112 @@
     Otherwise, you should use streaming mapping because you know exactly when you
     need to access the buffer, in which case you'll first flush the cache (thereby
     syncing the buffer) before accessing the buffer.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 建议在可以时使用流式映射，在必须时使用一致性映射。如果缓冲区会被 CPU 或 DMA 控制器不可预测地访问，你应该考虑使用一致性映射，因为内存始终会被同步。否则，你应该使用流式映射，因为你确切知道何时需要访问缓冲区，在这种情况下，你会先刷新缓存（从而同步缓冲区），然后再访问缓冲区。
 - en: 'The main header to include for handling DMA mappings is the following:'
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 处理 DMA 映射的主要头文件是：
 - en: '[PRE0]'
+  id: totrans-29
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'However, depending on the mapping, different APIs can be used. Before going
     further in the API, we need to understand the operations that are performed during
     DMA mappings:'
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，根据映射的不同，可以使用不同的 API。在进一步讨论 API 之前，我们需要理解在 DMA 映射过程中执行的操作：
 - en: Assuming the device supports DMA, if the driver sets up a buffer using `kmalloc()`,
     it will get a virtual address (let's call this *X*), which points nowhere yet.
+  id: totrans-31
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 假设设备支持 DMA，如果驱动程序使用`kmalloc()`设置缓冲区，它将获得一个虚拟地址（我们称之为*X*），但此时该地址尚未指向任何地方。
 - en: The virtual memory system (helped by the **MMU**, the **Memory Management Unit**)
     will map *X* to a physical address (let's call this *Y*) in the system's RAM,
     assuming there is still free memory available.
+  id: totrans-32
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 虚拟内存系统（由 **MMU**，即**内存管理单元**协助）将 *X* 映射到系统 RAM 中的物理地址（我们称之为 *Y*），前提是系统中仍有可用的空闲内存。
 - en: Because DMA does not flow through the CPU virtual memory system, the driver
     can use virtual address *X* to access the buffer at this point, but the device
     itself cannot.
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于 DMA 不通过 CPU 虚拟内存系统流动，驱动程序可以使用虚拟地址 *X* 来访问此时的缓冲区，但设备本身不能。
 - en: In some simple systems (those without I/O MMU), the device can do DMA directly
     to physical the address *Y*. But in many others, devices see the main memory through
     the lenses of the I/O MMU; thus, there is I/O MMU hardware that translates DMA
     addresses to physical addresses, for example, it translates *Z* to *Y*.
+  id: totrans-34
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在一些简单系统（没有 I/O MMU 的系统）中，设备可以直接对物理地址 *Y* 进行 DMA。但在许多其他系统中，设备通过 I/O MMU 观察主内存；因此，存在将
+    DMA 地址转换为物理地址的 I/O MMU 硬件，例如，它将 *Z* 转换为 *Y*。
 - en: 'This is where the DMA API intervenes:'
+  id: totrans-35
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 这时 DMA API 介入：
 - en: The driver can pass a virtual address *X* to a function such as `dma_map_single()`
     (which we will look at later in this chapter, in The *Single-buffer mapping* section),
     which sets up any appropriate I/O MMU mapping and returns the DMA address *Z.*
+  id: totrans-36
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 驱动程序可以将虚拟地址 *X* 传递给类似于 `dma_map_single()` 的函数（我们将在本章的 *单缓冲区映射* 部分中讨论），该函数设置任何适当的
+    I/O MMU 映射并返回 DMA 地址 *Z*。
 - en: The driver then instructs the device to do DMA into *Z*.
+  id: totrans-37
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 驱动程序接着指示设备执行 DMA 操作到 *Z*。
 - en: The I/O MMU finally maps it to the buffer at address *Y* in the system's RAM.
+  id: totrans-38
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: I/O MMU 最终将其映射到系统 RAM 中地址为 *Y* 的缓冲区。
 - en: Now that the concept of memory mapping for DMA has been introduced, we can start
     creating mappings, starting with the easiest ones – the coherent DMA mappings.
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经介绍了用于 DMA 的内存映射概念，我们可以开始创建映射，从最简单的一致性 DMA 映射开始。
 - en: Creating coherent DMA mappings
+  id: totrans-40
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 创建一致性的 DMA 映射
 - en: 'Such mappings are most often used for long-lasting, bi-directional I/O buffers.
     The following function sets up a coherent mapping:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种映射通常用于持久性双向 I/O 缓冲区。以下函数设置了一个一致性的映射：
 - en: '[PRE1]'
+  id: totrans-42
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: This function is responsible for both the allocation and the mapping of the
     buffer. It returns a kernel virtual address for that buffer, which is `size` bytes
     wide and accessible by the CPU. The `size` parameter may be misleading as it is
@@ -228,47 +308,59 @@
     mapping is guaranteed to be physically contiguous, and flags determine how memory
     should be allocated, which is usually `GFP_KERNEL`, or `GFP_ATOMIC` in an atomic
     context.
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
 - en: 'Do note that this mapping is said to be the following:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
 - en: Consistent (coherent) because the buffer content is always the same across all
     subsystems (either the device or the CPU)
+  id: totrans-45
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Synchronous, because a write by either the device or the CPU can immediately
     be read without worrying about cache coherency
+  id: totrans-46
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'To release the mapping, you can use the following API:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE2]'
+  id: totrans-48
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: In the preceding prototype, `cpu_addr` and `dma_handle` correspond to the kernel
     virtual address and bus address returned by `dma_alloc_coherent()`. Those two
     parameters are required by the MMU (which returned the virtual address) and the
     I/O MMU (which returned the bus address) to release their mappings.
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
 - en: Creating streaming DMA mappings
+  id: totrans-50
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
 - en: 'Streaming DMA mapping memory buffers are typically mapped right before the
     transmission and unmapped afterward. Such mappings have more constraints and differ
     from coherent mappings for the following reasons:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
 - en: Mappings need to function with a buffer that has previously been allocated dynamically.
+  id: totrans-52
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Mappings may accept several non-contiguous and scattered buffers.
+  id: totrans-53
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -276,64 +368,84 @@
     the CPU. Before the CPU can use the buffers, they should be unmapped first (after
     `dma_unmap_{single,sg}()`), or `dma_sync_{single,sg}_for_cpu()` must be invoked
     on those buffers. The main reason for this is caching purposes.
+  id: totrans-54
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: For write transactions (CPU to device), the driver should place data in the
     buffer before establishing the mapping.
+  id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: The transfer direction has to be specified, and the data should move and should
     be used only based on this direction.
+  id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'There are two forms of streaming mapping:'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
 - en: Single-buffer mapping, which allows one physically contiguous buffer mapping
+  id: totrans-58
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Scatter/gather mapping, which allows several buffers to be passed (scattered
     over memory)
+  id: totrans-59
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'For both mappings, the transfer direction should be specified by a symbol of
     the `enum dma_data_direction` type, defined in `include/linux/dma-direction.h`,
     as follows:'
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE3]'
+  id: totrans-61
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: In the preceding excerpt, each element is quite self-explanatory.
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
 - en: Coherent mappings implicitly have a direction attribute setting set with `DMA_BIDIRECTIONAL`.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
 - en: Now that we are aware of the two streaming DMA mapping methods, we can get the
     details of their implementations, starting with the single-buffer mappings.
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经了解了两种流式 DMA 映射方法，我们可以深入了解它们的实现，首先从单缓冲区映射开始。
 - en: Single-buffer mapping
+  id: totrans-66
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 单缓冲区映射
 - en: 'Single-buffer mapping is a streaming mapping for occasional transfer. You can
     set up such a mapping using the `dma_map_single()` function, which has the following
     definition:'
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 单缓冲区映射是一种偶尔传输的流式映射。你可以使用`dma_map_single()`函数设置这样的映射，该函数具有以下定义：
 - en: '[PRE4]'
+  id: totrans-68
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: The direction should be either `DMA_TO_DEVICE`, `DMA_FROM_DEVICE`, or `DMA_BIDIRECTIONAL`,
     respectively, when the CPU is the source (it writes to the device), when the CPU
     is the destination (it reads from the device), or when access is bi-directional
@@ -344,98 +456,143 @@
     present) for the device so that the device can DMA into. You should use `dma_mapping_error()`
     (which must return `0` if no error occurred) to check whether the mapping returned
     a valid address and not go further in case of an error.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 当 CPU 是源（它写入设备）、CPU 是目标（它从设备读取）或该映射的访问是双向的（在一致性映射中隐式使用）时，方向应分别为`DMA_TO_DEVICE`、`DMA_FROM_DEVICE`或`DMA_BIDIRECTIONAL`。`dev`是你硬件设备的底层`device`结构，`ptr`是一个输出参数，是缓冲区的内核虚拟地址。此函数返回`dma_addr_t`类型的元素，这是
+    I/O MMU（如果存在）返回的设备总线地址，以便设备能够进行 DMA 操作。你应该使用`dma_mapping_error()`（如果没有错误发生，必须返回`0`）来检查映射是否返回了有效地址，并且如果发生错误，不要继续操作。
 - en: 'Such mapping can be released by the following function:'
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种映射可以通过以下函数释放：
 - en: '[PRE5]'
+  id: totrans-71
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: The other mapping is scatter/gather mappings, since memory buffers are spread
     (scattered) over the system on allocation and gathered by the driver.
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一种映射是散列/收集映射，因为内存缓冲区在分配时被分散（散布）到系统中，并由驱动程序收集。
 - en: Scatter/gather mappings
+  id: totrans-73
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 散列/收集映射
 - en: 'Scatter/gather mappings are a special type of streaming DMA mapping that allow
     the transfer of several memory buffers in a single shot, instead of mapping each
     buffer individually and transferring them one by one. Suppose you have several
     buffers that might not be physically contiguous, all of which need to be transferred
     at the same time to or from the device. This situation may occur due to the following:'
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 散列/收集映射是一种特殊类型的流式 DMA 映射，允许在一次操作中传输多个内存缓冲区，而不是逐个映射每个缓冲区并依次传输它们。假设你有多个缓冲区，它们可能在物理上并不连续，但需要同时传输到设备或从设备传输。这种情况可能会由于以下原因发生：
 - en: A `readv` or `writev` system call
+  id: totrans-75
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个`readv`或`writev`系统调用
 - en: A disk I/O request
+  id: totrans-76
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个磁盘 I/O 请求
 - en: Or simply a list of pages or a vmalloced region
+  id: totrans-77
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 或者仅仅是一个页面列表或一个 vmalloc 区域
 - en: 'Before you can issue such a mapping, you must set up an array of scatter elements,
     each of which should describe the mapping of an individual buffer. A scatter element
     is abstracted in the kernel as an instance of `struct scatterlist`, defined as
     follows:'
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 在你可以发出这种映射之前，你必须设置一个散列元素数组，每个元素应描述单个缓冲区的映射。散列元素在内核中被抽象为`struct scatterlist`的实例，定义如下：
 - en: '[PRE6]'
+  id: totrans-79
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'To set up a scatter list mapping, you should do the following:'
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 要设置一个散列列表映射，你应当执行以下操作：
 - en: Allocate your scattered buffers.
+  id: totrans-81
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 分配你的散布缓冲区。
 - en: Create an array of scatter elements, initialize this array using `sg_init_table()`
     on it, and fill this array with allocated memory using `sg_set_buf()`. Note that
     each scatter element entry must be of page size, except the last one, which may
     not respect this rule.
+  id: totrans-82
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建一个散列元素数组，使用`sg_init_table()`初始化该数组，并使用`sg_set_buf()`将已分配的内存填充到此数组中。请注意，每个散列元素条目必须是页面大小，最后一个元素除外，最后一个元素可能不遵循此规则。
 - en: Call `dma_map_sg()` on the scatter list.
+  id: totrans-83
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在散列列表上调用`dma_map_sg()`。
 - en: Once done with DMA, call `dma_unmap_sg()` to unmap the scatter list.
+  id: totrans-84
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: DMA 操作完成后，调用`dma_unmap_sg()`取消映射散列列表。
 - en: 'The following is a diagram that describes most of the concepts of the scatter
     list:'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是描述散列列表大部分概念的图示：
 - en: '![Figure 11.1 – Scatter/gather memory organization'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 11.1 – 散列/收集内存组织'
 - en: '](img/B17934_11_001.jpg)'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_11_001.jpg)'
 - en: Figure 11.1 – Scatter/gather memory organization
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 11.1 – 散列/收集内存组织
 - en: While it is possible to DMA the content of several buffers individually, scatter/gather
     makes it possible to DMA the whole list at once by sending the pointer to the
     scatter list array to the device, along with its length, which is the number of
     entries in the array.
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
 - en: 'The prototypes of `sg_init_table()`, `sg_set_buf()`, and `dma_map_sg()` are
     as follows:'
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE7]'
+  id: totrans-91
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: In the preceding APIs, `sgl` is the `scatterlist` array to initialize and `nents`
     is the number of entries in this array. `sg_set_buf()` sets a `scattlerlist` entry
     to point at given data. In its parameters, `sg` is the `scatterlist` entry, `data`
@@ -443,41 +600,55 @@
     `dma_map_sg()` returns the number of elements in the list that have been successfully
     mapped, which means it must never be less than zero. In the event of an error,
     this function returns zero.
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
 - en: 'The following is a code sample that demonstrates the principle of scatter/gather
     mapping:'
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE8]'
+  id: totrans-94
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: The same rules described in the single-buffer mapping section apply to scatter/gather.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
 - en: 'To unmap the list, you must use `dma_unmap_sg()`, which has the following definition:'
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE9]'
+  id: totrans-97
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: '`dev` is a pointer to the same device that has been used for mapping, `sg`
     is the scatter list (actually a pointer to the first element in the list) to be
     unmapped, `dir` is the DMA direction, which should map the mapping direction,
     and `nents` is the number of elements in the list.'
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
 - en: 'The following is an example that unmaps the previous implementation:'
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE10]'
+  id: totrans-100
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: In the preceding example, we used the same parameters that we used during the
     mapping.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
 - en: Implicit and explicit cache coherency for streaming mapping
+  id: totrans-102
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
@@ -489,6 +660,7 @@
     flag set), the mappings must be released first before the CPU can access the buffers.
     This is because `dma_unmap_single()`/`dma_unmap_sg()` implicitly take care of
     cache coherency as well.
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
 - en: However, if you need to use the same streaming DMA region numerous times and
@@ -507,27 +679,42 @@
     if the source is RAM (the destination is the device memory), this means the CPU
     may have written some data to the source buffer and the data may be in the cache
     line, hence the cache should be flushed.
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，如果你需要多次使用相同的流式 DMA 区域，并在 DMA 传输之间访问数据，缓冲区必须正确同步，以便设备和 CPU 都能看到 DMA 缓冲区的最新正确副本。为了避免缓存一致性问题，驱动程序必须在从
+    RAM 向设备启动 DMA 传输之前（在将数据放入缓冲区并实际将缓冲区交给硬件之前）调用 `dma_sync_{single,sg}_for_device()`。这个函数调用会在必要时刷新与
+    DMA 缓冲区对应的缓存行。类似地，驱动程序在完成从设备到 RAM 的 DMA 传输后不应立即访问内存缓冲区；相反，在读取缓冲区之前，驱动程序应调用 `dma_sync_{single,sg}_for_cpu()`，如果需要，它将使相关硬件缓存行失效。换句话说，当源缓冲区是设备内存时，应使缓存失效（缓存数据并不脏，因为
+    CPU 没有向任何缓冲区写入数据）；而如果源是 RAM（目标是设备内存），这意味着 CPU 可能已经向源缓冲区写入了一些数据，并且这些数据可能在缓存行中，因此缓存应被刷新。
 - en: 'The following are the prototypes of those syncing APIs:'
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是这些同步 API 的原型：
 - en: '[PRE11]'
+  id: totrans-106
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: In all of the preceding APIs, the direction parameter must remain the same as
     the direction specified during the mapping of the corresponding buffer.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 在之前的所有 API 中，方向参数必须与映射相应缓冲区时指定的方向保持一致。
 - en: In this section, we have learned to set up streaming DMA mappings. Now that
     we are done with mappings, let's introduce the concept of completion, which is
     used to notify a DMA transfer completion.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们已经学习了如何设置流式 DMA 映射。现在我们完成了映射的部分，接下来介绍完成概念，用于通知 DMA 传输完成。
 - en: Introduction to the concept of completion
+  id: totrans-109
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 完成概念介绍
 - en: This section will briefly describe completion and the necessary part of its
     API that the DMA transfer uses. For a complete description, feel free to have
     a look at the kernel documentation at `Documentation/scheduler/completion.txt`.
@@ -538,196 +725,283 @@
     only difference being that they make the developer's life easier as it does not
     require the wait queue to be maintained, which makes it very easy to see the intent
     of the code.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节将简要描述完成以及 DMA 传输使用的必要 API 部分。有关完整描述，请随时查看 `Documentation/scheduler/completion.txt`
+    中的内核文档。在内核编程中，典型的做法是启动当前线程外的某些活动，然后等待其完成。完成是等待非常常见的过程完成时，等待队列或休眠 API 的良好替代方案。完成变量使用等待队列来实现，唯一的区别是它们使开发者的工作变得更简单，因为不需要维护等待队列，这使得代码的意图非常清晰易懂。
 - en: 'Working with completion requires this header:'
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用完成时需要这个头文件：
 - en: '[PRE12]'
+  id: totrans-112
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'A completion variable is represented in the kernel as an instance of struct
     completion structures that can be initialized statically as follows:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成变量在内核中表示为一个结构体 `completion` 的实例，可以像下面这样静态初始化：
 - en: '[PRE13]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'Dynamic allocation of an initialization is done as follows:'
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 动态分配初始化可以如下进行：
 - en: '[PRE14]'
+  id: totrans-116
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'When the driver initiates work whose completion must be awaited (a DMA transaction
     in our case), it just has to pass the completion event to the `wait_for_completion()`
     function, which has the following prototype:'
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 当驱动程序启动必须等待完成的工作（在我们这里是 DMA 事务）时，它只需要将完成事件传递给 `wait_for_completion()` 函数，该函数的原型如下：
 - en: '[PRE15]'
+  id: totrans-118
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'When the completion occurs, the driver can wake the waiters using one of the
     following APIs:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 当完成发生时，驱动程序可以使用以下 API 之一唤醒等待者：
 - en: '[PRE16]'
+  id: totrans-120
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: '`complete()` will wake up only one waiting task, while `complete_all()` will
     wake up every task waiting for that event. Completions are implemented in such
     a way that they will work properly even if `complete()` is called before `wait_for_completion()`
     is.'
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: '`complete()` 只会唤醒一个等待的任务，而 `complete_all()` 会唤醒所有等待该事件的任务。完成操作是以一种确保即使在 `wait_for_completion()`
+    之前调用 `complete()` 时也能正常工作的方式实现的。'
 - en: In this section, we have learned to implement a completion callback to notify
     the completeness status of a DMA transfer. Now that we are comfortable with all
     the common concepts of the DMA, we can start applying these concepts using the
     DMA engine APIs, which will also help us better understand how things work once
     everything is put together.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们已经学会了实现一个完成回调，以通知 DMA 传输的完成状态。现在我们已经掌握了 DMA 的所有常见概念，可以开始使用 DMA 引擎 API
+    来应用这些概念，这也有助于我们更好地理解当一切合并在一起时，事物是如何运作的。
 - en: Working with the DMA engine's API
+  id: totrans-123
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 DMA 引擎的 API
 - en: The DMA engine is a generic kernel framework used to develop DMA controller
     drivers and leverage this controller from the consumer side. Through this framework,
     the DMA controller driver exposes a set of channels that can be used by client
     devices. This framework then makes it possible for client drivers (also called
     slaves) to request and use DMA channels from the controller to issue DMA transfers.
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: DMA 引擎是一个通用的内核框架，用于开发 DMA 控制器驱动程序并从消费端利用该控制器。通过这个框架，DMA 控制器驱动程序暴露出一组可以供客户端设备使用的通道。这个框架使得客户端驱动（也称为从属驱动）能够请求并使用来自控制器的
+    DMA 通道来发起 DMA 传输。
 - en: 'The following diagram is the layering, showing how this framework is integrated
     with the Linux kernel:'
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下图示展示了这一框架的分层结构，显示了该框架如何与 Linux 内核集成：
 - en: '![Figure 11.2 – DMA engine framework'
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 11.2 – DMA 引擎框架'
 - en: '](img/B17934_11_002.jpg)'
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_11_002.jpg)'
 - en: Figure 11.2 – DMA engine framework
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 11.2 – DMA 引擎框架
 - en: 'Here we will simply walk through that (slave) API, which is applicable for
     slave DMA usage only. The mandatory header here is as follows:'
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们将简单介绍该（从属）API，仅适用于从属 DMA 使用。这里的强制性头文件如下：
 - en: '[PRE17]'
+  id: totrans-130
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'The slave DMA usage is straightforward, and consists of the following steps:'
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 从属 DMA 的使用是直接的，包括以下步骤：
 - en: Informing the kernel about the device's DMA addressing capabilities.
+  id: totrans-132
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通知内核设备的 DMA 地址能力。
 - en: Requesting a DMA channel.
+  id: totrans-133
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 请求 DMA 通道。
 - en: If successful, configuring this DMA channel.
+  id: totrans-134
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果成功，配置这个 DMA 通道。
 - en: Preparing or configuring a DMA transfer. At this step, a transfer descriptor
     that represents the transfer is returned.
+  id: totrans-135
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 准备或配置 DMA 传输。在此步骤中，返回一个表示传输的传输描述符。
 - en: Submitting the DMA transfer using the descriptor. The transfer is then added
     to the controller's pending queue corresponding to the specified channel. This
     step returns a special cookie that you can use to check the progression of the
     DMA activity.
+  id: totrans-136
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用描述符提交 DMA 传输。然后，传输被添加到控制器的待处理队列中，等待指定通道的处理。此步骤返回一个特殊的 cookie，你可以用它来检查 DMA
+    活动的进展。
 - en: Starting the DMA transfers on the specified channel so that, if the channel
     is idle, the first transfer in the queue is started.
+  id: totrans-137
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在指定通道上启动 DMA 传输，以便当通道空闲时，队列中的第一个传输开始。
 - en: Now that we are aware of the steps needed to implement a DMA transfer, let's
     learn the data structures involved in the DMA engine framework before using the
     corresponding APIs.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经了解了实现 DMA 传输所需的步骤，让我们在使用相应的 API 之前，先了解 DMA 引擎框架中涉及的数据结构。
 - en: A brief introduction to the DMA controller interface
+  id: totrans-139
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 简要介绍 DMA 控制器接口
 - en: 'The usage of DMA in Linux consists of two parts: the controllers, which perform
     memory transfer (without the CPU intervening), and the channels, which are the
     ways by which client drivers (that is, DMA-capable drivers) submit jobs to controllers.
     It goes without saying that both the controller and its channels are tightly coupled
     because the former exposes the latter to clients.'
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 中 DMA 的使用包括两个部分：控制器，执行内存传输（不需要 CPU 介入），以及通道，客户端驱动（即支持 DMA 的驱动）通过通道向控制器提交任务。无需多言，控制器和其通道是紧密耦合的，因为前者向客户端暴露后者。
 - en: Although this chapter targets DMA client drivers, for the sake of understandability,
     we will be introducing some controller data structures and APIs.
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管本章面向 DMA 客户端驱动，但为了便于理解，我们将介绍一些控制器数据结构和 API。
 - en: The DMA controller data structure
+  id: totrans-142
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: DMA 控制器数据结构
 - en: 'The DMA controller is abstracted in the Linux kernel as an instance of `struct
     dma_device`. On its own, the controller is useless without clients, which would
     use the channels it exposes. Moreover, the controller driver must expose callbacks
     for channel configuration, as specified in its data structure, which has the following
     definition:'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE18]'
+  id: totrans-144
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'The complete definition of this data structure is available in `include/linux/dmaengine.h`.
     For this chapter, only fields of our interest have been listed. Their meanings
     are as follows:'
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
 - en: '`chancnt`: Specifies how many DMA channels are supported by this controller'
+  id: totrans-146
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`channels`: The list of `struct dma_chan` structures, which corresponds to
     the DMA channels exposed by this controller'
+  id: totrans-147
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`privatecnt`: How many DMA channels are requested by `dma_request_channel()`,
     which is the DMA engine API to request a DMA channel'
+  id: totrans-148
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`cap_mask`: One or more `dma_capability` flags, representing the capabilities
     of this controller'
+  id: totrans-149
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'The following are the possible values:'
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE19]'
+  id: totrans-151
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'As an example, this element is set in the i.MX DMA controller driver as follows:'
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE20]'
+  id: totrans-153
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: '`src_addr_widths`: The bit mask of source address widths that the device supports.
     This width must be supplied in bytes; for example, if the device supports a width
     of `4`, the mask should be set to `BIT(4)`.'
+  id: totrans-154
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`dst_addr_widths`: The bit mask of destination address widths that the device
     supports.'
+  id: totrans-155
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -735,59 +1009,73 @@
     `enum dma_transfer_direction` does not include a bit flag for each type, the DMA
     controller should set `BIT(<TYPE>)` and the same should be checked by the controller
     as well.'
+  id: totrans-156
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'It is set in the i.MX SDMA controller driver as follows:'
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE21]'
+  id: totrans-158
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: '`device_alloc_chan_resources`: Allocates resources and returns the number of
     allocated descriptors. Invoked by the DMA engine core when requesting a channel
     on this controller.'
+  id: totrans-159
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_free_chan_resources`: A callback allowing the release of the DMA channel''s
     resources.'
+  id: totrans-160
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: While the preceding was a generic callback, the following is a controller callback
     that depends on the controller capabilities and that must be provided if the associated
     capability bit masks are set in `cap_mask`.
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
 - en: '`device_prep_dma_memcpy` prepares a memcpy operation. If `DMA_MEMCPY` is set
     in `cap_mask`, then this element must be set. For each flag set, the corresponding
     callback must be provided, otherwise controller registration will fail. This is
     the case for all `device_prep_*` callbacks.'
+  id: totrans-162
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_prep_dma_xor`: Prepares an XOR operation.'
+  id: totrans-163
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_prep_dma_xor_val`: Prepares an xor validation operation.'
+  id: totrans-164
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_prep_dma_memset`: Prepares a memset operation.'
+  id: totrans-165
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_prep_dma_memset_sg`: Prepares a memset operation over a scatter list.'
+  id: totrans-166
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_prep_dma_interrupt`: Prepares an end of chain interrupt operation.'
+  id: totrans-167
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_prep_slave_sg`: Prepares a slave DMA operation.'
+  id: totrans-168
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -795,46 +1083,55 @@
     is frequently used in audio or UART drivers. A buffer of size `buf_len` is required
     by the function. The callback function will be called after `period_len` bytes
     have been transferred. We discuss such DMAs in the *A word on cyclic DMA* section.'
+  id: totrans-169
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_prep_interleaved_dma`: Transfers expression in a generic way.'
+  id: totrans-170
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_config`: Pushes a new configuration to a channel, with a return value
     of `0` in the event of success or an error code otherwise.'
+  id: totrans-171
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_pause`: Pauses any current transfer on a channel and returns `0` or
     if the pausing is effective, or an error code otherwise.'
+  id: totrans-172
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_resume`: Resumes any previously paused transfer on a channel. It returns
     `0` or an error code otherwise.'
+  id: totrans-173
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_terminate_all`: A callback used to abort all the transfers on a channel,
     and which returns `0` in the event of success or an error code otherwise.'
+  id: totrans-174
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_synchronize`: A callback allowing synchronization of the termination
     of a transfer to the current context.'
+  id: totrans-175
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_tx_status`: Polls for transaction completion. The optional `txstate`
     parameter can be used to obtain a struct containing auxiliary transfer status
     information; otherwise, the call will just return a simple status code.'
+  id: totrans-176
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`device_issue_pending`: A mandatory callback that pushes pending transactions
     to hardware. This is the backend of the `dma_async_issue_pending()` API.'
+  id: totrans-177
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -842,9 +1139,11 @@
     you should be using the `dmaengine_prep_*` DMA engine APIs, which additionally
     do some sanity checks before invoking the appropriate callback. For example, for
     memory to memory, the driver should use the `device_prep_dma_memcpy()` wrapper.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
 - en: The DMA channel data structure
+  id: totrans-179
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -853,47 +1152,59 @@
     requests one or more channels, reconfigures this channel, and asks the controller
     to use this channel to perform the submitted DMA transfer. A channel is defined
     as follows:'
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE22]'
+  id: totrans-181
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'You can see a DMA channel as a highway for I/O data transfer. The following
     are the meanings of each element in this data structure:'
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
 - en: '`device`: This is a pointer to the DMA device (the controller) that supplies
     this channel. This field can never be `NULL` if the channel has been requested
     successfully because a channel always belongs to a controller.'
+  id: totrans-183
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`slave`: This is a pointer to the underlying `struct device` structure for
     the device using this channel (its driver is a client driver).'
+  id: totrans-184
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`cookie`: This represents the last cookie value returned to the client by this
     channel.'
+  id: totrans-185
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`Completed_cookie`: The last completed cookie for this channel.'
+  id: totrans-186
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: The complete definition of this data structure can be found in `include/linux/dmaengine.h`.
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
 - en: In the DMA engine framework, a cookie is nothing but a DMA transaction identifier
     that allows the status and progression of the transaction it identifies to be
     checked.
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
 - en: DMA transaction descriptor data structure
+  id: totrans-190
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -901,36 +1212,46 @@
     a DMA transaction (or DMA transfer by abuse of language). Such a descriptor is
     represented in the kernel using a `struct dma_async_tx_descriptor` data structure,
     which has the following definition:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE23]'
+  id: totrans-192
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'The meanings of each element we have retained in this data structure are set
     out here:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
 - en: '`cookie`: A tracking cookie for this transaction. It allows the progression
     of this transaction to be checked.'
+  id: totrans-194
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`chan`: The target channel for this operation.'
+  id: totrans-195
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`callback`: A function that should be called once this operation is complete.'
+  id: totrans-196
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`callback_param`: This is given as a parameter of the callback function.'
+  id: totrans-197
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: You can find the complete data structure description in `include/linux/dmaengine.h`.
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
 - en: Handling device DMA addressing capabilities
+  id: totrans-199
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -940,35 +1261,45 @@
     may only support the low order 24-bits of addressing. This limitation originated
     from the ISA bus, which was 24-bits wide and where DMA buffers could only live
     in the bottom 16 MB of the system's memory.
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
 - en: Nevertheless, you can use the concept of a DMA mask to inform the kernel of
     such limitations, which aims to inform the kernel of your device's DMA addressing
     capabilities.
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
 - en: 'This can be achieved using `dma_set_mask_and_coherent()`, which has the following
     prototype:'
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE24]'
+  id: totrans-203
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: The preceding function will set the same mask for both streaming mappings and
     coherent mappings given that the DMA API guarantees that the coherent DMA mask
     can be set to the same or smaller than the streaming DMA mask.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
 - en: 'However, for special requirements, you can use either `dma_set_mask()` or `dma_set_coherent_mask()`
     to set the mask accordingly. These APIs have the following prototypes:'
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE25]'
+  id: totrans-206
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: In these functions, `dev` is the underlying device structure, while `mask` is
     a bit mask describing which bits of an address your device supports, which you
     can specify using the `DMA_BIT_MASK` macro along with the actual bit order.
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
 - en: Both `dma_set_mask()` and `dma_set_coherent_mask()` return zero to indicate
@@ -978,49 +1309,65 @@
     can either fall back to non-DMA mode for data transfer in your driver or, if the
     DMA was mandatory, simply disable the feature in the device that required support
     for DMA or even not probe the device at all.
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
 - en: 'It is recommended that your driver prints a kernel warning (`dev_warn()` or
     `pr_warn()`) message when setting the DMA mask fails. The following is an example
     of pseudo-code for a sound card:'
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE26]'
+  id: totrans-210
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: In the preceding example, we have used the `DMA_BIT_MASK` macro to define the
     DMA mask. Then, we have disabled the features for which DMA support was mandatory
     when the required DMA mask was not supported. In either case, a warning is printed.
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
 - en: Requesting a DMA channel
+  id: totrans-212
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'A channel is requested using `dma_request_channel()`. Its prototype is as follows:'
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE27]'
+  id: totrans-214
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: In the preceding, the mask must be a bit mask that represents the capabilities
     the channel must satisfy. It is essentially used to specify the type of transfer
     the driver needs to perform, which must be supported in `dma_device.cap_mask`.
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
 - en: 'The `dma_cap_zero()` and `dma_cap_set()` functions are used to clear the mask
     and set the capability we need; for example:'
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE28]'
+  id: totrans-217
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: '`fn` is a callback pointer whose type has the following definition:'
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE29]'
+  id: totrans-219
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: Actually, `dma_requaest_channel()` walks through the available DMA controllers
     in the system (`dma_device_list`, defined in `drivers/dma/dmaengine.c`) and for
     each of them, it looks for a channel that corresponds to the request. If the `filter_fn`
@@ -1032,40 +1379,53 @@
     routine once for each free channel in the system. Upon seeing a suitable channel,
     `filter_fn` should return `DMA_ACK`, which will tag the given channel to be the
     return value from `dma_request_channel()`.
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
 - en: 'A channel allocated through this interface is exclusive to the caller until
     `dma_release_channel()` is called. It has the following definition:'
+  id: totrans-221
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE30]'
+  id: totrans-222
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: This API releases the DMA channel and makes it available for request by other
     clients.
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
 - en: 'By way of additional information, available DMA channels on a system can be
     listed in user space using the `ls /sys/class/dma/` command as follows:'
+  id: totrans-224
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE31]'
+  id: totrans-225
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'In the preceding snippet, the `chan<chan-index>` channel name is concatenated
     with the DMA controller, `dma<dma-index>`, to which it belongs. Whether a channel
     is in use or not can be seen by printing the `in_use` file value in the corresponding
     channel directory as follows:'
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE32]'
+  id: totrans-227
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: In the preceding, we can see, for example, that `dma0chan1` is in use, while
     `dma0chan6` is not.
+  id: totrans-228
   prefs: []
   type: TYPE_NORMAL
 - en: Configuring the DMA channel
+  id: totrans-229
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1077,34 +1437,45 @@
     and DMA burst lengths, for the peripheral. This configuration is then applied
     to the underlying hardware using the `dmaengine_slave_config()` function, which
     is defined as follows:'
+  id: totrans-230
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE33]'
+  id: totrans-231
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: The `chan` parameter represents the DMA channel to configure, and `config` is
     the configuration to be applied.
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
 - en: 'To better fine-tune this configuration, we must look at the `struct dma_slave_config`
     structure, which is defined as follows:'
+  id: totrans-233
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE34]'
+  id: totrans-234
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'Here is the meaning of each element in the structure:'
+  id: totrans-235
   prefs: []
   type: TYPE_NORMAL
 - en: '`direction` indicates whether the data should go in or out on this slave channel,
     right now. The possible values are as follows:'
+  id: totrans-236
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '[PRE35]'
+  id: totrans-237
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: '`src_addr`: This is the physical address (the bus address actually) of the
     buffer where the DMA slave data should be read (RX). This element is ignored if
     the source is memory. `dst_addr` is the physical address (the bus address) of
@@ -1113,34 +1484,44 @@
     register where the DMA data should be read. If the source is memory, this may
     be ignored depending on the architecture. In the same manner, `dst_addr_width`
     is the same as `src_addr_width`, but for the destination target (TX).'
+  id: totrans-238
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Any bus width must be one of the following enumerations:'
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE36]'
+  id: totrans-240
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: '`src_maxburs`: This is the maximum number of words that can be sent to the
     device in a single burst (consider words as units of the `src_addr_width` member,
     not bytes). On I/O peripherals, typically half the FIFO depth is used so that
     it does not overflow. On memory sources, this may or may not be applicable. `dst_maxburst`
     is similar to `src_maxburst`, but it is used for the destination target.'
+  id: totrans-241
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'The following is an example of DMA channel configuration:'
+  id: totrans-242
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE37]'
+  id: totrans-243
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: In the preceding excerpt, `dma_request_channel()` is used to request a DMA channel,
     which is then configured using `dmaengine_slave_config()`.
+  id: totrans-244
   prefs: []
   type: TYPE_NORMAL
 - en: Configuring the DMA transfer
+  id: totrans-245
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1150,62 +1531,80 @@
     submitted. Each of these APIs returns a transfer descriptor, represented by the
     `struct dma_async_tx_descriptor` data structure, which can be used later for customization
     before submitting the transfer.
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
 - en: 'For a memory-to-memory transfer, for example, you should be using the `device_prep_dma_memcpy`
     callback, as in the following code:'
+  id: totrans-247
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE38]'
+  id: totrans-248
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'In the preceding code sample, we dereference the controller callback for invocation
     while we could have checked for its existence first. However, for sanity and portability
     reasons, it is recommended to use the `dmaengine_prep_*` DMA engine APIs instead
     of invoking the controller callback directly. Our `tx_desc` assignation will then
     have the following form:'
+  id: totrans-249
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE39]'
+  id: totrans-250
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: This last approach is safer and portable regarding the controller data structure
     that may be subject to changes.
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
 - en: Additionally, the client driver can use the `callback` element of the `dma_async_tx_descriptor`
     structure (returned by the `dmaengine_prep_*` function) to supply a completion
     callback.
+  id: totrans-252
   prefs: []
   type: TYPE_NORMAL
 - en: Submitting the DMA transfer
+  id: totrans-253
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'To put the transaction in the driver pending queue, `dmaengine_submit()` is
     used, which has the following prototype:'
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE40]'
+  id: totrans-255
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'This API is the frontend of the controller''s `device_issue_pending` callback.
     This function returns a cookie that you can use to check the progression of DMA
     activity through other DMA engines. To check whether the returned cookie is valid,
     you can use the `dma_submit_error()` helper, as we will see in the example. Assuming
     the completion callback has not yet been provided, it can be set up before submitting
     the transfer, as in the following excerpt:'
+  id: totrans-256
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE41]'
+  id: totrans-257
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: The preceding excerpt is quite short and self-explanatory. For a parameter to
     be passed to the callback, it must be set in the descriptor's `callback_param`
     field. It can be a device state structure, for example.
+  id: totrans-258
   prefs: []
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-259
   prefs: []
   type: TYPE_NORMAL
 - en: An interrupt (from the DMA controller) is raised after each DMA transfer has
@@ -1213,9 +1612,11 @@
     tasklet is activated. If the client driver has provided a completion callback,
     the tasklet will call it when it is scheduled. Thus, the completion callback runs
     in an interrupt context.
+  id: totrans-260
   prefs: []
   type: TYPE_NORMAL
 - en: Issuing pending DMA requests and waiting for callback notification
+  id: totrans-261
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1226,36 +1627,48 @@
     the next one in the queue is started and a tasklet triggered. This tasklet is
     in charge of calling the client driver completion callback routine for notification,
     if set:'
+  id: totrans-262
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE42]'
+  id: totrans-263
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'This function is a wrapper around the controller''s `device_issue_pending`
     callback. An example of its usage would look like the following:'
+  id: totrans-264
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE43]'
+  id: totrans-265
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'The `wait_for_completion()` function will block, putting the current task to
     sleep until our DMA callback gets called to update (complete) our completion variable
     in order to resume the blocked code. It is a good alternative to `while (!done)
     msleep(SOME_TIME);`. The following is an example:'
+  id: totrans-266
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE44]'
+  id: totrans-267
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: This is all in our DMA transfer implementation. When the completion callback
     returns, the main code will resume and continue its normal workflow.
+  id: totrans-268
   prefs: []
   type: TYPE_NORMAL
 - en: Now that we have gone through the DMA engine APIs, we can summarize the knowledge
     in a complete example, as we see in the next section.
+  id: totrans-269
   prefs: []
   type: TYPE_NORMAL
 - en: Putting it all together – Single-buffer DMA mapping
+  id: totrans-270
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -1264,186 +1677,253 @@
     We will use a character device so that any write operation in this device will
     trig the DMA and any read operation will compare both the source and destination
     to check whether they match.
+  id: totrans-271
   prefs: []
   type: TYPE_NORMAL
 - en: 'First, let''s enumerate the header files required to pull the necessary APIs:'
+  id: totrans-272
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE45]'
+  id: totrans-273
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: 'Let''s now define some global variables for the driver:'
+  id: totrans-274
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE46]'
+  id: totrans-275
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: In the preceding, `wbuf` represents the source buffer, and `rbuf` represents
     the destination buffer. Since our implementation is based on a character device,
     `gMajor` and `dma_test_class` are used to represent the major number and the class
     of the character device.
+  id: totrans-276
   prefs: []
   type: TYPE_NORMAL
 - en: 'Because DMA mappings need to be given a device structure as the first parameter,
     let''s create a dummy one:'
+  id: totrans-277
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE47]'
+  id: totrans-278
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: Because we have used a static device, we set the device's DMA mask in the device
     structure. In a platform driver, we would have used `dma_set_mask_and_coherent()`
     to achieve that.
+  id: totrans-279
   prefs: []
   type: TYPE_NORMAL
 - en: 'The time has come to implement our first file operation, the `open` method,
     which in our case, simply allocates buffers:'
+  id: totrans-280
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE48]'
+  id: totrans-281
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'The preceding character device''s open operation does nothing other than allocate
     the buffer that will be used for our transfer. These buffers will be freed when
     the device file is closed, which will result in invoking our device''s release
     function, implemented as follows:'
+  id: totrans-282
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE49]'
+  id: totrans-283
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'We arrive at the implementation of the `read` method. This method will simply
     add an entry to the kernel message buffer, reporting the result of the DMA operation.
     It is implemented as follows:'
+  id: totrans-284
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE50]'
+  id: totrans-285
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: 'Now comes the DMA-related part. We first implement the completion callback,
     which does nothing other than invoke `complete()` on our completion structure
     and add a trace in the kernel log buffer. It is implemented as follows:'
+  id: totrans-286
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE51]'
+  id: totrans-287
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'The choice has been made to implement all the DMA logic in the write method.
     There is no technical reason behind this choice. A user is free to adapt the code
     architecture, based on the following implementation:'
+  id: totrans-288
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE52]'
+  id: totrans-289
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: In the preceding, there are variables we will require in order to perform our
     memory-to-memory DMA transfer.
+  id: totrans-290
   prefs: []
   type: TYPE_NORMAL
 - en: 'Now that our variables are defined, we initialize the source buffer with some
     content that will later be copied to the destination with the DMA operation:'
+  id: totrans-291
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE53]'
+  id: totrans-292
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: 'The source buffer is ready, and we can now start the DMA-related code. At this
     first step, we initialize capabilities and request a DMA channel:'
+  id: totrans-293
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE54]'
+  id: totrans-294
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: In the preceding, the channel could have also registered with `dma_m2m_chan
     = dma_request_chan_by_mask(&dma_m2m_mask);`. The advantage of using this method
     is that only the mask has to be specified in a parameter, and the driver need
     not bother with other arguments.
+  id: totrans-295
   prefs: []
   type: TYPE_NORMAL
 - en: 'In the second step, we set slave- and controller-specific parameters, and then
     we create the mappings for both source and destination buffers:'
+  id: totrans-296
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE55]'
+  id: totrans-297
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'In the third step, we grab a descriptor for the transaction:'
+  id: totrans-298
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE56]'
+  id: totrans-299
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: Calling `dmaengine_prep_dma_memcpy()` results in invoking `dma_m2m_chan->device->device_prep_dma_memcpy()`.
     It is, however, recommended to use the DMA engine method since it is more portable.
+  id: totrans-300
   prefs: []
   type: TYPE_NORMAL
 - en: 'In the fourth step, we submit the DMA transaction:'
+  id: totrans-301
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE57]'
+  id: totrans-302
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: 'Now that the transaction has been submitted, we can move to the fifth and final
     step, where we issue pending DMA requests and wait for callback notification:'
+  id: totrans-303
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE58]'
+  id: totrans-304
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: 'At this point in the code, the DMA transaction has run until completion, and
     we can check whether source and destination buffers have the same content. However,
     before accessing the buffers, they must be synced; luckily, the unmapping methods
     perform an implicit buffer sync:'
+  id: totrans-305
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE59]'
+  id: totrans-306
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: 'In the preceding write operation, we have gone through the five steps required
     to perform our DMA transfer: requesting a DMA channel; configuring this channel;
     preparing a DMA transfer; submitting this transfer; and then triggering the transfer
     providing a completion callback in the meantime.'
+  id: totrans-307
   prefs: []
   type: TYPE_NORMAL
 - en: 'After we are done with operation definitions, we can set up a file operation
     data structure as follows:'
+  id: totrans-308
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE60]'
+  id: totrans-309
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: 'Now that the file operation has been set up, we can implement the module''s
     `init` function, where we create and register the character device as follows:'
+  id: totrans-310
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE61]'
+  id: totrans-311
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: 'The module initialization will create and register a character device. This
     operation must be reverted when the module is unloaded, that is, in the module''s
     `exit` method, implemented as follows:'
+  id: totrans-312
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE62]'
+  id: totrans-313
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: 'At this point, we can register our module''s init and exit methods with the
     driver core and provide metadata for our module. This is done as follows:'
+  id: totrans-314
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE63]'
+  id: totrans-315
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: The full code is available in the repository of the book in the `chapter-12/`
     directory.
+  id: totrans-316
   prefs: []
   type: TYPE_NORMAL
 - en: Now that we are familiar with the DMA engine APIs and have summarized our skills
     in a concrete example, we can discuss a particular DMA transfer, the Cyclic DMA,
     mostly used in UART drivers.
+  id: totrans-317
   prefs: []
   type: TYPE_NORMAL
 - en: A word on cyclic DMA
+  id: totrans-318
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -1452,11 +1932,14 @@
     dealing with callbacks that the DMA controller can expose, we have seen `dma_device.device_prep_dma_cyclic`,
     which is the backend for `dmaengine_prep_dma_cyclic()`, which has the following
     prototype:'
+  id: totrans-319
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE64]'
+  id: totrans-320
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: 'The preceding API takes in five parameters: `chan`, which is the allocated
     DMA channel structure; `buf_addr`, the handle to the mapped DMA buffer; `buf_len`,
     which is the size of the DMA buffer; `period_len`, the size of one cyclic period;
@@ -1465,38 +1948,48 @@
     structure, which can be used to assign a completion function to the DMA transfer.
     Most of the time, `flags` correspond to `DMA_PREP_INTERRUPT`, which means that
     the DMA transfer callback should be invoked upon each cycle completion.'
+  id: totrans-321
   prefs: []
   type: TYPE_NORMAL
 - en: Cyclic mode is mostly used in TTY drivers, where the data is fed into a **First
     In First Out** (**FIFO**) ring buffer. In this mode, the allocated DMA buffer
     is divided into periods equal in size (often referenced as cyclic periods) so
     that every time one such transfer is finished, the callback function is invoked.
+  id: totrans-322
   prefs: []
   type: TYPE_NORMAL
 - en: 'The callback function that has been implemented is used to keep track of the
     state of the ring buffer and buffer management is implemented using the kernel
     ring buffer API (so you need to include `<linux/circ_buf.h>`):'
+  id: totrans-323
   prefs: []
   type: TYPE_NORMAL
 - en: '![Figure 11.3 – Cyclic DMA ring buffer'
+  id: totrans-324
   prefs: []
   type: TYPE_NORMAL
 - en: '](img/B17934_11_003.jpg)'
+  id: totrans-325
   prefs: []
   type: TYPE_NORMAL
 - en: Figure 11.3 – Cyclic DMA ring buffer
+  id: totrans-326
   prefs: []
   type: TYPE_NORMAL
 - en: The following is an example from the Atmel serial driver in `drivers/tty/serial/atmel_serial.c`,
     which demonstrates this principle of cyclic DMA quite well.
+  id: totrans-327
   prefs: []
   type: TYPE_NORMAL
 - en: 'The driver first prepares the DMA resources as in the following:'
+  id: totrans-328
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE65]'
+  id: totrans-329
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: For the sake of readability, error checking has been omitted. The function starts
     by setting the appropriate DMA capability mask (using `dma_set_cap()`) before
     requesting the DMA channel. After the channel has been requested, the mapping
@@ -1506,39 +1999,48 @@
     callback at the end of each cycle transfer. The descriptor obtained is then configured
     with the callback along with its parameter before being submitted to the DMA controller
     using `dmaengine_submit()` and fired with `dma_async_issue_pending()`.
+  id: totrans-330
   prefs: []
   type: TYPE_NORMAL
 - en: 'The `atmel_complete_rx_dma()` callback will schedule a tasklet whose handler
     is `atmel_tasklet_rx_func()` and which will invoke the real DMA completion callback,
     `atmel_rx_from_dma()`, implemented as follows:'
+  id: totrans-331
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE66]'
+  id: totrans-332
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: In the DMA completion callback, we can see that before the buffer is being accessed
     by the CPU, `dma_sync_sg_for_cpu()` is invoked to invalidate the corresponding
     hardware cache lines. Then, some ring buffers and TTY-related operations are performed
     (respectively, reading the received data and forwarding it to the TTY layer).
     And finally, the buffer is given back to the device after `dma_sync_sg_for_device()`
     is invoked.
+  id: totrans-333
   prefs: []
   type: TYPE_NORMAL
 - en: To summarize, the preceding example did not only show how cyclic DMA works but
     also showed how to address coherency issues when the buffer is used and reused
     between transfers, either by the CPU or the device.
+  id: totrans-334
   prefs: []
   type: TYPE_NORMAL
 - en: Now that we are familiar with the cyclic DMA, we have concluded our series on
     DMA transfer and DMA engine APIs. We have learned how to set up transfers, initiate
     them, and await their completion.
+  id: totrans-335
   prefs: []
   type: TYPE_NORMAL
 - en: In the next section, we will learn how to specify and grab DMA channels from
     the device tree and the code.
+  id: totrans-336
   prefs: []
   type: TYPE_NORMAL
 - en: Understanding DMA and DT bindings
+  id: totrans-337
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -1546,41 +2048,52 @@
     SoC-dependent, and some parameters (such as DMA cells) may vary from one SoC to
     another. This example only focuses on the i.MX SDMA controller, which can be found
     in the kernel source, at `Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt`.
+  id: totrans-338
   prefs: []
   type: TYPE_NORMAL
 - en: Consumer binding
+  id: totrans-339
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'According to the SDMA event-mapping table, the following code shows the DMA
     request signals for peripherals in i.MX 6Dual/6Quad:'
+  id: totrans-340
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE67]'
+  id: totrans-341
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: The second cells (25 and 26) in the `dma` property correspond to the DMA request/event
     ID. Those values come from the SoC manuals (i.MX53 in our case). You can have
     a look at [https://community.nxp.com/servlet/JiveServlet/download/614186-1-373516/iMX6_Firmware_Guide.pdf](https://community.nxp.com/servlet/JiveServlet/download/614186-1-373516/iMX6_Firmware_Guide.pdf)
     and the Linux reference manual at [https://community.nxp.com/servlet/JiveServlet/download/614186-1-373515/i.MX_Linux_Reference_Manual.pdf](https://community.nxp.com/servlet/JiveServlet/download/614186-1-373515/i.MX_Linux_Reference_Manual.pdf).
+  id: totrans-342
   prefs: []
   type: TYPE_NORMAL
 - en: 'The third cell indicates the priority of use. The driver code to request a
     specified parameter is defined next. You can find the complete code in `drivers/tty/serial/imx.c`
     in the kernel source tree. The following is the excerpt of the code grabbing elements
     from the device tree:'
+  id: totrans-343
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE68]'
+  id: totrans-344
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: The magic call here is `dma_request_slave_channel()`, which will parse the device
     node (in the DT) using `of_dma_request_slave_channel()` to gather channel settings,
     according to the DMA channel name (refer to the named resource in [*Chapter 6*](B17934_06_Epub.xhtml#_idTextAnchor095),
     *Understanding and Leveraging the Device Tree*).
+  id: totrans-345
   prefs: []
   type: TYPE_NORMAL
 - en: Summary
+  id: totrans-346
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -1589,10 +2102,12 @@
     and DMA engine APIs. After this chapter, I have no doubt you will be able to set
     up at least a memory-to-memory DMA transfer. Further information can be found
     at `Documentation/dmaengine/`, in the kernel source tree.
+  id: totrans-347
   prefs: []
   type: TYPE_NORMAL
 - en: However, the next chapter deals with the regmap, which introduces memory-oriented
     abstractions, and which unify access to memory-oriented devices (I2C, SPI, or
     memory-mapped).
+  id: totrans-348
   prefs: []
   type: TYPE_NORMAL

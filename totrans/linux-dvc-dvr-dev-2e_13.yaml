@@ -3,6 +3,7 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '*第10章*：理解Linux内核内存分配'
 - en: Linux systems use an illusion referred to as "virtual memory." This mechanism
     makes every memory address virtual, which means they do not point to any address
     in the RAM directly. This way, whenever we access a memory location, a translation
@@ -10,46 +11,55 @@
   id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux系统使用一种被称为“虚拟内存”的幻觉。这个机制使得每个内存地址都是虚拟的，这意味着它们并不直接指向RAM中的任何地址。通过这种方式，每当我们访问某个内存位置时，都会执行一个转换机制，以便匹配相应的物理内存。
 - en: 'In this chapter, we will deal with the whole Linux memory allocation and management
     system, covering the following topics:'
   id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将处理整个Linux内存分配与管理系统，涵盖以下主题：
 - en: An introduction to Linux kernel memory-related terms
   id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Linux内核内存相关术语简介
 - en: Demystifying address translation and MMU
   id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 揭开地址转换与MMU的神秘面纱
 - en: Dealing with memory allocation mechanisms
   id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 处理内存分配机制
 - en: Working with I/O memory to talk with hardware
   id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用I/O内存与硬件通信
 - en: Memory remapping
   id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 内存重映射
 - en: An introduction to Linux kernel memory-related terms
   id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: Linux内核内存相关术语简介
 - en: Though system memory (also known as RAM) can be extended in some computers that
     allow it, physical memory is a limited resource in computer systems.
   id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然系统内存（也称为RAM）在某些允许扩展的计算机中可以增加，但物理内存在计算机系统中是有限的资源。
 - en: 'Virtual memory is a concept, an illusion given to each process so that it thinks
     it has large and almost infinite memory, and sometimes more than the system really
     has. To set up everything, we will introduce the address space, virtual or logical
@@ -57,6 +67,7 @@
   id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 虚拟内存是一个概念，是给予每个进程的幻觉，使其认为自己拥有大量且几乎无限的内存，有时甚至超过系统实际拥有的内存。为了设置一切，我们将介绍地址空间、虚拟或逻辑地址、物理地址和总线地址等术语：
 - en: A physical address identifies a physical (RAM) location. Because of the virtual
     memory mechanism, the user or the kernel never directly deals with the physical
     address but can access it by its corresponding logical address.
@@ -64,6 +75,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 物理地址标识一个物理（RAM）位置。由于虚拟内存机制，用户或内核永远不会直接处理物理地址，而是通过其对应的逻辑地址进行访问。
 - en: A virtual address does not necessarily exist physically. This address is used
     as a reference to access the physical memory location by CPU on behalf of the
     **Memory Management Unit** (**MMU**). The MMU sits between the CPU core and memory
@@ -75,6 +87,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 虚拟地址不一定在物理上存在。该地址作为参考，用于通过**内存管理单元**（**MMU**）代表CPU访问物理内存位置。MMU位于CPU核心与内存之间，通常是物理CPU的一部分。也就是说，在ARM架构中，它是受许可核心的一部分。然后，它负责每次访问内存位置时将虚拟地址转换为物理地址。这个机制被称为**地址转换**。
 - en: A logical address is an address resulting from a linear mapping. It results
     from a mapping above `PAGE_OFFSET`. Such addresses are virtual addresses with
     a fixed offset from their physical addresses. Thus, a logical address is always
@@ -83,6 +96,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 逻辑地址是由线性映射产生的地址。它是`PAGE_OFFSET`之上的映射结果。这类地址是虚拟地址，与其物理地址有固定偏移。因此，逻辑地址始终是虚拟地址，而反之则不成立。
 - en: In computer systems, an address space is the amount of memory allocated for
     all possible addresses for a computational entity (in our case, the CPU). This
     address space may be virtual or physical. While physical address space can go
@@ -94,6 +108,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在计算机系统中，地址空间是为计算实体（在我们这里是CPU）分配的所有可能地址的内存量。这个地址空间可以是虚拟的或物理的。物理地址空间的最大值可以达到系统中安装的RAM的容量（理论上受限于CPU地址总线和寄存器的宽度），而虚拟地址的范围可以扩展到RAM或操作系统架构允许的最高地址（例如，在1
+    GB RAM系统上最多支持4 GB的虚拟内存地址）。
 - en: 'As the MMU is the centerpiece of memory management, it organizes memory into
     logical units of fixed size called **pages**. The size of a page is a power of
     2 in bytes and varies among systems. A page is backed by a page frame, and the
@@ -102,6 +118,7 @@
   id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于MMU是内存管理的核心，它将内存组织为固定大小的逻辑单元，称为**页**。页的大小是2的幂，以字节为单位，并在不同的系统中有所不同。一个页由一个页框支持，页的大小与页框匹配。在深入学习内存管理之前，我们先介绍一下其他术语：
 - en: A memory page, virtual page, or simply a page are terms used to refer to a fixed-length
     (`PAGE_SIZE`) block of virtual memory. The same term page is used as a kernel
     data structure to represent a memory page.
@@ -109,6 +126,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 内存页、虚拟页或简称页是用来指代一个固定长度的（`PAGE_SIZE`）虚拟内存块的术语。相同的术语“页”也作为内核数据结构，表示一个内存页。
 - en: On the other hand, a frame (or page frame) refers to a fixed-length block of
     physical memory (RAM) on top of which the operating system maps a page. The size
     of the page matches a page frame. Each page frame is given a number, called the
@@ -117,6 +135,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 另一方面，框架（或页框）指的是物理内存（RAM）中的一个固定长度块，操作系统将页面映射到这个块上。页的大小与页框大小匹配。每个页框都有一个编号，称为**页框号**（**PFN**）。
 - en: Then comes the term **page table**, which is a kernel and architecture data
     structure used to store the mappings between virtual addresses and physical addresses.
     The key pair page/frame describes a single entry in the page table and represents
@@ -125,6 +144,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 接下来是**页表**这一术语，它是一个内核和架构数据结构，用于存储虚拟地址与物理地址之间的映射关系。页/框的键值对描述了页表中的单个条目，代表一个映射。
 - en: Finally, the term "page-aligned" is used to qualify an address that starts exactly
     at the beginning of a page. It goes without saying that any memory whose address
     is a multiple of the system page size is said to be page-aligned. For example,
@@ -133,10 +153,12 @@
   id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，“页对齐”这一术语用于描述从页面的起始位置开始的地址。不言而喻，任何地址是系统页大小的倍数的内存，都被认为是页对齐的。例如，在一个4 KB页大小的系统中，`4.096`、`20.480`和`409.600`是页对齐的内存地址实例。
 - en: Note
   id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'The page size is fixed by the MMU, and the operating system can''t modify it.
     Some processors allow for multiple page sizes (for example, ARMv8-A supports three
     different granule sizes: 4 KB, 16 KB, and 64 KB), and the OS can decide which
@@ -144,11 +166,14 @@
   id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 页的大小由MMU固定，操作系统无法修改它。一些处理器允许使用多种页大小（例如，ARMv8-A支持三种不同的粒度大小：4 KB、16 KB和64 KB），操作系统可以决定使用哪种大小。不过，4
+    KB是广泛使用的页粒度。
 - en: Now that the terms frequently used while dealing with memory have been introduced,
     let's focus on memory management and organization by the kernel.
   id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 既然处理内存时常用的术语已经介绍完毕，那么我们就专注于内核如何进行内存管理和组织。
 - en: Linux is a virtual memory operating system. On a Linux running system, each
     process and even the kernel itself (and some devices) is allocated address space,
     which is some portion of the processor's virtual address space (note that neither
@@ -158,6 +183,7 @@
   id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux是一个虚拟内存操作系统。在一个运行中的Linux系统中，每个进程甚至内核本身（以及某些设备）都会被分配地址空间，这些空间是处理器虚拟地址空间的一部分（需要注意的是，内核和进程并不处理物理地址——只有MMU处理）。虽然这个虚拟地址空间被划分为内核空间和用户空间，但上半部分用于内核，下半部分用于用户空间。
 - en: 'The split varies between architectures and is held by the `CONFIG_PAGE_OFFSET`
     kernel configuration option. For 32-bit systems, the split is at `0xC0000000`
     by default. This is called the 3 GB/1 GB split, where the user space is given
@@ -170,35 +196,45 @@
   id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 划分因架构而异，并由 `CONFIG_PAGE_OFFSET` 内核配置选项控制。对于 32 位系统，默认划分在 `0xC0000000`。这被称为 3
+    GB/1 GB 划分，其中用户空间分配了较低的 3 GB 虚拟地址空间。然而，通过调整 `CONFIG_VMSPLIT_1G`、`CONFIG_VMSPLIT_2G`
+    和 `CONFIG_VMSPLIT_3G_OPT` 内核配置选项（参见 `arch/x86/Kconfig` 和 `arch/arm/Kconfig`），内核也可以获得不同大小的地址空间。对于
+    64 位系统，划分因架构而异，但其值较高：64 位 ARM 为 `0x8000000000000000`，x86_64 为 `0xffff880000000000`。
 - en: 'A typical process''s virtual address space layout looks like the following
     on a 32-bit system with the default splitting scheme:'
   id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 32 位系统上，采用默认划分方案时，一个典型进程的虚拟地址空间布局如下所示：
 - en: '![Figure 10.1 – 32-bit system memory splitting'
   id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.1 – 32 位系统内存划分'
 - en: '](img/B17934_10_001.jpg)'
   id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_001.jpg)'
 - en: Figure 10.1 – 32-bit system memory splitting
   id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.1 – 32 位系统内存划分
 - en: While this layout is transparent on 64-bit systems, there are particularities
     on 32-bit machines that need to be introduced. In the next sections, we will study
     in detail the reason for this memory splitting, its usage, and where it applies.
   id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然在 64 位系统上这种布局是透明的，但在 32 位机器上有一些特性需要介绍。在接下来的章节中，我们将详细研究这种内存划分的原因、用途及其应用场景。
 - en: Kernel address space layout on 32-bit systems – the concept of low and high
     memory
   id: totrans-30
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 32 位系统上的内核地址空间布局 – 低内存与高内存的概念
 - en: 'In an ideal world, all memory is permanently mappable. There are, however,
     some restrictions on 32-bit systems. This results in only a portion of RAM being
     permanently mapped. This part of memory can be accessed directly (by simple dereference)
@@ -211,18 +247,24 @@
   id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 在理想的情况下，所有内存都是永久可映射的。然而，在 32 位系统上存在一些限制，导致只有一部分 RAM 被永久映射。这部分内存可以被内核直接访问（通过简单的解引用），并被称为
+    **低内存**，而未被永久映射的（物理）内存部分则被称为 **高内存**。不同架构的限制决定了这个边界的具体位置。例如，英特尔核心只能永久映射前 1 GB
+    的 RAM。实际上，这个量略小，为 896 MiB 的 RAM，因为其中的一部分低内存用于动态映射高内存：
 - en: '![Figure 10.2 – High and low memory splitting'
   id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.2 – 高内存与低内存的划分'
 - en: '](img/B17934_10_002.jpg)'
   id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_002.jpg)'
 - en: Figure 10.2 – High and low memory splitting
   id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.2 – 高内存与低内存的划分
 - en: In the preceding diagram, we can see that 128 MB of the kernel address space
     is used to map a high memory of RAM on the fly when needed. On the other hand,
     896 MB of kernel address space is permanently and linearly mapped to a low 896
@@ -230,6 +272,8 @@
   id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的图示中，我们可以看到，内核地址空间的 128 MB 用于动态映射需要时的高内存 RAM。另一方面，896 MB 的内核地址空间被永久并线性地映射到低内存的
+    896 MB RAM。
 - en: The high-memory mechanism can also be used on a 1 GB RAM system to dynamically
     map user memory whenever the kernel needs access. The fact that the kernel can
     map the whole RAM into its address space does not mean the user space can't access
@@ -239,21 +283,26 @@
   id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 高内存机制还可以在 1 GB RAM 系统上使用，动态映射用户内存，只要内核需要访问。内核能够将整个 RAM 映射到其地址空间并不意味着用户空间无法访问它。一个
+    RAM 页框架可以有多个映射；它可以同时永久映射到内核内存空间，并在进程被选中执行时映射到用户空间的某个地址。
 - en: Note
   id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Given a virtual address, you can distinguish whether it is a kernel space or
     a user space address by using the process layout shown previously. Every address
     below `PAGE_OFFSET` comes from the user space; otherwise, it is from the kernel.
   id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 给定一个虚拟地址，您可以通过使用前面显示的进程布局来区分它是内核空间还是用户空间地址。`PAGE_OFFSET` 以下的每个地址来自用户空间；否则，它来自内核空间。
 - en: Low memory in detail
   id: totrans-39
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 低内存详细信息
 - en: 'The first 896 MB of kernel address space constitutes the low memory region.
     Early in the boot process, the kernel permanently maps that 896 MB onto physical
     RAM. Addresses that result from that mapping are called `LOWMEM` is reserved for
@@ -263,27 +312,32 @@
   id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核地址空间的前896 MB构成低内存区域。在引导过程的早期，内核会将这896 MB的地址空间永久映射到物理RAM上。由该映射得到的地址被称为`LOWMEM`，并且专门保留给**直接内存访问**（**DMA**）使用。由于硬件限制，硬件并不总是允许将所有页视为相同。我们可以在内核空间中识别出三个不同的内存区域：
 - en: '`ZONE_DMA`: This contains page frames of memory below 16 MB, reserved for DMA.'
   id: totrans-41
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ZONE_DMA`：该区域包含16 MB以下的内存页帧，专门保留给DMA使用。'
 - en: '`ZONE_NORMAL`: This contains page frames of memory above 16 MB and below 896
     MB, for normal use.'
   id: totrans-42
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ZONE_NORMAL`：该区域包含16 MB以上且小于896 MB的内存页帧，供正常使用。'
 - en: '`ZONE_HIGHMEM`: This contains page frames of memory at and above 896 MB.'
   id: totrans-43
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ZONE_HIGHMEM`：该区域包含896 MB及以上的内存页帧。'
 - en: However, on a 512 MB system, there will be no `ZONE_HIGHMEM`, 16 MB for `ZONE_DMA`,
     and 496 MB for `ZONE_NORMAL`.
   id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，在一个512 MB的系统上，将没有`ZONE_HIGHMEM`，16 MB用于`ZONE_DMA`，剩余的496 MB用于`ZONE_NORMAL`。
 - en: From all the preceding, we can complete the definition of logical addresses,
     adding that these are addresses in kernel space mapped linearly on physical addresses,
     and that the corresponding physical address can be obtained by using an offset.
@@ -294,24 +348,29 @@
   id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 从前面的所有内容，我们可以完善对逻辑地址的定义，补充说明这些地址是在内核空间中按物理地址线性映射的地址，并且可以通过使用偏移量获取相应的物理地址。内核虚拟地址与逻辑地址类似，都是从内核空间地址映射到物理地址的映射。然而，它们之间的区别在于，内核虚拟地址并不总是像逻辑地址那样具有相同的线性、一对一的物理位置映射。
 - en: Note
   id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: You can convert a physical address into a logical address using the `__pa(address)`
     macro and the revert with the `__va(address)` macro.
   id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以使用`__pa(address)`宏将物理地址转换为逻辑地址，并使用`__va(address)`宏进行反向转换。
 - en: Understanding high memory
   id: totrans-48
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 理解高内存
 - en: The top 128 MB of the kernel address space is called a `HIGHMEM` region.
   id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核地址空间的前128 MB被称为`HIGHMEM`区域。
 - en: Mapping to access high memory is created on the fly by the kernel and destroyed
     when done. This makes high memory access slower. However, the concept of high
     memory does not exist on 64-bit systems, due to the huge address range (264 TB),
@@ -319,11 +378,14 @@
   id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核会动态创建访问高内存的映射，并在使用完毕后销毁。这使得高内存的访问速度较慢。然而，由于64位系统具有巨大的地址范围（264 TB），因此高内存的概念在64位系统中不存在，3
+    GB/1 GB（或任何类似的拆分方案）的划分已经不再有意义。
 - en: An overview of a process address space from the kernel
   id: totrans-51
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 从内核看进程地址空间的概览
 - en: 'On a Linux system, each process is represented in the kernel as an instance
     of `struct task_struct` (see `include/linux/sched.h`), which characterizes and
     describes this process. Before the process starts running, it is allocated a table
@@ -333,6 +395,9 @@
   id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Linux系统中，每个进程在内核中都由`struct task_struct`的一个实例表示（见`include/linux/sched.h`），该结构描述了该进程。在进程开始运行之前，会为它分配一个内存映射表，存储在`struct
+    mm_struct`类型的变量中（见`include/linux/mm_types.h`）。通过查看`struct task_struct`定义的以下片段，可以验证这一点，该片段嵌入了指向`struct
+    mm_struct`类型元素的指针：
 - en: '[PRE0]'
   id: totrans-53
   prefs: []
@@ -345,6 +410,8 @@
   id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 在内核中，有一个全局变量始终指向当前进程，`current`，而`current->mm`字段指向当前进程的内存映射表。在进一步解释之前，我们先来看一下`struct
+    mm_struct`数据结构的以下片段：
 - en: '[PRE1]'
   id: totrans-55
   prefs: []
@@ -359,18 +426,22 @@
   id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 我故意移除了一些我们不感兴趣的字段。有些字段我们稍后会讲到：例如`pgd`，它是指向进程基地址（第一个条目）的一级表（**页全局目录**，缩写为**PGD**）的指针，写入在CPU的上下文切换时的转换表基地址。为了更好地理解这个数据结构，我们可以使用以下图表：
 - en: '![Figure 10.3 – A process address space'
   id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.3 – 进程地址空间'
 - en: '](img/B17934_10_003.jpg)'
   id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_003.jpg)'
 - en: Figure 10.3 – A process address space
   id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.3 – 进程地址空间
 - en: From a process point of view, a memory mapping can be seen as nothing but a
     set of page table entries dedicated to a consecutive virtual address range. That
     *"consecutive virtual address range"* is referred to as a memory area, or a **Virtual
@@ -381,33 +452,39 @@
   id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 从进程的角度来看，内存映射可以被视为一组专门用于连续虚拟地址范围的页表项。这个*“连续虚拟地址范围”*被称为内存区域，或**虚拟内存区域**（**VMA**）。每个内存映射都由起始地址和长度、权限（例如程序是否可以从该内存中读取、写入或执行）以及相关资源（例如物理页面、交换页面和文件内容）描述。
 - en: '`mm_struct` has two ways to store process regions (VMAs):'
   id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: '`mm_struct`有两种方式来存储进程区域（VMAs）：'
 - en: In a red-black tree (a self-balancing binary search tree), whose root element
     is pointed by the `mm_struct->mm_rb` field
   id: totrans-62
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在一棵红黑树（自平衡二叉查找树）中，根元素由`mm_struct->mm_rb`字段指向
 - en: In a linked list, where the first element is pointed by the `mm_struct->mmap`
     field
   id: totrans-63
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在一个链表中，第一个元素由`mm_struct->mmap`字段指向
 - en: Now that we have had an overview of a process address space and have seen that
     it is made of a set of virtual memory regions, let's dive into the details and
     study the mechanisms behind these memory regions.
   id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经概览了进程地址空间，并且看到它是由一组虚拟内存区域组成的，接下来让我们深入研究这些内存区域背后的机制。
 - en: Understanding the concept of VMA
   id: totrans-65
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 理解VMA的概念
 - en: In the kernel, process memory mappings are organized into areas, each referred
     to as a VMA. For your information, in each running process on a Linux system,
     the code section, each mapped file region (a library, for example), or each distinct
@@ -419,11 +496,13 @@
   id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 在内核中，进程的内存映射被组织成若干个区域，每个区域被称为VMA。供您参考，在Linux系统上的每个运行中的进程中，代码段、每个映射的文件区域（例如库文件）或每个独立的内存映射（如果有的话）都是由VMA实现的。VMA是一个与架构无关的结构，具有权限和访问控制标志，由起始地址和长度定义。它们的大小始终是页大小（`PAGE_SIZE`）的倍数。一个VMA由几个页面组成，每个页面在页表中都有一个条目（**页表项**（**PTE**））。
 - en: 'A VMA is represented in the kernel as an instance of `struct vma_area`, defined
     as the following:'
   id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: VMA在内核中表示为`struct vma_area`结构的一个实例，定义如下：
 - en: '[PRE2]'
   id: totrans-68
   prefs: []
@@ -435,29 +514,34 @@
   id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了提高本节的可读性和易理解性，只有与我们相关的元素被列出。然而，剩余元素的含义如下：
 - en: '`vm_start` is the VMA start address within the address space (`vm_mm`). It
     is the first address within this VMA.'
   id: totrans-70
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`vm_start`是VMA在地址空间（`vm_mm`）中的起始地址，它是该VMA内的第一个地址。'
 - en: '`vm_end` is the first byte after our end address within `vm_mm`. It is the
     first address outside this VMA.'
   id: totrans-71
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`vm_end`是`vm_mm`中我们结束地址之后的第一个字节，它是该VMA外部的第一个地址。'
 - en: '`vm_next` and `vm_prev` are used to implement a linked list of VM areas per
     task, sorted by address.'
   id: totrans-72
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`vm_next`和`vm_prev`用于实现按地址排序的每个任务的VMA链表。'
 - en: '`vm_mm` is the process address space that this VMA belongs to.'
   id: totrans-73
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`vm_mm`是该VMA所属的进程地址空间。'
 - en: '`vm_page_prot` and `vm_flags` represent the access permission of the VMA. The
     former is an architecture-level data type, whose update is applied directly to
     the PTEs of the underlying architecture. It is a form of cached conversion from
@@ -467,35 +551,42 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`vm_page_prot`和`vm_flags`表示VMA的访问权限。前者是一个架构级数据类型，其更新直接应用于底层架构的PTE。它是`vm_flags`的缓存转换形式，后者以架构无关的方式存储适当的保护位和映射类型。'
 - en: '`vm_file` is the file backing this mapping. This can be `NULL` (for example,
     for anonymous mapping, such as a process''s heap or stack).'
   id: totrans-75
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`vm_file`是支持该映射的文件。对于匿名映射（如进程的堆或栈），此值可以为`NULL`。'
 - en: '`vm_pgoff` is the offset (within `vm_file`) in page size unit. This offset
     is measured in number of pages.'
   id: totrans-76
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`vm_pgoff`是偏移量（在`vm_file`内）以页大小为单位。此偏移量以页数来度量。'
 - en: 'The following diagram is an overview of a process memory mapping, highlighting
     each VMA and describing some of its structure elements:'
   id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下图是进程内存映射的概览，突出显示了每个VMA并描述其一些结构元素：
 - en: '![Figure 10.4 – Process memory mappings'
   id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.4 – 进程内存映射'
 - en: '](img/B17934_10_004.jpg)'
   id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_004.jpg)'
 - en: Figure 10.4 – Process memory mappings
   id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.4 – 进程内存映射
 - en: The preceding image (from http://duartes.org/gustavo/blog/post/how-the-kernel-manages-your-memory/)
     describes a process's (started from `/bin/gonzo`) memory mappings (VMAs). We can
     see interactions between `struct task_struct` and its address space element (`mm`),
@@ -503,11 +594,14 @@
   id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的图片（来源：http://duartes.org/gustavo/blog/post/how-the-kernel-manages-your-memory/）描述了一个进程（从`/bin/gonzo`启动）的内存映射（VMA）。我们可以看到`struct
+    task_struct`与其地址空间元素（`mm`）之间的交互，后者列出了并描述了每个VMA（起始、结束及其后备文件）。
 - en: 'You can use the `find_vma()` function to find the VMA that corresponds to a
     given virtual address. `find_vma()` is declared in `linux/mm.h` as the following:'
   id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以使用`find_vma()`函数来查找与给定虚拟地址对应的VMA。`find_vma()`在`linux/mm.h`中声明，形式如下：
 - en: '[PRE3]'
   id: totrans-83
   prefs: []
@@ -520,6 +614,7 @@
   id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 该函数搜索并返回第一个满足`vm_start <= addr < vm_end`的VMA，若没有找到则返回`NULL`。`mm`是要搜索的进程地址空间。对于当前进程，它可以是`current->mm`。以下是一个示例：
 - en: '[PRE4]'
   id: totrans-85
   prefs: []
@@ -529,6 +624,7 @@
   id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的代码片段将寻找一个VMA，其内存边界包含`0x603000`。
 - en: 'Given a process whose identifier is `<PID>`, the whole memory mappings of this
     process can be obtained by reading the `/proc/<PID>/maps`, `/proc/<PID>/smaps`,
     and `/proc/<PID>/pagemap` files. The following lists the mappings of a running
@@ -536,6 +632,7 @@
   id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 给定一个进程，其标识符为`<PID>`，可以通过读取`/proc/<PID>/maps`、`/proc/<PID>/smaps`和`/proc/<PID>/pagemap`文件来获取该进程的所有内存映射。以下列出了一个正在运行的进程（进程标识符PID为`1073`）的映射：
 - en: '[PRE5]'
   id: totrans-88
   prefs: []
@@ -547,34 +644,40 @@
   id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的每一行表示一个VMA，字段对应于`{地址（起始-结束）} {权限} {偏移量} {设备（主：次）} {inode} {路径名（映像）}`的模式：
 - en: '`address`: Represents the starting and ending address of the VMA.'
   id: totrans-90
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`address`：表示VMA的起始和结束地址。'
 - en: '`permissions`: Describes access rights of the region: `r` (read), `w` (write),
     and `x` (execute). `p` is if the mapping is private and `s` is for shared mapping.'
   id: totrans-91
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`permissions`：描述区域的访问权限：`r`（读），`w`（写），`x`（执行）。`p`表示映射是私有的，`s`表示共享映射。'
 - en: '`offset`: If file mapping (the `mmap` system call), it is the offset in the
     file where the mapping takes place. It is `0` otherwise.'
   id: totrans-92
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`offset`：如果是文件映射（`mmap`系统调用），则为映射发生时在文件中的偏移量。否则为`0`。'
 - en: '`major:minor`: If file mapping, these represent the major and minor numbers
     of the devices in which the file is stored (the device holding the file).'
   id: totrans-93
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`major:minor`：如果是文件映射，这代表存储文件的设备的主次设备号（设备持有文件）。'
 - en: '`inode`: If mapping from a file, this is the `inode` number of the mapped file.'
   id: totrans-94
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`inode`：如果是从文件映射，则为映射文件的`inode`号。'
 - en: '`pathname`: This is the name of the mapped file or left blank otherwise. There
     are other region names, such as `[heap]`, `[stack]`, or `[vdso]` (which stands
     for **virtual dynamic shared object**, a shared library mapped by the kernel into
@@ -584,11 +687,13 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`pathname`：这是映射文件的名称，否则留空。还有其他区域名称，例如 `[heap]`、`[stack]` 或 `[vdso]`（代表**虚拟动态共享对象**，一种由内核映射到每个进程地址空间中的共享库，目的是减少系统调用切换到内核模式时的性能损失）。'
 - en: Each page allocated to a process belongs to an area, thus any page that does
     not live in the VMA does not exist and cannot be referenced by the process.
   id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 分配给进程的每个页面都属于某个区域，因此任何不在 VMA 中的页面都不存在，也无法被进程引用。
 - en: High memory is perfect for user space because its address space must be explicitly
     mapped. Thus, most high memory is consumed by user applications. `__GFP_HIGHMEM`
     and `GFP_HIGHUSER` are the flags for requesting the allocation of (potentially)
@@ -597,17 +702,21 @@
   id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 高内存非常适合用户空间，因为它的地址空间必须显式地进行映射。因此，大多数高内存被用户应用程序占用。`__GFP_HIGHMEM` 和 `GFP_HIGHUSER`
+    是请求分配（潜在）高内存的标志。没有这些标志，所有内核分配只会返回低内存。在 Linux 中，无法从用户空间分配连续的物理内存。
 - en: Now that VMAs have no more secrets for us, let's describe the hardware concepts
     involved in the translation to their corresponding physical addresses, if any,
     or their creation and allocation otherwise.
   id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 既然 VMAs 对我们已经没有秘密可言，那么我们就来描述将其翻译到相应物理地址的硬件概念（如果有的话），或者它们的创建和分配方式。
 - en: Demystifying address translation and MMU
   id: totrans-99
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 破解地址翻译和 MMU
 - en: MMU does not only convert virtual addresses into physical ones but also protects
     memory from unauthorized access. Given a process, any page that needs to be accessed
     from this process must exist in one of its VMAs and, thus, must live in the process's
@@ -615,6 +724,7 @@
   id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: MMU 不仅将虚拟地址转换为物理地址，还保护内存免受未授权访问。给定一个进程，任何需要从该进程访问的页面必须存在于其一个 VMA 中，因此必须存在于进程的页表中（每个进程都有自己的页表）。
 - en: As a recall, memory is organized by chunks of fixed-size named pages for virtual
     memory and frames for physical memory. The size in our case is 4 KB. However,
     it is defined and accessible with the `PAGE_SIZE` macro in the kernel. Remember,
@@ -624,6 +734,9 @@
   id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 回顾一下，内存是通过固定大小的块进行组织的，虚拟内存使用页面，而物理内存使用帧。在我们的例子中，大小是 4 KB。然而，它在内核中是通过 `PAGE_SIZE`
+    宏定义并访问的。请记住，页面大小是由硬件强制的。以 4 KB 页面大小的系统为例，字节 0 到 4095 属于页面 0，字节 4096 到 8191 属于页面
+    1，依此类推。
 - en: The concept of a page table is introduced to manage mapping between pages and
     frames. Pages are spread over tables so that each PTE corresponds to a mapping
     between a page and a frame. Each process is then given a set of page tables to
@@ -631,6 +744,7 @@
   id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 引入了页表的概念来管理页面和帧之间的映射。页面被分布在表中，每个 PTE 对应一个页面和一个帧之间的映射。然后，每个进程都会获得一组页表来描述其所有的内存区域。
 - en: 'To walk through pages, each page is assigned an index, called a **page number**.
     When it comes to a frame, it is a **Page Frame Number** (**PFN**). This way, VMAs
     (logical addresses, more precisely) are composed of two parts: a page number and
@@ -641,18 +755,23 @@
   id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了遍历页面，每个页面都会分配一个索引，称为**页号**。当涉及到帧时，它是**页面帧号**（**PFN**）。这样，VMA（更准确地说是逻辑地址）由两部分组成：页号和偏移量。在
+    32 位系统中，偏移量表示地址的低 12 位，而在 8 KB 页大小系统中，偏移量表示低 13 位。以下图展示了地址被分为页号和偏移量的概念：
 - en: '![Figure 10.5 – Logical address representation'
   id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.5 – 逻辑地址表示'
 - en: '](img/B17934_10_005.jpg)'
   id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_005.jpg)'
 - en: Figure 10.5 – Logical address representation
   id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.5 – 逻辑地址表示
 - en: 'How does the OS or CPU know which physical address corresponds to a given logical
     address? They use a page table as a translation table and know that each entry''s
     index is a virtual page number, and the value at this index is the PFN. To access
@@ -756,6 +875,7 @@
   id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux支持最多四级分页。然而，使用多少级别是与架构相关的。以下是每个级别的描述：
 - en: '`pgd_t` type in the kernel (generally, `unsigned long`) and points to an entry
     in the table at the second level. In the Linux kernel, `struct tastk_struct` represents
     a process''s description, which in turn has a member (`mm`) whose type is `struct
@@ -767,26 +887,32 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 内核中的`pgd_t`类型（通常是`unsigned long`）指向第二级表中的一个条目。在Linux内核中，`struct task_struct`表示一个进程的描述，它有一个成员（`mm`），该成员的类型是`struct
+    mm_struct`，用于表征和表示进程的内存空间。在`struct mm_struct`中，有一个处理器特定的字段`pgd`，它是指向进程的一级（PGD）页表的第一个条目（条目0）的指针。每个进程有且仅有一个PGD，最多可以包含1,024个条目。
 - en: '**Page Upper Directory (PUD)**: This represents the second level of indirection.'
   id: totrans-122
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**页上级目录（PUD）**：表示间接映射的第二级。'
 - en: '**Page Middle Directory (PMD)**: This is the third indirection level.'
   id: totrans-123
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**页中间目录（PMD）**：这是第三个间接映射级别。'
 - en: '`pte_t`, where each entry points to a physical page.'
   id: totrans-124
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`pte_t`，每个条目指向一个物理页。'
 - en: Note
   id: totrans-125
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 注意
 - en: All levels are not always used. The i.MX6's MMU only supports a two-level page
     table (PGD and PTE), which is the case for almost all 32-bit CPUs. In this case,
     PUD and PMD are simply ignored.
@@ -794,12 +920,15 @@
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 并非所有级别都被使用。i.MX6的MMU仅支持二级页表（PGD和PTE），这对于几乎所有32位CPU都是如此。在这种情况下，PUD和PMD被简单忽略。
 - en: 'It is important to know that the MMU does not store any mapping. It is a data
     structure located in RAM. Instead, there is a special register in the CPU, called
     the `pdg` field of `struct mm_struct` points: `current->mm.pgd == TTBR0`.'
   id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 重要的是要知道MMU不存储任何映射。它是一个位于RAM中的数据结构。而是CPU中有一个特殊的寄存器，称为`pdg`字段，指向`struct mm_struct`：`current->mm.pgd
+    == TTBR0`。
 - en: At context switch (when a new process is scheduled and given the CPU), the kernel
     immediately configures the MMU and updates the PTBR with the new process's `pgd`.
     Now, when a virtual address is given to MMU, it uses the PTBR's content to locate
@@ -816,24 +945,29 @@
   id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上下文切换时（当新进程被调度并分配CPU时），内核立即配置MMU并用新进程的`pgd`更新PTBR。现在，当虚拟地址传给MMU时，MMU会使用PTBR的内容定位到进程的一级页表（PGD），然后利用虚拟地址的**最高有效位**（**MSBs**）提取的一级索引找到合适的表条目，该条目包含指向合适的二级页表基地址的指针。然后，从该基地址开始，MMU使用二级索引查找合适的条目，依此类推，直到找到PTE。ARM架构（在我们的案例中是i.MX6）有二级页表。在这种情况下，二级条目是PTE，指向物理页（PFN）。此时，仅能找到物理页。为了访问页内的准确内存位置，MMU会提取内存偏移量，这也是虚拟地址的一部分，并指向物理页中的相同偏移。
 - en: 'For the sake of understandability, the preceding description has been limited
     to a two-level paging scheme but can easily extended. The following diagram is
     a representation of this two-level paging scheme:'
   id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了便于理解，前述描述仅限于二级分页方案，但可以轻松扩展。下图是此二级分页方案的表示：
 - en: '![Figure 10.8 – A two-level address translation scheme'
   id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.8 – 二级地址转换方案'
 - en: '](img/B17934_10_008.jpg)'
   id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_008.jpg)'
 - en: Figure 10.8 – A two-level address translation scheme
   id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.8 – 二级地址转换方案
 - en: When a process needs to read from or write into a memory location (of course,
     we are talking about virtual memory), the MMU performs a translation into that
     process's page table to find the right entry (PTE). The virtual page number is
@@ -845,6 +979,7 @@
   id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 当一个进程需要从某个内存位置读取或写入数据时（当然，我们讨论的是虚拟内存），MMU会将该进程的页面表转换到正确的条目（PTE）。虚拟页面号会从虚拟地址中提取，并由处理器作为索引查找进程的页面表，以检索其页面表条目。如果在该偏移量处有有效的页面表条目，处理器将从此条目中获取页面帧号。如果没有，这意味着该进程访问了其虚拟内存中未映射的区域。此时会触发页面错误，操作系统应该处理此问题。
 - en: 'In the real world, address translation requires a page-table walk, and it is
     not always a one-shot operation. There are at least as many memory accesses as
     there are table levels. A four-level page table would require four memory accesses.
@@ -857,11 +992,13 @@
   id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 在实际情况中，地址转换需要页面表遍历，它不总是一次完成的操作。每个表级别至少需要一次内存访问。一个四级页面表将需要四次内存访问。换句话说，每次虚拟访问都会导致五次物理内存访问。如果虚拟内存的访问比物理访问慢四倍，那么虚拟内存的概念将毫无意义。幸运的是，系统级芯片（SoC）制造商努力找到了一种巧妙的技巧来解决这个性能问题：现代CPU使用一种称为**翻译后备缓冲区**（**TLB**）的小型关联且非常快速的内存，用于缓存最近访问的虚拟页面的PTE。
 - en: Page lookup and the TLB
   id: totrans-135
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 页面查找与TLB
 - en: Before the MMU proceeds to address translation, there is another step involved.
     As there is a cache for recently accessed data, there is also a cache for recently
     translated addresses. As data cache speeds up the data accessing process, the
@@ -874,11 +1011,13 @@
   id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 在MMU进行地址转换之前，还有另一个步骤。由于存在用于缓存最近访问数据的缓存，也有一个用于缓存最近翻译的地址的缓存。数据缓存加速了数据访问过程，TLB加速了虚拟地址的转换（是的，地址转换是一个耗时的任务）。它是**内容可寻址存储器**（**CAM**），其中关键字是虚拟地址，值是物理地址。换句话说，TLB是MMU的一个缓存。在每次内存访问时，MMU首先检查TLB中最近使用的页面，TLB中包含一些虚拟地址范围，这些虚拟地址范围目前已分配给物理页面。
 - en: How does the TLB work?
   id: totrans-137
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: TLB是如何工作的？
 - en: On memory access, the CPU walks through the TLB trying to find the virtual page
     number of the page that is being accessed. This step is called a **TLB lookup**.
     When a TLB entry is found (a match occurs), it is called TLB hit, and the CPU
@@ -889,12 +1028,14 @@
   id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 在内存访问时，CPU遍历TLB，尝试查找正在访问的页面的虚拟页面号。这个步骤叫做**TLB查找**。当找到TLB条目（发生匹配）时，称为TLB命中，CPU会继续运行，并使用在TLB条目中找到的PFN来计算目标物理地址。当发生TLB命时，不会发生页面错误。如果在TLB中找到翻译，虚拟内存访问的速度将和物理访问一样快。如果没有TLB命中，则称为TLB未命中。
 - en: 'On a TLB miss, there are two possibilities. Depending on the processor type,
     the TLB miss event can be handled by the software, the hardware, or through the
     MMU:'
   id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 在TLB未命中的情况下，有两种可能性。根据处理器类型，TLB未命中事件可以由软件、硬件或通过MMU来处理：
 - en: '**Software handling**: The CPU raises a TLB miss interrupt, caught by the OS.
     The OS then walks through the process''s page table to find the right PTE. If
     there is a matching and valid entry, then the CPU installs the new translation
@@ -903,6 +1044,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**软件处理**：CPU 触发 TLB 未命中中断，操作系统捕获该中断。操作系统随后遍历进程的页表以找到正确的 PTE。如果有匹配且有效的条目，CPU
+    将在 TLB 中安装新的转换。否则，将执行页面故障处理程序。'
 - en: '**Hardware handling**: It is up to the CPU (the MMU, in fact) to walk through
     the process''s page table on hardware. If there is a match, the CPU adds the new
     translation in the TLB. Otherwise, the CPU raises a page fault interrupt, handled
@@ -911,28 +1054,35 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**硬件处理**：由 CPU（实际上是 MMU）在硬件上遍历进程的页表。如果有匹配，CPU 将把新的转换添加到 TLB 中。否则，CPU 会触发页面故障中断，由操作系统处理。'
 - en: In both cases, the page fault handler is the same, `do_page_fault()`. This function
     is architecture-dependent; for ARM, it is defined in `arch/arm/mm/fault.c`.
   id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这两种情况下，页面故障处理程序都是相同的，`do_page_fault()`。该函数是架构相关的；对于 ARM，它在 `arch/arm/mm/fault.c`
+    中定义。
 - en: 'The following is a diagram describing a TLB lookup, a TLB hit, or a TLB miss
     event:'
   id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是描述 TLB 查找、TLB 命中或 TLB 未命中事件的示意图：
 - en: '![Figure 10.9 – The MMU and TLB walk-through process'
   id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.9 – MMU 和 TLB 遍历过程](img/B17934_10_010.jpg)'
 - en: '](img/B17934_10_009.jpg)'
   id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_009.jpg)'
 - en: Figure 10.9 – The MMU and TLB walk-through process
   id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.9 – MMU 和 TLB 遍历过程
 - en: Page table and page directory entries are architecture-dependent. An OS must
     make sure the structure of a table corresponds to a structure recognized by the
     MMU. On ARM processors, the location of the translation table must be written
@@ -943,34 +1093,43 @@
   id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 页表和页目录条目依赖于架构。操作系统必须确保表的结构与 MMU 识别的结构相匹配。在 ARM 处理器上，转换表的位置必须写入 `control` 协处理器
+    15（CP15） `c2` 寄存器，然后通过写入 CP15 `c1` 寄存器启用缓存和 MMU。详细信息请查看 [http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0056d/BABHJIBH.htm](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0056d/BABHJIBH.htm)
+    和 [http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0433c/CIHFDBEJ.html](http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0433c/CIHFDBEJ.html)。
 - en: Now that we are comfortable with the address translation schemes and their ease
     with the TLB, we can talk about memory allocation, which involves manipulating
     page entries under the hood.
   id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，既然我们已经掌握了地址转换机制及其与 TLB 的配合，我们可以讨论内存分配，这涉及到在幕后操作页表项。
 - en: Dealing with memory allocation mechanisms and their APIs
   id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 处理内存分配机制及其 API
 - en: 'Before jumping to the list of APIs, let''s start with the following figure,
     showing the different memory allocators that exist on a Linux-based system, which
     we will discuss later:'
   id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 在进入 API 列表之前，我们先从以下图示开始，展示了在基于 Linux 的系统中存在的不同内存分配器，稍后我们将讨论这些分配器：
 - en: '![Figure 10.10 – Overview of kernel memory allocators'
   id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.10 – 内核内存分配器概览](img/B17934_10_010.jpg)'
 - en: '](img/B17934_10_010.jpg)'
   id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_010.jpg)'
 - en: Figure 10.10 – Overview of kernel memory allocators
   id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.10 – 内核内存分配器概览
 - en: The preceding diagram is inspired by [https://bootlin.com/doc/training/linux-kernel/linux-kernel-slides.pdf](https://bootlin.com/doc/training/linux-kernel/linux-kernel-slides.pdf).
     What it shows is that there is an allocation mechanism to satisfy any kind of
     memory request. Depending on what you need memory for, you can choose the one
@@ -981,16 +1140,20 @@
   id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述示意图的灵感来源于 [https://bootlin.com/doc/training/linux-kernel/linux-kernel-slides.pdf](https://bootlin.com/doc/training/linux-kernel/linux-kernel-slides.pdf)。图中显示的是一种满足各种内存请求的分配机制。根据你的内存需求，你可以选择最接近目标的分配器。最基础的分配器是
+    `kmalloc` API。虽然 `kmalloc` 可以用来从 slab 分配器请求内存，但我们也可以直接与 slab 交互，从其缓存中请求内存，甚至构建我们自己的缓存。
 - en: Let's start this memory allocation journey with the main and lowest level allocator,
     the page allocator, from which the others derivate.
   id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们从内存分配的主分配器和最低级别分配器——页分配器开始，它是其他分配器的派生来源。
 - en: The page allocator
   id: totrans-156
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 页分配器
 - en: The page allocator is the low-level allocator on the Linux system, the one that
     serves as a basis for other allocators. This allocator brings with it the concept
     of the page (virtual) and page frame (physical). So, the system's physical memory
@@ -999,11 +1162,14 @@
   id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 页面分配器是 Linux 系统中的低级分配器，它作为其他分配器的基础。这个分配器带来了页面（虚拟）和页面框架（物理）的概念。因此，系统的物理内存被分割成固定大小的块（称为
+    `struct page` 结构，我们将使用专门的 API 来操作它，下一节中会介绍）。
 - en: Page allocation APIs
   id: totrans-158
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 页面分配 API
 - en: 'This is the lowest-level allocator. It allocates and deallocates blocks of
     pages using the buddy algorithm. Pages are allocated in blocks that are to the
     power of 2 in size (to get the best from the buddy algorithm). That means it can
@@ -1013,6 +1179,8 @@
   id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是最低级的分配器。它使用伙伴算法分配和回收页面块。页面按 2 的幂大小分配（以获得伙伴算法的最佳效果）。这意味着它可以分配 1 个页面、2 个页面、4
+    个页面、8 个页面、16 个页面，依此类推。通过这种分配返回的页面是物理连续的。`alloc_pages()` 是主要的 API，其定义如下：
 - en: '[PRE7]'
   id: totrans-160
   prefs: []
@@ -1026,6 +1194,8 @@
   id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述函数在无法分配页面时返回 `NULL`。否则，它会分配 *2* 顺序的页面并返回指向 `struct page` 实例的指针，该指针指向预留块的第一个页面。然而，有一个帮助宏
+    `alloc_page()`，它可以用于分配单个页面。其定义如下：
 - en: '[PRE8]'
   id: totrans-162
   prefs: []
@@ -1035,6 +1205,7 @@
   id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个宏封装了 `alloc_pages()`，并将顺序参数设置为 `0`。
 - en: '`__free_pages()` must be used to release memory pages allocated with the `alloc_pages()`
     function. It takes a pointer to the first page of the allocated block as a parameter,
     along with the order, the same that was used for allocation. It is defined as
@@ -1042,6 +1213,7 @@
   id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: '`__free_pages()` 必须用于释放使用 `alloc_pages()` 函数分配的内存页面。它接受一个指向分配块第一个页面的指针作为参数，以及用于分配时相同的顺序。其定义如下：'
 - en: '[PRE9]'
   id: totrans-165
   prefs: []
@@ -1054,6 +1226,8 @@
   id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 还有其他以相同方式工作的函数，但它们返回的是预留块的（逻辑）地址，而不是 `struct page` 的实例。这些是 `__get_free_pages()`
+    和 `__get_free_page()`，它们的定义如下：
 - en: '[PRE10]'
   id: totrans-167
   prefs: []
@@ -1065,6 +1239,7 @@
   id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: '`free_pages()` 用于释放使用 `__get_free_pages()` 分配的页面。它接受表示分配页面起始区域的内核地址，以及顺序，它应与用于分配时相同：'
 - en: '[PRE11]'
   id: totrans-169
   prefs: []
@@ -1076,27 +1251,32 @@
   id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 无论分配类型是什么，`mask` 指定了应从哪些内存区域分配页面以及分配器的行为。以下是可能的值：
 - en: '`GFP_USER`: For user memory allocation.'
   id: totrans-171
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_USER`：用于用户内存分配。'
 - en: '`GFP_KERNEL`: The commonly used flag for kernel allocation.'
   id: totrans-172
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_KERNEL`：用于内核分配的常用标志。'
 - en: '`GFP_HIGHMEM`: This requests memory from the `HIGH_MEM` zone.'
   id: totrans-173
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_HIGHMEM`：这会请求从 `HIGH_MEM` 区域分配内存。'
 - en: '`GFP_ATOMIC`: This allocates memory in an atomic manner that cannot sleep.
     It is used when we need to allocate memory from an interrupt context.'
   id: totrans-174
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_ATOMIC`：这以原子方式分配内存，不能进入睡眠状态。它在我们需要从中断上下文分配内存时使用。'
 - en: However, you should note that whether specifying the `GFP_HIGHMEM` flag with
     `__get_free_pages()` (or `__get_free_page()`) or not, it won't be considered.
     This flag is masked out in these functions to make sure that the returned address
@@ -1105,16 +1285,22 @@
   id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，你应该注意，无论是否在 `__get_free_pages()`（或 `__get_free_page()`）中指定 `GFP_HIGHMEM`
+    标志，它都不会被考虑。这些函数会屏蔽掉该标志，以确保返回的地址永远不会表示高内存页面（因为它们具有非线性/永久映射）。如果你需要高内存，使用 `alloc_pages()`
+    然后使用 `kmap()` 来访问它。
 - en: '`__free_pages()` and `free_pages()` can be mixed. The main difference between
     them is that `free_page()` takes a logical address as a parameter, whereas `__free_page()`
     takes a `struct page` structure.'
   id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: '`__free_pages()` 和 `free_pages()` 可以混合使用。它们之间的主要区别是 `free_page()` 接受一个逻辑地址作为参数，而
+    `__free_page()` 接受一个 `struct page` 结构。'
 - en: Note
   id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: The maximum order that can be used varies between architectures. It depends
     on the `FORCE_MAX_ZONEORDER` kernel configuration option, which is `11` by default.
     In this case, the number of pages you can allocate is 1,024\. It means that on
@@ -1126,11 +1312,15 @@
   id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 可用的最大阶数因架构不同而异。它取决于 `FORCE_MAX_ZONEORDER` 内核配置选项，默认值为 `11`。在这种情况下，您可以分配的页面数为
+    1,024。也就是说，在一个 4 KB 大小的系统上，您最多可以分配 *1,024 x 4 KB = 4 MB* 的内存。在 ARM64 上，最大阶数随所选页面大小而变化。如果是
+    16 KB 页面大小，最大阶数为 `12`，如果是 64 KB 页面大小，最大阶数为 `14`。这些每次分配的大小限制对于 `kmalloc()` 同样适用。
 - en: Page and addresses conversion functions
   id: totrans-179
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 页面与地址转换函数
 - en: 'There are convenient functions exposed by the kernel to switch back and forth
     between the `struct page` instances and their corresponding logical addresses,
     which can be useful at different moments while dealing with memory. The `page_to_virt()`
@@ -1142,6 +1332,10 @@
   id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核提供了一些便捷的函数，可以在 `struct page` 实例和它们对应的逻辑地址之间来回转换，这在处理内存时的不同阶段都非常有用。`page_to_virt()`
+    函数用于将一个 `struct page`（例如，`alloc_pages()` 返回的）转换为内核逻辑地址。或者，`virt_to_page()` 接受一个内核逻辑地址并返回其关联的
+    `struct page` 实例（就像是使用 `alloc_pages()` 函数分配的那样）。`virt_to_page()` 和 `page_to_virt()`
+    都在 `<asm/page.h>` 中声明，具体如下：
 - en: '[PRE12]'
   id: totrans-181
   prefs: []
@@ -1152,6 +1346,7 @@
   id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 还有一个宏 `page_address()`，它简单地封装了 `page_to_virt()`，其声明如下：
 - en: '[PRE13]'
   id: totrans-183
   prefs: []
@@ -1161,11 +1356,13 @@
   id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 它返回传入参数的页面的逻辑地址。
 - en: The slab allocator
   id: totrans-185
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: slab 分配器
 - en: The slab allocator is the one on which `kmalloc()` relies. Its main purposes
     are to eliminate fragmentation caused by memory (de)allocation, which is caused
     by the buddy system in case of small-size memory allocation, and to speed up memory
@@ -1173,11 +1370,13 @@
   id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: slab 分配器是 `kmalloc()` 所依赖的分配器。它的主要目的是消除由于内存（释放）分配造成的碎片，这种碎片由伙伴系统在小尺寸内存分配时产生，并加速常用对象的内存分配。
 - en: Understanding the buddy algorithm
   id: totrans-187
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 理解伙伴算法
 - en: To allocate memory, the requested size is rounded up to the power of two, and
     the buddy allocator searches the appropriate list. If no entries exist on the
     requested list, an entry from the next upper list (which has blocks of twice the
@@ -1189,6 +1388,8 @@
   id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了分配内存，所请求的大小会向上舍入到二的幂，伙伴分配器会搜索相应的列表。如果请求的列表中没有条目，来自下一个较大列表（该列表中的块是上一个列表大小的两倍）的一项会被拆分成两半（称为
+    **buddies**）。分配器使用第一半，而另一半会被添加到下一个较小的列表中。这是一个递归的过程，直到伙伴分配器成功找到一个可以拆分的块，或者达到最大块大小并且没有可用的空闲块为止。
 - en: The following case study is heavily inspired by [http://dysphoria.net/OperatingSystems1/4_allocation_buddy_system.html](http://dysphoria.net/OperatingSystems1/4_allocation_buddy_system.html).
     For example, if the minimum allocation size is 1K bytes, and the memory size is
     1 MB, the buddy allocator will create an empty list for 1K byte holes, an empty
@@ -1198,6 +1399,10 @@
   id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下案例研究受到了 [http://dysphoria.net/OperatingSystems1/4_allocation_buddy_system.html](http://dysphoria.net/OperatingSystems1/4_allocation_buddy_system.html)
+    的深刻启发。例如，如果最小分配大小为 1K 字节，且内存大小为 1MB，则伙伴分配器将为 1K 字节、2K 字节、4K 字节、8K 字节、16K 字节、32K
+    字节、64K 字节、128K 字节、256K 字节、512K 字节、1MB 字节的空闲块分别创建一个空列表。除了 1MB 列表外，所有列表最初都是空的，1MB
+    列表只有一个空洞。
 - en: 'Let''s now imagine a scenario where we want to allocate a 70K block. The buddy
     allocator will round it up to 128K and will end up splitting the 1 MB into two
     512K blocks, then 256K, and finally 128K, and then it will allocate one of the
@@ -1205,80 +1410,98 @@
   id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在假设我们要分配一个 70K 的块，伙伴分配器会将其向上舍入到 128K，并最终将 1MB 分割为两个 512K 块，然后是 256K，最后是 128K，然后它会将其中一个
+    128K 块分配给用户。以下是总结这个场景的方案：
 - en: '![Figure 10.11 – Allocation using the buddy algorithm'
   id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.11 – 使用伙伴算法分配](img/B17934_10_011.jpg)'
 - en: '](img/B17934_10_011.jpg)'
   id: totrans-192
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_011.jpg)'
 - en: Figure 10.11 – Allocation using the buddy algorithm
   id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.11 – 使用伙伴算法分配
 - en: 'The deallocation is as fast as allocation. The following is a figure that summarizes
     the deallocation algorithm:'
   id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 释放速度与分配速度一样快。以下是总结释放算法的图示：
 - en: '![Figure 10.12 – Deallocation using the buddy algorithm'
   id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.12 – 使用伙伴算法释放](img/B17934_10_012.jpg)'
 - en: '](img/B17934_10_012.jpg)'
   id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_012.jpg)'
 - en: Figure 10.12 – Deallocation using the buddy algorithm
   id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.12 – 使用伙伴算法释放
 - en: In the preceding diagram, we can see that memory deallocation using the buddy
     algorithm works. In the next section, we will study the slab allocator, built
     on top of this algorithm.
   id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上图中，我们可以看到使用伙伴算法释放内存的过程。下一节我们将研究建立在此算法之上的 slab 分配器。
 - en: A journey into the slab allocator
   id: totrans-199
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 走进 slab 分配器
 - en: 'Before we introduce the slab allocator, let''s define some terms that it uses:'
   id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 在介绍 slab 分配器之前，首先定义它使用的一些术语：
 - en: '`inode` and `mutexe` objects. A slab can be considered an array of identically
     sized blocks.'
   id: totrans-201
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`inode` 和 `mutexe` 对象。一个 slab 可以看作是一个大小相同的块的数组。'
 - en: '`inode` objects only).'
   id: totrans-202
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`inode` 对象仅限于此。'
 - en: 'Slabs may be in one of the following states:'
   id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: Slabs 可能处于以下几种状态：
 - en: '**Empty**: Where all objects (chunks) on the slab are marked as free.'
   id: totrans-204
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**空**：表示 slabs 上的所有对象（块）都标记为可用。'
 - en: '**Partial**: Both used and free objects exist in the slab.'
   id: totrans-205
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**部分使用**：slab 中既有已用对象也有空闲对象。'
 - en: '**Full**: All objects on the slab are marked as used.'
   id: totrans-206
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**满**：表示 slabs 上的所有对象都标记为已用。'
 - en: The memory allocator is responsible for building caches. Initially, each slab
     is empty and marked so. When one allocates memory for a kernel object, the allocator
     looks for a free location for that object on a partial/free slab in a cache for
@@ -1294,41 +1517,52 @@
   id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 内存分配器负责构建缓存。最初，每个 slab 都是空的并标记为“空”。当为内核对象分配内存时，分配器会在该类型对象的缓存中查找一个空闲位置。如果未找到，分配器将分配一个新的
+    slab 并将其添加到缓存中。新对象会从该 slab 中分配，且该 slab 会被标记为“部分使用”。当代码完成对内存的使用（内存释放）后，对象会被简单地返回到
+    slab 缓存中，并恢复到初始化状态。这也是内核提供帮助函数来获取已清零初始化内存的原因，这样我们可以消除先前的内容。slab 会保持其对象的引用计数，以便在缓存中的所有
+    slabs 都满了且需要请求另一个对象时，slab 分配器负责添加新的 slabs。
 - en: 'The following diagram illustrates the concept of slabs, caches, and their different
     states:'
   id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下图示说明了 slabs、缓存及其不同状态的概念：
 - en: '![Figure 10.13 – Slabs and caches'
   id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.13 – Slabs 和缓存](img/B17934_10_013.jpg)'
 - en: '](img/B17934_10_013.jpg)'
   id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_013.jpg)'
 - en: Figure 10.13 – Slabs and caches
   id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.13 – Slabs 和缓存
 - en: It is a bit like creating a per-object allocator. The kernel allocates one cache
     per type of object, and only objects of the same type can be stored in a cache
     (for example, only `task_struct` structures).
   id: totrans-212
   prefs: []
   type: TYPE_NORMAL
+  zh: 有点像创建一个每个对象的分配器。内核为每种类型的对象分配一个缓存，并且只有相同类型的对象可以存储在缓存中（例如，只有`task_struct`结构体）。
 - en: 'There are different kinds of slab allocators in the kernel, depending on whether
     one needs compactness, cache-friendliness, or raw speed. These consist of the
     following:'
   id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核中有不同种类的 slab 分配器，具体取决于是否需要紧凑性、缓存友好性或原始速度。它们包括以下几种：
 - en: The **SLAB** (slab allocator), which is as cache-friendly as possible. This
     is the original memory allocator.
   id: totrans-214
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**SLAB**（slab 分配器），它是尽可能缓存友好的。这是最初的内存分配器。'
 - en: The **SLOB** (simple list of blocks), which is as compact as possible, appropriate
     for systems with very low memory, mostly embedded systems with a few megabytes
     or tens of megabytes.
@@ -1336,16 +1570,19 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**SLOB**（简单块列表），它尽可能紧凑，适用于内存非常低的系统，主要是嵌入式系统，内存为几兆字节或几十兆字节。'
 - en: 'The `CONFIG_SLUB=y`). See this patch: [https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=a0acd820807680d2ccc4ef3448387fcdbf152c73](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=a0acd820807680d2ccc4ef3448387fcdbf152c73).'
   id: totrans-216
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`CONFIG_SLUB=y`）。请查看此补丁：[https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=a0acd820807680d2ccc4ef3448387fcdbf152c73](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=a0acd820807680d2ccc4ef3448387fcdbf152c73)。'
 - en: Note
   id: totrans-217
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 注意
 - en: The term **slab** has become a generic name referring to a memory allocation
     strategy employing an object cache, enabling efficient allocation and deallocation
     of kernel objects. It must not be confused with the allocator of the same name,
@@ -1354,29 +1591,36 @@
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: '**slab** 这个术语已经成为一种通用名称，指代一种使用对象缓存的内存分配策略，能够高效地分配和释放内核对象。它不应与同名的分配器 SLAB 混淆，后者如今已经被
+    SLUB 取代。'
 - en: kmalloc family allocation
   id: totrans-219
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: kmalloc 家族分配
 - en: '`kmalloc()` is a kernel memory allocation function. It allocates physically
     contiguous (but not necessarily page-aligned) memory. The following image describes
     how memory is allocated and returned to the caller:'
   id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: '`kmalloc()`是一个内核内存分配函数。它分配物理上连续的（但不一定是页面对齐的）内存。下图描述了内存如何分配并返回给调用者：'
 - en: '![Figure 10.14 – kmalloc memory organization'
   id: totrans-221
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.14 – kmalloc 内存组织'
 - en: '](img/B17934_10_014.jpg)'
   id: totrans-222
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_014.jpg)'
 - en: Figure 10.14 – kmalloc memory organization
   id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.14 – kmalloc 内存组织
 - en: 'This allocation API is the general and highest-level memory allocation API
     in the kernel, which relies on the SLAB allocator. Memory returned from `kmalloc()`
     has a kernel logical address because it is allocated from the `LOW_MEM` region
@@ -1385,6 +1629,8 @@
   id: totrans-224
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个分配 API 是内核中通用的最高级别内存分配 API，它依赖于 SLAB 分配器。`kmalloc()`返回的内存具有内核逻辑地址，因为它是从`LOW_MEM`区域分配的，除非指定了`HIGH_MEM`。它在
+    `<linux/slab.h>` 中声明，这是在使用 API 之前需要包含的头文件。定义如下：
 - en: '[PRE14]'
   id: totrans-225
   prefs: []
@@ -1397,6 +1643,8 @@
   id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`size`指定要分配的内存大小（以字节为单位）。`flags`决定了内存应该如何和在哪里分配。可用的标志与页面分配器相同（`GFP_KERNEL`、`GFP_ATOMIC`、`GFP_DMA`
+    等），以下是它们的定义：
 - en: '`GFP_KERNEL`: This is the standard flag. We cannot use this flag in an interrupt
     handler because its code may sleep. It always returns memory from the `LOM_MEM`
     zone (hence, a logical address).'
@@ -1404,6 +1652,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_KERNEL`：这是标准标志。我们不能在中断处理程序中使用这个标志，因为它的代码可能会休眠。它总是从`LOM_MEM`区域返回内存（因此，是一个逻辑地址）。'
 - en: '`GFP_ATOMIC`: This guarantees the atomicity of the allocation. This flag is
     to be used when allocation is needed from an interrupt context. Because memory
     is allocated from an emergency pool or memory, you should not abuse its usage.'
@@ -1411,12 +1660,14 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_ATOMIC`：这保证了分配的原子性。该标志用于在中断上下文中需要分配内存时。由于内存是从紧急池或内存中分配的，因此不应滥用此标志。'
 - en: '`GFP_USER`: This allocates memory to a user space process. Memory is then distinct
     and separated from those allocated to the kernel.'
   id: totrans-229
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_USER`：这为用户空间进程分配内存。分配的内存与分配给内核的内存是分开的。'
 - en: '`GFP_NOWAIT`: This is to be used if the allocation is performed from within
     an atomic context, for example, interrupt handler use. This flag prevents direct
     reclaim and I/O and filesystem operations while doing allocation. Unlike `GFP_ATOMIC`,
@@ -1426,6 +1677,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_NOWAIT`：如果分配是在原子上下文中进行的，例如中断处理程序使用时，应使用此标志。此标志会在分配时防止直接回收、I/O 和文件系统操作。与
+    `GFP_ATOMIC` 不同，它不使用内存预留。因此，在内存紧张时，`GFP_NOWAIT` 的分配可能会失败。'
 - en: '`GFP_NOIO`: Like `GFP_USER`, this can block, but unlike `GFP_USER`, it will
     not start disk I/O. In other words, it prevents any I/O operation while doing
     allocation. This flag is mostly used in the block/disk layer.'
@@ -1433,11 +1686,14 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_NOIO`：与 `GFP_USER` 类似，这可能会阻塞，但与 `GFP_USER` 不同，它不会启动磁盘 I/O。换句话说，它在分配内存时会阻止任何
+    I/O 操作。此标志主要用于块设备/磁盘层。'
 - en: '`GFP_NOFS`: This will use direct reclaim but will not use any filesystem interfaces.'
   id: totrans-232
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_NOFS`：这将使用直接回收，但不会使用任何文件系统接口。'
 - en: '`__GFP_NOFAIL`: The virtual memory implementation must retry indefinitely because
     the caller is incapable of handling allocation failures. The allocation can stall
     indefinitely, but it will never fail. Consequently, it''s useless to test for
@@ -1446,28 +1702,33 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`__GFP_NOFAIL`：虚拟内存实现必须无限期重试，因为调用者无法处理分配失败。分配可能会一直阻塞，但永远不会失败。因此，测试是否失败是没有意义的。'
 - en: '`GFP_HIGHUSER`: This requests to allocate memory from the `HIGH_MEMORY` zone.'
   id: totrans-234
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_HIGHUSER`：请求从 `HIGH_MEMORY` 区域分配内存。'
 - en: '`GFP_DMA`: This allocates memory from `DMA_ZONE`.'
   id: totrans-235
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`GFP_DMA`：从 `DMA_ZONE` 分配内存。'
 - en: On successful allocation of memory, `kmalloc()` returns the virtual (logical,
     unless high memory is specified) address of the chunk allocated, guaranteed to
     be physically contiguous. On an error, it returns `NULL`.
   id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 在成功分配内存后，`kmalloc()` 返回分配块的虚拟（逻辑，除非指定了高内存）地址，并保证该内存是物理连续的。如果发生错误，它将返回 `NULL`。
 - en: 'For a device driver, however, it is recommended to use the managed version,
     `devm_kmalloc()`, which does not necessarily require freeing the memory, as it
     is handled internally by the memory core. The following is its prototype:'
   id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于设备驱动程序，建议使用托管版本 `devm_kmalloc()`，它不一定需要释放内存，因为内存管理由内存核心内部处理。以下是其原型：
 - en: '[PRE15]'
   id: totrans-238
   prefs: []
@@ -1477,6 +1738,7 @@
   id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的原型中，`dev` 是为其分配内存的设备。
 - en: Note that `kmalloc()` relies on SLAB caches when allocating a small size of
     memory. For this reason, it can internally round the allocated area size up to
     the size of the smallest SLAB cache in which that memory can fit. This can result
@@ -1487,10 +1749,13 @@
   id: totrans-240
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，`kmalloc()` 在分配小内存时依赖于 SLAB 缓存。为此，它可能会将分配区域的大小内部向上舍入到可以容纳该内存的最小 SLAB 缓存的大小。这可能会导致返回的内存量超过请求的内存。然而，可以使用
+    `ksize()` 来确定实际分配的内存量（以字节为单位）。即使最初通过 `kmalloc()` 调用指定了较小的内存量，你仍然可以使用这部分额外的内存。
 - en: 'The following is the `ksize` prototype:'
   id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是 `ksize` 原型：
 - en: '[PRE16]'
   id: totrans-242
   prefs: []
@@ -1500,17 +1765,21 @@
   id: totrans-243
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的例子中，`objp` 是将返回其实际字节大小的对象。
 - en: '`kmalloc()` has the same size limitations as the page-related allocation API.
     For example, with the default `FORCE_MAX_ZONEORDER` set to `11`, the maximum size
     per allocation with `kmalloc()` is `4 MB`.'
   id: totrans-244
   prefs: []
   type: TYPE_NORMAL
+  zh: '`kmalloc()`具有与页面相关的分配 API 相同的大小限制。例如，默认情况下将 `FORCE_MAX_ZONEORDER` 设置为 `11`，则每次通过
+    `kmalloc()` 分配的最大大小为 `4 MB`。'
 - en: '`kfree` function is used to free the memory allocated by `kmalloc()`. It is
     defined as the following:'
   id: totrans-245
   prefs: []
   type: TYPE_NORMAL
+  zh: '`kfree` 函数用于释放由 `kmalloc()` 分配的内存。它的定义如下：'
 - en: '[PRE17]'
   id: totrans-246
   prefs: []
@@ -1521,6 +1790,7 @@
   id: totrans-247
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是使用 `kmalloc()` 和 `kfree()` 分别分配和释放内存的示例：
 - en: '[PRE18]'
   id: totrans-248
   prefs: []
@@ -1530,6 +1800,7 @@
   id: totrans-249
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核提供了基于 `kmalloc()` 的其他辅助函数，如下所示：
 - en: '[PRE19]'
   id: totrans-250
   prefs: []
@@ -1544,6 +1815,9 @@
   id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: '`krealloc()` 是内核空间中与用户空间 `realloc()` 函数相对应的函数。由于 `kmalloc()` 返回的内存保留了其先前状态的内容，因此可以通过
+    `kzalloc()` 请求一块已初始化为零的 `kmalloc` 分配内存。`kzfree()` 是释放 `kzalloc()` 分配内存的函数，而 `kcalloc()`
+    用于为数组分配内存，其 `n` 和 `size` 参数分别表示数组中元素的数量和每个元素的大小。'
 - en: Since `kmalloc()` returns a memory area in the kernel permanent mapping, the
     logical address can be translated into a physical address using `virt_to_phys()`,
     or to a I/O bus address using `virt_to_bus()`. These macros internally call either
@@ -1553,29 +1827,37 @@
   id: totrans-252
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于 `kmalloc()` 返回的是内核永久映射中的内存区域，因此可以使用 `virt_to_phys()` 将逻辑地址转换为物理地址，或者使用 `virt_to_bus()`
+    转换为 I/O 总线地址。这些宏内部会调用 `__pa()` 或 `__va()`，如果有必要的话。物理地址（`virt_to_phys(kmalloc'ed
+    address)`）右移 `PAGE_SHIFT` 后，将生成从中分配内存块的第一个页面的 PFN（`pfn`）。
 - en: vmalloc family allocation
   id: totrans-253
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: vmalloc 系列分配
 - en: '`vmalloc()` is the last kernel allocator we will discuss in the book. It returns
     memory that is exclusively contiguous in the virtual address space. The underlying
     frames are scattered, as we can see in the following diagram:'
   id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vmalloc()` 是我们在本书中讨论的最后一个内核分配器。它返回的内存在虚拟地址空间中是唯一连续的。底层的内存帧是分散的，如下图所示：'
 - en: '![Figure 10.15 – vmalloc memory organization'
   id: totrans-255
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 10.15 – vmalloc 内存组织'
 - en: '](img/B17934_10_015.jpg)'
   id: totrans-256
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_015.jpg)'
 - en: Figure 10.15 – vmalloc memory organization
   id: totrans-257
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 10.15 – vmalloc 内存组织
 - en: In the preceding diagram, we can see that memory is not physically contiguous.
     Moreover, memory returned by `vmalloc()` always comes from the `HIGH_MEM` zone.
     Addresses returned are purely virtual (not logical) and cannot be translated into
@@ -1591,10 +1873,14 @@
   id: totrans-258
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的示意图中，我们可以看到内存并非物理连续的。此外，`vmalloc()` 返回的内存总是来自 `HIGH_MEM` 区域。返回的地址是纯粹的虚拟地址（而非逻辑地址），不能转换为物理地址或总线地址，因为无法保证背后的内存是物理连续的。这意味着
+    `vmalloc()` 返回的内存不能在微处理器之外使用（例如，不能轻易用于 DMA 目的）。使用 `vmalloc()` 为大量页面（例如，单独分配一个页面没有意义）分配内存是正确的，它们仅存在于软件中，如网络缓冲区。需要注意的是，`vmalloc()`
+    的速度比 `kmalloc()` 和页面分配器函数慢，因为它既要检索内存，又要构建页表，甚至可能需要重新映射到虚拟连续的范围，而 `kmalloc()` 从不做这些操作。
 - en: 'Before using the `vmalloc()` API, you should include this header:'
   id: totrans-259
   prefs: []
   type: TYPE_NORMAL
+  zh: 在使用 `vmalloc()` API 之前，你应当包含以下头文件：
 - en: '[PRE20]'
   id: totrans-260
   prefs: []
@@ -1604,6 +1890,7 @@
   id: totrans-261
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是 `vmalloc` 系列的原型：
 - en: '[PRE21]'
   id: totrans-262
   prefs: []
@@ -1617,10 +1904,13 @@
   id: totrans-263
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上述原型中，参数 `size` 是你需要分配的内存大小。成功分配内存后，它返回分配内存块的第一个字节的地址。失败时，返回 `NULL`。`vfree()`
+    执行反向操作，释放 `vmalloc()` 分配的内存。`vzalloc` 变体返回已初始化为零的内存。
 - en: 'The following is an example of using `vmalloc`:'
   id: totrans-264
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是使用 `vmalloc` 的示例：
 - en: '[PRE22]'
   id: totrans-265
   prefs: []
@@ -1634,11 +1924,13 @@
   id: totrans-266
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vmalloc()`将分配不连续的物理页面，并将它们映射到一个连续的虚拟地址区域。这些`vmalloc`虚拟地址的限制在内核空间的一个区域内，由`VMALLOC_START`和`VMALLOC_END`定义，这些是与架构相关的。内核通过暴露`/proc/vmallocinfo`来显示系统上所有`vmalloc`分配的内存。'
 - en: A short story about process memory allocation under the hood
   id: totrans-267
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 进程内存分配背后的短故事
 - en: '`vmalloc()` prefers the `HIGH_MEM` zone if it exists, which is suitable for
     processes, as they require implicit and dynamic mappings. However, because memory
     is a limited resource, the kernel will report the allocation of frame pages (physical
@@ -1648,6 +1940,7 @@
   id: totrans-268
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vmalloc()`偏好使用`HIGH_MEM`区域（如果存在），该区域适用于进程，因为它们需要隐式和动态映射。然而，由于内存是有限资源，内核只有在必要时（通过读或写访问时）才会报告分配帧页面（物理页面）。这种按需分配被称为**懒分配**，它消除了分配永远不会使用的页面的风险。'
 - en: Whenever a page is requested, only the page table is updated; in most cases,
     a new entry is created, which means only virtual memory is allocated. An interrupt
     called `page fault` is raised only when a user accesses the page. This interrupt
@@ -1657,6 +1950,8 @@
   id: totrans-269
   prefs: []
   type: TYPE_NORMAL
+  zh: 每当请求页面时，仅更新页表；在大多数情况下，会创建一个新条目，这意味着只分配了虚拟内存。只有当用户访问页面时，才会触发一个名为`page fault`的中断。这个中断有一个专用的处理程序，叫做`page
+    fault handler`，由MMU在尝试访问未立即成功的虚拟内存时调用。
 - en: 'In fact, a page fault interrupt is raised whatever the access type is (read,
     write, or execute) to a page whose entry in the page table has not got the appropriate
     permission bits set to allow that type of access. The response to that interrupt
@@ -1664,6 +1959,7 @@
   id: totrans-270
   prefs: []
   type: TYPE_NORMAL
+  zh: 实际上，当访问类型是（读、写或执行）时，只要页面在页表中没有设置适当的权限位来允许该类型的访问，都会触发页面错误中断。对该中断的响应分为以下三种方式之一：
 - en: '**The hard fault**: When the page does not reside anywhere (neither in the
     physical memory nor a memory-mapped file), which means the handler cannot immediately
     resolve the fault. The handler will perform I/O operations in order to prepare
@@ -1673,6 +1969,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**硬错误**：当页面不在任何地方（既不在物理内存中，也不在内存映射文件中）时，意味着处理程序无法立即解决该错误。处理程序将执行I/O操作，以准备解决该错误所需的物理页面，并可能暂停被中断的进程，切换到其他进程，直到系统解决问题。'
 - en: '**The soft fault**: When the page resides elsewhere in memory (in the working
     set of another process). It means the fault handler may resolve the fault by immediately
     attaching a page of physical memory to the appropriate page table entry, adjusting
@@ -1681,6 +1978,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**软错误**：当页面存在于内存的其他地方（另一个进程的工作集内）时，意味着错误处理程序可以通过立即将物理内存页面附加到适当的页表项，调整该项，并恢复中断的指令来解决错误。'
 - en: '**The fault cannot be resolved**: This will result in a bus error or **segmentation
     violation** (**segv**). A **Segmentation Violation Signal** (**SIGSEGV**) is sent
     to the faulty process, killing it (the default behavior), unless a signal handler
@@ -1689,6 +1987,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**无法解决的错误**：这将导致总线错误或**段错误**（**segv**）。一个**段错误信号**（**SIGSEGV**）会发送到故障进程，终止它（默认行为），除非已为SIGSEV安装了信号处理程序，以更改默认行为。'
 - en: To summarize, memory mappings generally start out with no physical pages attached,
     only by defining the virtual address ranges without any associated physical memory.
     The actual physical memory is allocated later in response to a page fault exception
@@ -1699,10 +1998,13 @@
   id: totrans-274
   prefs: []
   type: TYPE_NORMAL
+  zh: 总结来说，内存映射通常一开始不会附加物理页面，只有通过定义虚拟地址范围而没有关联的物理内存。实际的物理内存是在内存访问时，通过页面错误异常动态分配的，因为内核提供了一些标志来判断尝试访问是否合法，并指定页面错误处理程序的行为。因此，`brk()`
+    用户空间、`mmap()` 和类似的函数会分配（虚拟）空间，但物理内存会在稍后附加。
 - en: Note
   id: totrans-275
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: A page fault occurring in interrupt context causes a double fault interrupt,
     which usually panics the kernel (calling the `panic()` function). It is the reason
     why memory allocated in interrupt context is taken from a memory pool, which does
@@ -1712,11 +2014,13 @@
   id: totrans-276
   prefs: []
   type: TYPE_NORMAL
+  zh: 在中断上下文中发生页面错误会导致双重错误中断，通常会让内核崩溃（调用 `panic()` 函数）。这就是为什么在中断上下文中分配的内存来自于一个内存池的原因，因为该内存池不会引发页面错误中断。如果在处理双重错误时发生中断，将生成三重错误异常，导致CPU关闭并且操作系统立即重启。此行为依赖于架构。
 - en: The Copy on Write case
   id: totrans-277
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 写时复制情况
 - en: 'Let''s consider a memory region or data that needs to be shared by two or more
     tasks. The `fork()` system call) is a mechanism that allows the operating system
     not to immediately allocate memory and does not make a copy of it to each task
@@ -1727,6 +2031,8 @@
   id: totrans-278
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们考虑一个需要两个或多个任务共享的内存区域或数据。`fork()` 系统调用是一种机制，它允许操作系统不会立即分配内存，也不会将内存复制到每个共享数据的任务中，直到其中一个任务修改（写入）它——在这种情况下，为它分配内存以便拥有其私有副本（因此得名，写时复制）。接下来我们以一个共享内存页面为例，描述
+    `page fault handler` 如何管理写时复制：
 - en: When the page needs to be shared, a page table entry (whose target is marked
     as un-writable) pointing to this shared page is added to the process page table
     of each process accessing the shared page. This is an initial mapping.
@@ -1734,6 +2040,7 @@
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 当页面需要共享时，将为每个访问共享页面的进程的页面表添加一个指向此共享页面的页面表项（PTE），并且该PTE目标标记为不可写。这是一个初始映射。
 - en: The mapping will result the creation of a VMA per process, which is added to
     the VMA list of each process. The shared page is associated these VMAs (that is,
     the VMA previously created for each process), which are marked as writeable this
@@ -1743,6 +2050,7 @@
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 映射将导致为每个进程创建一个VMA，并将其添加到每个进程的VMA列表中。共享页面会与这些VMA关联（即，之前为每个进程创建的VMA），并且这次标记为可写。只要没有进程尝试修改共享页面的内容，就不会发生其他事情。
 - en: When one of the processes tries to write into the shared page (at its first
     write), the `fault handler` notices the difference between the PTE flag (previously
     marked as un-writable) and the VMA flag (marked as writable), which means, *"Hey,
@@ -1757,6 +2065,9 @@
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 当其中一个进程尝试写入共享页面（第一次写入时），`fault handler` 会注意到 PTE 标志（之前标记为不可写）和 VMA 标志（标记为可写）之间的区别，这意味着，*“嘿，这是写时复制。”*
+    然后它将分配一个物理页面，并将其分配给先前添加的 PTE（从而替换先前分配的共享页面），更新 PTE 标志（这些标志之一将标记该 PTE 为可写），刷新 TLB
+    条目，接着执行 `do_wp_page()` 函数，将共享地址中的内容复制到新的位置，该位置是进程私有的。此进程的后续写入将写入私有副本，而不是共享页面。
 - en: We can now close our parenthesis on process memory allocation, with which we
     are now familiar. We have also learned the lazy allocation mechanism and what
     CoW is. We can also conclude our learning about in-kernel memory allocation. At
@@ -1764,11 +2075,13 @@
   id: totrans-282
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们可以结束关于进程内存分配的部分内容，我们已经对其有了熟悉的了解。我们也学习了延迟分配机制以及什么是CoW（写时复制）。我们也可以总结关于内核内存分配的学习内容。此时，我们可以转向I/O内存操作，开始与硬件设备进行交互。
 - en: Working with I/O memory to talk to hardware
   id: totrans-283
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用I/O内存与硬件进行通信
 - en: So far, we have dealt with main memory, and we used to think of memory in terms
     of RAM. That said, RAM one a peripheral among many others, and its memory range
     corresponds to its size. RAM is unique in the way it is entirely managed by the
@@ -1782,6 +2095,7 @@
   id: totrans-284
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们主要处理了主内存，通常将内存视为RAM。但需要注意，RAM只是众多外围设备中的一种，它的内存范围对应于其大小。RAM的独特之处在于，它完全由内核管理，对用户透明。RAM控制器连接到CPU的数据/控制/地址总线，并与其他设备共享这些总线。这些设备被称为内存映射设备，因为它们在这些总线上的局部性，和与这些设备的通信（输入/输出操作）被称为内存映射I/O。这些设备包括CPU提供的各种总线控制器（如USB、UART、SPI、I2C、PCI和SATA），以及一些IP，如VPU、GPU、图像处理单元（IPU）和安全非易失性存储（SNVS，NXP的i.MX芯片中的功能）。
 - en: On a 32-bit system, the CPU has up to 232 choices of memory locations (from
     `0` to `0xFFFFFFFF`). The thing is that not all those addresses address RAM. Some
     of these are reserved for peripheral access and are called I/O memory. This I/O
@@ -1794,6 +2108,7 @@
   id: totrans-285
   prefs: []
   type: TYPE_NORMAL
+  zh: 在32位系统中，CPU最多可以选择232个内存位置（从`0`到`0xFFFFFFFF`）。问题是，并非所有这些地址都指向RAM。一些地址是为外围设备访问保留的，称为I/O内存。这些I/O内存被划分为不同大小的范围，并分配给这些外围设备，以便每当CPU收到来自内核的物理内存访问请求时，它可以将该请求路由到其地址范围包含指定物理地址的设备。分配给每个设备（包括RAM控制器）的地址范围通常在SoC数据手册中描述，通常会有一个叫做**内存映射**的部分。
 - en: Since the kernel exclusively works with virtual addresses (through page tables),
     accessing a particular address for any device would require this address to be
     mapped first (this is even more true if there is an IOMMU, the MMU equivalent
@@ -1803,32 +2118,39 @@
   id: totrans-286
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于内核仅使用虚拟地址（通过页表），访问任何设备的特定地址都需要先将该地址映射（如果存在IOMMU，即I/O设备的MMU等效物，这一点尤其适用）。这种将RAM模块之外的内存地址映射会在系统地址空间中产生一个经典的空洞（因为地址空间在内存和I/O之间共享）。
 - en: 'The following diagram describes how I/O memory and main memory are seen by
     the CPU:'
   id: totrans-287
   prefs: []
   type: TYPE_NORMAL
+  zh: 下图描述了I/O内存和主内存在CPU中的视图：
 - en: '![Figure 10.16 – (IO)MMU and main memory overview'
   id: totrans-288
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图10.16 – （IO）MMU和主内存概述'
 - en: '](img/B17934_10_016.jpg)'
   id: totrans-289
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_10_016.jpg)'
 - en: Figure 10.16 – (IO)MMU and main memory overview
   id: totrans-290
   prefs: []
   type: TYPE_NORMAL
+  zh: 图10.16 – （IO）MMU和主内存概述
 - en: Note
   id: totrans-291
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Always keep in mind that the CPU sees main memory (RAM) through the lenses of
     the MMU and devices through the lenses of IOMMU.
   id: totrans-292
   prefs: []
   type: TYPE_NORMAL
+  zh: 始终记住，CPU通过MMU的视角来看主内存（RAM），而通过IOMMU的视角来看设备。
 - en: The main advantage with that is that the same instructions are used for transferring
     data to memory and I/O, which reduces software coding logic. There are some disadvantages,
     however. The first one is that the entire address bus must be fully decoded for
@@ -1837,6 +2159,7 @@
   id: totrans-293
   prefs: []
   type: TYPE_NORMAL
+  zh: 这样做的主要优点是，传输数据到内存和I/O所使用的指令相同，这减少了软件编码的逻辑。然而，也有一些缺点。第一个缺点是，必须为每个设备完全解码整个地址总线，这增加了为机器添加硬件的成本，导致架构复杂。
 - en: The other inconvenience is that on a 32-bit system, even with 4 GB of RAM installed,
     the OS will never use the whole size because of the hole caused by memory-mapped
     devices, which stole part of the address space. x86 architectures adopted another
@@ -1846,11 +2169,14 @@
   id: totrans-294
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一个不便之处是，在 32 位系统上，即使安装了 4 GB 的内存，操作系统也永远不会使用整个大小，因为内存映射设备所造成的地址空间空洞，导致部分地址空间被占用。x86
+    架构采用了另一种方法，称为 `in` 和 `out`（通常在汇编中使用）。在这种情况下，设备寄存器不是内存映射的，系统可以访问整个 RAM 的地址范围。
 - en: PIO device access
   id: totrans-295
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: PIO 设备访问
 - en: On a system where PIO is used, I/O devices are mapped into a separate address
     space. This is usually accomplished by having a different set of signal lines
     to indicate memory access versus device access. Such systems have two different
@@ -1860,6 +2186,8 @@
   id: totrans-296
   prefs: []
   type: TYPE_NORMAL
+  zh: 在使用 PIO 的系统中，I/O 设备被映射到一个独立的地址空间。通常通过使用不同的信号线来区分内存访问和设备访问。这类系统有两个不同的地址空间，一个是系统内存的地址空间，我们之前讨论过，另一个是
+    I/O 端口的地址空间，有时被称为端口地址空间，最多支持 65,536 个端口。这是一种老方法，现在已经很少见。
 - en: 'The kernel exports a few functions (symbols) to handle I/O ports. Prior to
     accessing any port regions, we must first inform the kernel that we are using
     a range of ports using the `request_region()` function, which will return `NULL`
@@ -1868,6 +2196,9 @@
   id: totrans-297
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核导出了一些函数（符号）来处理 I/O 端口。在访问任何端口区域之前，我们必须首先通知内核我们正在使用一个端口范围，使用 `request_region()`
+    函数，如果出错将返回 `NULL`。完成该区域的使用后，我们必须调用 `release_region()`。这两个函数都在 `linux/ioport.h`
+    中声明，如下所示：
 - en: '[PRE23]'
   id: totrans-298
   prefs: []
@@ -1882,11 +2213,14 @@
   id: totrans-299
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些是礼貌函数，通知内核你打算使用/释放从 `start` 开始的 `len` 端口区域。`name` 参数应该设置为设备的名称或有意义的名称。不过，它们的使用并不是强制的。它可以防止两个或更多驱动程序引用相同的端口范围。你可以通过读取
+    `/proc/ioports` 文件的内容来查看系统上当前正在使用的端口。
 - en: 'After the region reservation has succeeded, the following APIs can be used
     to access the ports:'
   id: totrans-300
   prefs: []
   type: TYPE_NORMAL
+  zh: 在区域预留成功后，可以使用以下 API 来访问端口：
 - en: '[PRE24]'
   id: totrans-301
   prefs: []
@@ -1897,6 +2231,7 @@
   id: totrans-302
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述函数分别从 `addr` 端口读取 8、16 或 32 位（宽）数据。其写入变体定义如下：
 - en: '[PRE25]'
   id: totrans-303
   prefs: []
@@ -1907,6 +2242,7 @@
   id: totrans-304
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述函数将 `b` 数据写入 `addr` 端口，数据可以是 8、16 或 32 位大小。
 - en: The fact that PIO uses a different set of instructions to access the I/O ports
     or MMIO is a disadvantage, as it requires more instructions than normal memory
     to accomplish the same task. For instance, 1-bit testing has only one instruction
@@ -1917,11 +2253,14 @@
   id: totrans-305
   prefs: []
   type: TYPE_NORMAL
+  zh: PIO 使用一组不同的指令来访问 I/O 端口或 MMIO，这是一种劣势，因为它比普通内存操作需要更多的指令来完成相同的任务。例如，MMIO 中 1 位测试只需要一条指令，而
+    PIO 则需要先将数据读取到寄存器中，然后再测试位，这需要超过一条指令。PIO 的一个优点是，它解码地址所需的逻辑较少，降低了添加硬件设备的成本。
 - en: MMIO device access
   id: totrans-306
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: MMIO 设备访问
 - en: Main memory addresses reside in the same address space as MMIO addresses. The
     kernel maps the device registers to a portion of the address space that would
     ordinarily be utilized by RAM so that instead of system memory (that is, RAM),
@@ -1930,6 +2269,8 @@
   id: totrans-307
   prefs: []
   type: TYPE_NORMAL
+  zh: 主内存地址与 MMIO 地址位于相同的地址空间。内核将设备寄存器映射到原本应该由 RAM 使用的一部分地址空间，从而实现 I/O 设备寄存器的访问。因此，与
+    I/O 设备进行通信类似于对分配给该设备的内存地址进行读写操作。
 - en: If we need to access, let's say, the 4 MB of I/O memory assigned to IPU-2 (from
     `0x02400000` to `0x027fffff`), the CPU (by means of the IOMMU) can assign to us
     the `0x10000000` to `0x103FFFFF` addresses, which are virtual of course. This
@@ -1942,12 +2283,14 @@
   id: totrans-308
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们需要访问例如分配给IPU-2的4 MB I/O内存（从`0x02400000`到`0x027fffff`），CPU（通过IOMMU）可以分配给我们`0x10000000`到`0x103FFFFF`的虚拟地址。当然，这不会消耗物理RAM（除非用于构建和存储页表项），只是地址空间（你现在明白为什么32位系统在扩展卡，如具有GB内存的高端GPU时会遇到问题了吗？），意味着内核将不再使用这个虚拟内存范围来映射RAM。现在，写入/读取内存，如`0x10000004`，将被路由到IPU-2设备。这就是内存映射I/O的基本前提。
 - en: 'Like PIO, there are MMIO functions to inform the kernel about our intention
     to use a memory region. Remember that this information is a pure reservation only.
     These are `request_mem_region()` and `release_mem_region()`, defined as the following:'
   id: totrans-309
   prefs: []
   type: TYPE_NORMAL
+  zh: 与PIO类似，MMIO函数用于通知内核我们打算使用某个内存区域。请记住，这些信息只是一个纯粹的预留。它们是`request_mem_region()`和`release_mem_region()`，定义如下：
 - en: '[PRE26]'
   id: totrans-310
   prefs: []
@@ -1959,12 +2302,14 @@
   id: totrans-311
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些只是礼貌性函数，前者构建并返回一个合适的`resource`结构，表示内存区域的起始地址和长度，后者则释放它。
 - en: 'For the device driver, however, it is recommended to use the managed variant,
     as it simplifies the code and takes care of releasing the resource. This managed
     version is defined as the following:'
   id: totrans-312
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，对于设备驱动程序，推荐使用管理版本，因为它简化了代码并处理了资源的释放。该管理版本定义如下：
 - en: '[PRE27]'
   id: totrans-313
   prefs: []
@@ -1977,6 +2322,7 @@
   id: totrans-314
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`dev`是拥有内存区域的设备，其他参数与非管理版本相同。成功请求后，内存区域将显示在`/proc/iomem`中，这是一个包含系统内存区域使用情况的文件。
 - en: 'Prior to accessing a memory region (and after you successfully request it),
     the region must be mapped into kernel address space by calling special architecture-dependent
     functions (which make use of IOMMU to build a page table and thus cannot be called
@@ -1985,6 +2331,7 @@
   id: totrans-315
   prefs: []
   type: TYPE_NORMAL
+  zh: 在访问一个内存区域之前（并且在成功请求后），该区域必须通过调用特定的与架构相关的函数映射到内核地址空间中（这些函数利用IOMMU构建页表，因此不能从中断处理程序中调用）。这些函数是`ioremap()`和`iounmap()`，它们也处理缓存一致性。以下是它们的定义：
 - en: '[PRE28]'
   id: totrans-316
   prefs: []
@@ -1998,6 +2345,8 @@
   id: totrans-317
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的函数中，`phys_addr`对应设备在设备树或板文件中指定的物理地址。`size`对应映射区域的大小。`ioremap()`返回一个指向映射区域起始位置的`__iomem
+    void`指针。再次建议使用管理版本，定义如下：
 - en: '[PRE29]'
   id: totrans-318
   prefs: []
@@ -2007,6 +2356,7 @@
   id: totrans-319
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: '`ioremap()` builds new page tables, just as `vmalloc()` does. However, it does
     not actually allocate any memory but instead returns a special virtual address
     that can be used to access the specified I/O address. On 32-bit systems, the fact
@@ -2016,6 +2366,7 @@
   id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ioremap()`构建新的页表，就像`vmalloc()`一样。然而，它并不实际分配任何内存，而是返回一个特殊的虚拟地址，用于访问指定的I/O地址。在32位系统中，MMIO通过窃取物理内存地址空间为内存映射I/O设备创建映射，这是一个缺点，因为它会阻止系统将被窃取的内存用于一般的RAM用途。'
 - en: 'Because the mapping APIs are architecture-dependent, you should not deference
     (that is, getting/setting their value by reading/writing to the pointer) such
     pointers, even though on some architectures you can. The kernel provides portable
@@ -2023,6 +2374,7 @@
   id: totrans-321
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于映射 API 是架构相关的，你不应解除引用这些指针（即通过读取/写入指针值来获取/设置其值），即使在某些架构上可以这样做。内核提供了可移植的函数来访问内存映射区域。这些函数包括：
 - en: '[PRE30]'
   id: totrans-322
   prefs: []
@@ -2032,27 +2384,33 @@
   id: totrans-323
   prefs: []
   type: TYPE_NORMAL
+  zh: 前述函数分别用于读取和写入 8 位、16 位和 32 位的值。
 - en: Note
   id: totrans-324
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: '`__iomem` is a kernel cookie used by **Sparse**, a semantic checker used by
     the kernel to find possible coding faults. It prevents mixing normal pointer use
     (such as dereference) with I/O memory pointers.'
   id: totrans-325
   prefs: []
   type: TYPE_NORMAL
+  zh: '`__iomem` 是一个内核标记，供 **Sparse** 使用，Sparse 是一个内核的语义检查工具，用于发现可能的编码错误。它防止将普通指针（例如解除引用）与
+    I/O 内存指针混用。'
 - en: In this section, we have learned how to map memory-mapped device memory into
     kernel address space to access its registers using dedicated APIs. This will serve
     in driving in-chip devices.
   id: totrans-326
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们学习了如何通过专用的 API 将内存映射的设备内存映射到内核地址空间，以访问其寄存器。这将有助于驱动片上设备。
 - en: Memory (re)mapping
   id: totrans-327
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 内存（重新）映射
 - en: Kernel memory sometimes needs to be remapped, either from kernel to user space,
     or from high memory to a low memory region (from kernel to kernel space). The
     common case is remapping the kernel memory to user space, but there are other
@@ -2060,11 +2418,13 @@
   id: totrans-328
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核内存有时需要重新映射，要么从内核映射到用户空间，要么从高内存映射到低内存区域（从内核空间到内核空间）。常见的情况是将内核内存重新映射到用户空间，但也有其他情况，例如当我们需要访问高内存时。
 - en: Understanding the use of kmap
   id: totrans-329
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 理解 `kmap()` 的使用
 - en: The Linux kernel permanently maps 896 MB of its address space to the lower 896
     MB of the physical memory (low memory). On a 4 GB system, there is only 128 MB
     left to the kernel to map the remaining 3.2 GB of physical memory (high memory).
@@ -2077,6 +2437,9 @@
   id: totrans-330
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 内核将其地址空间的 896 MB 永久映射到物理内存的下部 896 MB（低内存）。在一个 4 GB 的系统上，内核只能映射剩余的 3.2
+    GB 物理内存（高内存），而剩下的只有 128 MB。不过，由于低内存具有永久且一对一的映射，内核可以直接访问它。对于高内存（896 MB 之前的内存），内核必须将请求的高内存区域映射到其地址空间，而前面提到的
+    128 MB 就是专门为此预留的。执行这个操作的函数是 `kmap()`。`kmap()` 函数用于将给定页面映射到内核地址空间。
 - en: '[PRE31]'
   id: totrans-331
   prefs: []
@@ -2089,6 +2452,8 @@
   id: totrans-332
   prefs: []
   type: TYPE_NORMAL
+  zh: '`page` 是一个指向 `struct page` 结构的指针，用于映射。当高内存页面被分配时，它不能直接访问。我们调用 `kmap()` 函数将高内存临时映射到内核地址空间。该映射将持续到调用
+    `kunmap()` 为止：'
 - en: '[PRE32]'
   id: totrans-333
   prefs: []
@@ -2100,6 +2465,7 @@
   id: totrans-334
   prefs: []
   type: TYPE_NORMAL
+  zh: '*临时*是指映射在不再需要时应立即撤销。最佳的编程实践是，当高内存映射不再需要时，取消映射。'
 - en: 'This function works on both high and low memory. However, if a page structure
     resides in low memory, then just the virtual address of the page is returned (because
     low-memory pages already have permanent mappings). If the page belongs to high
@@ -2108,6 +2474,7 @@
   id: totrans-335
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个函数适用于高内存和低内存。然而，如果页面结构位于低内存中，则仅返回页面的虚拟地址（因为低内存页面已经有了永久映射）。如果页面属于高内存，则会在内核的页表中创建永久映射，并返回地址：
 - en: '[PRE33]'
   id: totrans-336
   prefs: []
@@ -2124,6 +2491,8 @@
   id: totrans-337
   prefs: []
   type: TYPE_NORMAL
+  zh: '`kmap_high()`和`kunmap_high()`，它们定义在`mm/highmem.c`中，是这些实现的核心。然而，`kmap()`使用在启动时分配的物理连续页表将页面映射到内核空间。由于这些页表是相互连接的，因此移动起来非常简单，无需一直查询页目录。你应该注意，`kmap`页表对应于以`PKMAP
+    BASE`开头的内核虚拟地址，这在不同架构中有所不同，且它的页表项引用计数保存在一个名为`pkmap_count`的独立数组中。'
 - en: The page frame of the page to map into kernel space is passed to `kmap()` as
     a `struct *page` argument, and this can be a regular or `HIGHMEM` page; in the
     first case, `kmap()` simply returns the direct-mapped address. For `HIGHMEM` pages,
@@ -2138,16 +2507,19 @@
   id: totrans-338
   prefs: []
   type: TYPE_NORMAL
+  zh: 要映射到内核空间的页面框架作为`struct *page`参数传递给`kmap()`，这可以是普通页或`HIGHMEM`页；在第一种情况下，`kmap()`直接返回直接映射的地址。对于`HIGHMEM`页，`kmap()`会在启动时分配的`kmap`页表中查找一个未使用的条目——即`pkmap_count`值为零的条目。如果没有找到，它会进入睡眠状态，等待另一个进程`kunmap`一个页面。当它找到未使用的条目时，它会插入我们要映射的物理页地址，并同时递增对应页表项的`pkmap_count`引用计数，然后将虚拟地址返回给调用者。页面结构体的`page->virtual`也会更新，以反映映射的地址。
 - en: '`kunmap()` expects a `struct page*` representing the page to unmap. It finds
     the `pkmap_count` entry for the page''s virtual address and decrements it.'
   id: totrans-339
   prefs: []
   type: TYPE_NORMAL
+  zh: '`kunmap()`接收一个`struct page*`，表示要解除映射的页面。它查找该页面虚拟地址的`pkmap_count`条目，并对其进行递减操作。'
 - en: Mapping kernel memory to user space
   id: totrans-340
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 将内核内存映射到用户空间
 - en: Mapping physical addresses is one of the most common operations, especially
     in embedded systems. Sometimes, you may want to share part of the kernel memory
     with user space. As mentioned earlier, the CPU runs in unprivileged mode when
@@ -2156,17 +2528,20 @@
   id: totrans-341
   prefs: []
   type: TYPE_NORMAL
+  zh: 映射物理地址是最常见的操作之一，尤其是在嵌入式系统中。有时，你可能希望将部分内核内存共享给用户空间。如前所述，CPU在用户空间运行时处于非特权模式。为了让一个进程访问内核内存区域，我们需要将该区域重新映射到进程地址空间。
 - en: Using remap_pfn_range
   id: totrans-342
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用remap_pfn_range
 - en: '`remap_pfn_range()` maps physical contiguous memory into a process address
     space by means of a VMA. It is particularly useful for implementing the `mmap`
     file operation, which is the backend of the `mmap()` system call.'
   id: totrans-343
   prefs: []
   type: TYPE_NORMAL
+  zh: '`remap_pfn_range()`通过VMA将物理连续内存映射到进程地址空间。它对于实现`mmap`文件操作非常有用，`mmap()`系统调用的后台就是基于这个操作。'
 - en: After invoking the `mmap()` system call on a file descriptor (a device-backed
     file or not) given a region start and length, the CPU will switch to privileged
     mode. An initial kernel code will create an almost empty VMA as large as the requested
@@ -2183,10 +2558,12 @@
   id: totrans-344
   prefs: []
   type: TYPE_NORMAL
+  zh: 在给定区域的起始位置和长度后，调用`mmap()`系统调用时，CPU将切换到特权模式。初始内核代码将创建一个几乎为空的VMA，其大小与请求的映射区域相同，并运行相应的`file_operations.mmap`回调，将VMA作为参数传递。然后，此回调应调用`remap_pfn_range()`。该函数将更新VMA，并在将其添加到进程的页表之前推导出映射区域的内核PTE，并设置不同的保护标志。当然，进程的VMA列表将通过插入VMA条目（具有适当的属性）进行更新，使用推导出的PTE来访问相同的内存。通过这种方式，内核和用户空间将通过各自的页表指向相同的物理内存区域，但具有不同的保护标志。因此，内核只是复制了PTE，每个PTE都有自己的属性，而不是通过复制浪费内存和CPU周期。
 - en: '`remap_pfn_range()` is defined as the following:'
   id: totrans-345
   prefs: []
   type: TYPE_NORMAL
+  zh: '`remap_pfn_range()`定义如下：'
 - en: '[PRE34]'
   id: totrans-346
   prefs: []
@@ -2198,6 +2575,7 @@
   id: totrans-347
   prefs: []
   type: TYPE_NORMAL
+  zh: 成功调用将返回`0`，失败时返回负错误码。此函数的大部分参数是在调用`mmap()`系统调用时提供的。以下是它们的描述：
 - en: '`vma`: This is the virtual memory area provided by the kernel in case of the
     `file_operations.mmap` call. It corresponds to the user process''s VMA, into which
     the mapping should be done.'
@@ -2205,12 +2583,14 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`vma`：这是内核在调用`file_operations.mmap`时提供的虚拟内存区域。它对应于用户进程的VMA，映射应该在其中进行。'
 - en: '`addr`: This is the user (virtual) address where the VMA should start (`vma->vm_start`
     most of the time). It will result in a mapping from `addr` to `addr + size`.'
   id: totrans-349
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`addr`：这是VMA应开始映射的用户（虚拟）地址（大多数情况下是`vma->vm_start`）。它将导致从`addr`到`addr + size`的映射。'
 - en: '`pfn`: This represents the page frame number of the physical memory region
     to map. To obtain this page frame number, we must consider how the memory allocation
     was performed:'
@@ -2218,6 +2598,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`pfn`：这表示要映射的物理内存区域的页帧号。要获得这个页帧号，我们必须考虑内存分配是如何执行的：'
 - en: 'For memory allocated with `kmalloc()` or any other allocation API that returns
     a kernel logical address (`__get_free_pages()` with the `GFP_KERNEL` flag, for
     instance), `pfn` can be obtained as follows (obtaining the physical address and
@@ -2227,6 +2608,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于使用`kmalloc()`或任何返回内核逻辑地址的分配API（例如，使用`GFP_KERNEL`标志的`__get_free_pages()`）分配的内存，可以通过以下方式获取`pfn`（获取物理地址并将此地址右移`PAGE_SHIFT`次）：
 - en: '[PRE35]'
   id: totrans-352
   prefs:
@@ -2241,6 +2623,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于使用`alloc_pages()`分配的内存，我们可以使用以下方法（其中`page`是分配时返回的指针）：
 - en: '[PRE36]'
   id: totrans-354
   prefs:
@@ -2254,6 +2637,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 最后，对于使用`vmalloc()`分配的内存，可以使用以下方法：
 - en: '[PRE37]'
   id: totrans-356
   prefs:
@@ -2268,6 +2652,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`size`：这是要重新映射区域的大小（以字节为单位）。如果它不是页对齐的，内核将自动将其对齐到（下一个）页边界。'
 - en: '`flags`: This represents the protection requested for the new VMA. The driver
     can change the final values but should use the initial default values (found in
     `vma->vm_page_prot`) as a skeleton using the OR (`|` in the C language) operator.
@@ -2277,12 +2662,14 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`flags`：这表示为新的虚拟内存区域（VMA）请求的保护。驱动程序可以更改最终的值，但应使用初始的默认值（位于`vma->vm_page_prot`中）作为框架，通过按位“或”操作符（C语言中的`|`）来处理。这些默认值是由用户空间设置的。以下是一些标志的例子：'
 - en: '`VM_IO`, which specifies a device''s memory-mapped I/O.'
   id: totrans-359
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`VM_IO`，它指定了一个设备的内存映射I/O。'
 - en: '`VM_PFNMAP`, to specify a page range managed without a baking `struct page`,
     just pure PFN. This is used most of the time for I/O memory mappings. In other
     words, it means that the base pages are just raw PFN mappings and do not have
@@ -2292,18 +2679,22 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`VM_PFNMAP`，用于指定一个没有管理 `struct page` 的页面范围，仅使用原始的 PFN。这通常用于 I/O 内存映射。换句话说，这意味着基础页面只是原始的
+    PFN 映射，而没有与之关联的 `struct page`。'
 - en: '`VM_DONTCOPY`, which tells the kernel not to copy this VMA on a fork.'
   id: totrans-361
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`VM_DONTCOPY`，告诉内核在进行进程分叉时不要复制此虚拟内存区域（VMA）。'
 - en: '`VM_DONTEXPAND`, which prevents the VMA from expanding with `mremap()`.'
   id: totrans-362
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`VM_DONTEXPAND`，防止 VMA 在使用 `mremap()` 时扩展。'
 - en: '`VM_DONTDUMP`, which prevents the VMA from being included in a core dump, even
     with `VM_IO` turned off.'
   id: totrans-363
@@ -2311,6 +2702,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`VM_DONTDUMP`，防止 VMA 被包含在核心转储中，即使 `VM_IO` 被关闭。'
 - en: Memory mapping works with memory regions that are multiples of `PAGE_SIZE`,
     so, for example, you should allocate an entire page instead of using a `kmalloc`-allocated
     buffer. `kmalloc()` can return (if requesting a non-multiple size of `PAGE_SIZE`)
@@ -2323,6 +2715,10 @@
   id: totrans-364
   prefs: []
   type: TYPE_NORMAL
+  zh: 内存映射需要内存区域的大小是 `PAGE_SIZE` 的倍数。例如，你应该分配整页，而不是使用 `kmalloc` 分配的缓冲区。`kmalloc()`
+    如果请求的大小不是 `PAGE_SIZE` 的倍数，可能返回一个没有页对齐的指针，这时使用这样一个未对齐的地址进行 `remap_pfn_range()`
+    映射是非常糟糕的主意。没有任何保障能够确保 `kmalloc()` 返回的地址是页对齐的，因此你可能会破坏内核中的 slab 内部数据结构。你应该使用 `kmalloc(PAGE_SIZE
+    * npages)`，或者更好地，使用页分配 API（或类似的，因为这些函数始终返回页对齐的指针）。
 - en: 'If your baking object (a file or device) supports an offset, then the VMA offset
     (the offset into the object where the mapping must start) should be considered
     to produce the PFN where mapping must start. `vma->vm_pgoff` will contain this
@@ -2332,6 +2728,8 @@
   id: totrans-365
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的存储对象（文件或设备）支持偏移量，那么应该考虑 VMA 偏移量（映射必须开始的位置偏移）来计算映射开始的物理页号（PFN）。`vma->vm_pgoff`
+    将包含此偏移量（如果用户空间在 `mmap()` 中指定）值，单位是页数。最终的 PFN 计算（或映射起始位置）将如下所示：
 - en: '[PRE38]'
   id: totrans-366
   prefs: []
@@ -2343,10 +2741,12 @@
   id: totrans-367
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的摘录中，偏移量（以页数为单位）已经包含在最终位置计算中。然而，如果驱动程序实现不需要其支持，可以忽略此偏移量。
 - en: Note
   id: totrans-368
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: The offset can be used differently, by left-shifting `PAGE_SIZE` to obtain the
     offset by the number of bytes (`offset = vma->vm_pgoff << PAGE_SHIFT`), and then
     adding this offset to the memory start address before computing the final PFN
@@ -2354,11 +2754,14 @@
   id: totrans-369
   prefs: []
   type: TYPE_NORMAL
+  zh: 偏移量也可以通过左移 `PAGE_SIZE` 来计算字节数偏移量（`offset = vma->vm_pgoff << PAGE_SHIFT`），然后在计算最终
+    PFN 前，将该偏移量加到内存起始地址（`pfn = virt_to_phys(kmalloc_area + offset) >> PAGE_SHIFT`）。
 - en: Remapping vmalloc-allocated pages
   id: totrans-370
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 重新映射由 `vmalloc` 分配的页面
 - en: 'Note that memory allocated with `vmalloc()` is not physically contiguous, so
     if you need to map a memory region allocated with `vmalloc()`, you must map each
     page individually and compute the physical address for each page. This can be
@@ -2367,6 +2770,8 @@
   id: totrans-371
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，使用 `vmalloc()` 分配的内存不是物理连续的，因此，如果你需要映射使用 `vmalloc()` 分配的内存区域，必须单独映射每个页面并为每个页面计算物理地址。这可以通过遍历该
+    `vmalloc` 分配的内存区域中的所有页面，并按照以下方式调用 `remap_pfn_range()` 来实现：
 - en: '[PRE39]'
   id: totrans-372
   prefs: []
@@ -2379,16 +2784,20 @@
   id: totrans-373
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的摘录中，`length` 对应于 VMA 大小（`length = vma->vm_end - vma->vm_start`）。`pfn` 会为每个页面进行计算，下一次映射的起始地址会增加
+    `PAGE_SIZE`，以便映射该区域中的下一个页面。`start` 的初始值是 `start = vma->vm_start`。
 - en: That said, from within the kernel, the `vmalloc`-allocated memory can be used
     normally. The paginated use is necessary for remapping purposes only.
   id: totrans-374
   prefs: []
   type: TYPE_NORMAL
+  zh: 也就是说，在内核内部，`vmalloc` 分配的内存可以正常使用。分页使用仅在重新映射时需要。
 - en: Remapping the I/O memory
   id: totrans-375
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 重新映射 I/O 内存
 - en: 'Remapping the I/O memory requires a device''s physical addresses, as specified
     in the device tree or the board file. In this case, for portability reasons, the
     appropriate function to use is `io_remap_pfn_range()`, whose parameters are the
@@ -2397,6 +2806,8 @@
   id: totrans-376
   prefs: []
   type: TYPE_NORMAL
+  zh: 重新映射 I/O 内存需要设备的物理地址，这些地址通常在设备树或板文件中指定。在这种情况下，为了移植性，应该使用的函数是 `io_remap_pfn_range()`，其参数与
+    `remap_pfn_range()` 相同。唯一不同的是 PFN 的来源。其原型如下所示：
 - en: '[PRE40]'
   id: totrans-377
   prefs: []
@@ -2409,11 +2820,14 @@
   id: totrans-378
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的函数中，`vma` 和 `start` 与 `remap_pfn_range()` 中的意义相同。然而，`phys_pfn` 在获取方式上有所不同；它必须对应物理
+    I/O 内存地址，因为它已经被传递给了 `ioremap()`，并右移了 `PAGE_SHIFT` 次。
 - en: 'There is, however, a simplified `io_remap_pfn_range()` for common driver use:
     `vm_iomap_memory()`. This lite variant is defined as the following:'
   id: totrans-379
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，对于常见的驱动程序使用，有一个简化版的 `io_remap_pfn_range()`：`vm_iomap_memory()`。这个简化版定义如下：
 - en: '[PRE41]'
   id: totrans-380
   prefs: []
@@ -2428,17 +2842,22 @@
   id: totrans-381
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的函数中，`vma` 是用户 VMA（虚拟内存区域）进行映射的位置。`start` 是要映射的 I/O 内存区域的起始地址（它本应已传递给 `ioremap()`），`len`
+    是该区域的大小。通过 `vm_iomap_memory()`，驱动程序只需要提供要映射的物理内存范围；该函数会从 `vma` 信息中推导出其余部分。与 `io_remap_pfn_range()`
+    一样，函数在成功时返回 `0`，否则返回负错误代码。
 - en: Memory remapping and caching issues
   id: totrans-382
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 内存重新映射和缓存问题
 - en: While caching is generally a good idea, it can introduce side effects, especially
     if, for a memory-mapped device (or even RAM), the values written to the mmap'ed
     registers must be instantaneously visible to the device.
   id: totrans-383
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管缓存通常是一个好主意，但它可能会引入副作用，尤其是对于内存映射设备（甚至是 RAM）来说，当写入 mmap 映射的寄存器的值必须立即对设备可见时，缓存可能会导致问题。
 - en: You should note that, by default, the kernel remaps memory to user space with
     caching and buffering enabled. To change the default behavior, drivers must disable
     the cache on the VMA before invoking the remapping API. In order to do so, the
@@ -2448,10 +2867,13 @@
   id: totrans-384
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要注意的是，默认情况下，内核会将内存映射到用户空间，并启用缓存和缓冲区。为了更改默认行为，驱动程序必须在调用重新映射 API 之前禁用 VMA 上的缓存。为此，内核提供了
+    `pgprot_noncached()`。除了禁用缓存外，该函数还会禁用指定区域的缓冲区能力。此助手函数接受一个初始的 VMA 访问保护，并返回禁用缓存后的更新版本。
 - en: 'It is used as follows:'
   id: totrans-385
   prefs: []
   type: TYPE_NORMAL
+  zh: 它的使用方式如下：
 - en: '[PRE42]'
   id: totrans-386
   prefs: []
@@ -2464,16 +2886,20 @@
   id: totrans-387
   prefs: []
   type: TYPE_NORMAL
+  zh: 在测试我为内存映射设备开发的驱动程序时，我遇到了一个问题：在启用缓存时，当我通过 mmap 映射的区域在用户空间更新设备寄存器，并且设备看到该更新时，延迟大约为
+    20 毫秒。
 - en: After disabling the cache, this latency almost went away, as it fell below 200
     µs. Amazing!
   id: totrans-388
   prefs: []
   type: TYPE_NORMAL
+  zh: 禁用缓存后，这个延迟几乎消失了，降到了 200 微秒以下。太神奇了！
 - en: Implementing the mmap file operation
   id: totrans-389
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 实现 mmap 文件操作
 - en: From user space, the `mmap()` system call is used to map physical memory into
     the address space of the calling process. In order to support this system call
     in a driver, this driver must implement the `file_operations.mmap` hook. After
@@ -2484,10 +2910,12 @@
   id: totrans-390
   prefs: []
   type: TYPE_NORMAL
+  zh: 从用户空间，通过`mmap()`系统调用将物理内存映射到调用进程的地址空间。为了在驱动中支持这个系统调用，该驱动必须实现`file_operations.mmap`钩子。在映射完成后，用户进程将能够通过返回的地址直接写入设备内存。内核将通过常规的指针解引用，将对映射区域的任何访问转换为文件操作。
 - en: 'The `mmap()` system call is declared as follows:'
   id: totrans-391
   prefs: []
   type: TYPE_NORMAL
+  zh: '`mmap()`系统调用声明如下：'
 - en: '[PRE43]'
   id: totrans-392
   prefs: []
@@ -2498,6 +2926,7 @@
   id: totrans-393
   prefs: []
   type: TYPE_NORMAL
+  zh: 从内核端，驱动的文件操作结构（`struct file_operations`结构）中的`mmap`字段具有以下原型：
 - en: '[PRE44]'
   id: totrans-394
   prefs: []
@@ -2512,6 +2941,7 @@
   id: totrans-395
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的文件操作函数中，`filp`是指向驱动打开的设备文件的指针，结果是通过`fd`参数（在系统调用中给定）进行转换的。`vma`是由内核分配并作为参数提供的。它指向用户进程的VMA，映射应该放置在其中。要理解内核如何创建新的VMA，它使用传递给`mmap()`系统调用的参数，这些参数会以某种方式影响VMA的某些字段，如下所示：
 - en: '`addr` is the user space''s virtual address where the mapping should start.
     It has an impact on `vma>vm_start`. If `NULL` (the portable way), the kernel will
     automatically pick a free address.'
@@ -2519,6 +2949,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`addr`是用户空间的虚拟地址，映射应从此地址开始。它会影响`vma->vm_start`。如果为`NULL`（便于移植的方式），内核将自动选择一个空闲地址。'
 - en: '`len` specifies the length of the mapping and indirectly has an impact on `vma->vm_end`.
     Remember that the size of a VMA is always a multiple of `PAGE_SIZE`. It implies
     that `PAGE_SIZE` is the smallest size a VMA can have. If the `len` argument is
@@ -2528,33 +2959,39 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`len`指定映射的长度，并间接影响`vma->vm_end`。请记住，VMA的大小始终是`PAGE_SIZE`的倍数。这意味着`PAGE_SIZE`是VMA可以拥有的最小大小。如果`len`参数不是页大小的倍数，它将向上舍入到下一个最高的页大小倍数。'
 - en: '`prot` affects the permission of the VMA, which the driver can find in `vma->vm_page_prot`.'
   id: totrans-398
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`prot`影响VMA的权限，驱动可以在`vma->vm_page_prot`中找到。'
 - en: '`flags` determines the type of mapping that the driver can find in `vma->vm_flags`.
     The mapping can be private or shared.'
   id: totrans-399
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`flags`决定了驱动可以在`vma->vm_flags`中找到的映射类型。映射可以是私有的或共享的。'
 - en: '`offset` specifies the offset within the mapped region. It is computed by the
     kernel so that it is stored in the `vma->vm_pgoff` in `PAGE_SIZE` unit.'
   id: totrans-400
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`offset`指定映射区域内的偏移量。它由内核计算，并存储在以`PAGE_SIZE`为单位的`vma->vm_pgoff`中。'
 - en: 'With all these parameters defined, we can split the `mmap` file operation implementation
     into the following steps:'
   id: totrans-401
   prefs: []
   type: TYPE_NORMAL
+  zh: 在定义了所有这些参数后，我们可以将`mmap`文件操作实现拆分为以下步骤：
 - en: 'Get the mapping offset and check whether it is beyond our buffer size or not:'
   id: totrans-402
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 获取映射偏移量并检查其是否超出缓冲区大小：
 - en: '[PRE45]'
   id: totrans-403
   prefs:
@@ -2566,6 +3003,7 @@
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 检查映射长度是否大于我们的缓冲区大小：
 - en: '[PRE46]'
   id: totrans-405
   prefs:
@@ -2579,6 +3017,7 @@
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 计算与`offset`在缓冲区中的位置对应的PFN。注意，PFN的获取方式取决于缓冲区的分配方式：
 - en: '[PRE47]'
   id: totrans-407
   prefs:
@@ -2590,12 +3029,14 @@
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 设置适当的标志，必要时禁用缓存：
 - en: Disable caching using `vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);`.
   id: totrans-409
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);`禁用缓存。
 - en: 'Set the `VM_IO` flag if necessary: `vma->vm_flags |= VM_IO;`. It also prevents
     the VMA from being included in the process''s core dump.'
   id: totrans-410
@@ -2603,6 +3044,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果需要，设置`VM_IO`标志：`vma->vm_flags |= VM_IO;`。它还会防止VMA包含在进程的核心转储中。
 - en: 'Prevent the VMA from swapping out: `vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP`.
     In kernel versions before 3.7, `VM_RESERVED` will be used.'
   id: totrans-411
@@ -2610,12 +3052,14 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 防止VMA被交换出去：`vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP`。在3.7版本之前的内核中，`VM_RESERVED`会被使用。
 - en: 'Call `remap_pfn_range()` with the PFN calculated previously, `size`, and the
     protection flags. We will use `vm_iomap_memory()` in case of I/O memory mapping:'
   id: totrans-412
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 调用`remap_pfn_range()`，传入之前计算的PFN、`size`和保护标志。在进行I/O内存映射时，我们将使用`vm_iomap_memory()`：
 - en: '[PRE48]'
   id: totrans-413
   prefs:
@@ -2627,6 +3071,7 @@
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 最后，将函数传递给`struct file_operations`结构：
 - en: '[PRE49]'
   id: totrans-415
   prefs:
@@ -2639,11 +3084,13 @@
   id: totrans-416
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个文件操作的实现结束了我们关于内存映射的系列内容。在本节中，我们学习了映射在背后是如何工作的，以及所有相关机制，包括缓存考虑。
 - en: Summary
   id: totrans-417
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: This chapter is one of the most important chapters. It demystifies memory management
     and allocation (how and where) in the Linux kernel. It teaches in detail how mapping
     and address translation work. Some other aspects, such as talking with hardware
@@ -2652,8 +3099,10 @@
   id: totrans-418
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章是最重要的章节之一。它揭示了Linux内核中的内存管理与分配（如何分配以及在哪里分配）。它详细讲解了映射和地址转换的工作原理。其他一些方面，例如与硬件设备通信和为用户空间重新映射内存（代表`mmap()`系统调用）也进行了详细讨论。
 - en: This provides a strong base to introduce and understand the next chapter, which
     deals with **Direct Memory Access** (**DMA**).
   id: totrans-419
   prefs: []
   type: TYPE_NORMAL
+  zh: 这为引入和理解下一章奠定了坚实基础，该章讨论的是**直接内存访问**（**DMA**）。
