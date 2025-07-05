@@ -1,17 +1,25 @@
 - en: 4 Securing Your Server with a Firewall - Part 1
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 4 使用防火墙保护你的服务器 - 第一部分
 - en: Join our book community on Discord
+  id: totrans-1
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 加入我们的 Discord 书籍社区
 - en: '[https://packt.link/SecNet](https://packt.link/SecNet)'
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://packt.link/SecNet](https://packt.link/SecNet)'
 - en: '![](img/file33.png)'
+  id: totrans-3
   prefs: []
   type: TYPE_IMG
+  zh: '![](img/file33.png)'
 - en: Security is one of those things that's best done in layers. Security-in-depth,
     we call it. So, on any given corporate network, you will find a firewall appliance
     separating the Internet from the **demilitarized zone** (**DMZ**), where your
@@ -19,121 +27,171 @@
     the DMZ and the internal LAN, and firewall software installed on each individual
     server and client. We want to make it as tough as possible for intruders to reach
     their final destinations within our networks.
+  id: totrans-4
   prefs: []
   type: TYPE_NORMAL
+  zh: 安全性是那些最好分层执行的事情之一，我们称之为“深度防御”。因此，在任何给定的企业网络中，你会发现一个防火墙设备将互联网与 **非军事区**（**DMZ**）隔开，互联网面向的服务器通常会部署在这里。你还会发现另一个防火墙设备位于
+    DMZ 和内部局域网之间，并且在每台服务器和客户端上都安装有防火墙软件。我们的目标是尽可能让入侵者难以进入我们的网络。
 - en: Interestingly, though, of all the major Linux distros, only the SUSE distros
     and the Red Hat type distros come with a firewall already set up and enabled.
     Newer versions of Ubuntu come with a pre-configured firewall, but you need to
     activate it by running a couple of simple commands.
+  id: totrans-5
   prefs: []
   type: TYPE_NORMAL
+  zh: 有趣的是，在所有主要的 Linux 发行版中，只有 SUSE 发行版和 Red Hat 类型的发行版默认设置并启用了防火墙。较新的 Ubuntu 版本也附带了预配置的防火墙，但你需要通过运行几个简单的命令来激活它。
 - en: 'Since the focus of this book is on hardening our Linux servers, we''ll focus
     this chapter on that last level of defense: the firewalls on our servers and clients.
     We''ll cover both of the command-line netfilter interfaces, which are **iptables**
     and **nftables**.'
+  id: totrans-6
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于本书的重点是强化我们的 Linux 服务器，我们将专注于这一防线的最后一层：服务器和客户端上的防火墙。我们将讨论两个命令行的 netfilter 接口，即
+    **iptables** 和 **nftables**。
 - en: 'In this chapter, we''ll cover the following topics:'
+  id: totrans-7
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将涵盖以下主题：
 - en: An overview of the Linux firewall
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Linux 防火墙概述
 - en: An overview of iptables
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: iptables 概述
 - en: An overview of nftables
+  id: totrans-10
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: nftables 概述
 - en: In the next chapter, we'll cover **ufw** and **firewalld**, which are handy
     front-ends for iptables and nftables.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章中，我们将介绍 **ufw** 和 **firewalld**，它们是 iptables 和 nftables 的便捷前端。
 - en: Technical requirements
+  id: totrans-12
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 技术要求
 - en: 'The code files for this chapter are available here: [https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition](https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition).'
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章的代码文件可以在这里找到：[https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition](https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition)。
 - en: An overview of the Linux firewall
+  id: totrans-14
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: Linux 防火墙概述
 - en: 'In a typical business setting, especially in larger enterprises, you may encounter
     various types of firewalls in various places that can provide various types of
     functionality. Here are some examples:'
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 在典型的商业环境中，特别是在大型企业中，你可能会在不同的位置遇到各种类型的防火墙，这些防火墙可以提供各种功能。以下是一些示例：
 - en: Edge devices that separate the Internet from an internal network translate routable
     public IP addresses to non-routable private IP addresses. They can also provide
     various types of access control to keep out unauthorized people. By also providing
     various types of packet inspection services, they can help prevent attacks on
     the internal network, keep out malware, and prevent leakage of sensitive information
     from the internal network to the Internet.
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 边缘设备将互联网与内部网络分隔开，并将可路由的公共 IP 地址转换为不可路由的私有 IP 地址。它们还可以提供各种类型的访问控制，以防止未授权人员进入。通过提供各种类型的数据包检查服务，它们可以帮助防止对内部网络的攻击，阻止恶意软件的入侵，并防止敏感信息从内部网络泄漏到互联网。
 - en: Large enterprise networks are normally divided into subnetworks, or *subnets*,
     with each corporate department having a subnet to call its own. Best practice
     dictates separating the subnets with firewalls. This helps ensure that only authorized
     personnel can access any given subnet.
+  id: totrans-17
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 大型企业网络通常会被划分为多个子网或 *子网*，每个公司部门都会有一个属于自己的子网。最佳实践建议使用防火墙将这些子网隔开，这有助于确保只有授权人员才能访问特定的子网。
 - en: And, of course, you also have firewalls running on the individual servers and
     workstations. By providing a form of access control, they can help prevent an
     intruder who has compromised one machine from performing a lateral movement to
     another machine on the network. They can be also configured to prevent certain
     types of port scanning and **denial-of-service** (**DoS**) attacks.
+  id: totrans-18
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 当然，你还会在各个服务器和工作站上运行防火墙。通过提供一种访问控制方式，它们可以帮助防止已经被入侵的机器在网络上进行横向移动。它们还可以配置来防止某些类型的端口扫描和**拒绝服务**（**DoS**）攻击。
 - en: For the first two items in the preceding list, you would likely see dedicated
     firewall appliances and teams of firewall administrators taking care of them.
     The third item in the list is where you, the Linux professional, come into the
     picture. In this chapter and the next, we'll look at the firewall technologies
     that come packaged with your Linux server and Linux workstation distros.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于前面列表中的前两项，你通常会看到专用的防火墙设备和防火墙管理员团队来负责处理它们。列表中的第三项就是你作为 Linux 专业人员进入的地方。在本章以及下一章中，我们将探讨你在
+    Linux 服务器和 Linux 工作站发行版中使用的防火墙技术。
 - en: 'The name of the Linux firewall is **netfilter**. This netfilter code is compiled
     into the Linux kernel, and is what performs the actual packet filtering. There’s
     no way for human users to directly interface with netfilter, which means that
     we need some sort of helper program to interface with netfilter for us. There
     have been three helper programs, which are:'
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 防火墙的名称是**netfilter**。这个 netfilter 代码被编译进 Linux 内核，并执行实际的包过滤。人类用户无法直接与
+    netfilter 进行交互，这意味着我们需要某种助手程序来帮助我们与 netfilter 交互。曾经有三个助手程序，它们分别是：
 - en: '**ipchains**: This was the first one, and was part of the Linux kernel up through
     kernel version 2.4\. It’s now ancient history, so we won’t say any more about
     it.'
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**ipchains**：这是第一个，曾作为 Linux 内核的一部分，直到内核版本 2.4。它现在已经成为历史，所以我们不再谈论它。'
 - en: '**iptables**: This replaced ipchains in Linux kernel version 2.6\. It’s still
     used in a lot of Linux distros, but is rapidly disappearing.'
+  id: totrans-22
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**iptables**：它替代了 Linux 内核版本 2.6 中的 ipchains。它仍然在许多 Linux 发行版中使用，但正在迅速消失。'
 - en: '**nftables**: This is the new kid on the block, and is rapidly replacing iptables.
     As we’ll see later, it has a lot of advantages over the older iptables.'
+  id: totrans-23
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**nftables**：这是新兴的工具，正在迅速取代 iptables。正如我们稍后将看到的，它比旧版 iptables 有很多优势。'
 - en: 'All three of these helper programs do two things for us:'
+  id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 这三个助手程序为我们做了两件事：
 - en: They provide a command-line interface for human users.
+  id: totrans-25
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它们为用户提供了命令行界面。
 - en: They take the commands that human users input and inject them into netfilter.
+  id: totrans-26
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它们将用户输入的命令传递给 netfilter。
 - en: Making things even more interesting is that we also have helper programs for
     our helper programs. The **Uncomplicated Firewall** (**ufw**) was created by Ubuntu
     developers, and is a front-end for either iptables or nftables. Ubuntu comes with
@@ -145,119 +203,172 @@
     of setting up a proper firewall. Still though, it’s sometimes helpful to know
     how to work with either bare iptables or bare nftables. So, let’s begin by looking
     at iptables.
+  id: totrans-27
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 更有趣的是，我们还有为助手程序提供的助手程序。**简化防火墙**（**ufw**）是由 Ubuntu 开发者创建的，它是 iptables 或 nftables
+    的前端。Ubuntu 默认安装了 ufw，你也可以在 Debian 及其他 Debian 系列的发行版中自行安装 ufw。在 Red Hat 系列中，我们有
+    firewalld，它也是 iptables 或 nftables 的前端。请注意，firewalld 在所有 Red Hat 系列的发行版和 SUSE 发行版中默认安装并处于活动状态。在
+    Ubuntu 和 Debian 中它是一个可选项。ufw 和 firewalld 都可以极大简化设置正确防火墙的过程。不过，有时了解如何操作裸 iptables
+    或裸 nftables 也是很有帮助的。那么，我们就从 iptables 开始看吧。
 - en: An overview of iptables
+  id: totrans-28
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: iptables 概述
 - en: 'As I’ve mentioned, iptables is one of two command-line utilities that we can
     currently use to directly manage netfilter. It was originally introduced as a
     feature of Linux kernel version 2.6, so it''s been around for a long time. With
     iptables, you do have a few advantages:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 如我所提到的，iptables 是我们目前可以直接管理 netfilter 的两种命令行工具之一。它最初是作为 Linux 内核版本 2.6 的一项功能引入的，已经存在很长时间了。使用
+    iptables，你有一些优势：
 - en: It's been around long enough that most Linux admins already know how to use
     it.
+  id: totrans-30
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它已经存在了足够长的时间，以至于大多数 Linux 管理员都知道如何使用它。
 - en: It's easy to use iptables commands in shell scripts to create your own custom
     firewall configuration.
+  id: totrans-31
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用iptables命令在shell脚本中创建自定义防火墙配置非常简单。
 - en: It has great flexibility in that you can use it to set up a simple port filter,
     a router, or a virtual private network.
+  id: totrans-32
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它具有很大的灵活性，可以用来设置简单的端口过滤器、路由器或虚拟私人网络。
 - en: It still comes pre-installed on some Linux distros, although it’s rapidly getting
     replaced by nftables.
+  id: totrans-33
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它仍然在某些Linux发行版中预安装，尽管它正在迅速被nftables取代。
 - en: It's very well documented and has free of charge, book-length tutorials available
     on the Internet.
+  id: totrans-34
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它有非常完善的文档，并且在互联网上有免费、长篇的教程可供参考。
 - en: 'However, as you might know, there are also a few disadvantages:'
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，正如你可能知道的那样，它也有一些缺点：
 - en: IPv4 and IPv6 each require their own special implementation of iptables. So,
     if your organization still needs to run IPv4 while in the process of migrating
     to IPv6, you'll have to configure two firewalls on each server and run a separate
     daemon for each. (One for IPv4, the other for IPv6.)
+  id: totrans-36
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: IPv4和IPv6各自需要特定的iptables实现。因此，如果你的组织在迁移到IPv6的过程中仍然需要运行IPv4，你将不得不在每个服务器上配置两个防火墙，并为每个防火墙运行一个单独的守护进程。（一个用于IPv4，另一个用于IPv6。）
 - en: If you need to do MAC bridging, that requires **ebtables**, which is the third
     component of iptables, with its own unique syntax.
+  id: totrans-37
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果你需要进行MAC桥接，则需要**ebtables**，它是iptables的第三个组成部分，具有自己独特的语法。
 - en: '**arptables**, the fourth component of iptables, also requires its own daemon
     and syntax.'
+  id: totrans-38
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**arptables**，iptables的第四个组成部分，也需要其自己的守护进程和语法。'
 - en: Whenever you add a rule to a running iptables firewall, the entire iptables
     ruleset has to be reloaded, which can have an impact on performance.
+  id: totrans-39
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 每当你向正在运行的iptables防火墙添加规则时，整个iptables规则集必须重新加载，这可能会影响性能。
 - en: Until recently, just plain iptables was the default firewall manager on every
     Linux distro. It still is on some distros, but Red Hat Enterprise Linux 7 and
     all of its offspring now use the new firewalld as an easier-to-use frontend for
     configuring iptables rules. Ubuntu comes with **Uncomplicated Firewall** (**ufw**),
     which is also an easy to use frontend for iptables on all Ubuntu versions up through
     20.04.
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 直到最近，普通的iptables是所有Linux发行版的默认防火墙管理器。在某些发行版中仍然是默认设置，但Red Hat Enterprise Linux
+    7及其所有衍生版本现在使用新的firewalld作为更易用的前端来配置iptables规则。Ubuntu自带**简单防火墙**（**ufw**），它也是一个易于使用的iptables前端，适用于所有Ubuntu版本，直到20.04。
 - en: In this chapter, we'll discuss setting up iptables firewall rules for both IPv4
     and IPv6.
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将讨论如何为IPv4和IPv6配置iptables防火墙规则。
 - en: Mastering the basics of iptables
+  id: totrans-42
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 掌握iptables的基础知识
 - en: 'iptables consists of five tables of rules, each with its own distinct purpose:'
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: iptables由五个规则表组成，每个表都有其独特的目的：
 - en: '**Filter table**: For basic protection of our servers and clients, this might
     be the only table that we use.'
+  id: totrans-44
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**过滤表**：为了基本保护我们的服务器和客户端，这可能是我们使用的唯一表。'
 - en: '**Network Address Translation (NAT) table**: NAT is used to connect the public
     Internet to private networks.'
+  id: totrans-45
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**网络地址转换（NAT）表**：NAT用于将公共互联网与私有网络连接起来。'
 - en: '**Mangle table**: This is used to alter network packets as they go through
     the firewall.'
+  id: totrans-46
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**修改表**：用于在数据包通过防火墙时修改网络数据包。'
 - en: '**Raw table**: This is for packets that don''t require connection tracking.'
+  id: totrans-47
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**原始表**：这是用于不需要连接跟踪的包。'
 - en: '**Security table**: The security table is only used for systems that have SELinux
     installed.'
+  id: totrans-48
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**安全表**：安全表仅用于安装了SELinux的系统。'
 - en: Since we're currently only interested in basic host protection, we will only
     look at the filter table for the time being. (In a few moments, I'll show you
     a couple of fancy tricks that we can do with the mangle table.) Each table consists
     of chains of rules, and the filter table consists of the `INPUT`, `FORWARD`, and
     `OUTPUT` chains. Let’s look at this on an Ubuntu 20.04 virtual machine.
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于我们当前只关心基本的主机保护，因此暂时只看过滤表。（稍后我将向你展示我们可以使用mangle表做的一些花样技巧。）每个表由规则链组成，过滤表由`INPUT`、`FORWARD`和`OUTPUT`链组成。让我们在Ubuntu
+    20.04虚拟机上看一下这个。
 - en: Ubuntu 20.04 LTS comes with iptables, and Ubuntu 22.04 comes with nftables.
     However, even if you’re running Ubuntu 22.04 or newer, you’ll still want to learn
     how to work with iptables commands. The first reason is that Ubuntu 22.04 includes
@@ -267,126 +378,183 @@
     we start talking about Ubuntu’s **Uncomplicated Firewall** (**ufw**), you’ll see
     that you’ll still need to know iptables commands in order to configure it, regardless
     of which Ubuntu version that you’re using.
+  id: totrans-50
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: Ubuntu 20.04 LTS自带iptables，而Ubuntu 22.04自带nftables。然而，即使你正在运行Ubuntu 22.04或更高版本，你仍然需要学习如何使用iptables命令。第一个原因是，Ubuntu
+    22.04包括一个很棒的功能，可以自动将iptables命令转换为nftables命令。这样，你可以继续使用已经拥有的iptables脚本，而无需担心将其转换为nftables格式。第二个原因是，一旦我们开始讨论Ubuntu的**简单防火墙**（**ufw**），你会发现无论使用哪个版本的Ubuntu，仍然需要了解iptables命令才能配置它。
 - en: 'First, we''ll look at our current configuration by using the `sudo iptables
     -L` command:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们通过使用`sudo iptables -L`命令来查看当前的配置：
 - en: '[PRE0]'
+  id: totrans-52
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Remember that we said that you need a separate component of iptables to deal
     with IPv6\. Here, we''ll use the `sudo ip6tables -L` command:'
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 记住，我们之前说过，需要一个单独的iptables组件来处理IPv6。这里，我们将使用`sudo ip6tables -L`命令：
 - en: '[PRE1]'
+  id: totrans-54
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'In both cases, you can see that there are no rules and that the machine is
     wide open. (Understand that Ubuntu actually does come with a pre-configured Uncomplicated
     Firewall and you’ll also see some output that is specific to it, but we’ll ignore
     that for the time-being so that we can work directly with iptables.) We''ll start
     by creating a rule that will allow us to pass incoming packets from servers that
     our host has requested a connection to:'
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这两种情况下，你可以看到没有规则，机器是完全开放的。（理解Ubuntu实际上是带有预配置的简单防火墙，且你会看到一些特定的输出，但我们暂时忽略它，以便直接使用iptables。）我们将从创建一个规则开始，允许我们传递来自服务器的输入数据包，这些服务器是我们的主机请求过连接的：
 - en: '[PRE2]'
+  id: totrans-56
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Here''s the breakdown of this command:'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是该命令的分解：
 - en: '**-A INPUT**: `-A` places a rule at the end of the specified chain, which in
     this case is the `INPUT` chain. We would have used `-I` had we wanted to place
     the rule at the beginning of the chain.'
+  id: totrans-58
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-A INPUT**: `-A`将规则放在指定链的末尾，在此情况下是`INPUT`链。如果我们希望将规则放在链的开头，我们会使用`-I`。'
 - en: '**-m**: This calls in an iptables module. In this case, we''re calling in the
     `conntrack` module to track connection states. This module allows `iptables` to
     determine whether our client has made a connection to another machine, for example.'
+  id: totrans-59
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-m**: 这调用了一个iptables模块。在这种情况下，我们调用了`conntrack`模块来跟踪连接状态。此模块允许`iptables`确定我们的客户端是否已连接到另一台机器，例如。'
 - en: '**--ctstate**: The `ctstate`, or connection state, portion of our rule is looking
     for two things. First, it''s looking for a connection that the client established
     with a server. Then, it looks for the related connection that''s coming back from
     the server in order to allow it to connect to the client. So, if a user were to
     use a web browser to connect to a website, this rule would allow packets from
     the web server to pass through the firewall to get to the user''s browser.'
+  id: totrans-60
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**--ctstate**: `ctstate`，即连接状态，我们的规则部分正在寻找两件事。首先，它在寻找客户端与服务器建立的连接。接着，它寻找来自服务器并返回到客户端的相关连接，以便允许客户端连接。所以，如果用户使用网页浏览器连接到一个网站，这条规则将允许来自网页服务器的数据包通过防火墙，传输到用户的浏览器。'
 - en: '**-j**: This stands for jump. Rules jump to a specific target, which in this
     case is `ACCEPT`. (Please don''t ask me who came up with this terminology.) So,
     this rule will accept packets that have been returned from the server to which
     the client has requested a connection.'
+  id: totrans-61
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-j**: 这代表跳转。规则会跳转到一个特定的目标，在此情况下是`ACCEPT`。（请不要问我是谁发明的这个术语。）因此，这条规则将接受从服务器返回并且客户端已请求连接的数据包。'
 - en: 'Our new ruleset looks like this:'
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的新规则集如下所示：
 - en: '[PRE3]'
+  id: totrans-63
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'Next, we''ll open up port `22` so that we can connect through Secure Shell:'
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们将打开端口`22`，以便通过安全外壳协议（Secure Shell）进行连接：
 - en: '[PRE4]'
+  id: totrans-65
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'Here''s the breakdown:'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是分解：
 - en: '**-A INPUT**: As before, we want to place this rule at the end of the `INPUT`
     chain with `-A`.'
+  id: totrans-67
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-A INPUT**: 如前所述，我们希望将规则放在`INPUT`链的末尾，因此使用`-A`。'
 - en: '**-p tcp**: `-p` indicates the protocol that this rule affects. This rule affects
     the TCP protocol, of which Secure Shell is a part.'
+  id: totrans-68
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-p tcp**: `-p`表示该规则影响的协议。此规则影响TCP协议，其中安全外壳协议（Secure Shell）就是其中之一。'
 - en: '**--dport ssh**: When an option name consists of more than one letter, we need
     to precede it with two dashes, instead of just one. The `--dport` option specifies
     the destination port on which we want this rule to operate. (Note that we could
     have also listed this portion of the rule as `--dport 22` since `22` is the number
     of the SSH port.)'
+  id: totrans-69
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**--dport ssh**：当一个选项名称由多个字母组成时，我们需要在前面加上两个破折号，而不仅仅是一个。`--dport`选项指定了我们希望该规则操作的目标端口。（注意，我们也可以将该部分规则列为`--dport
+    22`，因为`22`是SSH端口的号码。）'
 - en: '**-j ACCEPT**: If we put this all together with `-j ACCEPT`, then we have a
     rule that allows other machines to connect to this one through Secure Shell.'
+  id: totrans-70
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-j ACCEPT**：如果我们将所有内容与`-j ACCEPT`结合在一起，那么我们就有了一条允许其他机器通过安全外壳连接到此机器的规则。'
 - en: 'Now, let''s say that we want this machine to be a DNS server. For that, we
     need to open port `53` for both the TCP and the UDP protocols:'
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，假设我们希望这台机器成为一个DNS服务器。为此，我们需要为TCP和UDP协议都打开端口`53`：
 - en: '[PRE5]'
+  id: totrans-72
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'Finally, we have an almost complete, usable ruleset for our `INPUT` chain:'
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们拥有了一个几乎完整且可用的`INPUT`链规则集：
 - en: '[PRE6]'
+  id: totrans-74
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'However, this is only *almost* complete, because there''s still one little
     thing that we forgot. That is, we need to allow traffic for the loopback interface.
     This is okay because it gives us a good chance to see how to insert a rule where
     we want it if we don''t want it at the end. In this case, we''ll insert the rule
     at `INPUT 1`, which is the first position of the `INPUT` chain:'
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，这几乎是*完整*的，因为我们还有一件小事忘记了。也就是，我们需要允许回环接口的流量。这样做是可以的，因为它给了我们一个很好的机会来查看如何插入规则，尤其是在我们不希望它出现在最后时。如果是这种情况，我们将把规则插入到`INPUT
+    1`，即`INPUT`链的第一个位置：
 - en: '[PRE7]'
+  id: totrans-76
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'Before you inserted the `ACCEPT` rule for the `lo` interface, you may have
     noticed that `sudo` commands were taking a long time to complete and that you
     were getting sudo: unable to resolve host. . .Resource temporarily unavailable
@@ -394,84 +562,123 @@
     it can know which rules are allowed to run on a particular machine. It uses the
     loopback interface to help resolve the hostname. If the `lo` interface is blocked,
     it takes longer for `sudo` to resolve the hostname.'
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: '在你插入`ACCEPT`规则之前，你可能已经注意到`sudo`命令执行时很慢，并且出现了sudo: unable to resolve host...
+    Resource temporarily unavailable的消息。这是因为`sudo`需要知道机器的主机名，以便知道哪些规则可以在特定机器上运行。它使用回环接口来帮助解析主机名。如果`lo`接口被阻止，`sudo`需要更长时间来解析主机名。'
 - en: 'Our ruleset now looks like this:'
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的规则集现在看起来是这样的：
 - en: '[PRE8]'
+  id: totrans-79
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'Note how port `53` is listed as the domain port. To see port numbers instead
     of port names, we can use the `-n` switch:'
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意端口`53`是作为域名端口列出的。为了看到端口号而不是端口名称，我们可以使用`-n`开关：
 - en: '[PRE9]'
+  id: totrans-81
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: Now, as things currently stand, we're still allowing *everything* to get through,
     because we still haven't created a rule that blocks what we haven't specifically
     allowed. Before we do that, though, let's look at a few more things that we might
     want to allow.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，按照当前的情况，我们仍然允许*一切*通过，因为我们还没有创建阻止未明确允许内容的规则。不过，在我们这样做之前，先看看我们可能希望允许的一些其他内容。
 - en: Blocking ICMP with iptables
+  id: totrans-83
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用iptables阻止ICMP
 - en: 'The conventional wisdom that you may have heard for most of your career is
     that we need to block all the packets from the **Internet Control Message Protocol**
     (**ICMP**). The idea you may have been told is to make your server invisible to
     hackers by blocking ping packets. Of course, there are some vulnerabilities that
     are associated with ICMP, such as the following:'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 你在职业生涯中可能听到的传统观点是，我们需要阻止所有来自**互联网控制消息协议**（**ICMP**）的包。你可能被告知的观点是，通过阻止ping包，使你的服务器对黑客不可见。当然，ICMP协议存在一些漏洞，例如以下几种：
 - en: By using a botnet, a hacker could inundate your server with ping packets from
     multiple sources at once, exhausting your server's ability to cope.
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过使用僵尸网络，黑客可以通过多个来源同时向你的服务器发送ping包，耗尽你的服务器应对的能力。
 - en: Certain vulnerabilities that are associated with the ICMP protocol can allow
     a hacker to either gain administrative privileges on your system, redirect your
     traffic to a malicious server, or crash your operating system.
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 与ICMP协议相关的某些漏洞可能允许黑客获得系统的管理员权限、将流量重定向到恶意服务器，或使操作系统崩溃。
 - en: By using some simple hacking tools, someone could embed sensitive data in the
     data field of an ICMP packet in order to secretly exfiltrate it from your organization.
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过使用一些简单的黑客工具，某人可能会将敏感数据嵌入到ICMP包的数据字段中，从而偷偷将其从你的组织中提取出去。
 - en: 'However, while blocking certain types of ICMP packets is good, blocking all
     ICMP packets is bad. The harsh reality is that certain types of ICMP messages
     are necessary for the proper functionality of the network. Since the *drop all
     that''s not allowed* rule that we''ll eventually create also blocks ICMP packets,
     we''ll need to create some rules that allow the types of ICMP messages that we
     have to have. So, here goes:'
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，虽然阻止某些类型的 ICMP 数据包是好的，但阻止所有 ICMP 数据包是不好的。严酷的现实是，某些类型的 ICMP 消息对于网络的正常功能是必要的。由于我们最终创建的“丢弃所有不被允许的”规则也会阻止
+    ICMP 数据包，因此我们需要创建一些规则，允许必须的 ICMP 消息类型。那么，接下来就要做这些：
 - en: '[PRE10]'
+  id: totrans-89
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Here''s the breakdown:'
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 下面是详细说明：
 - en: '**-m conntrack**: As before, we''re using the `conntrack` module to allow packets
     that are in a certain state. This time, though, instead of just allowing packets
     from a host to which our server has connected (`ESTABLISHED,RELATED`), we''re
     also allowing `NEW` packets that other hosts are sending to our server.'
+  id: totrans-91
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-m conntrack**：与之前一样，我们使用 `conntrack` 模块来允许处于某个状态的数据包。不过这一次，我们不仅仅允许来自已经连接主机的数据包（`ESTABLISHED,RELATED`），还允许其他主机发送到我们服务器的
+    `NEW` 数据包。'
 - en: '**-p icmp**: This refers to the ICMP protocol.'
+  id: totrans-92
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**-p icmp**：这表示 ICMP 协议。'
 - en: '**--icmp-type**: There are quite a few types of ICMP messages, which we''ll
     outline next.'
+  id: totrans-93
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**--icmp-type**：ICMP 消息类型有很多种，接下来我们会列出这些类型。'
 - en: 'Here are the three types of ICMP messages that we want to allow:'
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们希望允许的三种 ICMP 消息类型如下：
 - en: '**type 3**: These are the destination unreachable messages. Not only can they
     tell your server that it can''t reach a certain host, but they can also tell it
     why. For example, if the server has sent out a packet that''s too large for a
@@ -479,80 +686,113 @@
     the server to fragment that large packet. Without ICMP, the server would have
     connectivity problems every time it tries to send out a large packet that needs
     to be broken up into fragments.'
+  id: totrans-95
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**type 3**：这些是目标不可达消息。它们不仅可以告诉你的服务器无法访问某个主机，还可以告诉它原因。例如，如果服务器发送的数据包过大，超出了网络交换机的处理能力，交换机会返回一个
+    ICMP 消息，告诉服务器需要将该大数据包分片。如果没有 ICMP，每当服务器尝试发送需要分片的大数据包时，它都会遇到连接问题。'
 - en: '**type 11**: Time exceeded messages let your server know that a packet that
     it has sent out has either exceeded its **Time-to-Live** (**TTL**) value before
     it could reach its destination, or that a fragmented packet couldn''t be reassembled
     before the TTL expiration date.'
+  id: totrans-96
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**type 11**：超时消息让服务器知道它发送的数据包要么在到达目标之前已经超过了其 **生存时间（TTL）**，要么是一个分片数据包在 TTL
+    到期之前无法重新组装。'
 - en: '**type 12**: Parameter problem messages indicate that the server had sent a
     packet with a bad IP header. In other words, the IP header is either missing an
     option flag, or it''s of an invalid length.'
+  id: totrans-97
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**type 12**：参数问题消息表示服务器发送了一个带有错误 IP 头的数据包。换句话说，IP 头缺少某个选项标志，或者它的长度无效。'
 - en: 'Three common message types are conspicuously absent from our list:'
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 三种常见的消息类型明显没有出现在我们的列表中：
 - en: '**type 0** and **type 8**: These are the infamous ping packets. Actually, `type
     8` is the echo request packet that you would send out to ping a host, while `type
     0` is the echo reply that the host would return to let you know that it''s alive.
     Of course, allowing ping packets to get through could be a big help with troubleshooting
     network problems. If that scenario ever comes up, you could just add a couple
     of `iptables` rules to temporarily allow pings.'
+  id: totrans-99
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**type 0** 和 **type 8**：这些是臭名昭著的 ping 数据包。实际上，`type 8` 是你用来 ping 主机的回显请求数据包，而
+    `type 0` 是主机返回的回显应答，用来告诉你它是在线的。当然，允许 ping 数据包通过在排除网络问题时会大有帮助。如果出现这种情况，你可以添加几个
+    `iptables` 规则来暂时允许 ping。'
 - en: '**type 5**: Now, we have the infamous redirect messages. Allowing these could
     be handy if you have a router that can suggest more efficient paths for the server
     to use, but hackers can also use them to redirect you to someplace that you don''t
     want to go. So, just block them.'
+  id: totrans-100
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**type 5**：现在，我们来看著名的重定向消息。允许这些消息在你有一台可以为服务器建议更高效路径的路由器时是有用的，但黑客也可以利用它们将你重定向到你不希望去的地方。所以，最好阻止这些消息。'
 - en: There are lots more ICMP message types than I've shown here, but these are the
     only ones that we need to worry about for now.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里展示的 ICMP 消息类型远远不止这些，但这些是我们目前需要关注的唯一类型。
 - en: 'When we use `sudo iptables -L`, we''ll see our new ruleset, as things currently
     stand:'
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们使用 `sudo iptables -L` 时，可以看到当前的规则集：
 - en: '[PRE11]'
+  id: totrans-103
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: Looks good, eh? Well, not really. We haven't blocked anything with this ruleset
     yet. So, let's take care of that.
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 看起来不错，对吧？其实不完全是。我们还没有通过这些规则阻止任何东西。那么，现在我们来解决这个问题。
 - en: Blocking everything that isn't allowed with iptables
+  id: totrans-105
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用iptables阻止所有不被允许的内容
 - en: To start blocking stuff that we don't want, we have to do one of two things.
     We can set a default `DROP` or `REJECT` policy for the `INPUT` chain, or we can
     leave the policy set to `ACCEPT` and create a `DROP` or `REJECT` rule at the end
     of the `INPUT` chain. Which one you choose is really a matter of preference. (Of
     course, before you choose one over the other, you might want to check your organization's
     policy manual to see if your employer has a preference.)
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 要开始阻止我们不想要的内容，我们必须做两件事中的其中一件。我们可以为`INPUT`链设置一个默认的`DROP`或`REJECT`策略，或者我们可以将策略保持为`ACCEPT`，并在`INPUT`链的末尾创建一个`DROP`或`REJECT`规则。选择哪个完全是个人偏好问题。（当然，在选择之前，你可能想先查看一下你所在组织的政策手册，看看雇主是否有偏好。）
 - en: The difference between `DROP` and `REJECT` is that `DROP` blocks packets without
     sending any message back to the sender. `REJECT` blocks packets, and then sends
     a message back to the sender about why the packets were blocked. For our present
     purposes, let's say that we just want to `DROP` packets that we don't want to
     get through.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: '`DROP`和`REJECT`之间的区别是，`DROP`会阻止数据包而不向发送方返回任何信息；而`REJECT`则会阻止数据包，并且会向发送方返回一个信息，说明数据包为何被阻止。就我们当前的目的而言，假设我们只是想`DROP`那些我们不希望通过的数据包。'
 - en: 'Tip:'
+  id: totrans-108
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 提示：
 - en: ''
+  id: totrans-109
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
@@ -564,224 +804,327 @@
     packets are being blocked so that they will know to immediately quit trying to
     make a connection. With `DROP`, the host that's trying to make the connection
     will just keep trying to make the connection until it times out.
+  id: totrans-110
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 有时`DROP`更好，有时`REJECT`更好。如果让主机保持隐形很重要，就使用`DROP`。（尽管即使这样也不是特别有效，因为还有其他方式可以发现主机。）如果你需要让主机告知其他主机为什么不能建立连接，那么就使用`REJECT`。`REJECT`的一个大优点是，它会让连接的主机知道它们的数据包被阻止了，这样它们就会立刻停止尝试连接。而使用`DROP`时，尝试连接的主机会一直尝试，直到连接超时。
 - en: 'To create a `DROP` rule at the end of the `INPUT` chain, use this command:'
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 要在`INPUT`链的末尾创建一个`DROP`规则，可以使用以下命令：
 - en: '[PRE12]'
+  id: totrans-112
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'To set a default `DROP` policy instead, we can use the this command:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想设置默认的`DROP`策略，我们可以使用以下命令：
 - en: '[PRE13]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: The big advantage of setting up a default `DROP` or `REJECT` policy is that
     it makes it easier to add new `ACCEPT` rules if need be. This is because if we
     decide to keep the default `ACCEPT` policy and create a `DROP` or `REJECT` rule
     instead, that rule has to be at the bottom of the list.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 设置默认的`DROP`或`REJECT`策略的一个大优点是，它可以让你在需要时更容易地添加新的`ACCEPT`规则。这是因为如果我们决定保持默认的`ACCEPT`策略，并创建一个`DROP`或`REJECT`规则，那么该规则必须放在列表的末尾。
 - en: Since `iptables` rules are processed in order, from top to bottom, any `ACCEPT`
     rules that come after that `DROP` or `REJECT` rule would have no effect. You would
     need to insert any new `ACCEPT` rules above that final `DROP` or `REJECT` rule,
     which is just a tiny bit less convenient than just being able to append them to
     the end of the list. For now, in order to illustrate my next point, I've just
     left the default `ACCEPT` policy and added the `DROP` rule.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于`iptables`规则是按顺序处理的，从上到下，所以任何在`DROP`或`REJECT`规则之后的`ACCEPT`规则都不会生效。你需要将任何新的`ACCEPT`规则插入到该`DROP`或`REJECT`规则的上方，这比直接将它们附加到规则列表的末尾稍微不方便一点。为了说明我的下一个要点，我暂时保留了默认的`ACCEPT`策略，并添加了`DROP`规则。
 - en: 'When we look at our new ruleset, we''ll see something that''s rather strange:'
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们查看新的规则集时，会看到一些相当奇怪的东西：
 - en: '[PRE14]'
+  id: totrans-118
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'The first rule and the last rule of the `INPUT` chain look the same, except
     that one is a `DROP` and the other is an `ACCEPT`. Let''s look at it again with
     the `-v` (verbose) option:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: '`INPUT`链的第一条规则和最后一条规则看起来是一样的，唯一的区别是一个是`DROP`，另一个是`ACCEPT`。让我们再次使用`-v`（详细）选项来看一下：'
 - en: '[PRE15]'
+  id: totrans-120
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: Now, we can see that `lo`, for loopback, shows up under the `in` column of the
     first rule, and that `any` shows up under the `in` column of the last rule. We
     can also see that the `-v` switch shows the number of packets and bytes that have
     been counted by each rule. So, in the preceding example, we can see that the `ctstate
     RELATED,ESTABLISHED` rule has accepted 828 packets and 52,354 bytes. The `DROP
     all` rule has blocked 251 packets and 40,763 bytes.
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们可以看到`lo`（回环接口）出现在第一条规则的`in`列下，而`any`出现在最后一条规则的`in`列下。我们还可以看到`-v`开关显示了每条规则计数的包和字节数。因此，在前面的示例中，我们可以看到`ctstate
+    RELATED,ESTABLISHED`规则接受了828个数据包和52,354字节。`DROP all`规则阻止了251个数据包和40,763字节。
 - en: 'This all looks great, except that if we were to reboot the machine right now,
     the rules would disappear. The final thing that we need to do is make them permanent.
     There are several ways to do this, but the simplest way to do this on an Ubuntu
     machine is to install the `iptables-persistent` package:'
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 这一切看起来都不错，除了如果我们现在重启机器，规则会消失。我们需要做的最后一件事是让它们变得永久。虽然有多种方法可以做到这一点，但在Ubuntu机器上最简单的方法是安装`iptables-persistent`包：
 - en: '[PRE16]'
+  id: totrans-123
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'During the installation process, you''ll be presented with two screens that
     ask you whether you want to save the current set of `iptables rules`. The first
     screen will be for IPv4 rules, while the second will be for IPv6 rules:'
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 在安装过程中，你会看到两个屏幕，询问你是否希望保存当前的`iptables规则`。第一个屏幕是用于IPv4规则的，而第二个是用于IPv6规则的：
 - en: '![19501_04_01.png](img/file34.png)'
+  id: totrans-125
   prefs: []
   type: TYPE_IMG
+  zh: '![19501_04_01.png](img/file34.png)'
 - en: 19501_04_01.png
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 19501_04_01.png
 - en: 'You''ll now see two new rules files in the `/etc/iptables/` directory:'
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 你现在会看到在`/etc/iptables/`目录下有两个新的规则文件：
 - en: '[PRE17]'
+  id: totrans-128
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: If you were to reboot the machine now, you'd see that your iptables rules are
     still there and in effect. The only slight problem with `iptables-persistent`
     is that it won't save any subsequent changes that you make to the rules. That's
     okay, though. I'll show you how to deal with that in just a bit.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果现在重启机器，你会看到你的iptables规则仍然存在并生效。`iptables-persistent`的唯一小问题是它不会保存你之后对规则所做的任何修改。不过没关系，我会稍后告诉你如何处理这个问题。
 - en: Hands-on lab for basic iptables usage
+  id: totrans-130
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 基础iptables使用的动手实验
 - en: 'You''ll complete this lab on your Ubuntu 20.04 virtual machine. Follow these
     steps to get started:'
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 你将在你的Ubuntu 20.04虚拟机上完成此实验。按照以下步骤开始：
 - en: 'Shut down your Ubuntu virtual machine and create a snapshot. After you boot
     it back up, look at your iptables rules, or lack thereof, by using this command:'
+  id: totrans-132
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 关闭你的Ubuntu虚拟机并创建一个快照。重新启动后，使用此命令查看你的iptables规则，或者没有规则的情况：
 - en: '[PRE18]'
+  id: totrans-133
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'With a default Ubuntu setup, the Uncomplicated Firewall (ufw) service is already
     running, albeit with an unactivated firewall configuration. We want to disable
     it to work directly with iptables. Do that now with this command:'
+  id: totrans-134
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在默认的Ubuntu设置中，简单防火墙（ufw）服务已经在运行，尽管它的防火墙配置并未启用。我们需要禁用它，以便直接使用iptables。现在就执行以下命令：
 - en: '[PRE19]'
+  id: totrans-135
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'Create the rules that you need for a basic firewall, allowing for Secure Shell
     access, DNS queries and zone transfers, and the proper types of ICMP. Deny everything
     else:'
+  id: totrans-136
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建你需要的基础防火墙规则，允许Secure Shell访问、DNS查询和区域传输，并启用适当类型的ICMP。拒绝其他所有流量：
 - en: '[PRE20]'
+  id: totrans-137
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'Use this command to view the results:'
+  id: totrans-138
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用此命令查看结果：
 - en: '[PRE21]'
+  id: totrans-139
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'Oops – it looks like you forgot about that loopback interface. Add a rule for
     it at the top of the list:'
+  id: totrans-140
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 哎呀，似乎你忘记了回环接口。为它添加一个规则，放在规则列表的最上面：
 - en: '[PRE22]'
+  id: totrans-141
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'View the results by using the following two commands. Note the difference between
     the output of each:'
+  id: totrans-142
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用以下两个命令查看结果。注意每个命令输出的不同：
 - en: '[PRE23]'
+  id: totrans-143
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'Install the `iptables-persistent` package and choose to save the IPv4 and IPv6
     rules when prompted:'
+  id: totrans-144
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 安装`iptables-persistent`包，并在提示时选择保存IPv4和IPv6规则：
 - en: '[PRE24]'
+  id: totrans-145
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: Reboot the virtual machine and verify that your rules are still active.
+  id: totrans-146
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重启虚拟机并验证你的规则仍然有效。
 - en: Keep this virtual machine; you'll be adding more to it in the next hands-on
     lab.
+  id: totrans-147
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 保留这台虚拟机，接下来你将在下一次动手实验中对其进行更多操作。
 - en: That's the end of this lab—congratulations!
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 实验到此结束——祝贺你！
 - en: Blocking invalid packets with iptables
+  id: totrans-149
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用iptables阻止无效的数据包
 - en: If you've been in the IT business for any length of time, you're most likely
     familiar with the good old TCP three-way handshake. If you're not, no worries.
     Here's the simplified explanation.
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你在IT行业工作了一段时间，你很可能熟悉传统的TCP三次握手。如果不熟悉也没关系，下面是简化版的解释。
 - en: 'Let''s say that you''re sitting at your workstation, and you pull up Firefox
     to visit a website. To access that website, your workstation and the web server
     have to set up the connection. Here''s what happens:'
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设你坐在工作站前，打开 Firefox 访问一个网站。为了访问该网站，工作站和 web 服务器必须建立连接。下面是发生的过程：
 - en: Your workstation sends a packet with only the `SYN` flag set to the web server.
     This is your workstation's way of saying, "Hello, Mr. Server. I'd like to make
     a connection with you."
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 你的工作站向 web 服务器发送一个只设置了 `SYN` 标志的数据包。这是工作站向服务器打招呼的方式：“你好，服务器先生。我想和你建立连接。”
 - en: After receiving your workstation's `SYN` packet, the web server sends back a
     packet with the `SYN` and `ACK` flags set. With this, the server is saying, "Yeah,
     bro. I'm here, and I'm willing to connect with you."
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 在接收到工作站的 `SYN` 数据包后，web 服务器会返回一个带有 `SYN` 和 `ACK` 标志的数据包。通过这个，服务器在说：“是的，兄弟。我在这里，愿意和你建立连接。”
 - en: Upon receipt of the `SYN-ACK` packet, the workstation sends back a packet with
     only the `ACK` flag set. With this, the workstation is saying, "Cool deal, dude.
     I'm glad to connect with you."
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 当收到 `SYN-ACK` 数据包时，工作站返回一个只设置了 `ACK` 标志的数据包。通过这个，工作站在说：“好，伙计。我很高兴能和你建立连接。”
 - en: Upon receipt of the `ACK` packet, the server sets up the connection with the
     workstation so that they can exchange information.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 当收到 `ACK` 数据包时，服务器与工作站建立连接，以便它们可以交换信息。
 - en: This sequence works the same way for setting up any kind of TCP connection.
     This includes connections that involve Secure Shell, telnet, and the various mail
     server protocols, among other things.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个序列设置 TCP 连接的方式是相同的，包括涉及安全外壳、Telnet 和各种邮件服务器协议的连接，等等。
 - en: 'However, clever people can use a variety of tools to craft TCP packets with
     some very weird combinations of flags. With these so-called *invalid* packets,
     a few things could happen:'
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，聪明的人可以使用各种工具制作带有一些非常奇怪标志组合的 TCP 数据包。通过这些所谓的 *无效* 数据包，可能会发生以下几种情况：
 - en: The invalid packets could be used to elicit responses from the target machine
     in order to find out what operating system it's running, what services are running
     on it, and which versions of the services are running.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些无效数据包可能被用来引发目标机器的响应，从而查找它运行的操作系统、正在运行的服务以及服务的版本。
 - en: The invalid packets could be used to trigger certain sorts of security vulnerabilities
     on the target machine.
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些无效数据包可能被用来触发目标机器上的某些安全漏洞。
 - en: Some of these invalid packets require more processing power than what normal
     packets require, which could make them useful for performing Denial-of-Service
     (DoS) attacks.
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 其中一些无效数据包比正常数据包需要更多的处理能力，这可能使它们在执行拒绝服务攻击（DoS）时非常有用。
 - en: Now, in truth, the `DROP all` rule at the end of the filter table's `INPUT`
     chain will block some of these invalid packets. However, there are some things
     that this rule might miss. And even if we could count on it to block all the invalid
@@ -790,63 +1133,93 @@
     entire `INPUT` chain, looking for a rule that will let them through. When no `ALLOW`
     rule is found for them, they'll finally get blocked by the `DROP all` rule, which
     is the last rule in the chain. So, what if we could find a more efficient solution?
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 事实上，过滤表 `INPUT` 链末尾的 `DROP all` 规则会阻止一些无效数据包。然而，这个规则可能会漏掉一些数据包。即使我们能依赖它来阻挡所有无效的内容，这也不是最有效的做法。依赖这个
+    `DROP all` 规则，我们允许这些无效数据包通过整个 `INPUT` 链，寻找能放行它们的规则。当没有找到 `ALLOW` 规则时，它们最终会被 `DROP
+    all` 规则阻挡，而这个规则是链中的最后一条。那么，如果我们能找到一个更高效的解决方案呢？
 - en: 'Ideally, we''d like to block these invalid packets before they travel through
     the entire `INPUT` chain. We could do that with a `PREROUTING` chain, but the
     filter table doesn''t have a `PREROUTING` chain. Therefore, we need to use the
     `PREROUTING` chain of the mangle table instead. Let''s start by adding these two
     rules:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 理想情况下，我们希望在这些无效数据包通过整个 `INPUT` 链之前就阻止它们。我们可以通过 `PREROUTING` 链来做到这一点，但过滤表没有 `PREROUTING`
+    链。因此，我们需要使用 mangle 表的 `PREROUTING` 链。让我们从添加以下两条规则开始：
 - en: '[PRE25]'
+  id: totrans-163
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'The first of these rules will block most of what we would consider *invalid*.
     However, there are still some things that it misses. Due to this, we added the
     second rule, which blocks all `NEW` packets that are not `SYN` packets. Now, let''s
     see what we have:'
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些规则中的第一条将阻止我们认为是*无效*的绝大多数数据包。然而，它仍然有一些遗漏。因此，我们添加了第二条规则，阻止所有不是`SYN`包的`NEW`包。现在，让我们看看我们得到了什么：
 - en: '[PRE26]'
+  id: totrans-165
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: Hmm...
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 嗯……
 - en: 'We can''t see our new rules, can we? That''s because, by default, `iptables
     -L` only shows rules for the filter table. We need to see what we''ve just placed
     into the mangle table, so let''s do this, instead:'
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们看不到新规则，对吗？这是因为，默认情况下，`iptables -L`只显示过滤表的规则。我们需要查看刚刚放入mangle表的规则，所以我们可以这样做：
 - en: '[PRE27]'
+  id: totrans-168
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'Here, we used the `-t mangle` option to indicate that we want to see the configuration
     for the mangle table. Something rather curious that you may have noticed is how
     iptables renders the rule that was created by the `sudo iptables -t mangle -A
     PREROUTING -p tcp ! --syn -m conntrack --ctstate NEW -j DROP` command. For some
     reason, it renders like this:'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们使用了`-t mangle`选项，表示我们希望查看mangle表的配置。你可能已经注意到一个有趣的地方，那就是`sudo iptables
+    -t mangle -A PREROUTING -p tcp ! --syn -m conntrack --ctstate NEW -j DROP`命令创建的规则，iptables渲染出来的方式。由于某些原因，它渲染成了这样：
 - en: '[PRE28]'
+  id: totrans-170
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: It looks strange, but don't let that throw you. It still means that it's blocking
     `NEW` packets that aren't `SYN` packets.
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 看起来有点奇怪，但不要让它困扰你。它的意思仍然是，它阻止了那些不是`SYN`包的`NEW`包。
 - en: 'Previously, I mentioned that the `iptables-persistent` package won''t save
     subsequent changes to your `iptables` rules. So, as things stand now, the mangle
     table rules that we just added will disappear once I reboot this virtual machine.
     To make these changes permanent, I''ll use the `iptables-save` command to save
     a new file in my own home directory. Then, I''ll copy the file over to the `/etc/iptables`
     directory, replacing the original one:'
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 之前，我提到过`iptables-persistent`软件包不会保存对`iptables`规则的后续更改。所以，现在的情况是，我们刚刚添加的mangle表规则将在我重启这台虚拟机后消失。为了使这些更改永久生效，我将使用`iptables-save`命令将新文件保存在我的个人主目录中。然后，我会将该文件复制到`/etc/iptables`目录，替换原来的文件：
 - en: '[PRE29]'
+  id: totrans-173
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: To test this, we'll use a handy utility called Nmap. It's a free utility that
     you can install on your Windows, Mac, or Linux workstation. Or, if you don't want
     to install it on your host machine, you can install it on one of your Linux virtual
@@ -854,20 +1227,29 @@
     RHEL/AlmaLinux 8\. So, just install the Nmap package with the appropriate install
     command for your distro. If you want to install Nmap on your Windows or Mac host
     machine, you'll need to download it from the Nmap website.
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了测试这个，我们将使用一个非常方便的工具，叫做Nmap。它是一个免费的工具，你可以在Windows、Mac或Linux工作站上安装。如果你不想在主机上安装它，也可以在你的Linux虚拟机上安装它。它在Debian/Ubuntu、RHEL/CentOS
+    7和RHEL/AlmaLinux 8的常规软件库中都有。所以，只需使用适合你发行版的安装命令安装Nmap软件包。如果你想在Windows或Mac主机上安装Nmap，则需要从Nmap网站下载它。
 - en: 'You can download Nmap from the official website, which can be found here: [https://nmap.org/download.html](https://nmap.org/download.html).'
+  id: totrans-175
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 你可以从官方网站下载Nmap，网址如下：[https://nmap.org/download.html](https://nmap.org/download.html)。
 - en: 'With our new mangle table rules in place, let''s perform an XMAS scan of our
     Ubuntu machine. I have Nmap installed here on the Fedora workstation that I''m
     currently using, so I''ll just use this for now. I can do this like so:'
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们应用了新的mangle表规则后，让我们对我们的Ubuntu机器执行XMAS扫描。我在当前使用的Fedora工作站上安装了Nmap，所以我就使用它。操作如下：
 - en: '[PRE30]'
+  id: totrans-177
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'By default, Nmap only scans the most commonly used 1,000 ports. The XMAS scan
     sends invalid packets that consist of the FIN, PSH, and URG flags. The fact that
     all 1,000 scanned ports show as `open|filtered` means that the scan was blocked,
@@ -875,203 +1257,304 @@
     `22` is open.) We can view the result to see which rule did the blocking. (To
     simplify things a bit, I''ll only show the output for the `PREROUTING` chain since
     it''s the only mangle table chain that''s doing anything):'
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，Nmap只扫描最常用的1,000个端口。XMAS扫描发送由FIN、PSH和URG标志组成的无效数据包。所有1,000个扫描的端口都显示为`open|filtered`，这意味着扫描被阻止，Nmap无法确定端口的真实状态。（实际上，端口`22`是开放的。）我们可以查看结果，看看是哪个规则进行了阻止。（为了简化一些，我只显示`PREROUTING`链的输出，因为这是唯一一个执行了操作的mangle表链）：
 - en: '[PRE31]'
+  id: totrans-179
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'Here, you can see that the first rule – the `INVALID` rule – blocked 2,000
     packets and 80,000 bytes. Now, let''s zero out the counter so that we can do another
     scan:'
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，你可以看到第一条规则——`INVALID`规则——阻止了2000个数据包和80,000字节的流量。现在，让我们将计数器清零，以便进行另一次扫描：
 - en: '[PRE32]'
+  id: totrans-181
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'This time, let''s do a Window scan, which bombards the target machine with
     `ACK` packets:'
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 这次，让我们进行一个窗口扫描，向目标机器发送`ACK`数据包：
 - en: '[PRE33]'
+  id: totrans-183
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'As before, the scan was blocked, as indicated by the message that all 1,000
     scanned ports have been filtered. Now, let''s view what we have on the target
     Ubuntu machine:'
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 和之前一样，扫描被阻止了，正如消息所示，所有1,000个扫描端口都已被过滤。现在，让我们查看目标Ubuntu机器上的情况：
 - en: '[PRE34]'
+  id: totrans-185
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: This time, we can see that our invalid packets got past the first rule, but
     were blocked by the second rule.
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 这次，我们可以看到无效的数据包通过了第一个规则，但被第二个规则阻止了。
 - en: 'Now, just for fun, let''s clear out the mangle table rules and do our scans
     again. We''ll use the `-D` option to delete the two rules from the mangle table:'
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，为了好玩，我们清除mangle表规则，再进行扫描。我们将使用`-D`选项从mangle表中删除这两个规则：
 - en: '[PRE35]'
+  id: totrans-188
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'When you delete a rule, you have to specify the rule number, just like you
     do when you insert a rule. Here, I specified rule 1 twice, because deleting the
     first rule moved the second rule up to first place. Now, let''s verify that the
     rules are gone:'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 当你删除一个规则时，必须指定规则编号，就像插入规则时一样。在这里，我指定了规则1两次，因为删除第一个规则后，第二个规则上移到了第一个位置。现在，让我们确认规则已经被删除：
 - en: '[PRE36]'
+  id: totrans-190
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'Yes, they are. Cool. Now, let''s see what we get when we perform another XMAS
     scan:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 是的，它们确实存在。太棒了。现在，让我们看看执行另一次XMAS扫描时会有什么结果：
 - en: '[PRE37]'
+  id: totrans-192
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: Even without the mangle table rules, it shows that my scan is still blocked.
     What's up with that? This is happening because I still have the `DROP all` rule
     at the end of the `INPUT` table. Let's disable that and see what we get with another
     scan.
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 即使没有mangle表规则，仍然显示我的扫描被阻止了。怎么回事？发生这种情况是因为在`INPUT`表的末尾仍然有`DROP all`规则。让我们禁用这个规则，看看另一次扫描的结果。
 - en: 'First, I need to see what the rule number is:'
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我需要查看规则的编号：
 - en: '[PRE38]'
+  id: totrans-195
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'Counting down, I can see that it''s rule number 4, so I''ll delete it:'
+  id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过倒数，我看到是规则编号4，所以我将删除它：
 - en: '[PRE39]'
+  id: totrans-197
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: 'Now, for the XMAS scan:'
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，进行XMAS扫描：
 - en: '[PRE40]'
+  id: totrans-199
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: This time, the scan shows that 999 ports are closed and that port `22`, the
     SSH port, is either open or filtered. This shows that the scan is no longer being
     blocked by anything.
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 这次，扫描结果显示999个端口被关闭，端口`22`（SSH端口）要么是开放的，要么是过滤的。这表明扫描不再被任何东西阻止。
 - en: Restoring the deleted rules
+  id: totrans-201
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 恢复删除的规则
 - en: 'When I used the `iptables -D` commands, I only deleted the rules from the runtime
     configuration, and not from the `rules.v4` configuration file. To restore the
     rules that I deleted, I can either reboot the machine or restart the `netfilter-persistent`
     service. The latter choice is quicker, so I''ll activate it like this:'
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我使用`iptables -D`命令时，我只删除了运行时配置中的规则，而没有删除`rules.v4`配置文件中的规则。要恢复删除的规则，我可以重启机器或重新启动`netfilter-persistent`服务。后者更快，所以我将这样启动它：
 - en: '[PRE41]'
+  id: totrans-203
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: The `iptables -L` and `iptables -t mangle -L` commands will show that all the
     rules are now back in effect.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: '`iptables -L`和`iptables -t mangle -L`命令将显示所有规则现在已经重新生效。'
 - en: Hands-on lab for blocking invalid IPv4 packets
+  id: totrans-205
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 阻止无效IPv4数据包的动手实验
 - en: 'For this lab, you''ll use the same virtual machine that you used for the previous
     lab. You won''t replace any of the rules that you already have. Rather, you''ll
     just add a couple. Let''s get started:'
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于这个实验，你将使用与上一个实验相同的虚拟机。你不会替换已经存在的规则，而是只会添加几个规则。让我们开始吧：
 - en: 'Look at the rules for the filter and the mangle tables. (Note that the `-v`
     option shows you statistics about packets that were blocked by `DROP` and `REJECT`
     rules.) Then, zero out the blocked packets counter:'
+  id: totrans-207
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查看过滤器表和mangle表中的规则。（请注意，`-v`选项显示有关被`DROP`和`REJECT`规则阻止的包的统计信息。）然后，将阻止的数据包计数器清零：
 - en: '[PRE42]'
+  id: totrans-208
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'From either your host machine or another virtual machine, perform the NULL
     and Windows Nmap scans against the virtual machine:'
+  id: totrans-209
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 从你的主机或其他虚拟机中，执行NULL和Windows Nmap扫描，针对虚拟机进行扫描：
 - en: '[PRE43]'
+  id: totrans-210
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Repeat *Step 1*. You should see a large jump in the number of packets that
     were blocked by the final `DROP` rule in the `INPUT` chain of the filter table:'
+  id: totrans-211
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重复*步骤1*。你应该会看到在过滤器表`INPUT`链的最终`DROP`规则阻止的包数量大幅增加：
 - en: '[PRE44]'
+  id: totrans-212
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: 'Make the firewall work more efficiently by using the `PREROUTING` chain of
     the mangle table to drop invalid packets, such as those that are produced by the
     two Nmap scans that we just performed. Add the two required rules with the following
     two commands:'
+  id: totrans-213
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过使用mangle表的`PREROUTING`链来提高防火墙效率，丢弃无效的数据包，例如刚才执行的两次Nmap扫描产生的那些包。使用以下两个命令添加所需的两个规则：
 - en: '[PRE45]'
+  id: totrans-214
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: 'Save the new configuration to your own home directory. Then, copy the file
     to its proper location and zero out the blocked packet counters:'
+  id: totrans-215
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将新配置保存到你的个人目录。然后，将文件复制到正确的位置，并清除已阻止的数据包计数器：
 - en: '[PRE46]'
+  id: totrans-216
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: 'Perform only the NULL scan against the virtual machine:'
+  id: totrans-217
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 仅对虚拟机执行 NULL 扫描：
 - en: '[PRE47]'
+  id: totrans-218
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'Look at the `iptables` ruleset and observe which rule was triggered by the
     Nmap scan:'
+  id: totrans-219
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查看 `iptables` 规则集，观察 Nmap 扫描触发了哪个规则：
 - en: '[PRE48]'
+  id: totrans-220
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'This time, perform just the Windows scan against the virtual machine:'
+  id: totrans-221
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 这次，仅对虚拟机执行 Windows 扫描：
 - en: '[PRE49]'
+  id: totrans-222
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'Observe which rule was triggered by this scan:'
+  id: totrans-223
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 观察此次扫描触发了哪个规则：
 - en: '[PRE50]'
+  id: totrans-224
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: That's the end of this lab—congratulations!
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 这就是本次实验的全部内容——祝贺你！
 - en: Protecting IPv6
+  id: totrans-226
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 保护 IPv6
 - en: I know, you're used to having all networking based on IPv4, with its nice, short,
     easy to use IP addresses. However, that can't last forever, considering that the
     world is now out of new IPv4 addresses. IPv6 offers a much larger address space
     that will last for a long time to come. Some organizations, especially wireless
     carriers, are either in the process of switching over to IPv6 or have already
     switched to it.
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 我知道，你习惯了所有网络都基于 IPv4，其简短、易用的 IP 地址。然而，这种情况不可能永远持续下去，因为全球 IPv4 地址已经用尽。IPv6 提供了一个更大的地址空间，将持续很长时间。一些组织，尤其是无线运营商，正在或已经切换到
+    IPv6。
 - en: 'So far, all we''ve covered is how to set up an IPv4 firewall with iptables.
     But remember what we said before. With iptables, you need one daemon and one set
     of rules for the IPv4 network, and another daemon and set of rules for IPv6\.
@@ -1085,64 +1568,98 @@
     mostly the same as what we''ve just covered. The biggest difference is that instead
     of using the `iptables` command, you''ll use the `ip6tables` command. Let''s start
     with our basic setup, just like what we did for IPv4:'
+  id: totrans-228
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们所讲的只是如何使用 iptables 设置 IPv4 防火墙。但请记住我们之前所说的，使用 iptables 时，你需要为 IPv4 网络设置一个守护进程和一组规则，而为
+    IPv6 设置另一个守护进程和一组规则。这意味着在使用 iptables 设置防火墙时，保护 IPv6 意味着需要做两次配置。大多数 Linux 发行版默认启用了
+    IPv6 网络，因此你要么需要用防火墙保护它，要么禁用它。否则，即使你刚刚配置的 IPv4 防火墙不会保护它，你的 IPv6 地址仍然会暴露给攻击者。即使你的服务器或设备面向
+    IPv4 网络，这也依然适用，因为有方法通过 IPv4 网络隧道传输 IPv6 数据包。幸运的是，设置 IPv6 防火墙的命令与我们刚刚介绍的几乎相同，最大的区别在于，你将使用
+    `ip6tables` 命令，而不是 `iptables` 命令。让我们像配置 IPv4 时一样，从基本设置开始：
 - en: '[PRE51]'
+  id: totrans-229
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'The other big difference between IPv4 and IPv6 is that with IPv6, you must
     allow more types of ICMP messages than you need to for IPv4\. This is due to the
     following reasons:'
+  id: totrans-230
   prefs: []
   type: TYPE_NORMAL
+  zh: IPv4 和 IPv6 之间的另一个大区别是，对于 IPv6，必须允许更多类型的 ICMP 消息，而不仅仅是 IPv4 所需的。这是由于以下原因：
 - en: With IPv6, new types of ICMP messages have replaced the **Address Resolution
     Protocol** (**ARP**).
+  id: totrans-231
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于 IPv6，新的 ICMP 消息类型已取代了**地址解析协议**（**ARP**）。
 - en: With IPv6, dynamic IP address assignments are normally done by exchanging ICMP
     discovery messages with other hosts, rather than by DHCP.
+  id: totrans-232
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于 IPv6，动态 IP 地址分配通常是通过与其他主机交换 ICMP 探测消息，而不是通过 DHCP 完成的。
 - en: With IPv6, echo requests and echo replies, the infamous ping packets, are required
     when you need to tunnel IPv6 packets through an IPv4 network.
+  id: totrans-233
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于 IPv6，当你需要通过 IPv4 网络隧道 IPv6 数据包时，必须使用回显请求和回显回复，即臭名昭著的 ping 数据包。
 - en: 'And of course, we still need the same types of ICMP messages that we need for
     IPv4\. So, let''s start with them:'
+  id: totrans-234
   prefs: []
   type: TYPE_NORMAL
+  zh: 当然，我们仍然需要与 IPv4 相同类型的 ICMP 消息。那么，让我们从这些开始：
 - en: '[PRE52]'
+  id: totrans-235
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: 'These message types are as follows, in order of appearance:'
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些消息类型按出现顺序如下：
 - en: Destination unreachable
+  id: totrans-237
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 目标不可达
 - en: Packet too big
+  id: totrans-238
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 数据包过大
 - en: Time exceeded
+  id: totrans-239
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 超时
 - en: Parameter problem with the packet header
+  id: totrans-240
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 数据包头部的参数问题
 - en: 'Next, we''ll enable echo requests (type 128) and echo responses (type 129)
     so that IPv6 over IPv4 tunneling will work:'
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们将启用回显请求（类型 128）和回显响应（类型 129），以便 IPv6 可以通过 IPv4 隧道工作：
 - en: '[PRE53]'
+  id: totrans-242
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: The Teredo protocol is one of a few different ways to tunnel IPv6 packets across
     an IPv4 network. This protocol is what requires echo requests and echo replies,
     the infamous ping packets, to be allowed through a firewall. However, if you search
@@ -1150,417 +1667,586 @@
     because the Linux implementation of the Teredo protocol is called miredo. So,
     when installing the Teredo protocol on a Linux machine, you'll need to install
     the `miredo` and `miredo-server` packages.
+  id: totrans-243
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
 - en: 'The next four ICMP message types that we need are for the Link-local Multicast
     Receiver Notification messages:'
+  id: totrans-244
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE54]'
+  id: totrans-245
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'These are as follows, in order of appearance:'
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
 - en: Listener query
+  id: totrans-247
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Listener report
+  id: totrans-248
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Listener done
+  id: totrans-249
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Listener report v2
+  id: totrans-250
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Next up is our neighbor and router discovery message types:'
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE55]'
+  id: totrans-252
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'These are as follows, in order of appearance:'
+  id: totrans-253
   prefs: []
   type: TYPE_NORMAL
 - en: Router solicitation
+  id: totrans-254
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Router advertisement
+  id: totrans-255
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Neighbor solicitation
+  id: totrans-256
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Neighbor advertisement
+  id: totrans-257
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Inverse neighbor discovery solicitation
+  id: totrans-258
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Inverse neighbor discovery advertisement
+  id: totrans-259
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Space doesn't permit me to go into the details of these message types. So, for
     now, let's just say that they're required in order for IPv6 hosts to dynamically
     assign themselves an IPv6 address.
+  id: totrans-260
   prefs: []
   type: TYPE_NORMAL
 - en: 'For times when you''re using security certificates to authenticate the routers
     that are attached to your network, you''ll also need to allow **Secure Neighbor
     Discovery** (**SEND**) messages:'
+  id: totrans-261
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE56]'
+  id: totrans-262
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: 'Are your fingers tired yet? If so, have no fear. This next group of ICMP rules
     is the last one. This time, we need to allow Multicast Router Discovery messages:'
+  id: totrans-263
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE57]'
+  id: totrans-264
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: 'Finally, we''ll add our `DROP` rule to block everything else:'
+  id: totrans-265
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE58]'
+  id: totrans-266
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: I know you're thinking, “Wow, that's a lot of hoops to jump through just to
     set up a basic firewall”. And yeah, you're right, especially when you also need
     to configure rules for IPv6\. Soon, I'll show you what the Ubuntu folk came up
     with to make things simpler.
+  id: totrans-267
   prefs: []
   type: TYPE_NORMAL
 - en: 'You can get the whole scoop on how to use iptables on Ubuntu here: [https://help.ubuntu.com/community/IptablesHowTo](https://help.ubuntu.com/community/IptablesHowTo).'
+  id: totrans-268
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
 - en: Hands-on lab for ip6tables
+  id: totrans-269
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
 - en: 'For this lab, you''ll use the same Ubuntu virtual machine that you used in
     the previous iptables labs. You''ll leave the IPv4 firewall setup that''s already
     there as-is and create a new firewall for IPv6\. Let''s get started:'
+  id: totrans-270
   prefs: []
   type: TYPE_NORMAL
 - en: 'View your IPv6 rules, or lack thereof, with this command:'
+  id: totrans-271
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE59]'
+  id: totrans-272
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: Create the IPv6 firewall. Due to formatting constraints, I can't list the entire
     code block of commands here. You can find the respective commands in this chapter's
     directory, in the code file that you can download from the Packt Publishing website.
+  id: totrans-273
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: 'View the new ruleset by using the following command:'
+  id: totrans-274
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE60]'
+  id: totrans-275
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: 'Next, set up the mangle table rules for blocking invalid packets:'
+  id: totrans-276
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE61]'
+  id: totrans-277
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: 'Save the new ruleset to a file in your own home directory, and then transfer
     the rules file to the proper location:'
+  id: totrans-278
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE62]'
+  id: totrans-279
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: 'Obtain the IPv6 address of the virtual machine with this command:'
+  id: totrans-280
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE63]'
+  id: totrans-281
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: 'On the machine on which you installed Nmap, perform a Windows scan of the virtual
     machine''s IPv6 address. The command will look like this, except with your own
     IP address:'
+  id: totrans-282
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在你安装了Nmap的机器上，对虚拟机的IPv6地址进行Windows扫描。命令应该是这样的，只不过用你自己的IP地址替换：
 - en: '[PRE64]'
+  id: totrans-283
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: 'On the virtual machine, observe which rule was triggered with this command:'
+  id: totrans-284
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在虚拟机上，观察使用此命令时触发了哪个规则：
 - en: '[PRE65]'
+  id: totrans-285
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: You should see non-zero numbers for the packet counters for one of the rules.
+  id: totrans-286
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该能看到某个规则的包计数器显示非零数字。
 - en: 'On the machine on which you installed Nmap, perform an XMAS scan of the virtual
     machine''s IPv6 address. The command will look like this, except with your own
     IP address:'
+  id: totrans-287
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在你安装了Nmap的机器上，对虚拟机的IPv6地址进行XMAS扫描。命令应该是这样的，只不过用你自己的IP地址替换：
 - en: '[PRE66]'
+  id: totrans-288
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: 'As before, on the virtual machine, observe which rule was triggered by this
     scan:'
+  id: totrans-289
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 和之前一样，在虚拟机上，观察这个扫描触发了哪个规则：
 - en: '[PRE67]'
+  id: totrans-290
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: Shut down the virtual machine, and restore it from the snapshot that you created
     at the beginning of the *Hands-on lab for basic iptables usage*.
+  id: totrans-291
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 关闭虚拟机，并从开始时创建的*基本iptables使用实验室*快照恢复虚拟机。
 - en: That's the end of this lab – congratulations!
+  id: totrans-292
   prefs: []
   type: TYPE_NORMAL
+  zh: 实验到此结束，恭喜你！
 - en: So far, you've seen the good, the bad, and the ugly of `iptables`. It's very
     flexible, and there's a lot of power in the `iptables` commands. If you're clever
     at shell scripting, you can create some rather complex shell scripts that you
     can use to deploy firewalls on the machines all across your network.
+  id: totrans-293
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，你已经看到了`iptables`的优缺点以及它的丑陋面。它非常灵活，`iptables`命令也充满了强大功能。如果你擅长shell脚本，你可以编写一些相当复杂的脚本，用于在整个网络中的机器上部署防火墙。
 - en: On the other hand, getting everything right can be quite complex, especially
     if you need to consider that your machines have to run both IPv4 and IPv6, and
     that everything you do for IPv4 has to be done again for IPv6\. (If you're a masochist,
     you might actually enjoy it.)
+  id: totrans-294
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一方面，做到一切正确可能会非常复杂，特别是如果你需要考虑你的机器必须同时运行IPv4和IPv6，并且你为IPv4所做的一切都必须为IPv6再做一次。（如果你是个受虐狂，或许你会喜欢这样。）
 - en: nftables – a more universal type of firewall system
+  id: totrans-295
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: nftables——一种更通用的防火墙系统
 - en: 'Now, let''s turn our attention to nftables, the new kid on the block. So, what
     does nftables bring to the table? (Yes, the pun was intended.):'
+  id: totrans-296
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们将注意力转向nftables，这个新兴的防火墙工具。那么，nftables带来了什么呢？（是的，这个双关语是故意的。）：
 - en: You can forget about needing separate daemons and utilities for all of the different
     networking components. The functionality of iptables, ip6tables, ebtables, and
     arptables is now all combined in one neat package. The nft utility is now the
     only firewall utility that you'll need.
+  id: totrans-297
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 你可以忘记需要为所有不同的网络组件设置单独的守护进程和实用工具。iptables、ip6tables、ebtables和arptables的功能现在都合并在一个简洁的包里。nft实用工具现在是你所需要的唯一防火墙工具。
 - en: With nftables, you can create multi-dimensional trees to display your rulesets.
     This makes troubleshooting vastly easier because it's now easier to trace a packet
     all the way through all of the rules.
+  id: totrans-298
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用nftables时，你可以创建多维树来展示你的规则集。这使得故障排除变得更加轻松，因为现在更容易追踪一个包通过所有规则的过程。
 - en: With iptables, you have the filter, NAT, mangle, and security tables installed
     by default, whether or not you use each one.
+  id: totrans-299
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用iptables时，无论是否使用，每个默认安装的表包括过滤器、NAT、mangle和安全表。
 - en: With nftables, you only create the tables that you intend to use, resulting
     in enhanced performance.
+  id: totrans-300
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用nftables时，你只需要创建你打算使用的表，从而提高性能。
 - en: Unlike iptables, you can specify multiple actions in one rule, instead of having
     to create multiple rules for each action.
+  id: totrans-301
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 与iptables不同，你可以在一个规则中指定多个操作，而不必为每个操作创建多个规则。
 - en: Unlike iptables, new rules get added atomically. (That's a fancy way of saying
     that there's no longer a need to reload the entire ruleset in order to just add
     one rule.)
+  id: totrans-302
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 与iptables不同，新增规则是原子性添加的。（这是一个华丽的说法，意思是你不再需要重新加载整个规则集来仅仅添加一个规则。）
 - en: nftables has its own built-in scripting engine, allowing you to write scripts
     that are more efficient and more human-readable.
+  id: totrans-303
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: nftables拥有内建的脚本引擎，允许你编写更高效、更易于阅读的脚本。
 - en: If you already have lots of iptables scripts that you still need to use, you
     can install a set of utilities that will help you convert them into nftables format.
     (That is, unless you’re running Ubuntu 22.04, which can automatically translate
     iptables commands for you.)
+  id: totrans-304
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果你已经有了大量需要使用的iptables脚本，你可以安装一组实用工具，帮助你将它们转换为nftables格式。（除非你使用的是Ubuntu 22.04，它可以自动为你转换iptables命令。）
 - en: Although nftables was created by Red Hat, Ubuntu was the first enterprise-grade
     Linux distro to offer it as an option, beginning with Ubuntu 16.04\. It’s now
     the default option for Ubuntu 22.04, SUSE, OpenSUSE, and the RHEL 8/9-type distros.
     Let’s begin by looking at some basic nftables concepts.
+  id: totrans-305
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然 nftables 是由 Red Hat 创建的，但 Ubuntu 是第一个将其作为选项提供的企业级 Linux 发行版，从 Ubuntu 16.04
+    开始。现在它已成为 Ubuntu 22.04、SUSE、OpenSUSE 和 RHEL 8/9 类型发行版的默认选项。让我们从一些基本的 nftables
+    概念开始。
 - en: Learning about nftables tables and chains
+  id: totrans-306
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 了解 nftables 表和链
 - en: 'If you''re used to iptables, you might recognize some of the nftables terminology.
     The only problem is that some of the terms are used in different ways, with different
     meanings. Let''s go over some examples so that you’ll know what I''m talking about:'
+  id: totrans-307
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你习惯了 iptables，你可能会认出一些 nftables 的术语。唯一的问题是，有些术语的使用方式不同，含义也有所变化。让我们通过一些例子来讲解，这样你就能明白我在说什么：
 - en: '**Tables**: Tables in nftables refer to a particular protocol family. The table
     types are ip, ip6, inet, arp, bridge, and netdev.'
+  id: totrans-308
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**Tables**：在 nftables 中，表指的是特定的协议家族。表的类型有 ip、ip6、inet、arp、bridge 和 netdev。'
 - en: '**Chains**: Chains in nftables roughly equate to tables in iptables. For example,
     in nftables, you could have filter, route, or NAT chains.'
+  id: totrans-309
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**Chains**：nftables 中的链大致等同于 iptables 中的表。例如，在 nftables 中，你可能会有 filter、route
+    或 NAT 链。'
 - en: Getting started with nftables
+  id: totrans-310
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 开始使用 nftables
 - en: Let's start with a clean snapshot of our Ubuntu 22.04 virtual machine, since
     it comes with nftables already installed.
+  id: totrans-311
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们从一台已安装 nftables 的 Ubuntu 22.04 虚拟机的干净快照开始。
 - en: 'Tip:'
+  id: totrans-312
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 提示：
 - en: ''
+  id: totrans-313
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
 - en: 'You can use Ubuntu 20.04 if you really want to, but you’ll first have to install
     nftables by doing:'
+  id: totrans-314
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 如果你真的想使用 Ubuntu 20.04，你可以，但首先需要通过以下命令安装 nftables：
 - en: '[PRE68]'
+  id: totrans-315
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: 'Now, let''s take a look at the list of installed tables:'
+  id: totrans-316
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们来看一下已安装表的列表：
 - en: '[PRE69]'
+  id: totrans-317
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: You didn't see any tables, did you? So, let's load some up.
+  id: totrans-318
   prefs: []
   type: TYPE_NORMAL
+  zh: 你没有看到任何表格，对吧？那么，让我们加载一些表格吧。
 - en: Configuring nftables on Ubuntu
+  id: totrans-319
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 在 Ubuntu 上配置 nftables
 - en: On the Ubuntu virtual machine that we'll be using, the default `nftables.conf`
     file is nothing more than a meaningless placeholder. The file you need, which
     you'll copy over to replace the default `nftables.conf` file, is elsewhere. Let's
     check it out.
+  id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们使用的 Ubuntu 虚拟机中，默认的 `nftables.conf` 文件不过是一个没有意义的占位符。你需要的文件会被放在其他地方，复制过来替换掉默认的
+    `nftables.conf` 文件。我们来看看。
 - en: 'First, we''ll go into the directory where the sample configurations are stored
     and list the sample configuration files:'
+  id: totrans-321
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们进入存放示例配置文件的目录，并列出示例配置文件：
 - en: '[PRE70]'
+  id: totrans-322
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE70]'
 - en: 'You should see something similar to this:'
+  id: totrans-323
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该会看到类似这样的内容：
 - en: '[PRE71]'
+  id: totrans-324
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE71]'
 - en: If you view the contents of the `workstation.nft` file, you'll see that it's
     the one we need.
+  id: totrans-325
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你查看 `workstation.nft` 文件的内容，你会看到它正是我们需要的文件。
 - en: 'Next, we''ll copy the workstation file over to the `/etc` directory, changing
     its name to `nftables.conf`. (Note that this will overwrite the old `nftables.conf`
     file, which is what we want.):'
+  id: totrans-326
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们将把工作站文件复制到 `/etc` 目录，并将其命名为 `nftables.conf`。 （注意，这将覆盖掉旧的 `nftables.conf`
+    文件，这正是我们想要的。）
 - en: '[PRE72]'
+  id: totrans-327
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE72]'
 - en: 'Here''s the breakdown of what you''ll see in the `/etc/nftables.conf` file
     that you''ll be using:'
+  id: totrans-328
   prefs: []
   type: TYPE_NORMAL
+  zh: 下面是你将在 `/etc/nftables.conf` 文件中看到的内容解析：
 - en: '**#!/usr/sbin/nft -f**: Although you can create normal Bash shell scripts with
     nftables commands, it''s better to use the built-in scripting engine that''s included
     with nftables. That way, we can make our scripts more human-readable, and we don''t
     have to type `nft` in front of everything we want to execute.'
+  id: totrans-329
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**#!/usr/sbin/nft -f**：虽然你可以使用 nftables 命令创建普通的 Bash 脚本，但最好使用 nftables 自带的脚本引擎。这样，我们可以让脚本更具可读性，而且无需在每个要执行的命令前都输入
+    `nft`。'
 - en: '**flush ruleset**: We want to start with a clean slate, so we''ll flush out
     any rules that may have already been loaded.'
+  id: totrans-330
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**flush ruleset**：我们希望从一个干净的状态开始，所以我们将清除任何可能已经加载的规则。'
 - en: '**table inet filter**: This creates an inet family filter, which works for
     both IPv4 and IPv6\. The name of this table is `filter`, but it could just as
     well have been something a bit more descriptive.'
+  id: totrans-331
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**table inet filter**：这会创建一个 inet 家族的过滤器，它适用于 IPv4 和 IPv6。这个表的名字是 `filter`，但它也可以用一个更具描述性的名字。'
 - en: '**chain input**: Within the first pair of curly brackets, we have a chain called
     `input`. (Again, the name could have been something more descriptive.)'
+  id: totrans-332
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**chain input**：在第一个大括号对内，我们有一个叫做 `input` 的链。（同样，这个名字本来可以更具描述性。）'
 - en: '**type filter hook input priority 0;**: Within the next pair of curly brackets,
     we define our chain and list the rules. This chain is defined as a `filter` type.
     `hook input` indicates that this chain is meant to process incoming packets. Because
     this chain has both a `hook` and a `priority`, it will accept packets directly
     from the network stack.'
+  id: totrans-333
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**type filter hook input priority 0;**：在接下来的花括号对中，我们定义了我们的链并列出了规则。这个链被定义为`filter`类型。`hook
+    input`表示这个链是用来处理传入数据包的。因为这个链有`hook`和`priority`，它将直接接受来自网络栈的数据包。'
 - en: Finally, we have the standard rules for a very basic host firewall, starting
     with the **Input Interface** (**iif**) rule, which allows the loopback interface
     to accept packets.
+  id: totrans-334
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们有一些非常基本的主机防火墙标准规则，从**输入接口**（**iif**）规则开始，该规则允许回环接口接受数据包。
 - en: Next is the standard connection tracking (`ct`) rule, which accepts traffic
     that's in response to a connection request from this host.
+  id: totrans-335
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来是标准的连接跟踪（`ct`）规则，它接受响应于来自此主机的连接请求的流量。
 - en: Then, there's a commented-out rule to accept Secure Shell and both secure and
     nonsecure web traffic. `ct state` new indicates that the firewall will allow other
     hosts to initiate connections to our server on these ports.
+  id: totrans-336
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，有一条被注释掉的规则，用于接受安全外壳（Secure Shell）和安全与非安全的网页流量。`ct state` new表示防火墙将允许其他主机在这些端口上发起连接到我们的服务器。
 - en: The `meta nfproto ipv6` rule accepts neighbor discovery packets, allowing IPv6
     functionality.
+  id: totrans-337
   prefs: []
   type: TYPE_NORMAL
+  zh: '`meta nfproto ipv6`规则接受邻居发现数据包，允许IPv6功能。'
 - en: The `counter drop` rule at the end silently blocks all other traffic and counts
     both the number of packets and the number of bytes that it blocks. (This is an
     example of how you can have one nftables rule perform multiple different actions.)
+  id: totrans-338
   prefs: []
   type: TYPE_NORMAL
+  zh: 末尾的`counter drop`规则默默地阻止所有其他流量，并统计它阻止的包的数量和字节数。（这是一个示例，说明一个nftables规则如何执行多个不同的操作。）
 - en: 'If all you need on your Ubuntu server is a basic, no-frills firewall, your
     best bet is to just edit this `/etc/nftables.conf` file so that it suits your
     own needs. For starters, let''s set this up to match the setup that we created
@@ -1568,138 +2254,204 @@
     and we need to allow connections to port `22` and port `53`. Remove the comment
     symbol from in front of the `tcp dport` line, get rid of ports `80` and `443`,
     and add port `53`. The line should now look like this:'
+  id: totrans-339
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的Ubuntu服务器只需要一个基本的、简单的防火墙，最好的方法就是直接编辑`/etc/nftables.conf`文件，使其符合你的需求。首先，让我们设置一个配置，和我们为iptables部分创建的设置相匹配。换句话说，假设这是一个DNS服务器，我们需要允许端口`22`和端口`53`的连接。删除`tcp
+    dport`行前面的注释符号，去掉端口`80`和`443`，并添加端口`53`。该行现在应该是这样的：
 - en: '[PRE73]'
+  id: totrans-340
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE73]'
 - en: Note how you can use one nftables rule to open multiple ports.
+  id: totrans-341
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，你可以使用一个nftables规则打开多个端口。
 - en: 'DNS also uses port `53/udp`, so let''s add a line for it:'
+  id: totrans-342
   prefs: []
   type: TYPE_NORMAL
+  zh: DNS也使用端口`53/udp`，所以我们为它添加一行：
 - en: '[PRE74]'
+  id: totrans-343
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE74]'
 - en: When you're only opening one port, you don't need to enclose that port number
     within curly brackets. When opening multiple ports, just include the comma-separated
     list within curly brackets, with a blank space after each comma, before the first
     element, and after the last element.
+  id: totrans-344
   prefs: []
   type: TYPE_NORMAL
+  zh: 当你只打开一个端口时，不需要将该端口号括在花括号内。打开多个端口时，只需将逗号分隔的列表括在花括号内，在每个逗号之后、第一个元素之前和最后一个元素之后留一个空格。
 - en: 'Load the configuration file and view the results:'
+  id: totrans-345
   prefs: []
   type: TYPE_NORMAL
+  zh: 加载配置文件并查看结果：
 - en: '[PRE75]'
+  id: totrans-346
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE75]'
 - en: 'The `counter drop` rule is another example of how an nftables rule can do multiple
     things. In this case, the rule drops and counts unwanted packets. So far, the
     rule has blocked one packet and 32 bytes. To demonstrate how this works, let''s
     say that we want to make a log entry when packets are dropped. Just add the `log`
     keyword to the `drop` rule, like so:'
+  id: totrans-347
   prefs: []
   type: TYPE_NORMAL
+  zh: '`counter drop`规则是另一个示例，说明一个nftables规则如何做多件事。在这种情况下，该规则丢弃并统计不需要的包。到目前为止，该规则已经阻止了一个包和32个字节。为了演示这如何工作，假设我们希望在丢包时创建一条日志条目。只需将`log`关键字添加到`drop`规则中，如下所示：'
 - en: '[PRE76]'
+  id: totrans-348
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE76]'
 - en: 'To make these messages easier to find, add a tag to each log message, like
     this:'
+  id: totrans-349
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了让这些消息更容易查找，可以给每个日志消息添加一个标签，像这样：
 - en: '[PRE77]'
+  id: totrans-350
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE77]'
 - en: Now, when you need to peruse the `/var/log/kern.log` file to see how many dropped
     packets you've had, just search for the `Dropped packet` text string.
+  id: totrans-351
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，当你需要查看`/var/log/kern.log`文件，看看你丢了多少包时，只需搜索`Dropped packet`文本字符串。
 - en: 'Now, let''s say that we want to block certain IP addresses from reaching the
     Secure Shell port of this machine. To do this, we can edit the file, placing a
     `drop` rule above the rule that opens port `22`. The relevant section of the file
     would look like this:'
+  id: totrans-352
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，假设我们想要阻止某些IP地址访问这台机器的安全外壳端口。为此，我们可以编辑文件，将`drop`规则放在打开端口`22`的规则之上。文件的相关部分如下所示：
 - en: '[PRE78]'
+  id: totrans-353
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE78]'
 - en: After we reload the file, we'll be blocking SSH access from two different IPv4
     addresses. Any attempts to log in from either of those two addresses will create
     a `/var/log/kern.log` message with the `Blocked SSH packets` tag. Note that we've
     placed the `drop` rule ahead of the `accept` rule because if the `accept` rule
     gets read first, the `drop` rule won't have an effect.
+  id: totrans-354
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们重新加载文件后，我们将阻止来自两个不同IPv4地址的SSH访问。任何来自这两个地址的登录尝试都会在`/var/log/kern.log`文件中生成一条带有`Blocked
+    SSH packets`标签的消息。请注意，我们将`drop`规则放在了`accept`规则之前，因为如果`accept`规则先被读取，`drop`规则将不起作用。
 - en: 'Next, we need to allow the desired types of ICMP packets, like so:'
+  id: totrans-355
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们需要允许所需类型的ICMP数据包，如下所示：
 - en: '[PRE79]'
+  id: totrans-356
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE79]'
 - en: In this case, you need separate rules for ICMPv4 and ICMPv6.
+  id: totrans-357
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，您需要为ICMPv4和ICMPv6创建独立的规则。
 - en: 'Finally, we''ll block invalid packets by adding a new prerouting chain to the
     filter table, like so:'
+  id: totrans-358
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们将通过向过滤表添加一个新的prerouting链来阻止无效数据包，如下所示：
 - en: '[PRE80]'
+  id: totrans-359
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE80]'
 - en: Now, we can save the file and close the text editor.
+  id: totrans-360
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们可以保存文件并关闭文本编辑器。
 - en: Due to formatting constraints, I can't show the entire completed file here.
     To see the whole file, download the code file from the Packt website, and look
     in the `Chapter 4` directory. The example file you seek is the `nftables_example_1.conf`
     file.
+  id: totrans-361
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 由于格式限制，我无法在此处显示完整的文件。要查看完整的文件，请从Packt网站下载代码文件，并查看`Chapter 4`目录。您要找的示例文件是`nftables_example_1.conf`文件。
 - en: 'Now, let''s load up the new rules:'
+  id: totrans-362
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们加载新规则：
 - en: '[PRE81]'
+  id: totrans-363
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE81]'
 - en: Another really cool thing to note is how we've mixed IPv4 (ip) rules with IPv6
     (ip6) rules in the same configuration file. Also, unless we specify otherwise,
     all the rules that we create will apply to both IPv4 and IPv6\. That's the beauty
     of using an inet-type table. For simplicity and flexibility, you'll want to use
     inet tables as much as possible, rather than separate tables for IPv4 and IPv6.
+  id: totrans-364
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一个值得注意的非常酷的事情是，我们如何将IPv4（ip）规则与IPv6（ip6）规则混合在同一个配置文件中。此外，除非我们另行指定，否则我们创建的所有规则都将同时适用于IPv4和IPv6。这就是使用inet类型表的魅力所在。为了简化和灵活性，您应该尽可能使用inet表，而不是为IPv4和IPv6分别使用不同的表。
 - en: Most of the time, when all you need is just a simple host firewall, your best
     bet would be to just use this `nftables.conf` file as your starting point, and
     edit the file to suit your own needs. However, there's also a command-line component
     that you may find useful.
+  id: totrans-365
   prefs: []
   type: TYPE_NORMAL
+  zh: 大多数时候，当您只需要一个简单的主机防火墙时，最佳选择是将此`nftables.conf`文件作为起点，并编辑该文件以满足自己的需求。然而，您还可以使用命令行工具，它可能会对您有所帮助。
 - en: Using nft commands
+  id: totrans-366
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用nft命令
 - en: My preferred method of working with nftables is to just start with a template
     and hand-edit it to my liking, as we did in the previous section. But for those
     who'd rather do everything from the command line, there's the nft utility.
+  id: totrans-367
   prefs: []
   type: TYPE_NORMAL
+  zh: 我与nftables合作的首选方法是从模板开始，并像我们在上一节中做的那样手动编辑它。但对于那些更愿意从命令行做一切的人，nft工具是一个选择。
 - en: 'Tip:'
+  id: totrans-368
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 提示：
 - en: ''
+  id: totrans-369
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
 - en: Even if you know that you'll always create firewalls by hand-editing `nftables.conf`,
     there are still a couple of practical reasons to know about the nft utility.
+  id: totrans-370
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 即使您知道自己总是通过手动编辑`nftables.conf`来创建防火墙，了解nft工具仍然有一些实际原因。
 - en: ''
+  id: totrans-371
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
@@ -1708,71 +2460,101 @@
     a custom rule on the fly that will block the attack. Creating nftables rules on
     the fly also allows you to test the firewall as you configure it, before making
     any permanent changes.
+  id: totrans-372
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 假设您观察到正在进行的攻击，并且需要快速阻止它，而不让系统宕机。通过`nft`命令，您可以即时创建一个自定义规则来阻止攻击。即时创建nftables规则还可以让您在配置防火墙时进行测试，而不会做出任何永久性更改。
 - en: ''
+  id: totrans-373
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
 - en: And, if you decide to take a Linux security certification exam, you might see
     questions about `nft` commands. (I happen to know.)
+  id: totrans-374
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 如果您决定参加Linux安全认证考试，可能会看到有关`nft`命令的问题。（我恰好知道。）
 - en: There are two ways to use the `nft` utility. For one, you could just do everything
     directly from the Bash shell, prefacing every action you want to perform with
     `nft`, followed by the `nft` subcommands. The other way is to use `nft` in interactive
     mode. For our present purposes, we'll just go with the Bash shell.
+  id: totrans-375
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用`nft`工具有两种方式。第一种是你可以直接从 Bash shell 中执行所有操作，每次执行操作时都以`nft`开头，后接`nft`的子命令。另一种方式是以交互模式使用`nft`。出于目前的目的，我们将使用
+    Bash shell。
 - en: 'First, let''s delete our previous configuration and create an `inet` table
     since we want something that works for both IPv4 and IPv6\. We''ll want to give
     it a somewhat descriptive name, so let''s call it `ubuntu_filter`:'
+  id: totrans-376
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，让我们删除之前的配置并创建一个`inet`表，因为我们希望它同时适用于 IPv4 和 IPv6。我们希望给它起个相对描述性的名称，所以我们叫它`ubuntu_filter`：
 - en: '[PRE82]'
+  id: totrans-377
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE82]'
 - en: 'Next, we''ll add an input filter chain to the table that we just created (note
     that since we''re doing this from the Bash shell, we need to escape the semicolon
     with a backslash):'
+  id: totrans-378
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们将向刚才创建的表中添加一个输入过滤链（请注意，由于我们是在 Bash shell 中执行此操作，所以需要使用反斜杠转义分号）：
 - en: '[PRE83]'
+  id: totrans-379
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE83]'
 - en: We could have given it a more descriptive name, but for now, `input` works.
     Within the pair of curly brackets, we're setting the parameters for this chain.
+  id: totrans-380
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们本可以给它起个更具描述性的名称，但目前`input`就足够了。在一对大括号内，我们设置了此链的参数。
 - en: 'Each nftables protocol family has its own set of hooks, which define how packets
     will be processed. For now, we''re only concerned with the ip/ip6/inet families,
     which have the following hooks:'
+  id: totrans-381
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个 nftables 协议族都有自己的一组钩子，用于定义如何处理数据包。现在，我们只关注 ip/ip6/inet 协议族，它们有以下钩子：
 - en: Prerouting
+  id: totrans-382
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 前路由
 - en: Input
+  id: totrans-383
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 输入
 - en: Forward
+  id: totrans-384
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 转发
 - en: Output
+  id: totrans-385
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 输出
 - en: Postrouting
+  id: totrans-386
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 后路由
 - en: Of these, we're only concerned with the input and output hooks, which apply
     to filter-type chains. By specifying a hook and a priority for our input chain,
     we're saying that we want this chain to be a base chain that will accept packets
@@ -1781,24 +2563,33 @@
     if you're running the commands from the Bash shell. Finally, we're specifying
     a default policy of `drop`. If we had not specified `drop` as the default policy,
     then the policy would have been `accept` by default.
+  id: totrans-387
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这些中，我们只关注输入和输出钩子，这些钩子适用于过滤类型的链。通过为我们的输入链指定钩子和优先级，我们表示希望将此链作为基本链，直接接受来自网络栈的数据包。你还会看到某些参数必须以分号终止，如果你是在
+    Bash shell 中运行这些命令，分号需要用反斜杠进行转义。最后，我们指定了默认策略为`drop`。如果我们没有指定`drop`作为默认策略，那么默认策略将是`accept`。
 - en: 'Tip:'
+  id: totrans-388
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 提示：
 - en: ''
+  id: totrans-389
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
 - en: Every `nft` command that you enter takes effect immediately. So, if you're doing
     this remotely, you'll drop your Secure Shell connection as soon as you create
     a filter chain with a default `drop` policy.
+  id: totrans-390
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 每个你输入的`nft`命令都会立即生效。所以，如果你是远程操作，一旦你创建了一个默认策略为`drop`的过滤链，你的 Secure Shell 连接会被断开。
 - en: ''
+  id: totrans-391
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
@@ -1806,95 +2597,131 @@
     a `drop` rule as the final rule. Other people like to create chains with a default
     `drop` policy, and then leave off the `drop` rule at the end. Be sure to check
     your local procedures to see what your organization prefers.
+  id: totrans-392
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 有些人喜欢创建一个默认策略为`accept`的链，然后添加一个`drop`规则作为最后一条规则。另一些人则喜欢创建一个默认策略为`drop`的链，然后在末尾省略`drop`规则。务必检查你所在组织的本地操作规程，了解其偏好。
 - en: 'Verify that the chain has been added. You should see something like this:'
+  id: totrans-393
   prefs: []
   type: TYPE_NORMAL
+  zh: 验证链是否已添加。你应该能看到类似这样的内容：
 - en: '[PRE84]'
+  id: totrans-394
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE84]'
 - en: 'That''s great, but we still need some rules. Let''s start with a connection
     tracking rule and a rule to open the Secure Shell port. Then, we''ll verify that
     they were added:'
+  id: totrans-395
   prefs: []
   type: TYPE_NORMAL
+  zh: 很好，但我们仍然需要一些规则。我们从一个连接跟踪规则和一个打开 Secure Shell 端口的规则开始。接着，我们将验证它们是否已添加：
 - en: '[PRE85]'
+  id: totrans-396
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE85]'
 - en: 'Okay, that looks good. You now have a basic, working firewall that allows Secure
     Shell connections. Well, except that just as we did in the in the iptables section
     of this chapter, we forgot to create a rule to allow the loopback adapter to accept
     packets. Since we want this rule to be at the top of the rules list, we''ll use
     `insert` instead of `add`:'
+  id: totrans-397
   prefs: []
   type: TYPE_NORMAL
+  zh: 好的，看起来不错。你现在有了一个基本的、可工作的防火墙，允许 Secure Shell 连接。嗯，除非我们像在本章的 iptables 部分一样，忘记创建一个规则来允许环回适配器接受数据包。由于我们希望这个规则位于规则列表的顶部，所以我们将使用`insert`而不是`add`：
 - en: '[PRE86]'
+  id: totrans-398
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE86]'
 - en: 'Now, we''re all set. But what if we want to insert a rule at a specific location?
     For that, you''ll need to use list with the `-a` option to see the rule handles:'
+  id: totrans-399
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们一切准备就绪。但如果我们想在特定位置插入规则呢？为此，你需要使用带有`-a`选项的列表来查看规则句柄：
 - en: '[PRE87]'
+  id: totrans-400
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE87]'
 - en: 'As you can see, there''s no real rhyme or reason to the way the handles are
     numbered. Let''s say that we want to insert the rule about blocking certain IP
     addresses from accessing the Secure Shell port. We can see that the SSH `accept`
     rule is `handle 3`, so we''ll need to insert our `drop` rule before it. This command
     will look like this:'
+  id: totrans-401
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE88]'
+  id: totrans-402
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE88]'
 - en: 'So, to place the rule before the rule with the `handle 3` label, we have to
     insert it at position `3`. The new rule that we just inserted has the label `handle
     6.` To delete a rule, we have to specify the rule''s handle number:'
+  id: totrans-403
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE89]'
+  id: totrans-404
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE89]'
 - en: 'As is the case with iptables, everything you do from the command line will
     disappear once you reboot the machine. To make it permanent, let''s redirect the
     output of the `list` subcommand to the `nftables.conf` configuration file (of
     course, we''ll want to have made a backup copy of the already-existing file, in
     case we want to revert back to it):'
+  id: totrans-405
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE90]'
+  id: totrans-406
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE90]'
 - en: 'Due to a quirk in the Bash shell, we can''t just redirect output to a file
     in the `/etc/` directory in the normal manner, even when we use `sudo`. That''s
     why I had to add the `sh -c` command, with the `nft list` command surrounded by
     double quotes. Also, note that the file has to be named `nftables.conf` because
     that''s what the nftables systemd service looks for. Now, when we look at the
     file, we''ll see that there are a couple of things that are missing:'
+  id: totrans-407
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE91]'
+  id: totrans-408
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE91]'
 - en: 'Those of you who are sharp-eyed will see that we''re missing the `flush` rule
     and the shebang line to specify the shell that we want to interpret this script.
     Let''s add them:'
+  id: totrans-409
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE92]'
+  id: totrans-410
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE92]'
 - en: 'Much better. Let''s test this by loading the new configuration and observing
     the `list` output:'
+  id: totrans-411
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE93]'
+  id: totrans-412
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE93]'
 - en: That's all there is to creating your own simple host firewall. Of course, running
     commands from the command line, rather than just creating a script file in your
     text editor, does make for a lot more typing. However, it does allow you to test
@@ -1902,6 +2729,7 @@
     this manner and then redirecting the `list` output to your new configuration file
     relieves you of the burden of having to keep track of all of those curly brackets
     as you try to hand-edit the file.
+  id: totrans-413
   prefs: []
   type: TYPE_NORMAL
 - en: It's also possible to take all of the `nft` commands that we just created and
@@ -1909,106 +2737,147 @@
     you really don't want to do that. Just use the nft-native scripting format, as
     we've done here, and you'll have a script that performs better and is much more
     human-readable.
+  id: totrans-414
   prefs: []
   type: TYPE_NORMAL
 - en: Hands-on lab for nftables on Ubuntu
+  id: totrans-415
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
 - en: For this lab, you'll need a clean snapshot of your Ubuntu 22.04 virtual machine.
     Let’s get started.
+  id: totrans-416
   prefs: []
   type: TYPE_NORMAL
 - en: 'Restore your Ubuntu virtual machine to a clean snapshot to clear out any firewall
     configurations that you created previously. (Or, if you refer, start with a new
     virtual machine.) Disable ufw and verify that no firewall rules are present:'
+  id: totrans-417
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE94]'
+  id: totrans-418
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE94]'
 - en: You should see no rules listed for nftables.
+  id: totrans-419
   prefs: []
   type: TYPE_NORMAL
 - en: 'Copy the `workstation.nft` template over to the `/etc/` directory and rename
     it `nftables.conf`:'
+  id: totrans-420
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE95]'
+  id: totrans-421
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE95]'
 - en: 'Edit the `/etc/nftables.conf` file to create your new configuration. (Note
     that due to formatting constraints, I have to break this into three different
     code blocks.) Make the top portion of the file look like this:'
+  id: totrans-422
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE96]'
+  id: totrans-423
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE96]'
 - en: 'Make the second portion of the file look like this:'
+  id: totrans-424
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE97]'
+  id: totrans-425
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE97]'
 - en: 'Make the final portion of the file look like this:'
+  id: totrans-426
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE98]'
+  id: totrans-427
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE98]'
 - en: 'Save the file and reload nftables:'
+  id: totrans-428
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE99]'
+  id: totrans-429
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE99]'
 - en: 'View the results:'
+  id: totrans-430
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE100]'
+  id: totrans-431
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE100]'
 - en: 'From either your host computer or from another virtual machine, do a Windows
     scan against the Ubuntu virtual machine:'
+  id: totrans-432
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE101]'
+  id: totrans-433
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE101]'
 - en: 'Look at the packet counters to see which blocking rule was triggered. (Hint:
     It''s in the prerouting chain.):'
+  id: totrans-434
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE102]'
+  id: totrans-435
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE102]'
 - en: 'This time, do a null scan of the virtual machine:'
+  id: totrans-436
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE103]'
+  id: totrans-437
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE103]'
 - en: 'Finally, look at which rule was triggered this time. (Hint: It''s the other
     one in the prerouting chain.):'
+  id: totrans-438
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE104]'
+  id: totrans-439
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE104]'
 - en: In the `/var/log/kern.log` file, search for the `Invalid Packets` text string
     to view the messages about the dropped invalid packets.
+  id: totrans-440
   prefs: []
   type: TYPE_NORMAL
 - en: That's the end of this lab – congratulations!
+  id: totrans-441
   prefs: []
   type: TYPE_NORMAL
 - en: In this section, we looked at the ins and outs of nftables, and looked at ways
     to configure it to help prevent certain types of attacks. In the next chapter,
     we’ll look at the helper programs for our helper programs.
+  id: totrans-442
   prefs: []
   type: TYPE_NORMAL
 - en: Summary
+  id: totrans-443
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -2017,224 +2886,273 @@
     We saw that even though it's been around forever and still works, it does have
     some shortcomings. Then, we worked with nftables, and saw that it has certain
     advantages over the old iptables.
+  id: totrans-444
   prefs: []
   type: TYPE_NORMAL
 - en: In the space that's been allotted for this chapter, I've only been able to present
     the essentials that you need in order to set up basic host protection. However,
     this should be enough to get you started.
+  id: totrans-445
   prefs: []
   type: TYPE_NORMAL
 - en: In the next chapter, we'll look at ufw and firewalld, which are helper programs
     for the two helper programs that we discussed in this chapter. I’ll see you there.
+  id: totrans-446
   prefs: []
   type: TYPE_NORMAL
 - en: Questions
+  id: totrans-447
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: Which of the following statements is true?
+  id: totrans-448
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: iptables is the easiest firewall system to work with.
+  id: totrans-449
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: With iptables, any rule that you create applies to both IPv4 and IPv6.
+  id: totrans-450
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: With iptables, you have to create IPv6 rules separately from IPv4 rules.
+  id: totrans-451
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: With nftables, you have to create IPv6 rules separately from IPv4 rules.
+  id: totrans-452
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: What is the official name of the Linux firewall?
+  id: totrans-453
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: iptables
+  id: totrans-454
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: ufw
+  id: totrans-455
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: nftables
+  id: totrans-456
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: netfilter
+  id: totrans-457
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Which of the following statements about nftables is false?
+  id: totrans-458
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: With nftables, rules are added atomically.
+  id: totrans-459
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: With nftables, a table refers to a particular protocol family.
+  id: totrans-460
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: With nftables, ports and their associated rules are bundled into zones.
+  id: totrans-461
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: With nftables, you can write scripts in either normal bash shell scripting,
     or with the scripting engine that's built into nftables.
+  id: totrans-462
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Which iptables command would show you how many packets have been dropped by
     a particular rule?
+  id: totrans-463
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: Which nftables command would you use to see how many packets have been dropped
     by a particular rule?
+  id: totrans-464
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: In iptables, which of the following targets would cause packets to be blocked
     without sending a notification back to the source?
+  id: totrans-465
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`STOP`'
+  id: totrans-466
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`DROP`'
+  id: totrans-467
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`REJECT`'
+  id: totrans-468
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`BLOCK`'
+  id: totrans-469
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Which of the following six choices are tables in iptables?
+  id: totrans-470
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: netfilter
+  id: totrans-471
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: filter
+  id: totrans-472
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: mangle
+  id: totrans-473
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: security
+  id: totrans-474
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: ip6table
+  id: totrans-475
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: NAT
+  id: totrans-476
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Which firewall system loads its rules atomically?
+  id: totrans-477
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: Further reading
+  id: totrans-478
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: '25 iptables netfilter firewall examples: [https://www.cyberciti.biz/tips/linux-iptables-examples.html](https://www.cyberciti.biz/tips/linux-iptables-examples.html)'
+  id: totrans-479
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Linux IPv6 how-to: [http://tldp.org/HOWTO/html_single/Linux+IPv6-HOWTO/](http://tldp.org/HOWTO/html_single/Linux+IPv6-HOWTO/)'
+  id: totrans-480
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Recommendations for Filtering ICMPv6 Messages in Firewalls: [https://www.ietf.org/rfc/rfc4890.txt](https://www.ietf.org/rfc/rfc4890.txt)'
+  id: totrans-481
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'nftables wiki: [https://wiki.nftables.org/wiki-nftables/index.php/Main_Page](https://wiki.nftables.org/wiki-nftables/index.php/Main_Page)'
+  id: totrans-482
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'nftables examples: [https://wiki.gentoo.org/wiki/Nftables/Examples](https://wiki.gentoo.org/wiki/Nftables/Examples)'
+  id: totrans-483
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Answers
+  id: totrans-484
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: C
+  id: totrans-485
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: D
+  id: totrans-486
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: C
+  id: totrans-487
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: sudo iptables -L -v
+  id: totrans-488
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: sudo nft list ruleset
+  id: totrans-489
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: B
+  id: totrans-490
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: B, C, D, F
+  id: totrans-491
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: nftables
+  id: totrans-492
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
