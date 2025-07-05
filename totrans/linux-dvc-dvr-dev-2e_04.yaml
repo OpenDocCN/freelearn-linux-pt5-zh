@@ -3236,6 +3236,8 @@
   id: totrans-445
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核在每个 CPU 上维护正常优先级和高优先级任务的两个队列（每个 CPU 维护自己的低优先级和高优先级队列对）。`tasklet_schedule()`将任务添加到其所在
+    CPU 的正常优先级队列中，并调度相关的软中断，使用`TASKLET_SOFTIRQ`标志。使用`tasklet_hi_schedule()`时，任务被添加到高优先级队列中（仍然是所在队列），并调度相关的软中断，使用`HI_SOFTIRQ`标志。当任务被调度时，其`TASKLET_STATE_SCHED`标志被设置，并且任务被排队执行。在执行时，`TASKLET_STATE_RUN`标志被设置，`TASKLET_STATE_SCHED`状态被移除，这样任务在执行过程中可以重新调度，无论是由任务本身还是在中断处理程序中触发。
 - en: '`tasklet_schedule()` on a tasklet already scheduled and whose execution has
     not started yet will do nothing, resulting in the tasklet being executed only
     once. A tasklet can reschedule itself, and you can safely call `tasklet_schedule()`
@@ -3249,6 +3251,7 @@
   id: totrans-446
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于一个已经调度但还未开始执行的任务，调用`tasklet_schedule()`不会有任何效果，从而确保任务只执行一次。任务可以自行重新调度，并且你可以在任务中安全地调用`tasklet_schedule()`。高优先级任务总是比正常任务先执行，因此应小心使用，否则可能会增加系统延迟。停止任务非常简单，只需调用`tasklet_kill()`，如下代码片段所示，这将防止任务再次运行，或者如果任务当前已经被调度执行，则等待其完成后再终止。如果任务重新调度自己，在调用此函数之前，你应先阻止任务重新调度自己：
 - en: '[PRE94]'
   id: totrans-447
   prefs: []
@@ -3259,10 +3262,12 @@
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 编写你的任务处理程序
 - en: 'All that being said, let''s see some use cases, as follows:'
   id: totrans-449
   prefs: []
   type: TYPE_NORMAL
+  zh: 话虽如此，让我们来看一些使用案例，如下所示：
 - en: '[PRE95]'
   id: totrans-450
   prefs: []
@@ -3275,19 +3280,23 @@
   id: totrans-451
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，我们静态声明了我们的`my_tasklet`任务，并定义了当该任务被调度时应调用的函数。由于我们没有使用`_OLD`变体，因此我们将处理程序的原型定义为与任务对象中的`callback`字段相同。
 - en: Note
   id: totrans-452
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Tasklet API is deprecated, and you should consider using threaded IRQs instead.
   id: totrans-453
   prefs: []
   type: TYPE_NORMAL
+  zh: 任务 API 已被弃用，建议考虑使用线程化的 IRQ 代替。
 - en: Workqueues
   id: totrans-454
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 工作队列
 - en: Added since Linux kernel 2.6, the most used and simple deferring mechanism is
     a workqueue. As a deferring mechanism, it takes an opposite approach to the others
     we've seen, running only in a preemptible context. It is the only choice when
@@ -3298,11 +3307,13 @@
   id: totrans-455
   prefs: []
   type: TYPE_NORMAL
+  zh: 自 Linux 内核 2.6 以来添加的，最常用且简单的延迟机制是工作队列。作为一种延迟机制，它采取了与我们看到的其他机制相反的方式，只在可抢占的上下文中运行。它是唯一在需要休眠的情况下可用的选择，除非你隐式创建一个内核线程或使用线程化的中断。也就是说，工作队列是建立在内核线程之上的，出于这个简单的原因，本书中我们不会深入讲解内核线程。
 - en: 'At the core of the workqueue subsystem, there are two data structures that
     fairly well explain the concept behind this, as follows:'
   id: totrans-456
   prefs: []
   type: TYPE_NORMAL
+  zh: 在工作队列子系统的核心部分，有两个数据结构能够很好地解释其背后的概念，如下所示：
 - en: 'The work to be deferred (referred to as a work item), represented in the kernel
     by instances of `struct work_struct`, which indicates the handler function to
     run. If you need a delay before the work runs after it has been submitted to the
@@ -3314,6 +3325,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 要推迟的工作（称为工作项），在内核中通过 `struct work_struct` 实例表示，指示要执行的处理函数。如果你需要在工作提交到工作队列后延迟执行，内核提供了一个
+    `struct delayed_work` 实例。工作项是一个简单的结构，仅包含指向要调度的异步执行函数的指针。总结来说，我们可以列出两种工作项结构，如下所示：
 - en: A `work_struct` structure, which schedules a task to run as soon as possible
     when the system allows it
   id: totrans-458
@@ -3321,6 +3334,7 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`work_struct` 结构体，用于在系统允许时尽快调度任务运行。'
 - en: A `delayed_work` structure, which schedules a task to run after at least a given
     time interval
   id: totrans-459
@@ -3328,29 +3342,34 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`delayed_work` 结构体，用于在至少给定的时间间隔后调度任务运行。'
 - en: The workqueue itself, which is represented by a `struct workqueue_struct` instance
     and is the structure onto which work is placed. It is a queue of work items.
   id: totrans-460
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 工作队列本身，由 `struct workqueue_struct` 实例表示，是一个放置工作项的结构体。它是一个工作项的队列。
 - en: 'Apart from these data structures, there are two generic terms you should be
     familiar with, as follows:'
   id: totrans-461
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了这些数据结构之外，还有两个通用术语你应该熟悉，如下所示：
 - en: '**Worker threads**, which are dedicated threads that execute and pull the functions
     off the queue, one by one, one after the other.'
   id: totrans-462
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**工作线程**，这些线程专门执行并从队列中一个接一个地拉取函数。'
 - en: '**Worker pools**: This is a collection of worker threads (a thread pool) that
     are used to better manage the worker threads.'
   id: totrans-463
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**工作线程池**：这是一个工作线程的集合（线程池），用于更好地管理工作线程。'
 - en: 'The first step in using workqueues consists of creating a work item, represented
     by `struct work_struct` or `struct delayed_work` for the delayed variant, and
     defined in `linux/workqueue.h`. The kernel provides either a `DECLARE_WORK` macro
@@ -3361,6 +3380,9 @@
   id: totrans-464
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用工作队列的第一步是创建一个工作项，由 `struct work_struct` 或延迟变体的 `struct delayed_work` 表示，定义在
+    `linux/workqueue.h` 中。内核提供了 `DECLARE_WORK` 宏用于静态声明和初始化工作结构，或动态使用 `INIT_WORK` 宏。如果你需要延迟工作，可以使用
+    `INIT_DELAYED_WORK` 宏进行动态分配和初始化，或使用 `DECLARE_DELAYED_WORK` 进行静态声明。你可以在以下代码片段中看到这些宏的应用：
 - en: '[PRE96]'
   id: totrans-465
   prefs: []
@@ -3370,6 +3392,7 @@
   id: totrans-466
   prefs: []
   type: TYPE_NORMAL
+  zh: 下面是我们的工作项结构的样子：
 - en: '[PRE97]'
   id: totrans-467
   prefs: []
@@ -3380,6 +3403,7 @@
   id: totrans-468
   prefs: []
   type: TYPE_NORMAL
+  zh: '`func` 字段，类型为 `work_func_t`，告诉我们更多关于 `work` 函数头部的信息，如此处所示：'
 - en: '[PRE98]'
   id: totrans-469
   prefs: []
@@ -3393,6 +3417,8 @@
   id: totrans-470
   prefs: []
   type: TYPE_NORMAL
+  zh: '`work` 是一个输入参数，对应于需要调度的工作结构。如果你提交了延迟工作，它将对应于 `delayed_work.work` 字段。然后，需要使用
+    `to_delayed_work()` 函数来获取底层的延迟工作结构，如以下代码片段所示：'
 - en: '[PRE99]'
   id: totrans-471
   prefs: []
@@ -3404,6 +3430,7 @@
   id: totrans-472
   prefs: []
   type: TYPE_NORMAL
+  zh: 工作队列基础设施允许驱动程序创建一个专用的内核线程（工作队列），称为工作线程，用于执行工作函数。可以通过以下函数创建一个新的工作队列：
 - en: '[PRE100]'
   id: totrans-473
   prefs: []
@@ -3422,6 +3449,7 @@
   id: totrans-474
   prefs: []
   type: TYPE_NORMAL
+  zh: '`create_workqueue()`在系统的每个CPU上创建一个专用线程（工作者线程）。例如，在一个8核系统上，将创建8个内核线程来运行提交到您工作队列的工作。除非有充分的理由要为每个CPU创建一个线程，否则应优先选择单线程变体。在大多数情况下，一个单系统内核线程应该足够了。在这种情况下，您应该使用`create_singlethread_workqueue()`，它创建一个单线程工作队列。普通工作或延迟工作可以排队到同一个队列。为了在创建的工作队列上安排工作，您可以使用`queue_work()`或`queue_delayed_work()`，具体定义如下：'
 - en: '[PRE101]'
   id: totrans-475
   prefs: []
@@ -3435,6 +3463,7 @@
   id: totrans-476
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些函数如果工作已经在队列中，则返回`false`，否则返回`true`。`queue_dalayed_work()`用于安排稍后执行的工作项（延迟执行）。延迟的时间单位是一个节拍。但是，有API可以将毫秒和微秒转换为节拍，定义如下：
 - en: '[PRE102]'
   id: totrans-477
   prefs: []
@@ -3444,6 +3473,7 @@
   id: totrans-478
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下示例将使用200毫秒作为延迟：
 - en: '[PRE103]'
   id: totrans-479
   prefs: []
@@ -3457,6 +3487,7 @@
   id: totrans-480
   prefs: []
   type: TYPE_NORMAL
+  zh: 请不要期望此延迟精确，因为延迟将四舍五入为最接近的节拍值。因此，即使请求200微秒，也应该期望一个节拍。可以通过调用`cancel_delayed_work()`、`cancel_delayed_work_sync()`或`cancel_work_sync()`来取消提交的工作项。这些取消函数定义如下：
 - en: '[PRE104]'
   id: totrans-481
   prefs: []
@@ -3470,6 +3501,7 @@
   id: totrans-482
   prefs: []
   type: TYPE_NORMAL
+  zh: '`cancel_work_sync()`同步取消给定的工作——换句话说，它取消工作并等待其执行完成。内核保证此函数返回后，`work`不会在任何CPU上挂起或执行，即使工作迁移到另一个工作队列或重新排队。如果`work`处于挂起状态，则返回`true`，否则返回`false`。'
 - en: '`cancel_delayed_work()` asynchronously cancels a delayed entry. It returns
     `true` (actually, a nonzero value) if `dwork` was pending and canceled and `false`
     if it wasn''t pending, probably because it is actually running, and thus might
@@ -3480,11 +3512,13 @@
   id: totrans-483
   prefs: []
   type: TYPE_NORMAL
+  zh: '`cancel_delayed_work()`异步取消延迟条目。如果`dwork`处于挂起状态并已取消，则返回`true`（实际上是非零值），如果未挂起，则返回`false`，可能是因为实际上正在运行，因此在`cancel_delayed_work()`返回后可能仍在运行。为确保工作确实运行到结束，您可以使用`flush_workqueue()`来刷新给定队列中的每个工作项，或者使用`cancel_delayed_work_sync()`，这是`cancel_delayed_work()`的同步版本。'
 - en: 'When you are done with a workqueue, you should destroy it with `destroy_workqueue()`,
     as illustrated here:'
   id: totrans-484
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成工作队列后，应使用`destroy_workqueue()`销毁它，如下所示：
 - en: '[PRE105]'
   id: totrans-485
   prefs: []
@@ -3495,11 +3529,13 @@
   id: totrans-486
   prefs: []
   type: TYPE_NORMAL
+  zh: 在等待任何挂起的工作执行时，`_sync`变体函数会休眠，因此只能从进程上下文中调用。
 - en: Kernel-global workqueue – the shared queue
   id: totrans-487
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 内核全局工作队列——共享队列
 - en: In most situations, your code does not necessarily need the performance of its
     own dedicated set of threads, and because `create_workqueue()` creates one worker
     thread for each CPU, it may be a bad idea to use it on very large multi-CPU systems.
@@ -3509,6 +3545,7 @@
   id: totrans-488
   prefs: []
   type: TYPE_NORMAL
+  zh: 在大多数情况下，您的代码并不一定需要自己专用线程集合的性能，并且因为`create_workqueue()`为每个CPU创建一个工作线程，因此在非常大的多CPU系统上使用它可能不是一个好主意。您可能想要使用内核共享队列，该队列已经预先分配了一组内核线程（在启动期间，通过`workqueue_init_early()`函数）来运行工作。
 - en: This kernel-global workqueue is the so-called `system_wq` workqueue, defined
     in `kernel/workqueue.c`. There is actually one instance per CPU, each backed by
     a dedicated thread named `events/n`, where `n` is the processor number (or index)
@@ -3516,11 +3553,13 @@
   id: totrans-489
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个内核全局工作队列就是所谓的`system_wq`工作队列，在`kernel/workqueue.c`中定义。实际上，每个CPU都有一个实例，每个实例由一个名为`events/n`的专用线程支持，其中`n`是绑定该线程的处理器编号（或索引）。
 - en: 'You can queue a work item in the default system workqueue using one of the
     following functions:'
   id: totrans-490
   prefs: []
   type: TYPE_NORMAL
+  zh: 您可以使用以下函数之一将工作项排入默认系统工作队列：
 - en: '[PRE106]'
   id: totrans-491
   prefs: []
@@ -3536,6 +3575,7 @@
   id: totrans-492
   prefs: []
   type: TYPE_NORMAL
+  zh: '`schedule_work()`会立即调度工作，并在当前处理器的工作线程唤醒后尽快执行该工作。使用`schedule_delayed_work()`时，工作将在未来的某个时间被放入队列，延迟计时器触发后才会执行。`_on`变体用于在特定的CPU上调度工作（不一定是当前的CPU）。这些函数中的每一个都会将工作排入系统的共享工作队列`system_wq`，该队列在`kernel/workqueue.c`中定义如下：'
 - en: '[PRE107]'
   id: totrans-493
   prefs: []
@@ -3547,11 +3587,13 @@
   id: totrans-494
   prefs: []
   type: TYPE_NORMAL
+  zh: 您还应该注意，由于该系统工作队列是共享的，因此不应将运行时间过长的工作排入队列，否则可能会减慢其他竞争工作，从而使它们在执行前等待的时间比应有的更长。
 - en: 'In order to flush the kernel-global workqueue—that is, ensure a given batch
     of work is completed—we can use `flush_scheduled_work()`, as follows:'
   id: totrans-495
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了刷新内核全局工作队列——即确保给定的工作批次完成——我们可以使用`flush_scheduled_work()`，如下所示：
 - en: '[PRE108]'
   id: totrans-496
   prefs: []
@@ -3565,31 +3607,37 @@
   id: totrans-497
   prefs: []
   type: TYPE_NORMAL
+  zh: '`flush_scheduled_work()`是一个包装器，它在`system_wq`上调用`flush_workqueue()`。请注意，`system_wq`工作队列中可能有您没有提交且无法控制的工作。因此，完全刷新此工作队列是过度的，建议使用`cancel_delayed_work_sync()`或`cancel_work_sync()`来代替。'
 - en: Note
   id: totrans-498
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Unless you have a strong reason for creating a dedicated thread, the default
     (kernel-global) thread is preferred.
   id: totrans-499
   prefs: []
   type: TYPE_NORMAL
+  zh: 除非有强烈的理由创建专用线程，否则推荐使用默认的（内核全局）线程。
 - en: Workqueues' new generation
   id: totrans-500
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 新一代工作队列
 - en: 'The original (now legacy) workqueue implementation used two kinds of workqueues:
     those with a single thread system-wide, and those with a thread per CPU. However,
     for a growing number of CPUs, this led to some limitations, as outlined here:'
   id: totrans-501
   prefs: []
   type: TYPE_NORMAL
+  zh: 原始（现在的遗留）工作队列实现使用了两种类型的工作队列：一种是整个系统共享单个线程，另一种是每个CPU都有一个线程。然而，对于越来越多的CPU，这导致了一些局限性，具体如下：
 - en: On very large systems, the kernel could run out of `init` process started.
   id: totrans-502
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在非常大的系统上，内核可能会耗尽`init`进程启动所需的资源。
 - en: Multithreaded workqueues provided poor concurrency management as their threads
     compete for the CPU with each other threads on the system. As there were more
     CPU contenders, this introduced some overhead—that is, more context switches than
@@ -3598,11 +3646,13 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 多线程工作队列提供了较差的并发管理，因为它们的线程与系统上其他线程争夺CPU。当CPU竞争者增多时，这会引入一些开销——也就是比必要的更多的上下文切换。
 - en: The consumption of far more resources than were really needed.
   id: totrans-504
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 消耗了远超实际需要的资源。
 - en: Moreover, subsystems that needed a dynamic or fine-grained level of concurrency
     had to implement their own thread pools. As a result of this, a new workqueue
     API has been designed, and the legacy workqueue API (`create_workqueue()`, `create_singlethread_workqueue()`,
@@ -3614,11 +3664,15 @@
   id: totrans-505
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，需要动态或细粒度并发控制的子系统必须实现自己的线程池。因此，设计了新的工作队列 API，传统的工作队列 API（`create_workqueue()`、`create_singlethread_workqueue()`
+    和 `create_freezable_workqueue()`）将被移除，尽管它们实际上是围绕新 API 设计的封装，所谓的**并发管理工作队列**（**cmwq**），使用由所有工作队列共享的每个
+    CPU 的工作池，从而自动提供动态且灵活的并发级别，抽象化这些细节供 API 用户使用。
 - en: cmwq
   id: totrans-506
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: cmwq
 - en: 'cmwq is an upgrade of workqueue APIs. Using this new API implies you are choosing
     between the `alloc_workqueue()` function and the `alloc_ordered_workqueue()` macro
     to create a workqueue. They both allocate a workqueue and return a pointer to
@@ -3628,6 +3682,9 @@
   id: totrans-507
   prefs: []
   type: TYPE_NORMAL
+  zh: cmwq 是工作队列 API 的升级版。使用这个新 API 意味着你在 `alloc_workqueue()` 函数和 `alloc_ordered_workqueue()`
+    宏之间做出选择来创建一个工作队列。它们都分配一个工作队列，并在成功时返回指向它的指针，在失败时返回 `NULL`。返回的工作队列可以通过 `destroy_workqueue()`
+    函数释放。你可以在以下代码片段中看到代码的示例：
 - en: '[PRE109]'
   id: totrans-508
   prefs: []
@@ -3638,6 +3695,7 @@
   id: totrans-509
   prefs: []
   type: TYPE_NORMAL
+  zh: '`fmt` 是工作队列名称的 `printf` 格式，`args...` 是 `fmt` 的参数。'
 - en: '`destroy_workqueue()` is to be called on the workqueue once you are done with
     it. All works currently pending will be done first before the kernel truly destroys
     the workqueue. `alloc_workqueue()` creates a workqueue based on `max_active`,
@@ -3651,12 +3709,16 @@
   id: totrans-510
   prefs: []
   type: TYPE_NORMAL
+  zh: '`destroy_workqueue()` 在你完成工作队列的使用后需要调用。当前待处理的所有工作会首先完成，然后内核才会真正销毁工作队列。`alloc_workqueue()`
+    基于 `max_active` 创建一个工作队列，`max_active` 定义了并发级别，通过限制该工作队列在任何给定 CPU 上同时执行的工作（任务，实际上是）数量。例如，`max_active`
+    值为 5 时，意味着每个 CPU 上最多只能同时执行 5 个该工作队列的工作项。另一方面，`alloc_ordered_workqueue()` 创建一个按队列顺序逐个处理每个工作项的工作队列（即**先进先出**（**FIFO**）顺序）。'
 - en: '`flags` controls how and when work items are queued, assigned execution resources,
     scheduled, and executed. There are various flags used in this new API on which
     we should spend some time, as follows:'
   id: totrans-511
   prefs: []
   type: TYPE_NORMAL
+  zh: '`flags` 控制工作项如何以及何时排队、分配执行资源、调度和执行。在这个新的 API 中使用了各种标志，我们应该花些时间讨论一下，具体如下：'
 - en: '`WQ_UNBOUND`: Legacy workqueues had a worker thread per CPU and were designed
     to run tasks on the CPU where they were submitted. The kernel scheduler had no
     choice but to always schedule a worker on the CPU on which it was defined. With
@@ -3671,6 +3733,10 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`WQ_UNBOUND`：传统的工作队列每个 CPU 有一个工作线程，并设计为在提交任务的 CPU 上运行任务。内核调度器别无选择，只能始终将工作线程调度到定义它的
+    CPU 上。采用这种方法时，即便是单个工作队列也能够防止 CPU 处于空闲状态并被关闭，从而导致增加的功耗或不良的调度策略。`WQ_UNBOUND` 关闭了上述行为。工作项不再绑定到某个
+    CPU 上，因此称为**无绑定工作队列**。不再存在本地性，调度器可以根据需要在任何 CPU 上重新调度工作线程。现在，调度器拥有最终决定权，可以平衡 CPU
+    负载，尤其对于长时间运行和有时需要大量 CPU 资源的任务。'
 - en: '`WQ_MEM_RECLAIM`: This flag is to be set for workqueues that need to guarantee
     forward progress during the memory reclaim path (when free memory is running dangerously
     low; the system is said to be under memory pressure). In this case, `GFP_KERNEL`
@@ -3682,6 +3748,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`WQ_MEM_RECLAIM`：这个标志需要在那些需要在内存回收路径中保证前进进度的工作队列中设置（当空闲内存低得危险时，系统处于内存压力状态）。在这种情况下，`GFP_KERNEL`分配可能会阻塞并导致整个工作队列死锁。工作队列随后将保证至少有一个准备好的工作线程——一个所谓的“救援线程”——为其预留，无论内存压力如何，以便它能够向前推进。对于每个设置了此标志的工作队列，都会分配一个救援线程。'
 - en: 'Let''s consider a situation where we have three work items (`w1`, `w2`, and
     `w3`) in our workqueue `W`. `w1` does some work and then waits for `w3` to complete
     (let''s say it depends on the computation result of `w3`). Afterward, `w2` (which
@@ -3699,16 +3766,19 @@
   id: totrans-514
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设我们在工作队列`W`中有三个工作项（`w1`、`w2` 和 `w3`）。`w1`执行一些工作后，等待`w3`完成（假设它依赖于`w3`的计算结果）。之后，`w2`（与其他工作项无关）进行一些`kmalloc()`分配（`GFP_KERNEL`），可是——内存不足。在`w2`被阻塞时，它仍然占用`W`的工作队列。这导致`w3`无法运行，尽管`w2`与`w3`之间没有依赖关系。由于内存不足，无法为`w3`分配新线程。预分配的线程肯定能解决这个问题，方法不是神奇地为`w2`分配内存，而是通过运行`w3`来让`w1`继续它的工作，以此类推。只要有足够的内存，`w2`会尽快继续其进程。这个预分配的线程，如果你认为工作队列可能会在内存回收路径中使用，就是所谓的`WQ_MEM_RECLAIM`标志。从这次提交开始，该标志取代了旧有的`WQ_RESCUER`标志：[https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=493008a8e475771a2126e0ce95a73e35b371d277](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=493008a8e475771a2126e0ce95a73e35b371d277)。
 - en: Note
   id: totrans-515
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Memory reclaim is a Linux mechanism on a memory allocation path that consists
     of allocating memory only after throwing the current content of that memory somewhere
     else.
   id: totrans-516
   prefs: []
   type: TYPE_NORMAL
+  zh: 内存回收是Linux在内存分配路径上的一个机制，其操作是：在将当前内存的内容移动到其他地方后，才会进行内存分配。
 - en: '`WQ_FREEZABLE`: This flag is used for power-management purposes. A workqueue
     with this flag set will be frozen when the system is suspended or hibernates.
     On the freezing path, all current work items of the worker(s) will be processed.
@@ -3728,6 +3798,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`WQ_FREEZABLE`：此标志用于电源管理目的。设置此标志的工作队列将在系统挂起或休眠时被冻结。在冻结路径上，所有当前工作项将被处理。当冻结完成后，系统解冻之前将不会执行任何新工作项。与文件系统相关的工作队列可能会使用此标志（即确保对文件的修改被推送到磁盘，或者在冻结路径上创建休眠映像，并且在创建休眠映像后，磁盘上不再进行任何修改。在这种情况下，不可冻结项或做法不同可能会导致文件系统损坏。例如，所有`fs/xfs/xfs_super.c`）都确保一旦冻结基础设施冻结内核线程并创建休眠映像，磁盘上不再进行任何更改。如果你的工作队列可以作为系统的休眠/挂起/恢复过程的一部分运行任务，绝对不应该设置此标志。有关此主题的更多信息，请参见`Documentation/power/freezing-of-tasks.txt`，并查看`freeze_workqueues_begin()`和`thaw_workqueues()`内核函数。'
 - en: '`WQ_HIGHPRI`: Tasks with this flag set run immediately and do not wait for
     the CPU to become available. This flag is used for workqueues that queue work
     items requiring a high priority for execution. Such workqueues have worker threads
@@ -3744,6 +3815,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`WQ_HIGHPRI`：设置此标志的任务会立即运行，并且不会等待CPU变得可用。此标志用于排队需要高优先级执行的工作项的工作队列。这些工作队列的工作线程具有较高的优先级（较低的nice值）。在早期的cmwq中，高优先级工作项会被排队到全局普通优先级工作列表的头部，以便它们能立即运行。如今，普通优先级和高优先级工作队列之间没有交互，因为每个工作队列都有自己的工作列表和自己的工作池。高优先级工作队列的工作项被排队到目标CPU的高优先级工作池中。此工作队列中的任务不应阻塞太多。如果你不希望你的工作项与普通或较低优先级的任务竞争CPU资源，可以使用此标志。例如，Crypto和块设备子系统就使用此标志。'
 - en: '`WQ_CPU_INTENSIVE`: Work items of CPU-intensive workqueues may burn a lot of
     CPU cycles and do not participate in workqueue concurrency management. Instead,
     as with any other task, their execution is regulated by the system scheduler,
@@ -3758,29 +3830,35 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`WQ_CPU_INTENSIVE`：CPU密集型工作队列的工作项可能会消耗大量CPU周期，并且不参与工作队列的并发管理。相反，就像任何其他任务一样，它们的执行由系统调度程序调控，这使得此标志对于可能消耗大量CPU时间的绑定工作项非常有用。尽管系统调度程序控制它们的执行，但并发管理控制它们执行的开始，且可运行的非CPU密集型工作项可能会导致CPU密集型工作项的延迟。`crypto`和`dm-crypt`子系统使用此类工作队列。为了防止此类任务延迟其他非CPU密集型工作项的执行，在工作队列代码确定CPU是否可用时，它们将不被考虑。'
 - en: 'To be compliant and feature-compatible with the old workqueue API, the following
     mappings are done to keep this API compatible with the original one:'
   id: totrans-520
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了与旧的工作队列 API 保持兼容并具备功能兼容性，进行了以下映射，以保持该 API 与原始 API 的兼容性：
 - en: '`create_workqueue(name)` is mapped onto `alloc_workqueue(name,WQ_MEM_RECLAIM,
     1)`'
   id: totrans-521
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`create_workqueue(name)`映射为`alloc_workqueue(name,WQ_MEM_RECLAIM, 1)`'
 - en: '`create_singlethread_workqueue(name)` is mapped onto `alloc_ordered_workqueue(name,
     WQ_MEM_RECLAIM)`'
   id: totrans-522
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`create_singlethread_workqueue(name)`已映射为`alloc_ordered_workqueue(name, WQ_MEM_RECLAIM)`'
 - en: '`create_freezable_workqueue(name)` is mapped onto `alloc_workqueue(name,WQ_FREEZABLE
     | WQ_UNBOUND|WQ_MEM_RECLAIM, 1)`'
   id: totrans-523
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`create_freezable_workqueue(name)`映射为`alloc_workqueue(name,WQ_FREEZABLE | WQ_UNBOUND|WQ_MEM_RECLAIM,
+    1)`'
 - en: 'To summarize, `alloc_ordered_workqueue()` actually replaces `create_freezable_workqueue()`
     and `create_singlethread_workqueue()` (as per this commit: [https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=81dcaf6516d8](https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=81dcaf6516d8)).
     Workqueues allocated with `alloc_ordered_workqueue()` are unbound and have `max_active`
@@ -3788,6 +3866,7 @@
   id: totrans-524
   prefs: []
   type: TYPE_NORMAL
+  zh: 总结来说，`alloc_ordered_workqueue()`实际上取代了`create_freezable_workqueue()`和`create_singlethread_workqueue()`（根据此提交：[https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=81dcaf6516d8](https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=81dcaf6516d8)）。通过`alloc_ordered_workqueue()`分配的工作队列是无绑定的，并且`max_active`被设置为`1`。
 - en: When it comes to scheduling items in a workqueue, the work items that have been
     queued to a specific CPU using `queue_work_on()` will execute on that CPU. Work
     items queued via `queue_work()` will prefer the queueing CPU, but locality is
@@ -3795,10 +3874,13 @@
   id: totrans-525
   prefs: []
   type: TYPE_NORMAL
+  zh: 当调度工作队列中的任务时，使用`queue_work_on()`将工作项排队到特定 CPU 上的任务将在该 CPU 上执行。通过`queue_work()`排队的工作项会优先选择排队的
+    CPU，但无法保证局部性。
 - en: Note
   id: totrans-526
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'Note that `schedule_work()` is a wrapper that calls `queue_work()` on the system
     workqueue (`system_wq`), while `schedule_work_on()` is a wrapper around `queue_work_on()`.
     Also, keep in mind the following: `system_wq = alloc_workqueue("events", 0, 0);`.
@@ -3807,6 +3889,8 @@
   id: totrans-527
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，`schedule_work()`是一个包装器，调用的是系统工作队列（`system_wq`）上的`queue_work()`，而`schedule_work_on()`是`queue_work_on()`的包装器。此外，记住以下内容：`system_wq
+    = alloc_workqueue("events", 0, 0);`。你可以查看内核源代码中的`kernel/workqueue.c`文件中的`workqueue_init_early()`函数，了解其他系统级工作队列是如何创建的。
 - en: We are done with the new Linux kernel workqueue management implementation—that
     is, cmwq. Because workqueues can be used to defer works from interrupt handlers,
     we can move on to the next section and learn how to handle interrupts from the
@@ -3814,11 +3898,14 @@
   id: totrans-528
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们已经完成了新的 Linux 内核工作队列管理实现，即 cmwq。由于工作队列可以用来延迟中断处理程序中的工作任务，因此我们可以继续学习下一部分，了解如何处理
+    Linux 内核中的中断。
 - en: Kernel interrupt handling
   id: totrans-529
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 内核中断处理
 - en: Apart from servicing processes and user requests, another job of the Linux kernel
     is managing and speaking with hardware. This is either from the CPU to the device
     or from the device to the CPU and is achieved by means of interrupts. An interrupt
@@ -3829,11 +3916,15 @@
   id: totrans-530
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了服务进程和用户请求外，Linux 内核的另一个任务是管理硬件并与硬件通信。这是通过中断实现的，可以是从 CPU 到设备的中断，也可以是从设备到 CPU
+    的中断。中断是外部硬件设备向处理器发送的信号，请求立即处理。在中断对 CPU 可见之前，必须通过中断控制器启用该中断。中断控制器本身就是一个设备，主要任务是将中断路由到
+    CPU。
 - en: The Linux kernel allows the provision of handlers for interrupts we are interested
     in so that when those interrupts are triggered, our handlers are executed.
   id: totrans-531
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 内核允许我们为感兴趣的中断提供处理程序，以便当这些中断被触发时，我们的处理程序会执行。
 - en: An interrupt is how a device halts the kernel, telling it that something interesting
     or important has happened. These are called IRQs on Linux systems. The main advantage
     interrupts offer is to avoid device polling. It is up to the device to tell if
@@ -3841,23 +3932,27 @@
   id: totrans-532
   prefs: []
   type: TYPE_NORMAL
+  zh: 中断是设备停止内核并告诉它发生了有趣或重要的事情的方式。这些在 Linux 系统中称为 IRQ（中断请求）。中断的主要优势在于避免了设备轮询。由设备决定其状态是否发生变化，而不是由我们去轮询它。
 - en: To be notified when an interrupt occurs, you need to register with that IRQ,
     providing a function called an interrupt handler that will be called every time
     that interrupt is raised.
   id: totrans-533
   prefs: []
   type: TYPE_NORMAL
+  zh: 若要在中断发生时收到通知，您需要注册该 IRQ，提供一个称为中断处理程序的函数，该函数将在每次该中断被触发时被调用。
 - en: Designing and registering an interrupt handler
   id: totrans-534
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 设计和注册中断处理程序
 - en: 'When an interrupt handler is executed, it runs with interrupts disabled on
     the local CPU. This involves respecting certain constraints while designing an
     **interrupt service routine** (**ISR**), as outlined here:'
   id: totrans-535
   prefs: []
   type: TYPE_NORMAL
+  zh: 当一个中断处理程序被执行时，它会在本地 CPU 上禁用中断的情况下运行。这就涉及到在设计**中断服务例程**（**ISR**）时需要遵守某些约束，如下所示：
 - en: '**Execution time**: As IRQ handlers run with interrupts disabled on the local
     CPU, the code must be as short and small as possible and fast enough to assure
     a fast re-enabling of the previously disabled CPU-local interrupts in order not
@@ -3867,6 +3962,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**执行时间**：由于 IRQ 处理程序是在本地 CPU 上禁用中断的情况下运行，因此代码必须尽可能简短、小巧，并且足够快速，以确保能够快速重新启用之前禁用的本地
+    CPU 中断，以免错过任何进一步发生的 IRQ。耗时的 IRQ 处理程序可能会显著改变系统的实时特性并使其变慢。'
 - en: '**Execution context**: Since interrupt handlers are executed in an atomic context,
     sleeping (or other mechanisms that may sleep—such as mutexes—copying data from
     kernel to user space or vice versa, and so on) is forbidden. Any part of the code
@@ -3876,6 +3973,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**执行上下文**：由于中断处理程序是在原子上下文中执行的，因此禁止进行睡眠（或可能导致睡眠的其他机制——如互斥锁、从内核到用户空间或反向复制数据等）。任何需要或涉及睡眠的代码必须推迟到另一个、更安全的上下文中（即进程上下文）。'
 - en: 'An IRQ handler needs to be given two arguments: the interrupt line to install
     the handler for, and a **unique device ID** (**UDI**) of the peripheral (mostly
     used as a context data structure—that is, a pointer to the per-device or private
@@ -3883,6 +3981,7 @@
   id: totrans-538
   prefs: []
   type: TYPE_NORMAL
+  zh: IRQ 处理程序需要传递两个参数：安装处理程序的中断线路和外设的**唯一设备 ID**（**UDI**）（通常作为上下文数据结构使用——即指向相关硬件设备的每设备或私有结构的指针），如下所示：
 - en: '[PRE110]'
   id: totrans-539
   prefs: []
@@ -3893,6 +3992,8 @@
   id: totrans-540
   prefs: []
   type: TYPE_NORMAL
+  zh: 设备驱动程序希望为给定的 IRQ 注册中断处理程序时，应调用 `devm_request_irq()`，该函数在 `<linux/interrupt.h>`
+    中定义，如下所示：
 - en: '[PRE111]'
   id: totrans-541
   prefs: []
@@ -3914,12 +4015,16 @@
   id: totrans-542
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述函数参数列表中的 `dev` 是负责 IRQ 线路的设备，`irq` 代表中断线路（即发出中断的设备的中断号），用于注册 `handler`。在验证请求之前，内核将确保请求的中断是有效的，并且不会已经分配给另一个设备，除非两个设备都请求共享该
+    `irq` 线路（借助 `flags`）。`handler` 是指向中断处理程序的函数指针，`flags` 代表中断标志。`name` 是 `dev`，每个注册的处理程序都应具有唯一的
+    `name`，并且对于共享 IRQ 线路来说不能为 `NULL`，因为它是内核 IRQ 核心用来识别设备的标识符。常见的使用方式是提供指向设备结构的指针或指向任何每设备（并且可能对处理程序有用的）数据结构的指针，因为当中断发生时，中断线路（`irq`）和此参数都会传递给注册的处理程序，后者可以将此数据作为上下文数据用于进一步处理。
 - en: '`flags` mangles the state or the behavior of the IRQ line or its handler by
     means of the following masks, which can be OR''ed to form a final desired bitmask
     according to your needs:'
   id: totrans-543
   prefs: []
   type: TYPE_NORMAL
+  zh: '`flags` 通过以下掩码来改变 IRQ 线路或其处理程序的状态或行为，这些掩码可以通过按位“或”运算来形成最终所需的位掩码，以满足您的需求：'
 - en: '[PRE112]'
   id: totrans-544
   prefs: []
@@ -3931,6 +4036,7 @@
   id: totrans-545
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，`flags` 也可以是 `0`。接下来我们将解释一些重要的标志——其余的请用户自行探索 `include/linux/interrupt.h`，以下是我们将详细讨论的标志：
 - en: '`IRQF_NOBALANCING` excludes the interrupt from IRQ balancing, which is a mechanism
     that consists of distributing/relocating interrupts across CPUs, with a goal of
     increasing performance. It is kind of preventing the CPU affinity of that IRQ
@@ -3941,6 +4047,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQF_NOBALANCING` 排除该中断不参与 IRQ 平衡，这是一个将中断分布/重新定位到不同 CPU 上的机制，旨在提高性能。它相当于防止该
+    IRQ 的 CPU 亲和性被更改。这个标志在多核系统上才有意义，可能有助于为时钟源或时钟事件设备提供灵活的设置，避免将事件错误地归属到错误的核心。'
 - en: '`IRQF_IRQPOLL`: This flag allows the implementation of an `irqpoll` mechanism,
     intended to fix interrupt problems, meaning this handler should be added to the
     list of known interrupt handlers that can be looked for when a given interrupt
@@ -3949,6 +4057,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQF_IRQPOLL`：该标志允许实现一个 `irqpoll` 机制，旨在修复中断问题，意味着该处理程序应该被添加到已知的中断处理程序列表中，当给定的中断没有被处理时，可以查看该列表。'
 - en: '`IRQF_ONESHOT`: Normally, the actual interrupt line being serviced is re-enabled
     after its hardirq handler completes, whether it awakes a threaded handler or not.
     This flag keeps the interrupt line disabled after the hardirq handler finishes.
@@ -3959,6 +4068,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQF_ONESHOT`：通常，实际的中断线路在其硬中断处理程序完成后会被重新启用，无论它是否唤醒线程化的处理程序。这个标志会在硬中断处理程序完成后保持中断线路禁用。它必须在线程化中断上设置（稍后我们会讨论），对于这些中断，必须保持中断线路禁用，直到线程化的处理程序完成，之后才会重新启用。'
 - en: '`IRQF_NO_SUSPEND` does not disable the IRQ during system hibernation/suspension.
     It does mean the interrupt is able to wake up the system from a suspended state.
     Such IRQs may be timer interrupts that may trigger and need to be handled even
@@ -3970,12 +4080,16 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQF_NO_SUSPEND` 不会在系统休眠/挂起期间禁用 IRQ。它的意思是中断能够唤醒处于挂起状态的系统。这种 IRQ 可能是定时器中断，甚至在系统挂起期间也可能触发并需要处理。整个
+    IRQ 线路都受此标志的影响，因此如果 IRQ 是共享的，每个为该共享线路注册的处理程序都会执行，而不仅仅是安装此标志的处理程序。你应尽量避免同时使用 `IRQF_NO_SUSPEND`
+    和 `IRQF_SHARED`。'
 - en: '`IRQF_FORCE_RESUME` enables the IRQ in the system resume path even if `IRQF_NO_SUSPEND`
     is set.'
   id: totrans-550
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQF_FORCE_RESUME` 即使在设置了 `IRQF_NO_SUSPEND` 的情况下，也会启用系统恢复路径中的 IRQ。'
 - en: '`IRQF_NO_THREAD` prevents the interrupt handler from being threaded. This flag
     overrides the kernel `threadirqs` command-line option that forces every interrupt
     to be threaded. This flag has been introduced to address the non-threadability
@@ -3985,6 +4099,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQF_NO_THREAD` 防止中断处理程序被线程化。这个标志会覆盖内核的 `threadirqs` 命令行选项，该选项强制所有中断都进行线程化。此标志的引入是为了解决一些中断（例如定时器中断，即使在所有中断处理程序都强制线程化时，也无法线程化）无法线程化的问题。'
 - en: '`IRQF_TIMER` marks this handler as being specific to system timer interrupts.
     It helps not to disable the timer IRQ during system suspension to ensure normal
     resumption and not thread them when full preemption (that is, `PREEMPT_RT`) is
@@ -3993,6 +4108,8 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQF_TIMER` 将该处理程序标记为特定于系统定时器中断。它有助于在系统挂起期间不禁用定时器 IRQ，以确保正常恢复，并在启用完全抢占（即 `PREEMPT_RT`）时不对它们进行线程化。它只是
+    `IRQF_NO_SUSPEND | IRQF_NO_THREAD` 的别名。'
 - en: '`IRQF_EARLY_RESUME` resumes IRQ early at resume time of **system core** (**syscore**)
     operations instead of at device resume time. The following link points to the
     message of the commit introducing its support: [https://lkml.org/lkml/2013/11/20/89](https://lkml.org/lkml/2013/11/20/89).'
@@ -4000,6 +4117,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQF_EARLY_RESUME` 在 **系统核心**（**syscore**）操作的恢复时间点，而不是在设备恢复时，提前恢复 IRQ。以下链接指向引入该支持的提交消息：[https://lkml.org/lkml/2013/11/20/89](https://lkml.org/lkml/2013/11/20/89)。'
 - en: '`IRQF_SHARED` allows for the sharing of the interrupt line among several devices.
     However, each device driver that needs to share the given interrupt line must
     set with this flag; otherwise, the handler registration will fail.'
@@ -4007,12 +4125,14 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQF_SHARED`允许多个设备共享中断线。但是，所有需要共享该中断线的设备驱动程序必须设置此标志；否则，处理程序注册将失败。'
 - en: 'We must also consider the `irqreturn_t` return type of interrupt handlers since
     it may involve further actions after the return of the handler. Possible return
     values are listed here:'
   id: totrans-555
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还必须考虑中断处理程序的`irqreturn_t`返回类型，因为它可能涉及在处理程序返回后进行进一步的操作。可能的返回值如下所示：
 - en: '`IRQ_NONE`: On a shared interrupt line, once the interrupt occurs, the kernel
     IRQ core successively walks through handlers registered for this line and executes
     them in the order they have been registered. The driver then has the responsibility
@@ -4029,6 +4149,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQ_NONE`：在共享中断线中，一旦发生中断，内核的IRQ核心会依次遍历为该线注册的处理程序，并按注册顺序执行它们。然后，驱动程序有责任检查是否是其设备发出了中断。如果中断不是来自其设备，它必须返回`IRQ_NONE`，以指示内核调用下一个注册的中断处理程序。此返回值通常用于共享中断线，因为它通知内核该中断不是来自我们的设备。但是，如果给定IRQ线上的100,000个中断中有99,900个没有得到处理，内核就会假设该IRQ某种程度上已卡住，抛出诊断信息，并尝试关闭该IRQ。关于这方面的更多信息，您可以查看内核源代码中的`__report_bad_irq()`函数。'
 - en: '`IRQ_HANDLED`: This value should be returned if the interrupt has been handled
     successfully. On a threaded IRQ, this value does acknowledge the interrupt (at
     a controller level) without waking the thread handler up.'
@@ -4036,6 +4157,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQ_HANDLED`：如果中断已成功处理，则应返回此值。在线程中断中，这个值表示在控制器级别确认了中断（而不会唤醒线程处理程序）。'
 - en: '`IRQ_WAKE_THREAD`: On a thread IRQ handler, this value must be returned by
     the hard-IRQ handler to wake the handler thread. In this case, `IRQ_HANDLED` must
     only be returned by that threaded handler, previously registered with `devm_request_threaded_irq()`.
@@ -4044,22 +4166,26 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IRQ_WAKE_THREAD`：在线程中断处理程序中，硬中断处理程序必须返回此值以唤醒处理程序线程。在这种情况下，只有在先前通过`devm_request_threaded_irq()`注册的线程处理程序中，才会返回`IRQ_HANDLED`。我们将在本章后面讨论这一点。'
 - en: Note
   id: totrans-559
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 注意
 - en: You should never re-enable IRQs from within your IRQ handler as this would involve
     allowing "interrupt reentrancy".
   id: totrans-560
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 您绝不应该在中断处理程序内重新启用IRQ，因为这会允许“中断重入”。
 - en: '`devm_request_irq()` is the managed version of `request_irq()`, defined as
     follows:'
   id: totrans-561
   prefs: []
   type: TYPE_NORMAL
+  zh: '`devm_request_irq()`是`request_irq()`的受管版本，定义如下：'
 - en: '[PRE113]'
   id: totrans-562
   prefs: []
@@ -4073,6 +4199,7 @@
   id: totrans-563
   prefs: []
   type: TYPE_NORMAL
+  zh: 它们的变量含义相同。如果驱动程序使用了受管版本，IRQ核心将负责释放资源。在其他情况下，例如在卸载路径或设备离开时，驱动程序必须通过使用`free_irq()`来注销中断处理程序，从而释放IRQ资源，定义如下：
 - en: '[PRE114]'
   id: totrans-564
   prefs: []
@@ -4087,11 +4214,14 @@
   id: totrans-565
   prefs: []
   type: TYPE_NORMAL
+  zh: '`free_irq()`会移除处理程序（当涉及共享中断时，通过`dev_id`来标识）并禁用中断线。如果中断线是共享的，处理程序仅从该`irq`的处理程序列表中移除，并且当最后一个处理程序被移除时，将来会禁用中断线。此外，如果可能，您的代码必须确保在调用此函数之前，实际禁用驱动卡上的中断，因为遗漏这一步可能会导致伪中断（spurious
+    IRQ）。'
 - en: 'There are a few things worth mentioning here about interrupts that you should
     never forget, as follows:'
   id: totrans-566
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于中断，有一些事项值得在此提及，您永远不应忘记，具体如下：
 - en: On Linux systems, when the handler of an IRQ is being executed by a CPU, all
     interrupts are disabled on that CPU and the interrupt being serviced is masked
     on all the other cores. This means interrupt handlers need not be reentrant because
@@ -4105,6 +4235,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在Linux系统中，当CPU正在执行IRQ的处理程序时，所有中断都在该CPU上被禁用，且正在服务的中断会在其他所有核心上被屏蔽。这意味着中断处理程序不需要具备可重入性，因为在当前处理程序完成之前，永远不会接收到相同的中断。然而，除了正在服务的中断，其他所有中断都保持启用（或者我们可以说，保持不变）在其他核心上，因此其他中断会继续被服务，尽管当前的中断线总是被禁用，且本地CPU上的进一步中断也被禁用。结果，相同的中断处理程序永远不会并发执行来处理嵌套的中断。这使得编写中断处理程序变得更加容易。
 - en: Critical regions that need to run with interrupts disabled should be limited
     as much as possible. To remember this, tell yourself that your interrupt handler
     has interrupted other code and needs to give the CPU back.
@@ -4112,6 +4243,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 需要禁用中断运行的关键区域应尽可能限制。为了记住这一点，可以告诉自己，中断处理程序已经中断了其他代码，并且需要将CPU交还给其他任务。
 - en: The interrupt context has its own (fixed and quite low) stack size. It thus
     totally makes sense to disable IRQs while running an ISR as reentrancy could cause
     stack overflow if too many preemptions happen.
@@ -4119,18 +4251,21 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 中断上下文有其自己的（固定且相当小的）栈大小。因此，在运行ISR时禁用IRQ是完全合理的，因为可重入性可能会导致栈溢出，特别是当发生过多的抢占时。
 - en: 'Interrupt handlers cannot block; they do not run in a process context. Thus,
     you may not perform the following operations from within an interrupt handler:'
   id: totrans-570
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 中断处理程序不能阻塞；它们不在进程上下文中运行。因此，您不能在中断处理程序中执行以下操作：
 - en: You cannot transfer data to/from user space since this may block.
   id: totrans-571
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 你不能向用户空间传输数据或从用户空间传输数据，因为这可能会阻塞。
 - en: You cannot sleep or rely on code that may lead to sleep, such as invoking `wait_event()`,
     memory allocation with any flag other than `GFP_ATOMIC`, or using a mutex/semaphore.
     The threaded handler can handle this.
@@ -4139,18 +4274,21 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 你不能进入休眠状态或依赖可能导致休眠的代码，比如调用`wait_event()`、使用除`GFP_ATOMIC`之外的任何内存分配标志，或使用互斥量/信号量。线程化的处理程序可以处理这些情况。
 - en: You cannot trigger or call `schedule()`.
   id: totrans-573
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 你不能触发或调用`schedule()`。
 - en: Note
   id: totrans-574
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 注意
 - en: If a device issues an IRQ while this IRQ is disabled (or masked) at a controller
     level, it will not be processed at all (masked in the flow handler), but an interrupt
     will instantaneously occur if it is still pending (at a device level) when the
@@ -4160,6 +4298,7 @@
   - PREF_IND
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果设备在IRQ被禁用（或屏蔽）时发出IRQ请求（在控制器层面），它将完全无法处理（在流程处理程序中被屏蔽）。但是，如果IRQ启用（或取消屏蔽）时该请求仍然挂起（在设备层面），中断会立即发生。
 - en: The concept of non-reentrancy for an interrupt means that, if an interrupt is
     already in an active state, it cannot enter it again until the active status is
     cleared.
@@ -4168,11 +4307,13 @@
   - PREF_IND
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 中断的不可重入性概念意味着，如果中断已经处于活动状态，它不能再次进入，直到活动状态被清除。
 - en: Understanding the concept of top and bottom halves
   id: totrans-577
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 理解顶半部和底半部的概念
 - en: External devices send interrupt requests to the CPU either to signal a particular
     event or request a service. As stated in the previous section, bad interrupt management
     may considerably increase a system's latency and decrease its real-time properties.
@@ -4182,6 +4323,7 @@
   id: totrans-578
   prefs: []
   type: TYPE_NORMAL
+  zh: 外部设备向CPU发送中断请求，以便信号特定事件或请求服务。如前所述，糟糕的中断管理可能显著增加系统的延迟，并降低其实时性能。我们还提到，中断处理——至少是硬中断处理程序——必须非常快速，不仅为了保持系统响应性，还为了不丢失其他中断事件。
 - en: The idea here is to split the interrupt handler into two parts. The first part
     (a function, actually) will run in a so-called hard-IRQ context with interrupts
     disabled, and will perform the minimum required work (such as doing some quick
@@ -4195,6 +4337,7 @@
   id: totrans-579
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里的思路是将中断处理程序分成两部分。第一部分（实际上是一个函数）将在所谓的硬中断上下文中运行，并禁用中断，执行最少的必要工作（如进行一些快速的健全性检查——本质上是时间敏感的任务，读写硬件寄存器，快速处理这些数据，并向触发中断的设备确认中断）。这一部分即是Linux系统中的**上半部分**。然后，上半部分将调度一个线程处理程序，后者将运行所谓的**下半部分**函数，重新启用中断，这是中断的第二部分。下半部分可以执行耗时的操作（如缓冲区处理）和可能需要休眠的任务，因为它是在一个线程中运行的。
 - en: This splitting would considerably increase system responsiveness as the time
     spent with IRQs disabled is reduced to its minimum, and since bottom halves are
     run in kernel threads, they compete for the CPU with other processes on the runqueue.
@@ -4205,6 +4348,7 @@
   id: totrans-580
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种分割会显著提高系统的响应性，因为禁用IRQ的时间被减少到最小，并且由于下半部分在内核线程中运行，它们与运行队列中的其他进程争夺CPU资源。此外，它们可能已经设置了实时属性。上半部分实际上是通过`devm_request_irq()`注册的处理程序。当使用`devm_request_threaded_irq()`时，正如我们将在下一节看到的，上半部分是传递给该函数的第一个处理程序。
 - en: As described previously in the *Implementing work-deferring mechanisms* section,
     a bottom half represents nowadays any task (or work) scheduled from within an
     interrupt handler. Bottom halves are designed using work-deferring mechanisms,
@@ -4212,21 +4356,25 @@
   id: totrans-581
   prefs: []
   type: TYPE_NORMAL
+  zh: 如前所述，在*实现工作延迟机制*部分，下半部分现在代表了从中断处理程序内调度的任何任务（或工作）。下半部分是使用工作延迟机制设计的，这些我们之前已经看到过。
 - en: Depending on which one you choose, it may run in a (software) interrupt context
     or in a process context. These are softirqs, tasklets, workqueues, and threaded
     IRQs.
   id: totrans-582
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据你选择的类型，它可能会在（软件）中断上下文或进程上下文中运行。这些包括softirqs、tasklets、工作队列和线程化IRQ。
 - en: Note
   id: totrans-583
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Tasklets and softirqs have nothing to do with the "thread interrupt" mechanism
     since they run in their own special (atomic) contexts.
   id: totrans-584
   prefs: []
   type: TYPE_NORMAL
+  zh: Tasklets和softirqs与“线程中断”机制无关，因为它们在各自的特殊（原子）上下文中运行。
 - en: Since softirq handlers run at a high priority with the scheduler preemption
     disabled, not relinquishing CPU to processes/threads until they complete, care
     must be taken while using them for bottom-half delegation. As nowadays the quantum
@@ -4237,6 +4385,7 @@
   id: totrans-585
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于softirq处理程序在高优先级下运行，并且调度器抢占被禁用，直到它们完成之前不会将CPU让给进程/线程，因此在使用它们进行下半部分委派时必须小心。由于现在为特定进程分配的时间片可能会有所不同，因此没有严格的规则来规定softirq处理程序完成所需的时间，以免减慢系统速度，因为内核无法为其他进程分配CPU时间。我认为不应超过半个时钟周期。
 - en: 'The hard IRQ (top half, actually) must be as fast as possible, and most of
     the time, just reading and writing in I/O memory. Any other computation should
     be deferred in the bottom half, whose main goal is to perform any time-consuming
@@ -4246,16 +4395,19 @@
   id: totrans-586
   prefs: []
   type: TYPE_NORMAL
+  zh: 硬件中断（实际上是上半部分）必须尽可能快速，通常只是读写I/O内存。任何其他计算应推迟到下半部分处理，下半部分的主要目标是执行由上半部分未完成的、与中断无关的耗时工作。关于上半部分和下半部分的工作分配没有明确的指导方针。以下是一些建议：
 - en: Hardware-related or time-sensitive work can be performed in the top half.
   id: totrans-587
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 与硬件相关或时间敏感的工作可以在上半部分执行。
 - en: If the work really need not be interrupted, it can be performed in the top half.
   id: totrans-588
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果工作确实不需要中断，它可以在上半部分执行。
 - en: From my point of view, everything else can be deferred and thus performed in
     the bottom half, which will run with interrupts enabled and when the system is
     less busy.
@@ -4263,6 +4415,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 从我的角度来看，其他所有工作都可以推迟并在底半部分执行，底半部分会在启用中断时运行，并且在系统较空闲时进行处理。
 - en: If the hard IRQ is fast enough to process and acknowledge interrupts within
     a few microseconds consistently, then there is absolutely no need to use bottom-half
     delegations.
@@ -4270,11 +4423,13 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果硬中断（hard IRQ）足够快速，能够在几微秒内处理并确认中断，那么完全没有必要使用底半部分的委托。
 - en: Working with threaded IRQ handlers
   id: totrans-591
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 与线程化IRQ处理程序的工作
 - en: Threaded interrupt handlers were introduced to reduce the time spent in interrupt
     handlers and defer the rest of the work (that is, processing) out into kernel
     threads. So, the top half (hard IRQ) would consist of quick sanity checks such
@@ -4287,6 +4442,7 @@
   id: totrans-592
   prefs: []
   type: TYPE_NORMAL
+  zh: 线程化中断处理程序的引入是为了减少在中断处理程序中花费的时间，并将剩余的工作（即处理）推迟到内核线程中。因此，硬中断部分（top half）会进行快速的合理性检查，例如确保中断来自其设备并相应地唤醒底半部分。线程化的中断处理程序将在自己的线程中运行，可能是在其父线程中（如果它们有父线程），或者在一个独立的内核线程中。此外，专用的内核线程可以设置实时优先级，尽管它默认运行在正常的实时优先级（即，`MAX_USER_RT_PRIO/2`，如你在`kernel/irq/manage.c`中的`setup_irq_thread()`函数中看到的）。
 - en: 'The general rule behind threaded interrupts is simple: keep the hard-IRQ handler
     as minimal as possible and defer as much work to the kernel thread as possible
     (preferably, all work). You should use `devm_request_threaded_irq()` if you wish
@@ -4294,6 +4450,7 @@
   id: totrans-593
   prefs: []
   type: TYPE_NORMAL
+  zh: 基于线程化中断的通用规则很简单：将硬中断处理程序保持尽可能简单，并将尽可能多的工作推迟到内核线程中（最好是将所有工作推迟）。如果你希望请求线程化中断处理，应该使用`devm_request_threaded_irq()`。它的原型如下：
 - en: '[PRE115]'
   id: totrans-594
   prefs: []
@@ -4304,6 +4461,7 @@
   id: totrans-595
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个函数接受两个特殊参数，我们应该花一些时间来了解它们，`handler`和`thread_fn`。它们在这里进行了更详细的说明：
 - en: '`handler` immediately runs when the interrupt occurs, in an interrupt context,
     and acts as a hard-IRQ handler. Its job usually consists of reading the interrupt
     cause (in the device''s status register) to determine whether or how to handle
@@ -4313,6 +4471,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`handler` 会在中断发生时立即运行，处于中断上下文中，充当硬中断处理程序。它的工作通常包括读取中断原因（在设备的状态寄存器中）以确定是否以及如何处理该中断（这在`IRQ_NONE`中很常见。这个返回值通常只有在共享中断线中才有意义）。'
 - en: If this hard-IRQ handler can finish interrupt processing fast enough (this is
     not a universal rule, but let's say no longer than a half of jiffy—that is, not
     longer than 500 µs if `CONFIG_HZ`, which defines the value of a jiffy, is set
@@ -4325,6 +4484,7 @@
   id: totrans-597
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果这个硬中断处理程序能够足够快地完成中断处理（这不是一个普遍规则，但假设不超过半个时间片——即，如果`CONFIG_HZ`（定义时间片的值）设置为`1000`，那么最长为500微秒），对于某些中断原因，处理完后应该返回`IRQ_HANDLED`来确认中断。未在这个时间范围内完成的中断处理应该被推迟到线程化的中断处理程序中。在这种情况下，硬中断处理程序应该返回`IRQ_WAKE_THREAD`来唤醒线程化处理程序。返回`IRQ_WAKE_THREAD`只有在同时提供了`thread_fn`处理程序时才有意义。
 - en: '`thread_fn` is the threaded handler added to the scheduler runqueue when the
     hard-IRQ handler function returns `IRQ_WAKE_THREAD`. If `thread_fn` is `NULL`
     while the handler is set and returns `IRQ_WAKE_THREAD`, nothing happens at the
@@ -4339,6 +4499,7 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`thread_fn`是当硬中断处理程序返回`IRQ_WAKE_THREAD`时添加到调度器运行队列中的线程处理程序。如果`thread_fn`为`NULL`而处理程序已设置并返回`IRQ_WAKE_THREAD`，那么在硬中断处理程序的返回路径中不会发生任何操作，只会发出一个简单的警告消息（我们可以在内核源代码中的`__irq_wake_thread()`函数中看到这一点）。由于`thread_fn`与运行队列中的其他进程竞争CPU，它可能会立即执行，也可能在系统负载较低时稍后执行。该函数应在完成中断处理后返回`IRQ_HANDLED`。之后，关联的内核线程将被从运行队列中移除并进入阻塞状态，直到通过硬中断功能再次唤醒。'
 - en: A default hard-IRQ handler will be installed by the kernel if `handler` is `NULL`
     and `thread_fn != NULL`. This is the default primary handler. It does nothing
     but return `IRQ_WAKE_THREAD` to wake up the associated kernel thread that will
@@ -4346,10 +4507,12 @@
   id: totrans-599
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果`handler`为`NULL`且`thread_fn != NULL`，内核将安装一个默认的硬中断处理程序。这是默认的主要处理程序，它什么也不做，只是返回`IRQ_WAKE_THREAD`，以唤醒关联的内核线程，该线程将执行`thread_fn`处理程序。
 - en: 'It is implemented as follows:'
   id: totrans-600
   prefs: []
   type: TYPE_NORMAL
+  zh: 它的实现如下：
 - en: '[PRE116]'
   id: totrans-601
   prefs: []
@@ -4361,11 +4524,13 @@
   id: totrans-602
   prefs: []
   type: TYPE_NORMAL
+  zh: 这使得可以将中断处理程序的执行完全移到进程上下文中，从而防止有缺陷的驱动程序（实际上是有缺陷的中断处理程序）破坏整个系统，并减少中断延迟。
 - en: In new kernel releases, `request_irq()` simply wraps `request_threaded_irq()`
     with the `thread_fn` parameter set to `NULL` (the same goes for the `devm_` variant).
   id: totrans-603
   prefs: []
   type: TYPE_NORMAL
+  zh: 在新的内核版本中，`request_irq()`仅仅是将`request_threaded_irq()`包装起来，并将`thread_fn`参数设置为`NULL`（`devm_`变体也是如此）。
 - en: Note that the interrupt is acknowledged at an interrupt controller level when
     you return from the hard-IRQ handler (whatever the return value is), thus allowing
     you to take other interrupts into account. In such a situation, if the interrupt
@@ -4376,6 +4541,7 @@
   id: totrans-604
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，当你从硬中断处理程序返回时（无论返回值是什么），中断会在中断控制器级别被确认，这样就允许你考虑其他中断。在这种情况下，如果中断在设备级别没有被确认，中断将一次又一次地触发，对于级别触发的中断来说，会导致堆栈溢出（或永远卡在硬中断处理程序中），因为触发中断的设备仍然保持中断线有效。
 - en: For threaded interrupt implementation, when drivers needed to run the bottom
     half in a thread, they had to mask the interrupt at device level from the hard-interrupt
     handler. This required accessing the issuing device, which is not, however, always
@@ -4386,6 +4552,7 @@
   id: totrans-605
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于线程中断实现，当驱动程序需要在一个线程中运行底半部分时，它们必须在硬中断处理程序中屏蔽设备级别的中断。这需要访问发出中断的设备，但对于某些位于慢速总线（如I2C或`IRQF_ONESHOT`）上的设备来说，这并不总是可能的。此操作不再是强制性的，因为它有助于在线程处理程序运行时保持控制器级别的中断禁用。但是，驱动程序必须在线程处理程序中清除设备中断，才能完成中断处理。
 - en: Using `devm_request_threaded()` (or the non-managed variant), it is possible
     to request an exclusively threaded IRQ by omitting the hard-interrupt handler.
     In this case, it is mandatory to set the `IRQF_ONESHOT` flag, else the kernel
@@ -4394,10 +4561,12 @@
   id: totrans-606
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用`devm_request_threaded()`（或非托管变体），通过省略硬中断处理程序，可以请求一个专门的线程中断。在这种情况下，必须设置`IRQF_ONESHOT`标志，否则内核会报错，因为线程处理程序将在设备和控制器级别的中断未屏蔽的情况下运行。
 - en: 'Here is an example of this:'
   id: totrans-607
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里是一个示例：
 - en: '[PRE117]'
   id: totrans-608
   prefs: []
@@ -4409,12 +4578,14 @@
   id: totrans-609
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的示例中，我们的设备位于 I2C 总线上，因此访问该设备可能会导致底层任务进入休眠。此类操作绝不能在硬中断处理程序中执行。
 - en: 'Here is an excerpt from the message in the link that introduced the `IRQF_ONESHOT`
     flag and which explains what it does (the whole message can be found via this
     link: [http://lkml.iu.edu/hypermail/linux/kernel/0908.1/02114.html](http://lkml.iu.edu/hypermail/linux/kernel/0908.1/02114.html)):'
   id: totrans-610
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是链接中介绍 `IRQF_ONESHOT` 标志的消息摘录，并解释了它的作用（完整消息可以通过此链接找到：[http://lkml.iu.edu/hypermail/linux/kernel/0908.1/02114.html](http://lkml.iu.edu/hypermail/linux/kernel/0908.1/02114.html)）：
 - en: '"*It allows drivers to request that the interrupt is not unmasked (at controller
     level) after the hard interrupt context handler has been executed and the thread
     has been woken. The interrupt line is unmasked after the thread handler function
@@ -4422,6 +4593,7 @@
   id: totrans-611
   prefs: []
   type: TYPE_NORMAL
+  zh: '"*它允许驱动程序请求在硬中断上下文处理程序执行并且线程被唤醒之后，中断在控制器级别不被解除屏蔽。中断线在线程处理程序执行后才会解除屏蔽。*"'
 - en: If one driver has set either `IRQF_SHARED` or `IRQF_ONESHOT` flags on a given
     IRQ, then the other driver sharing the IRQ must set the same flags. The `/proc/interrupts`
     file lists IRQs with their number of processing per CPU, the IRQ name as given
@@ -4430,6 +4602,8 @@
   id: totrans-612
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果一个驱动程序为给定的 IRQ 设置了 `IRQF_SHARED` 或 `IRQF_ONESHOT` 标志，那么共享该 IRQ 的其他驱动程序也必须设置相同的标志。`/proc/interrupts`
+    文件列出了每个 IRQ 的处理次数、请求时给定的 IRQ 名称，以及注册该中断处理程序的驱动程序的以逗号分隔的列表。
 - en: Threading the IRQs is the best choice for interrupt processing that can hog
     too many CPU cycles (exceeding a jiffy, for example), such as bulk data processing.
     Threading IRQs allows the priority and CPU affinity of their associated threads
@@ -4444,17 +4618,24 @@
   id: totrans-613
   prefs: []
   type: TYPE_NORMAL
+  zh: 为 IRQ 设置线程化是处理可能占用过多 CPU 周期的中断（例如，超过一个时钟周期）时的最佳选择，例如批量数据处理。线程化 IRQ 使得能够单独管理其相关线程的优先级和
+    CPU 亲和性。由于这一概念来源于实时内核树，因此它满足了实时系统的许多要求，例如允许细粒度的优先级模型和减少内核中的中断延迟。你可以查看 `/proc/irq/<IRQ>/smp_affinity`，它可以用来获取或设置相应
+    `<IRQ>` 的亲和性。该文件返回并接受一个位掩码，表示哪些处理器可以处理为此 IRQ 注册的 ISR。通过这种方式，你可以—例如—决定将硬中断处理程序的亲和性设置为一个
+    CPU，同时将线程化处理程序的亲和性设置为另一个 CPU。
 - en: Requesting a context-agnostic IRQ
   id: totrans-614
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 请求一个与上下文无关的 IRQ
 - en: A driver requesting an IRQ must know in advance the nature of the interrupt
     and decide whether its handler can run in a hard-IRQ context or not, which may
     influence the choice between `devm_request_irq()` and `devm_request_threaded_irq()`.
   id: totrans-615
   prefs: []
   type: TYPE_NORMAL
+  zh: 请求 IRQ 的驱动程序必须事先了解中断的性质，并决定其处理程序是否可以在硬中断上下文中运行，这可能会影响 `devm_request_irq()` 和
+    `devm_request_threaded_irq()` 之间的选择。
 - en: 'The problem with those approaches is that sometimes, a driver requesting an
     IRQ does not know about the nature of the interrupt controller that provides this
     IRQ line, especially when the interrupt controller is a discrete chip (typically,
@@ -4467,6 +4648,9 @@
   id: totrans-616
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些方法的问题在于，有时请求 IRQ 的驱动程序并不了解提供此 IRQ 线路的中断控制器的性质，尤其是当中断控制器是一个独立芯片时（通常是一个 `request_any_context_irq()`
+    函数，驱动程序请求 IRQ 时将知道处理程序是否会在线程上下文中运行，并根据需要调用 `request_threaded_irq()` 或 `request_irq()`）。这意味着无论与我们设备相关的
+    IRQ 是来自可能不进入休眠的内存映射中断控制器，还是来自可能进入休眠的中断控制器（如 I2C/SPI 总线后），都不需要修改代码。其原型如下所示：
 - en: '[PRE118]'
   id: totrans-617
   prefs: []
@@ -4484,6 +4668,7 @@
   id: totrans-618
   prefs: []
   type: TYPE_NORMAL
+  zh: '`devm_request_any_context_irq()`和`devm_request_irq()`有相同的接口，但语义不同。根据底层上下文（硬件平台），`devm_request_any_context_irq()`会选择使用`request_irq()`进行硬中断处理，或者使用`request_threaded_irq()`进行线程化处理。它在失败时返回负错误值，成功时返回`IRQC_IS_HARDIRQ`（表示使用硬中断处理方法）或`IRQC_IS_NESTED`（表示使用线程化方法）。通过这个函数，中断处理程序的行为在运行时决定。有关更多信息，可以通过以下链接查看引入它的内核提交：[https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=ae731f8d0785](https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=ae731f8d0785)。'
 - en: The advantage of using `devm_request_any_context_irq()` is that the driver does
     not need to care about what can be done in the IRQ handler, as the context in
     which the handler will run depends on the interrupt controller that provides the
@@ -4494,6 +4679,7 @@
   id: totrans-619
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用`devm_request_any_context_irq()`的优点在于，驱动程序不需要关心IRQ处理程序中可以做什么，因为处理程序将运行的上下文取决于提供IRQ线路的中断控制器。例如，对于一个基于GPIO-IRQ的设备驱动程序，如果GPIO属于一个位于I2C或SPI总线上的控制器（GPIO访问可能会休眠），处理程序将会是线程化的。否则（即GPIO访问不休眠，并且是内存映射的，属于SoC的一部分），处理程序将在硬中断处理程序中运行。
 - en: 'In the following example, the device expects an IRQ line mapped to a GPIO.
     The driver cannot assume that the given GPIO line will be memory-mapped, coming
     from the SoC. It may come from a discrete I2C or SPI GPIO controller as well.
@@ -4501,6 +4687,8 @@
   id: totrans-620
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下面的示例中，设备期望一个映射到GPIO的IRQ线路。驱动程序不能假设给定的GPIO线路会是内存映射的，来自SoC。它也可能来自一个独立的I2C或SPI
+    GPIO控制器。一个好的做法是在这里使用`request_any_context_irq()`：
 - en: '[PRE119]'
   id: totrans-621
   prefs: []
@@ -4515,11 +4703,13 @@
   id: totrans-622
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的代码足够简单，但相当安全，因为`devm_request_any_context_irq()`完成了这个任务，防止了误判底层GPIO的类型。这种方法的优点在于，你不需要关心提供IRQ线路的中断控制器的性质。在我们的例子中，如果GPIO属于一个位于I2C或SPI总线上的控制器，处理程序将会是线程化的。否则（即内存映射的情况），处理程序将在硬中断上下文中运行。
 - en: Using a workqueue to defer the bottom half
   id: totrans-623
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用工作队列延迟底半部处理
 - en: As we have already discussed the workqueue API in a dedicated section, it is
     now preferable to give an example here. This example is not error-free and has
     not been tested. It is just a demonstration to highlight the concept of bottom-half
@@ -4527,11 +4717,13 @@
   id: totrans-624
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于我们已经在专门的章节中讨论了工作队列API，现在最好在这里给出一个示例。这个示例并非没有错误，也没有经过测试，它只是一个展示，目的是突出通过工作队列延迟底半部的概念。
 - en: 'Let''s start by defining a data structure that will hold the elements we need
     for further development, as follows:'
   id: totrans-625
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们从定义一个数据结构开始，这个结构将保存我们在后续开发中需要的元素，如下所示：
 - en: '[PRE120]'
   id: totrans-626
   prefs: []
@@ -4544,6 +4736,7 @@
   id: totrans-627
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的数据结构中，我们的工作结构由`my_work`元素表示。这里没有使用指针，因为我们需要使用`container_of()`宏来获取指向初始数据结构的指针。接下来，我们可以定义一个方法，该方法将在工作线程中调用，如下所示：
 - en: '[PRE121]'
   id: totrans-628
   prefs: []
@@ -4555,6 +4748,7 @@
   id: totrans-629
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的工作结构中，当足够的数据被缓冲时，我们开始数据处理。现在，我们可以提供IRQ处理程序，负责调度我们的工作，如下所示：
 - en: '[PRE122]'
   id: totrans-630
   prefs: []
@@ -4566,6 +4760,7 @@
   id: totrans-631
   prefs: []
   type: TYPE_NORMAL
+  zh: IRQ处理程序中的注释已经足够有意义。`schedule_work()`是调度我们工作的函数。最后，我们可以编写探测方法，请求IRQ并注册前面的处理程序，如下所示：
 - en: '[PRE123]'
   id: totrans-632
   prefs: []
@@ -4577,11 +4772,13 @@
   id: totrans-633
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面探测方法的结构毫无疑问地表明我们正在面对一个平台设备驱动程序。这里使用了通用IRQ和工作队列API来初始化我们的工作队列并注册处理程序。
 - en: Locking from within an interrupt handler
   id: totrans-634
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 在中断处理程序中加锁
 - en: 'It is common to use spinlocks on SMP systems, as this guarantees mutual exclusion
     at the CPU level. Therefore, if a resource is shared only with a threaded bottom
     half (that is, it is never accessed from the hard IRQ), it is better to use mutexes,
@@ -4589,6 +4786,7 @@
   id: totrans-635
   prefs: []
   type: TYPE_NORMAL
+  zh: 在SMP系统中常常使用自旋锁，因为这可以保证在CPU级别的互斥性。因此，如果某个资源只与线程化的底半部分共享（即它永远不会从硬件IRQ访问），那么使用互斥锁更为合适，正如我们在以下示例中所见：
 - en: '[PRE124]'
   id: totrans-636
   prefs: []
@@ -4600,6 +4798,7 @@
   id: totrans-637
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，如果从硬中断处理程序中访问共享资源，则必须使用`_irqsave`变体的自旋锁，如以下示例所示，从探测方法开始：
 - en: '[PRE125]'
   id: totrans-638
   prefs: []
@@ -4610,6 +4809,7 @@
   id: totrans-639
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在探测方法已经实现，我们来实现顶半部分——即硬件IRQ处理程序——如下所示：
 - en: '[PRE126]'
   id: totrans-640
   prefs: []
@@ -4620,6 +4820,7 @@
   id: totrans-641
   prefs: []
   type: TYPE_NORMAL
+  zh: 顶半部分的返回值将唤醒线程化的底半部分，底半部分的实现如下：
 - en: '[PRE127]'
   id: totrans-642
   prefs: []
@@ -4635,11 +4836,13 @@
   id: totrans-643
   prefs: []
   type: TYPE_NORMAL
+  zh: 在请求IRQ线路时，如果设置了`IRQF_ONESHOT`标志，可能不需要在硬件IRQ和其线程化对应部分之间进行保护。该标志会在硬中断处理程序完成后禁用中断。设置此标志后，IRQ线路将一直禁用，直到线程化处理程序运行完毕。这样，硬件处理程序和线程化处理程序就不会发生竞争，因此可能不需要为两者之间共享的资源加锁。
 - en: Summary
   id: totrans-644
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: In this chapter, we discussed the fundamental elements to start driver development,
     presenting all the mechanisms frequently used in drivers such as work scheduling
     and time management, interrupt handling, and locking primitives. This chapter
@@ -4647,8 +4850,10 @@
   id: totrans-645
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章讨论了开始驱动开发的基本元素，介绍了驱动程序中常用的机制，如工作调度、时间管理、中断处理和锁原语。本章非常重要，因为它讨论了本书其他章节依赖的主题。
 - en: For instance, the next chapter, dealing with character devices, will use some
     of the elements discussed in this chapter.
   id: totrans-646
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，下一章将讨论字符设备，它将使用本章中讨论的一些元素。
