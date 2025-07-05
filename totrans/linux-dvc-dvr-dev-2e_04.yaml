@@ -1,42 +1,60 @@
 - en: '*Chapter 3*: Dealing with Kernel Core Helpers'
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '*第三章*：处理内核核心助手'
 - en: The Linux kernel is a standalone piece of software—as you'll see in this chapter—that
     does not depend on any external library as it implements any functionalities it
     needs to use (from list management to compression algorithms, everything is implemented
     from scratch). It implements any mechanism you may encounter in modern libraries
     and even more, such as compression, string functions, and so on. We will walk
     step by step through the most important aspects of such capabilities.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 内核是一个独立的软件——正如本章所述——它不依赖任何外部库，而是实现了它所需的所有功能（从列表管理到压缩算法，所有内容都从零开始实现）。它实现了现代库中可能遇到的所有机制，甚至更多，例如压缩、字符串函数等。我们将一步一步地探讨这些功能的最重要方面。
 - en: 'In this chapter, we will cover the following topics:'
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这一章中，我们将涵盖以下主题：
 - en: Linux kernel locking mechanisms and shared resources
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Linux 内核锁机制和共享资源
 - en: Dealing with kernel waiting, sleeping, and delay mechanisms
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 处理内核等待、休眠和延迟机制
 - en: Understanding Linux kernel time management
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 理解 Linux 内核时间管理
 - en: Implementing work-deferring mechanisms
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 实现工作延迟机制
 - en: Kernel interrupt handling
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 内核中断处理
 - en: Linux kernel locking mechanisms and shared resources
+  id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: Linux 内核锁机制和共享资源
 - en: A resource is said to be shared when it is accessible by several contenders,
     whether exclusively or not. When it is exclusive, access must be synchronized
     so that only the allowed contender(s) may own the resource. Such resources might
@@ -48,30 +66,40 @@
     Modern operating systems nowadays rely on hardware (which should allow atomic
     operations) to implement synchronization, though a simple system may ensure atomicity
     by disabling interrupts (and avoiding scheduling) around the critical code section.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 当多个竞争者可以访问一个资源时（无论是否排他性），这个资源就被视为共享资源。当资源是排他性时，访问必须同步，以确保只有被允许的竞争者能够拥有该资源。这些资源可能是内存位置或外部设备，而竞争者可能是处理器、进程或线程。操作系统通过原子修改一个存储资源当前状态的变量来实现互斥，使得所有可能同时访问该变量的竞争者都能看到这种变化。原子性保证了修改要么完全成功，要么完全失败。现代操作系统通常依赖硬件（它应支持原子操作）来实现同步，尽管一个简单的系统也可以通过禁用中断（避免调度）来确保临界代码段的原子性。
 - en: 'We can enumerate two synchronization mechanisms, as follows:'
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以列举出两种同步机制，如下所示：
 - en: '**Locks**: Used for mutual exclusion. When one contender holds the lock, no
     other can hold it (others are excluded). The most known locks in the kernel are
     spinlocks and mutexes.'
+  id: totrans-11
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**锁**：用于互斥。当一个竞争者持有锁时，其他竞争者不能持有该锁（其他人被排除在外）。内核中最常见的锁是自旋锁和互斥锁。'
 - en: '**Conditional variables**: For waiting for a change. These are implemented
     differently in the kernel, as we will see later.'
+  id: totrans-12
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**条件变量**：用于等待某个变化。内核中对此的实现方式不同，稍后我们将看到。'
 - en: When it comes to locking, it is up to the hardware to allow such synchronizations
     by means of atomic operations, which the kernel uses to implement locking facilities.
     Synchronization primitives are data structures used for coordinating access to
     shared resources. Because only one contender can hold the lock (and thus access
     the shared resource), it might perform an arbitrary operation on the resource
     associated with the lock, which would appear to be atomic to others.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 在谈到锁机制时，硬件通过原子操作提供这种同步功能，内核利用这些原子操作来实现锁设施。同步原语是用来协调对共享资源访问的数据结构。因为只有一个竞争者可以持有锁（从而访问共享资源），所以它可以对与锁相关的资源执行任意操作，这对其他竞争者而言是原子的。
 - en: 'Apart from dealing with the exclusive ownership of a given shared resource,
     there are situations where it is better to wait for the state of the resource
     to change—for example, waiting for a list to contain at least one object (its
@@ -80,33 +108,46 @@
     implement conditional variables. From user space, we could think of conditional
     variables for both situations, but to achieve the same or even better, the kernel
     provides the following mechanisms:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了处理给定共享资源的独占所有权外，还有一些情况更适合等待资源状态的变化——例如，等待一个列表包含至少一个对象（其状态从空变为非空），或者等待任务完成（例如，**直接内存访问**（**DMA**）事务）。Linux
+    内核没有实现条件变量。在用户空间，我们可以考虑为这两种情况使用条件变量，但为了实现相同或更好的效果，内核提供了以下机制：
 - en: '**Wait queue**: To wait for a change—designed to work in concert with locks'
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**等待队列**：等待状态变化——旨在与锁一起工作'
 - en: '**Completion queue**: To wait for the completion of a given computation, mostly
     used with DMAs'
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**完成队列**：等待给定计算的完成，主要与 DMA 一起使用'
 - en: All the aforementioned mechanisms are supported by the Linux kernel and exposed
     to drivers by means of a reduced set of **application programming interfaces**
     (**APIs**) (which significantly ease their use for developers), which we will
     discuss in the coming sections.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有上述机制都由 Linux 内核支持，并通过一组简化的**应用程序编程接口**（**API**）暴露给驱动程序（这大大简化了开发人员的使用），我们将在接下来的章节中讨论这些内容。
 - en: Spinlocks
+  id: totrans-18
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 自旋锁
 - en: A spinlock is a hardware-based locking primitive that depends on hardware capabilities
     to provide atomic operations (such as `test_and_set`, which in a non-atomic implementation
     would result in read, modify, and write operations). It is the simplest and the
     base locking primitive, working as described in the following scenario.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 自旋锁是一种基于硬件的锁定原语，它依赖硬件能力提供原子操作（例如 `test_and_set`，在非原子实现中会导致读取、修改和写入操作）。它是最简单的基础锁定原语，按以下场景描述的方式工作。
 - en: When *CPUB* is running, and task *B* wants to acquire the spinlock (task *B*
     calls the spinlock's locking function), and this spinlock is already held by another
     `while` loop (thus blocking task *B*) until the other CPU releases the lock (task
@@ -116,8 +157,12 @@
     holds the spinlock and proceeds or never runs until the lock is released). A spinlock
     is said to be a lock held by a CPU, in contrast to a mutex (which we will discuss
     in the next section of this chapter), which is a lock held by a task.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 当*CPUB*正在运行，并且任务 *B* 想要获取自旋锁（任务 *B* 调用自旋锁的锁定函数），而该自旋锁已经被另一个 `while` 循环占用（因此阻塞任务
+    *B*），直到另一个 CPU 释放锁（任务 *A* 调用自旋锁的释放函数）。这种自旋只会发生在多核机器上（因此前面描述的用例涉及多个 CPU），因为在单核机器上不会发生（任务要么持有自旋锁并继续执行，要么一直不运行直到锁被释放）。自旋锁被认为是由
+    CPU 持有的锁，与互斥锁（我们将在本章的下一节讨论）不同，互斥锁是由任务持有的锁。
 - en: A spinlock operates by disabling the scheduler on the local CPU (that is, the
     CPU running the task that called the spinlock's locking API). This also means
     that a task currently running on that CPU cannot be preempted except by **interrupt
@@ -125,11 +170,16 @@
     later). In other words, spinlocks protect resources that only one CPU can take/access
     at a time. This makes spinlocks suitable for **symmetrical multiprocessing** (**SMP**)
     safety and for executing atomic tasks.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 自旋锁通过禁用本地 CPU 上的调度程序来工作（即运行调用自旋锁锁定 API 的任务的 CPU）。这也意味着，当前在该 CPU 上运行的任务不能被抢占，除非通过**中断请求**（**IRQ**），前提是它们在本地
+    CPU 上没有被禁用（稍后会详细讨论）。换句话说，自旋锁保护的是每次只能被一个 CPU 获取/访问的资源。这使得自旋锁适用于**对称多处理**（**SMP**）安全性和执行原子任务。
 - en: Note
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Not only do spinlocks take advantage of hardware atomic functions. In the Linux
     kernel, for example, preemption status depends on a per-CPU variable that, if
     it equals `0`, means preemption is enabled; if it is greater than 0, this means
@@ -139,51 +189,80 @@
     the new value is `0`, and calls `schedule()`. Those addition/subtraction operations
     are atomic and thus rely on the CPU being able to provide atomic addition/subtraction
     functions.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 自旋锁不仅利用硬件原子操作功能。在 Linux 内核中，例如，抢占状态取决于每个 CPU 的一个变量，如果该变量等于`0`，则表示抢占已启用；如果大于
+    0，则表示抢占已禁用（`schedule()` 变得无效）。因此，禁用抢占（`preempt_disable()`）是通过将当前每个 CPU 变量（实际上是
+    `preempt_count`）加 1 来实现的，而 `preempt_enable()` 则从该变量中减去 `1`，检查新值是否为 `0`，并调用 `schedule()`。这些加减操作是原子的，因此依赖于
+    CPU 能提供原子加减功能。
 - en: 'A spinlock is created either statically using a `DEFINE_SPINLOCK` macro, as
     illustrated here, or dynamically by calling `spin_lock_init()` on an uninitialized
     spinlock:'
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 自旋锁可以通过静态方式使用 `DEFINE_SPINLOCK` 宏创建，如此处所示，或者通过在未初始化的自旋锁上调用 `spin_lock_init()`
+    以动态方式创建：
 - en: '[PRE0]'
+  id: totrans-25
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'To understand how this works, we just must look at the definition of this macro
     in `include/linux/spinlock_types.h`, as follows:'
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 要了解这个是如何工作的，我们必须查看`include/linux/spinlock_types.h`中这个宏的定义，如下所示：
 - en: '[PRE1]'
+  id: totrans-27
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'This can be used as follows:'
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 这可以如下使用：
 - en: '[PRE2]'
+  id: totrans-29
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: After this, the spinlock will be accessible through its name `foo_lock`, and
     its address would be `&foo_lock`.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 之后，可以通过自旋锁的名称 `foo_lock` 来访问它，其地址为 `&foo_lock`。
 - en: 'However, for dynamic (runtime) allocation, it''s better to embed the spinlock
     into a bigger structure, allocating memory for this structure and then calling
     `spin_lock_init()` on the spinlock element, as illustrated in the following code
     snippet:'
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，对于动态（运行时）分配，最好将自旋锁嵌入到一个更大的结构中，为该结构分配内存，然后在自旋锁元素上调用 `spin_lock_init()`，如下代码片段所示：
 - en: '[PRE3]'
+  id: totrans-32
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'It''s better to use `DEFINE_SPINLOCK` whenever possible. This offers compile-time
     initialization and requires fewer lines of code, with no real drawback. In this
     step, we can lock/unlock the spinlock using `spin_lock()` and `spin_unlock()`
     inline functions, both defined in `include/linux/spinlock.h`, as follows:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽可能使用 `DEFINE_SPINLOCK` 是更好的选择。它提供了编译时初始化，并且需要更少的代码行，且没有实际的缺点。在这一步中，我们可以使用 `spin_lock()`
+    和 `spin_unlock()` 内联函数来锁定/解锁自旋锁，这些函数都定义在 `include/linux/spinlock.h` 中，如下所示：
 - en: '[PRE4]'
+  id: totrans-34
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: That said, there are some known limitations in using spinlocks this way. Though
     a spinlock prevents preemption on the local CPU, it does not prevent this CPU
     from being hogged by an interrupt (thus executing this interrupt's handler). Imagine
@@ -194,65 +273,96 @@
     the resource is shared with the interrupt handler). It will infinitely spin in
     place, trying to acquire a lock already locked by a task that it has preempted.
     This situation will result in a deadlock, for sure.
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管如此，以这种方式使用自旋锁是有已知的限制的。虽然自旋锁可以防止本地 CPU 上的抢占，但它并不能防止 CPU 被中断占用（从而执行中断处理程序）。假设有这样一种情况，CPU
+    代表任务 A 持有一个“自旋锁”以保护某个资源，并且发生了一个中断。CPU 会停止当前的任务并跳转到该中断处理程序。到此为止，情况良好。现在，假设这个 IRQ
+    处理程序需要获取同一个自旋锁（你可能已经猜到，资源与中断处理程序是共享的）。它会无限期地自旋，试图获取一个已经被任务所锁住的锁，这个任务正是它被抢占的任务。这种情况肯定会导致死锁。
 - en: 'To address this issue, the Linux kernel provides `_irq` variant functions for
     spinlocks, which, in addition to disabling/enabling preemption, also disable/enable
     interrupts on the local CPU. These functions are `spin_lock_irq()` and `spin_unlock_irq()`,
     defined as follows:'
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了解决这个问题，Linux 内核为自旋锁提供了 `_irq` 变体函数，这些函数除了禁用/启用抢占外，还禁用/启用本地 CPU 上的中断。这些函数是
+    `spin_lock_irq()` 和 `spin_unlock_irq()`，定义如下：
 - en: '[PRE5]'
+  id: totrans-37
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: We might think that this solution is sufficient, but it isn't. The `_irq` variant
     partially solves the problem. Imagine interrupts are already disabled on the processor
     before your code starts locking; when you call `spin_unlock_irq()`, you will not
     just release the lock but enable interrupts also, but probably in an erroneous
     manner since there is no way for `spin_unlock_irq()` to know which interrupts
     were enabled before locking and which were not.
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可能认为这个解决方案足够了，但实际上并非如此。`_irq` 变种部分解决了这个问题。假设在代码开始加锁之前，处理器上的中断已经被禁用；当你调用 `spin_unlock_irq()`
+    时，不仅会释放锁，还会启用中断，但这可能是错误的，因为 `spin_unlock_irq()` 无法知道在加锁之前哪些中断是被启用的，哪些没有。
 - en: 'Let''s consider the following example:'
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们考虑以下示例：
 - en: Let's say interrupt `x` and `y` were disabled before a spinlock was acquired,
     and `z` was not.
+  id: totrans-40
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 假设在获取自旋锁之前，`x` 和 `y` 中断已经被禁用，而 `z` 并没有被禁用。
 - en: '`spin_lock_irq()` will disable the interrupts (`x`, `y`, and `z` are now disabled)
     and take the lock.'
+  id: totrans-41
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spin_lock_irq()` 会禁用中断（此时 `x`、`y` 和 `z` 都被禁用）并获取锁。'
 - en: '`spin_unlock_irq()` will enable the interrupts. `x`, `y`, and `z` find themselves
     all enabled, which was not the case before acquiring the lock. This is where the
     problem lies.'
+  id: totrans-42
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`spin_unlock_irq()` 将会启用中断。此时，`x`、`y` 和 `z` 都被启用了，而在获取锁之前并非如此。问题就在这里。'
 - en: This makes `spin_lock_irq()` unsafe when called from IRQs off-context as its
     counterpart `spin_unlock_irq()` will dumbly enable IRQs, with the risk of enabling
     those that were not enabled while `spin_lock_irq()` was invoked. It makes sense
     to use `spin_lock_irq()` only when you know that interrupts are enabled—that is,
     you are sure nothing else might have disabled interrupts on the local CPU.
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 这使得在 IRQ 上下文外调用 `spin_lock_irq()` 时变得不安全，因为它的对应函数 `spin_unlock_irq()` 会愚蠢地启用中断，存在启用那些在
+    `spin_lock_irq()` 调用时未启用的中断的风险。因此，只有在你确认中断已经启用时，才应该使用 `spin_lock_irq()`——也就是说，你确定没有其他操作禁用了本地
+    CPU 上的中断。
 - en: 'Now, imagine if you save the interrupts'' status in a variable before acquiring
     the lock and restore them exactly as they were while releasing—there would be
     no further issues at all. To achieve this, the kernel provides `_irqsave` variant
     functions that behave exactly like the `_irq` ones, with saving and restoring
     interrupts status features in addition. These are `spin_lock_irqsave()` and `spin_lock_irqrestore()`,
     defined as follows:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，假设你在获取锁之前将中断状态保存在一个变量中，并在释放锁时精确地恢复它们，那么就不会再有任何问题。为了实现这一点，内核提供了 `_irqsave`
+    变种函数，它们的行为与 `_irq` 函数完全相同，此外还具备保存和恢复中断状态的功能。它们是 `spin_lock_irqsave()` 和 `spin_lock_irqrestore()`，定义如下：
 - en: '[PRE6]'
+  id: totrans-45
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: Note
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: '`spin_lock()` and all its variants automatically call `preempt_disable()`,
     which disables preemption on the local CPU, while `spin_unlock()` and its variants
     call `preempt_enable()`, which tries to enable preemption (Yes—tries!!! It depends
@@ -260,12 +370,18 @@
     counter), and which internally calls `schedule()` if enabled (depending on the
     current value of the counter, whose current value should be `0`). `spin_unlock()`
     is then a preemption point and might re-enable preemption.'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: '`spin_lock()` 及其所有变种会自动调用 `preempt_disable()`，禁用本地 CPU 上的抢占，而 `spin_unlock()`
+    及其变种会调用 `preempt_enable()`，尝试启用抢占（是的—是尝试！！！这取决于是否有其他自旋锁被锁定，这将影响抢占计数器的值），并且在启用时会内部调用
+    `schedule()`（具体取决于当前计数器的值，当前值应该是 `0`）。因此，`spin_unlock()` 是一个抢占点，可能会重新启用抢占。'
 - en: Disabling preemption versus disabling interrupts
+  id: totrans-48
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 禁用抢占与禁用中断
 - en: Though disabling interrupts may prevent kernel preemption (scheduler tick disabled),
     nothing prevents the protected section from invoking the scheduler (`schedule()`
     function). A lot of kernel functions indirectly invoke the scheduler, such as
@@ -279,18 +395,24 @@
     `spin_lock*` family function. On the other side, releasing a spinlock (any `spin_unlock*`
     family function) decrements it from `1`, and whenever it reaches `0`, the scheduler
     is invoked, meaning that your critical section would not be that atomic.
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管禁用中断可能会防止内核的抢占（调度器滴答禁用），但没有什么能阻止受保护的代码段调用调度器（`schedule()`函数）。许多内核函数间接调用调度器，例如那些处理自旋锁的函数。因此，即使是一个简单的`printk()`函数也可能调用调度器，因为它处理保护内核消息缓冲区的自旋锁。内核通过增加或减少一个名为`preempt_count`的内核全局变量和每个CPU的变量（默认为`0`，表示*启用*）来禁用或启用调度器（从而禁用或启用抢占）。当该变量大于`0`时（通过`schedule()`函数检查），调度器会直接返回并不执行任何操作。每次调用`spin_lock*`系列函数时，该变量会递增。另一方面，释放自旋锁（任何`spin_unlock*`系列函数）时，它会从`1`递减，并且当它的值达到`0`时，调度器会被调用，这意味着你的临界区并非完全原子化。
 - en: Thus, only disabling interrupts protects you from kernel preemption only in
     cases where the protected code does not trigger preemption itself. That said,
     code that locked a spinlock may not sleep as there would be no way to wake it
     up (remember—timer interrupts and/or schedulers are disabled on the local CPU).
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，仅禁用中断能保护你免受内核抢占，仅在受保护的代码段没有触发抢占时有效。也就是说，锁定自旋锁的代码可能无法休眠，因为无法唤醒它（记住——本地CPU上的定时器中断和/或调度器是禁用的）。
 - en: Mutexes
+  id: totrans-51
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 互斥锁
 - en: A mutex is the second and last locking primitive we will discuss in this chapter.
     It behaves exactly like a spinlock, with the only difference being that your code
     can sleep. If you try to lock a mutex that is already held by another task, your
@@ -298,54 +420,78 @@
     No spinning this time, meaning that the CPU can do something else while your task
     waits in a sleeping state. As I mentioned previously, a spinlock is a lock held
     by a CPU. A mutex, on the other hand, is a lock held by a task.
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 互斥锁是我们本章讨论的第二种也是最后一种锁定原语。它的行为完全像自旋锁，唯一的区别是你的代码可以休眠。如果你尝试锁定一个已被另一个任务持有的互斥锁，你的任务将被挂起，并且只有在互斥锁被释放时才会被唤醒。这次没有自旋，也就是说在你的任务处于休眠状态时，CPU可以做其他事情。正如我之前提到的，自旋锁是由CPU持有的锁。而互斥锁，则是由任务持有的锁。
 - en: 'A mutex is a simple data structure that embeds a wait queue (to put contenders
     to sleep) and a spinlock to protect access to this wait queue, as illustrated
     in the following code snippet:'
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: '**互斥锁（mutex）**是一个简单的数据结构，包含一个等待队列（用于将竞争者置于休眠状态）和一个自旋锁，用于保护对该等待队列的访问，具体如下代码片段所示：'
 - en: '[PRE7]'
+  id: totrans-54
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: In the preceding code snippet, elements used only in debugging mode have been
     removed for the sake of readability. However, as we can see, mutexes are built
     on top of spinlocks. `owner` represents the process that owns (holds) the lock.
     `wait_list` is the list in which the mutex's contenders are put to sleep. `wait_lock`
     is the spinlock that protects `wait_list` manipulation (removal or insertion of
     contenders to sleep in it). It helps to keep `wait_list` coherent on SMP systems.
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，为了提高可读性，已移除仅在调试模式下使用的元素。不过，正如我们所见，互斥锁是建立在自旋锁之上的。`owner`表示持有（拥有）锁的进程。`wait_list`是互斥锁的竞争者被置于休眠状态的队列。`wait_lock`是保护`wait_list`操作（移除或插入竞争者）自旋锁。它有助于在SMP系统上保持`wait_list`的一致性。
 - en: 'The mutex APIs can be found in the `include/linux/mutex.h` header file. Prior
     to acquiring and releasing a mutex, it must be initialized. As for other kernel
     core data structures, there is a static initialization, as shown here:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 互斥锁的API可以在`include/linux/mutex.h`头文件中找到。在获取和释放互斥锁之前，必须对其进行初始化。与其他内核核心数据结构一样，互斥锁有一个静态初始化，如下所示：
 - en: '[PRE8]'
+  id: totrans-57
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'Here is a definition of the `DEFINE_MUTEX()` macro:'
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 下面是`DEFINE_MUTEX()`宏的定义：
 - en: '[PRE9]'
+  id: totrans-59
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'A second approach the kernel offers is dynamic initialization, possible thanks
     to a call to a `__mutex_init()` low-level function, which is actually wrapped
     by a much more user-friendly macro, `mutex_init()`. You can see this in action
     in the following code snippet:'
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核提供的第二种方法是动态初始化，得益于调用`__mutex_init()`低级函数，实际上它被一个更用户友好的宏`mutex_init()`包装。你可以在以下代码片段中看到它的应用：
 - en: '[PRE10]'
+  id: totrans-61
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Acquiring (aka locking) a mutex is as simple as calling one of the following
     three functions:'
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 获取（即锁定）互斥锁就像调用以下三个函数中的一个一样简单：
 - en: '[PRE11]'
+  id: totrans-63
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: If the mutex is free (unlocked), your task will immediately acquire it without
     going to sleep. Otherwise, your task will be put to sleep in a manner that depends
     on the locking function you use. With `mutex_lock()`, your task will be put in
@@ -356,137 +502,200 @@
     to be interrupted only by signals that actually kill the task. Each of these functions
     returns `0` if the lock has been acquired successfully. Moreover, interruptible
     variants return `-EINTR` when the locking attempt was interrupted by a signal.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果互斥锁是空闲的（未锁定），你的任务将立即获取它，而无需进入睡眠状态。否则，任务将进入睡眠状态，具体取决于你使用的锁定函数。使用`mutex_lock()`时，任务将进入不可中断的睡眠状态（`TASK_UNINTERRUPTIBLE`），等待互斥锁被释放（如果它被另一个任务持有）。`mutex_lock_interruptible()`会将任务放入可中断的睡眠状态，在这种状态下，任何信号都可以打断睡眠。`mutex_lock_killable()`则只允许通过实际杀死任务的信号来打断睡眠。每个函数在成功获取锁时返回`0`。此外，可中断的变种会在锁定尝试被信号中断时返回`-EINTR`。
 - en: 'Whichever locking function is used, the mutex owner (and only the owner) should
     release the mutex using `mutex_unlock()`, defined as follows:'
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 无论使用哪种锁定函数，互斥锁的拥有者（并且只有拥有者）应使用`mutex_unlock()`来释放互斥锁，定义如下：
 - en: '[PRE12]'
+  id: totrans-66
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'If it is worth checking the status of the mutex, you can use `mutex_is_locked()`,
     as follows:'
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果需要检查互斥锁的状态，可以使用`mutex_is_locked()`，如下所示：
 - en: '[PRE13]'
+  id: totrans-68
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: This function simply checks if the mutex owner is `NULL` and returns `true`
     if so or `false` otherwise.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 该函数仅检查互斥锁的拥有者是否为`NULL`，如果是，则返回`true`，否则返回`false`。
 - en: Note
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: It is recommended to use `mutex_lock()` only when you can guarantee the mutex
     will not be held for a long time. If not, you should use an interruptible variant
     instead.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 推荐仅在能够保证互斥锁不会被持有很长时间时使用`mutex_lock()`。否则，应使用可中断的变种。
 - en: 'There are specific rules while using mutexes. The most important ones are enumerated
     in the `include/linux/mutex.h` kernel mutex API header file, and some of these
     are outlined here:'
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用互斥锁时有一些特定的规则。最重要的规则列在`include/linux/mutex.h`内核互斥锁API头文件中，其中一些规则在这里进行了概述：
 - en: A mutex can be held by one and only one task at a time.
+  id: totrans-73
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 互斥锁一次只能由一个任务持有。
 - en: Once held, the mutex can only be unlocked by the owner (that is, the task that
     locked it).
+  id: totrans-74
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一旦被持有，互斥锁只能由拥有者解锁（即锁定它的任务）。
 - en: Multiple, recursive, or nested locks/unlocks are not allowed.
+  id: totrans-75
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 不允许多次、递归或嵌套的锁/解锁操作。
 - en: A mutex object must be initialized via the API. It must not be initialized by
     copying nor by using `memset`, just as held mutexes must not be reinitialized.
+  id: totrans-76
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 互斥锁对象必须通过API进行初始化。它不能通过复制或使用`memset`进行初始化，就像持有的互斥锁不能重新初始化一样。
 - en: A task that holds a mutex may not exit, just as memory areas where held locks
     reside must not be freed.
+  id: totrans-77
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 持有互斥锁的任务不能退出，就像持有锁的内存区域必须不被释放一样。
 - en: Mutexes may not be used in hardware or software interrupt contexts such as tasklets
     and timers.
+  id: totrans-78
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 互斥锁不能在硬件或软件中断上下文中使用，例如任务块和定时器。
 - en: 'All this makes mutexes suitable for the following cases:'
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有这些使得互斥锁适用于以下情况：
 - en: Locking only in the user context
+  id: totrans-80
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 仅在用户上下文中进行锁定
 - en: If the protected resource is not accessed from an IRQ handler and the operations
     need not be atomic
+  id: totrans-81
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果受保护的资源不是从IRQ处理程序访问的，并且操作不需要原子性
 - en: However, it may be cheaper (in terms of CPU cycles) to use spinlocks for very
     small critical sections since the spinlock only suspends the scheduler and starts
     spinning, compared to the cost of using a mutex, which needs to suspend the current
     task and insert it into the mutex's wait queue, requiring the scheduler to switch
     to another task and rescheduling the sleeping task once the mutex is released.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，对于非常小的关键部分来说，使用自旋锁可能更加节省（在CPU周期方面），因为自旋锁仅挂起调度程序并开始自旋，而使用互斥锁的成本则要高得多，因为它需要挂起当前任务并将其插入互斥锁的等待队列，需要调度程序切换到另一个任务，并在互斥锁释放后重新安排休眠任务。
 - en: Trylock methods
+  id: totrans-83
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 尝试锁定方法
 - en: There are cases where we may need to acquire the lock only if it is not already
     held by another contender elsewhere. Such methods try to acquire the lock and
     immediately (without spinning if we are using a spinlock, nor sleeping if we are
     using a mutex) return a status value, showing whether the lock has been successfully
     locked or not.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 有些情况下，我们可能只需要在其他地方没有其他竞争者持有锁时才获取锁。这样的方法试图获取锁，并立即（如果我们使用自旋锁则不会自旋，如果使用互斥锁则不会休眠）返回状态值，显示锁是否已成功锁定。
 - en: 'Both spinlock and mutex APIs provide a trylock method. These are, respectively,
     `spin_trylock()` and `mutex_trylock()`, the latter of which you can see here.
     Both methods return 0 on failure (the lock is already locked) or 1 on success
     (lock acquired). Thus, it makes sense to use these functions along with an `if`
     statement:'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 自旋锁和互斥锁API都提供了尝试锁定的方法。它们分别是 `spin_trylock()` 和 `mutex_trylock()`，您可以在此处看到后者的示例。这两种方法在失败时（锁已被锁定）返回
+    `0`，成功时返回 `1`。因此，结合 `if` 语句使用这些函数是有意义的：
 - en: '[PRE14]'
+  id: totrans-86
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: '`spin_trylock()` actually targets spinlocks. It will lock the spinlock if it
     is not already locked, just as the `spin_lock()` method does. However, it immediately
     returns `0` without spinning in cases where the spinlock is already locked. You
     can see it in action here:'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: '`spin_trylock()` 实际上针对自旋锁。如果自旋锁尚未被锁定，它将锁定自旋锁，就像 `spin_lock()` 方法一样。然而，在自旋锁已被锁定的情况下，它会立即返回
+    `0` 而不进行自旋。您可以在这里看到它的作用：'
 - en: '[PRE15]'
+  id: totrans-88
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'On the other hand, `mutex_trylock()` targets mutexes. It will lock the mutex
     if it is not already locked, just as the `mutex_lock()` method does. However,
     it immediately returns `0` without sleeping in cases where the mutex is already
     locked. You can see an example of this in the following code snippet:'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一方面，`mutex_trylock()` 针对互斥锁。如果互斥锁尚未被锁定，它将锁定互斥锁，就像 `mutex_lock()` 方法一样。然而，在互斥锁已被锁定的情况下，它会立即返回
+    `0` 而不休眠。您可以在以下代码片段中看到其示例：
 - en: '[PRE16]'
+  id: totrans-90
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: In the preceding excerpt, `mutex_trylock()` is used along with an `if` statement
     so that the driver can adapt its behavior.
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上述摘录中，`mutex_trylock()` 与 `if` 语句一起使用，以便驱动程序可以调整其行为。
 - en: Now that we are done with the trylock variant, let's switch to a totally different
     concept—learning how to explicitly delay execution.
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经完成了尝试锁定的变体，让我们转向一个完全不同的概念——学习如何显式延迟执行。
 - en: Dealing with kernel waiting, sleeping, and delay mechanisms
+  id: totrans-93
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理内核等待、休眠和延迟机制
 - en: The term *sleeping* in this section refers to a mechanism by which a task (on
     behalf of the running kernel code) voluntarily relaxes the processor, with the
     possibility of another task being scheduled. While simple sleeping would consist
@@ -500,27 +709,37 @@
     This mechanism is implemented in the kernel using the concept of wait queues.
     That said, both sleep APIs and wait queues implement what we can call passive
     waiting. The difference between the two is how the waking-up process occurs.
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节中的*睡眠*一词指的是一种机制，任务（代表正在运行的内核代码）自愿释放处理器，可能会调度另一个任务。简单的睡眠是指任务进入睡眠状态，并在给定时间后被唤醒（例如，主动延迟操作），但也有基于外部事件（如数据可用性）的睡眠机制。简单睡眠通过内核中的专用API实现；从这种睡眠中醒来是隐式的（由内核自己处理），在持续时间到期后进行。另一种睡眠机制是基于事件的，唤醒过程是显式的（另一个任务必须基于条件显式唤醒我们，否则我们将永远处于睡眠状态），除非指定了睡眠超时。该机制在内核中通过等待队列的概念实现。也就是说，睡眠API和等待队列都实现了我们可以称之为被动等待的功能。两者的区别在于唤醒过程的实现方式。
 - en: Wait queue
+  id: totrans-95
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 等待队列
 - en: The kernel scheduler manages a list of tasks to run (tasks in a `TASK_RUNNING`
     state), known as a runqueue. On the other hand, sleeping tasks, whether interruptible
     or not (in a `TASK_INTERRUPTIBLE` or `TASK_UNINTERRUPTIBLE` state), have their
     own queues, known as wait queues.
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核调度器管理一个待执行任务的列表（处于`TASK_RUNNING`状态的任务），称为运行队列。另一方面，处于睡眠状态的任务，无论是可中断的还是不可中断的（处于`TASK_INTERRUPTIBLE`或`TASK_UNINTERRUPTIBLE`状态），都有自己的队列，称为等待队列。
 - en: 'Wait queues are a higher-level mechanism essentially used to process blocking
     `true`, to wait for a given event to occur, or to sense data or resource availability.
     To understand how they work, let''s have a look at the following structure in
     `include/linux/wait.h`:'
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 等待队列是一个更高级的机制，主要用于处理阻塞`true`，等待某个事件发生，或感知数据或资源的可用性。为了理解它们是如何工作的，我们可以查看以下`include/linux/wait.h`中的结构：
 - en: '[PRE17]'
+  id: totrans-98
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: A wait queue is nothing but a list (with sleeping processes in it waiting to
     be awakened) and a spinlock to protect access to this list. We can use a wait
     queue when more than one process wants to sleep, waiting for one or more events
@@ -529,21 +748,31 @@
     event to occur puts itself it this list before going to sleep. While a process
     is in the list, it is called wait queue entry. When an event occurs, one or more
     processes on the list are woken up and moved off the list.
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 等待队列就是一个列表（其中包含等待唤醒的睡眠进程）和一个自旋锁，用于保护对该列表的访问。当多个进程希望在等待一个或多个事件发生以便被唤醒时，可以使用等待队列。头成员实际上是一个等待事件发生的进程列表。每个希望在等待事件发生时进入睡眠的进程都会在睡眠前将自己加入该列表。进程在列表中时，称为等待队列条目。当事件发生时，列表中的一个或多个进程被唤醒并从列表中移除。
 - en: 'We can declare and initialize a wait queue in two ways. The first method is
     to statically use `DECLARE_WAIT_QUEUE_HEAD`, as follows:'
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过两种方式声明和初始化一个等待队列。第一种方法是静态使用`DECLARE_WAIT_QUEUE_HEAD`，如下所示：
 - en: '[PRE18]'
+  id: totrans-101
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'Alternatively, we can dynamically use `init_waitqueue_head()`, as follows:'
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 另外，我们也可以动态使用`init_waitqueue_head()`，如下所示：
 - en: '[PRE19]'
+  id: totrans-103
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'Any process that wants to sleep while waiting for `my_event` to occur can invoke
     either `wait_event_interruptible()` or `wait_event()`. Most of the time, the event
     is just the fact that a resource becomes available, thus it makes sense for a
@@ -551,53 +780,77 @@
     To make things easy, these functions both take an expression in place of the second
     argument so that the process is put to sleep only if the expression evaluates
     `false`, as illustrated in the following code snippet:'
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 任何希望在等待`my_event`发生时睡眠的进程，都可以调用`wait_event_interruptible()`或`wait_event()`。大多数情况下，事件只是资源变得可用，因此进程只有在首次检查到资源可用性之后，才会进入睡眠状态。为了简化操作，这些函数都接受一个表达式作为第二个参数，使得进程只有在该表达式评估为`false`时才会进入睡眠状态，如下方代码片段所示：
 - en: '[PRE20]'
+  id: totrans-105
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: '`wait_event()` or `wait_event_interruptible()` simply evaluates the condition
     when called. If the condition is `false`, the process is put into either a `TASK_UNINTERRUPTIBLE`
     or a `TASK_INTERRUPTIBLE` (for the `_interruptible` variant) state and removed
     from the runqueue.'
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: '`wait_event()`或`wait_event_interruptible()`在调用时仅评估条件。如果条件为`false`，则进程会进入`TASK_UNINTERRUPTIBLE`或`TASK_INTERRUPTIBLE`（对于`_interruptible`变种）状态，并从运行队列中移除。'
 - en: Note
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: '`wait_event()` puts the process into an exclusive wait, aka uninterruptible
     sleep, and can''t thus be interrupted by the signal. It should be used only for
     critical tasks. Interruptible functions are recommended in most situations.'
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: '`wait_event()`将进程置于独占等待状态，也就是不可中断的睡眠，因此不能被信号中断。它应仅用于关键任务。在大多数情况下，建议使用可中断函数。'
 - en: 'There may be cases where you need not only the condition to be `true` but to
     time out after a certain waiting duration. You can address such cases using `wait_event_timeout()`,
     whose prototype is shown here:'
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 在某些情况下，你可能不仅需要条件为`true`，还需要在特定的等待时间后超时。你可以使用`wait_event_timeout()`来处理这种情况，其原型如下所示：
 - en: '[PRE21]'
+  id: totrans-110
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'This function has two behaviors, depending on the timeout having elapsed or
     not. These are outlined here:'
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个函数有两种行为，取决于是否已超时。这些行为在此列出：
 - en: '`0` if the condition is evaluated to `false` or `1` if it is evaluated to `true`.'
+  id: totrans-112
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`0`表示条件评估为`false`，`1`表示条件评估为`true`。'
 - en: '`true`.'
+  id: totrans-113
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`true`。'
 - en: 'The time unit for timeout is a jiffy. There are convenient APIs to convert
     convenient time units such as milliseconds and microseconds to jiffies, defined
     as follows:'
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 超时的时间单位是jiffy。有一些便捷的API可以将常用的时间单位（如毫秒和微秒）转换为jiffy，定义如下：
 - en: '[PRE22]'
+  id: totrans-115
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'After a change on any variable that could affect the result of the wait condition,
     you must call the appropriate `wake_up*` family function. That being said, in
     order to wake up a process sleeping on a wait queue, you should call either `wake_up()`,
@@ -607,99 +860,144 @@
     the `_all()` variant) in the wait queue will be awakened, and its (their) state
     set to `TASK_RUNNING`; otherwise, (the condition is `false`), nothing happens.
     The following code snippet illustrates this concept:'
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 在任何可能影响等待条件结果的变量变化后，你必须调用相应的`wake_up*`系列函数。也就是说，为了唤醒一个在等待队列中休眠的进程，你应该调用`wake_up()`、`wake_up_all()`、`wake_up_interruptible()`或`wake_up_interruptible_all()`。每当你调用这些函数时，条件会重新评估。如果此时条件为`true`，那么在等待队列中的进程（或对于`_all()`变种，所有进程）将被唤醒，其状态被设置为`TASK_RUNNING`；否则（如果条件为`false`），则没有任何事情发生。以下代码片段阐明了这一概念：
 - en: '[PRE23]'
+  id: totrans-117
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: In the preceding code snippet, `wake_up()` will wake only one process from the
     wait queue, while `wake_up_all()` will wake all processes from the wait queue.
     On the other hand, `wake_up_interruptible()` will wake only one process from the
     wait queue that is in interruptible sleep, and `wake_up_interruptible_all()` will
     wake all processes from the wait queue that are in interruptible sleep.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，`wake_up()`将仅唤醒等待队列中的一个进程，而`wake_up_all()`将唤醒等待队列中的所有进程。另一方面，`wake_up_interruptible()`将仅唤醒在可中断睡眠状态下的一个进程，而`wake_up_interruptible_all()`将唤醒所有在可中断睡眠状态下的进程。
 - en: 'Because they can be interrupted by signals, you should check the return value
     of the `_interruptible` variants. A nonzero value means your sleep has been interrupted
     by some sort of signal, and the driver should return `ERESTARTSYS`, as illustrated
     in the following code snippet:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 因为它们可能会被信号中断，你应该检查`_interruptible`变种的返回值。非零值表示你的休眠已经被某种信号中断，驱动程序应返回`ERESTARTSYS`，如下代码片段所示：
 - en: '[PRE24]'
+  id: totrans-120
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'In the preceding example, we have used the `msleep()` API, which will be explained
     shortly. Back to the behavior of the code—the current process (actually, `insmod`)
     will be put to sleep in the wait queue for 5 seconds and woken up by the work
     handler. The `dmesg` output is shown here:'
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的示例中，我们使用了`msleep()` API，稍后会进行解释。回到代码的行为——当前进程（实际上是`insmod`）将被放入等待队列休眠5秒，并由工作处理程序唤醒。`dmesg`输出如下所示：
 - en: '[PRE25]'
+  id: totrans-122
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: Now that we are comfortable with the concept of wait queue, which allows us
     to put processes to sleep and wait for these to be awakened, let's learn another
     simple sleeping mechanism that simply consists of delaying the execution flow
     unconditionally.
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经掌握了等待队列的概念，它允许我们将进程置于睡眠状态，并等待它们被唤醒，让我们学习另一种简单的休眠机制，它仅仅是无条件地延迟执行流程。
 - en: Simple sleeping in the kernel
+  id: totrans-124
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 内核中的简单休眠
 - en: 'This simple sleeping can also be referred to as `#include <linux/delay>`, which
     would make the following function available:'
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个简单的休眠也可以称为 `#include <linux/delay>`，这将使以下函数可用：
 - en: '[PRE26]'
+  id: totrans-126
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: In the preceding APIs, `msecs` is the number of milliseconds of sleep. `min`
     and `max` are the minimum and upper bounds of sleeping in microseconds.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的 API 中，`msecs` 是休眠的毫秒数，`min` 和 `max` 是休眠时间的最小值和最大值（微秒）。
 - en: The `usleep_range()` API relies on `µsecs` or small `msecs` (between 10 microseconds
     and 20 milliseconds), avoiding the busy-wait loop of `udelay()`.
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: '`usleep_range()` API 依赖于 `µsecs` 或小的 `msecs`（介于 10 微秒到 20 毫秒之间），避免了 `udelay()`
+    的忙等待循环。'
 - en: '`msleep*()` APIs are backed by `jiffies`/legacy timers. You should use this
     for larger milliseconds of sleep (10 milliseconds or more). This API sets the
     current task to `TASK_UNINTERRUPTIBLE`, whereas `msleep_interruptible()` sets
     the current task to `TASK_INTERRUPTIBLE` before scheduling the sleep. In short,
     the difference is whether the sleep can be ended early by a signal. It is recommended
     to use `msleep()` unless you have a need for the interruptible variant.'
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: '`msleep*()` API 是基于 `jiffies`/传统定时器的。对于较长时间的毫秒级休眠（10 毫秒或更多），应使用这个 API。此 API
+    将当前任务设置为 `TASK_UNINTERRUPTIBLE`，而 `msleep_interruptible()` 则在调度休眠之前将当前任务设置为 `TASK_INTERRUPTIBLE`。简而言之，区别在于休眠是否可以被信号提前结束。除非你需要可中断的版本，否则推荐使用
+    `msleep()`。'
 - en: APIs in this section must be used for inserting delays in a non-atomic context
     exclusively.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节中的 API 仅适用于在非原子上下文中插入延迟。
 - en: Kernel delay or busy waiting
+  id: totrans-131
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 内核延迟或忙等待
 - en: First, the term "delay" in this section can be considered as busy waiting as
     the task actively waits (corresponding to the `for()` or the `while()` loop),
     consuming CPU resources, in contrast to sleep, which is a passive delay as the
     task sleeps while waiting.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，本节中的“延迟”一词可以视为忙等待，因为任务主动等待（对应 `for()` 或 `while()` 循环），消耗 CPU 资源，与休眠（被动延迟，任务在等待时处于休眠状态）形成对比。
 - en: 'Even for busy loop waiting, the driver must include `#include <linux/delay>`,
     which would make the following APIs available as well:'
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 即使是忙等待循环，驱动程序也必须包含 `#include <linux/delay>`，这也会使以下 API 可用：
 - en: '[PRE27]'
+  id: totrans-134
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: The advantage of such APIs is that they can be used in both atomic and non-atomic
     contexts.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 这类 API 的优势在于它们可以在原子和非原子上下文中都能使用。
 - en: 'The precision of `ndelay` depends on how accurate your timer is (not always
     the case on an embedded `ndelay`-level precision may not actually exist on many
     non-PC devices. Instead, you are more likely to come across the following:'
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ndelay` 的精度取决于你的定时器的准确性（在嵌入式设备上，`ndelay` 的精度可能并不存在，许多非 PC 设备上可能并不具备这种精度。相反，你更可能遇到以下情况：'
 - en: '`udelay`: This API is busy-wait loop-based. It will busy wait for enough loop
     cycles to achieve the desired delay. You should use this function if you need
     to sleep for a few `µsecs` (< ~10 microseconds). It is recommended to use this
@@ -707,36 +1005,52 @@
     SoCs), the overhead of setting up hrtimers for `usleep` may not be worth it. Such
     an evaluation will obviously depend on your specific situation, but it is something
     to be aware of.'
+  id: totrans-137
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`udelay`：这个 API 基于忙等待循环。它将通过忙等待足够的循环次数来实现所需的延迟。如果你需要休眠几微秒（< ~10 微秒），应使用这个函数。即使是休眠少于
+    10 微秒，也推荐使用这个 API，因为在较慢的系统（某些嵌入式 SoC）上，设置 `usleep` 的 hrtimers 开销可能不值得。这样的评估显然取决于你的具体情况，但这是需要注意的。'
 - en: '`mdelay`: This is a macro wrapper around `udelay` to account for possible overflow
     when passing large arguments to `udelay`. In general, the use of `mdelay` is discouraged,
     and code should be refactored to allow for the use of `msleep`.'
+  id: totrans-138
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`mdelay`：这是一个包装 `udelay` 的宏，用于处理传递大参数给 `udelay` 时可能发生的溢出。通常不推荐使用 `mdelay`，应该重构代码以使用
+    `msleep`。'
 - en: At this step, we are done with Linux kernel sleeping or delay mechanisms. We
     should be able to design and implement a time-slice-managed execution flow. We
     can now get deeper into the way the Linux kernel manages time.
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这一步，我们已经完成了 Linux 内核的休眠或延迟机制。我们应该能够设计并实现一个时间片管理的执行流程。接下来，我们可以深入了解 Linux 内核如何管理时间。
 - en: Understanding Linux kernel time management
+  id: totrans-140
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 理解 Linux 内核的时间管理
 - en: 'Time is one of the most used resources in computer systems, right after memory.
     It is used to do almost everything: timer, sleep, scheduling, and many other tasks.'
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 时间是计算机系统中最常用的资源之一，仅次于内存。几乎所有操作都需要时间：定时器、休眠、调度以及许多其他任务。
 - en: The Linux kernel includes software timer concepts to enable kernel functions
     to be invoked at a later time.
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 内核包含软件定时器概念，以使内核函数能够在稍后的时间被调用。
 - en: The concepts of clocksource, clockevent, and tick device
+  id: totrans-143
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 时钟源、时钟事件和滴答设备的概念
 - en: In the original Linux timer implementation, the main hardware timer was mainly
     used for timekeeping. It was also programmed to fire interrupts periodically at
     HZ frequency, whose corresponding period is called a **jiffy** (both are explained
@@ -744,15 +1058,21 @@
     generated every 1/HZ second was (and still is) referred to as a tick. Throughout
     this section, the term *tick* will refer to the interrupt generated at a 1/HZ
     period.
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 在原始的 Linux 定时器实现中，主要硬件定时器主要用于时间keeping。它还被编程为以 HZ 的频率定期触发中断，其对应的周期称为**滴答**（稍后将在本章的
+    *滴答与 HZ* 部分解释）。这些每 1/HZ 秒生成的中断（现在仍然如此）被称为 tick。在本节中，术语 *tick* 将指代以 1/HZ 周期生成的中断。
 - en: The whole system time management (either from the kernel or user space) was
     bound to jiffies, which is also a global variable in the kernel, incremented at
     each tick. In addition to incrementing the value of `jiffies` (on top of which
     a timer wheel was implemented), the tick handler was also responsible for processes
     scheduling, statistic updating, and profiling.
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 整个系统的时间管理（无论是来自内核还是用户空间）都与 jiffies 绑定，jiffies 也是内核中的一个全局变量，在每次 tick 时递增。除了递增
+    `jiffies` 的值（在其上实现了定时器轮），tick 处理程序还负责进程调度、统计更新和性能分析。
 - en: Starting from kernel version 2.6.21, as a first improvement, hrtimers implementation
     was merged (and is now available through `CONFIG_HIGH_RES_TIMERS`). This feature
     was (and still is) transparent and has come with `hrtimer` timers as a functionality
@@ -763,33 +1083,48 @@
     POSIX timers. Without this improvement, the best accuracy that could be obtained
     for timer events would be 1 jiffy, whose duration depends on the value of `HZ`
     in the kernel.
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 从内核版本 2.6.21 开始，作为第一个改进，hrt timers 实现被合并（现在通过 `CONFIG_HIGH_RES_TIMERS` 可用）。该特性是（并且仍然是）透明的，伴随着
+    `hrtimer` 定时器作为独立功能，其引入了一种新的数据类型 `ktime_t`，用于以纳秒为单位存储时间值。然而，旧有的（基于 tick 和低分辨率的）定时器实现仍然存在。该改进使得
+    `nanosleep()`、`nanosleep()` 和 `clock_nanosleep()` 成为可能，这是通过对 `nanosleep()` 和 POSIX
+    定时器的转换实现的。如果没有这个改进，定时器事件能够达到的最佳精度将是 1 个滴答，其持续时间取决于内核中 `HZ` 的值。
 - en: Note
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: That said, high-resolution timer implementation is an independent feature. hrtimer
     timers can be enabled whatever the platform, but whether they work in high-resolution
     mode or not depends on the underlying hardware timer. Otherwise, the system is
     said to be in **low-resolution** (**low-res**) mode.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 也就是说，高分辨率定时器的实现是一个独立的特性。无论平台如何，都可以启用 hrtimer 定时器，但它们是否工作在高分辨率模式取决于底层硬件定时器。否则，系统将处于**低分辨率**（**低分辨率**）模式。
 - en: Improvements have been done all along the kernel evolutions until the generic
     clockevent interface came in, with the concepts of clock source, clock event,
     and tick devices. This completely changed time management in the kernel and influenced
     CPU power management.
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 随着内核的演进，改进不断进行，直到通用时钟事件接口的出现，引入了时钟源、时钟事件和滴答设备的概念。这完全改变了内核中的时间管理，并对 CPU 电源管理产生了影响。
 - en: The clocksource framework and clock source devices
+  id: totrans-150
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 时钟源框架和时钟源设备
 - en: A clock source is a monotonic, atomic, and free-running counter. This can be
     considered as a timer that acts as a free-running counter that provides time stamping
     and read access to the monotonically increasing time value. The common operation
     performed on clock source devices is reading the counter's value.
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 时钟源是一个单调的、原子性的、自由运行的计数器。可以将其视为一个定时器，作为一个自由运行的计数器，提供时间戳和读取单调递增的时间值。对时钟源设备执行的常见操作是读取计数器的值。
 - en: In the kernel, there is a `clocksource_list` global list that tracks the clock
     source devices registered with the system, enqueued ordered by rating. This allows
     the Linux kernel to know about all registered clock source devices and switch
@@ -799,139 +1134,212 @@
     either `clocksource_mmio_init()` or `clocksource_register_hz()` (you can `grep`
     these words). However, clock source device drivers are in `drivers/clocksource/`
     in kernel sources.
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 在内核中，有一个 `clocksource_list` 全局列表，用于跟踪已注册到系统的时钟源设备，按评级顺序入队。这使得 Linux 内核能够了解所有已注册的时钟源设备，并切换到具有更好评级和特性的时钟源。例如，在每次注册新的时钟源后，都会调用
+    `__clocksource_select()` 函数，确保始终选择最佳时钟源。时钟源通过 `clocksource_mmio_init()` 或 `clocksource_register_hz()`
+    注册（你可以通过 `grep` 查找这些词）。然而，时钟源设备驱动程序位于内核源代码的 `drivers/clocksource/` 中。
 - en: 'On a running Linux system, the most intuitive way to list clock source devices
     that are registered with the framework is by looking for the word `clocksource`
     in the kernel log message buffer, as shown here:'
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 在正在运行的 Linux 系统上，列出已注册的时钟源设备的最直观方式是通过查看内核日志消息缓冲区中的 `clocksource` 字眼，如下所示：
 - en: '![Figure 3.1 – System clocksource list'
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 3.1 – 系统时钟源列表'
 - en: '](img/B17934_03_001.jpg)'
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_03_001.jpg)'
 - en: Figure 3.1 – System clocksource list
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 3.1 – 系统时钟源列表
 - en: Note
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: In the preceding output logs (from a Pi 4), the `jiffies` clock source is a
     jiffy granularity-based and always provided clock source registered by the kernel
     as `clocksource_jiffies` in `kernel/time/jiffies.c`, with the lowest valid rating
     value (that is, used as the last resort). On the x86 platform, this clock source
     is refined and renamed into `refined-jiffies`—see the `register_refined_jiffies()`
     function call in `arch/x86/kernel/setup.c`.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上述输出日志（来自 Pi 4）中，`jiffies` 时钟源是基于滴答粒度的，并且始终由内核以 `clocksource_jiffies` 注册在 `kernel/time/jiffies.c`
+    中，是有效评级值最低的时钟源（即作为最后的备用）。在 x86 平台上，这个时钟源被精细化并重命名为 `refined-jiffies`—请参阅 `arch/x86/kernel/setup.c`
+    中的 `register_refined_jiffies()` 函数调用。
 - en: 'However, the preferred way (especially where the `dmesg` buffer has rotated
     or has been cleared) to enumerate the available clock source on a running Linux
     system is by reading the content of the `available_clocksource` file in `/sys/devices/system/clocksource/clocksource0/`,
     as shown in the following code snippet (on a Pi 4):'
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，最推荐的方式（特别是在 `dmesg` 缓冲区已滚动或已清除的情况下）是通过读取 `/sys/devices/system/clocksource/clocksource0/`
+    中 `available_clocksource` 文件的内容来枚举当前正在运行的 Linux 系统上可用的时钟源，代码示例如下（在 Pi 4 上）：
 - en: '[PRE28]'
+  id: totrans-160
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'On an i.MX6 board, we have the following:'
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 i.MX6 板上，我们有以下内容：
 - en: '[PRE29]'
+  id: totrans-162
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'To check the currently used clock source, you can use the following code:'
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 要检查当前使用的时钟源，可以使用以下代码：
 - en: '[PRE30]'
+  id: totrans-164
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'On my x86 machine, we have the following for both available clock sources and
     the currently used one:'
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我的 x86 机器上，我们有以下内容，显示了可用的时钟源以及当前使用的时钟源：
 - en: '[PRE31]'
+  id: totrans-166
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'To change the current clock source, you can echo the name of one of the available
     clock sources into the `current_clocksource` file, like this:'
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 要更改当前的时钟源，可以将某个可用时钟源的名称写入 `current_clocksource` 文件，如下所示：
 - en: '[PRE32]'
+  id: totrans-168
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: Changing the current clock source must be done with caution since the current
     clock source selected by the kernel during the boot is always the best one.
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 更改当前时钟源时必须小心，因为内核在启动过程中选择的当前时钟源始终是最佳的。
 - en: Linux kernel timekeeping
+  id: totrans-170
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: Linux 内核时间管理
 - en: 'One of the main goals of the clock source device is feeding the timekeeper.
     There can be multiple clock sources in a system, but the timekeeper will choose
     the one with the highest precision to use. The timekeeper needs to obtain the
     value of the clock source periodically to update the system time, which is usually
     updated during the tick processing, as illustrated in the following diagram:'
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 时钟源设备的主要目标之一是为时间管理器提供时间信息。一个系统中可以有多个时钟源，但时间管理器会选择精度最高的时钟源进行使用。时间管理器需要定期获取时钟源的值，以更新系统时间，通常在滴答处理过程中进行更新，如下图所示：
 - en: '![Figure 3.2 – Linux kernel timekeeper implementation'
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 3.2 – Linux 内核时间管理器实现'
 - en: '](img/B17934_03_002.jpg)'
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_03_002.jpg)'
 - en: Figure 3.2 – Linux kernel timekeeper implementation
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 3.2 – Linux 内核时间管理器实现
 - en: 'The timekeeper provides several types of time: **xtime**, **monotonic time**,
     **raw monotonic time**, and **boot time**, which are outlined in more detail here:'
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 时间管理器提供几种类型的时间：**xtime**、**单调时间**、**原始单调时间** 和 **启动时间**，这些在此处有更详细的说明：
 - en: '**xtime**: This is wall (real) time, which represents the current time as given
     by the **Real-Time Clock** (**RTC**) chip.'
+  id: totrans-176
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**xtime**：这是墙钟时间（实时时间），表示由**实时时钟**（**RTC**）芯片提供的当前时间。'
 - en: '**Monotonic time**: The cumulative time since the system is turned on, but
     does not count the time the system sleeps.'
+  id: totrans-177
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**单调时间**：自系统开启以来的累计时间，但不计入系统休眠时间。'
 - en: '**Raw monotonic time**: This has the same meaning as monotonic time, but it
     is purer and will not be affected by **Network Time Protocol** (**NTP**) time
     adjustment.'
+  id: totrans-178
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**原始单调时间**：与单调时间含义相同，但它更加纯粹，不会受到**网络时间协议**（**NTP**）时间调整的影响。'
 - en: '**Boot time**: This adds the time the system spent sleeping to the monotonic
     time, which gives the total time after the system is powered on.'
+  id: totrans-179
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**启动时间**：将系统休眠期间的时间加到单调时间上，得到系统开机后的总时间。'
 - en: 'The following table shows the different types of time and their kernel getter
     functions:'
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 下表显示了不同类型的时间及其内核获取函数：
 - en: '![Table 3.1 – Linux kernel timekeeping functions'
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: '![表 3.1 – Linux 内核时间管理函数'
 - en: '](img/Table_01.jpg)'
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/Table_01.jpg)'
 - en: Table 3.1 – Linux kernel timekeeping functions
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 表 3.1 – Linux 内核时间管理函数
 - en: Now that we are familiar with the Linux kernel timekeeping mechanisms and APIs,
     we are free to learn another concept involved in this time management—the clockevent
     framework.
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经了解了 Linux 内核的时间管理机制和 API，可以开始学习时间管理中的另一个概念——时钟事件框架。
 - en: The clockevent framework and clock event devices
+  id: totrans-185
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 时钟事件框架和时钟事件设备
 - en: Before the concept of clockevent was introduced, the locality of hardware timers
     was not considered. The clock source/event hardware was programmed to periodically
     generate `HZ` ticks (interrupts) per second, the interval between each tick being
@@ -939,15 +1347,20 @@
     of the clock became abstracted as an event. The main function of the clockevent
     framework is to distribute the clock interrupts (events) and set the next trigger
     condition. It is a generic framework for next-event interrupt programming.
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 在引入时钟事件概念之前，硬件定时器的本地性并未被考虑。时钟源/事件硬件被编程为每秒周期性生成 `HZ` 个滴答（中断），每个滴答之间的间隔为一个 jiffy。随着时钟事件/源在内核中的引入，时钟中断被抽象为事件。时钟事件框架的主要功能是分发时钟中断（事件）并设置下一个触发条件。它是一个通用的下一个事件中断编程框架。
 - en: A clock event device is a device that can fire interrupts and allow us to program
     when the next interrupt (an event) will poke in the future. Each clock event device
     driver must provide a `set_next_event` function (or `set_next_ktime` in the case
     of an hrtimer-backed clock event device), which is used by the framework when
     it comes to using the underlying clock event device to program the next interrupt.
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 时钟事件设备是可以触发中断的设备，允许我们编程设置下一个中断（事件）将在未来何时触发。每个时钟事件设备驱动程序必须提供一个 `set_next_event`
+    函数（如果是基于 hrtimer 的时钟事件设备，则为 `set_next_ktime`），该函数将在使用底层时钟事件设备编程下一个中断时由框架调用。
 - en: Clock event devices are orthogonal to clock source devices. This is probably
     why their drivers are in the same place (and, sometimes, in the same compilation
     unit) as clock source device drivers—that is, in `drivers/clocksource`. On most
@@ -959,152 +1372,225 @@
     registers" that can be used to schedule interrupts. In such cases, the driver
     usually registers the clock source and the clock event device in the same compilation
     unit.
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 时钟事件设备与时钟源设备是正交的。这也是它们的驱动程序通常位于与时钟源设备驱动程序相同位置（有时甚至在相同的编译单元）的原因——也就是在 `drivers/clocksource`
+    目录下。在大多数平台上，时钟事件和时钟源可能会使用相同的硬件和寄存器范围，但它们本质上是不同的。例如，BCM2835 系统定时器就是一个位于树莓派中使用的
+    BCM2835 上的内存映射外设。它具有一个以 1 **兆赫**（**MHz**）运行的 64 位自由计数器，以及四个不同的“输出比较寄存器”，可用于调度中断。在这种情况下，驱动程序通常会在同一编译单元中注册时钟源和时钟事件设备。
 - en: 'On a running Linux system, the available clock event devices can by listed
     from the `/sys/devices/system/clockevents/` directory. Here is an example on a
     Pi 4:'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 在运行中的 Linux 系统中，可以通过 `/sys/devices/system/clockevents/` 目录列出可用的时钟事件设备。以下是一个
+    Pi 4 的示例：
 - en: '[PRE33]'
+  id: totrans-190
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'On a dual-core i.MX6 running system, we have the following:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 在一台双核 i.MX6 系统上，我们有以下内容：
 - en: '[PRE34]'
+  id: totrans-192
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'And finally, on my height core machine, we have the following:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，在我的多核机器上，我们有以下配置：
 - en: '[PRE35]'
+  id: totrans-194
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'From the preceding listings of available clock event devices on the system,
     we can say the following:'
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 从系统上可用的时钟事件设备的前述列表中，我们可以得出以下结论：
 - en: There are as many clock event devices as CPUs on the system (allowing per-CPU
     clock devices, thus involving timer locality).
+  id: totrans-196
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 系统中有与 CPU 数量相同的时钟事件设备（允许每个 CPU 使用独立的时钟设备，从而涉及定时器本地性）。
 - en: There is always a strange directory, `broadcast`. We will discuss this particular
     timer in the next sections.
+  id: totrans-197
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 总是有一个奇怪的目录，`broadcast`。我们将在接下来的章节中讨论这个特定的定时器。
 - en: To know the underlying timer of a given clock event device, you can read the
     content of `current_device` in the clock event directory. We'll now look at some
     examples on three different machines.
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 要了解给定时钟事件设备的底层定时器，可以读取时钟事件目录中的 `current_device` 内容。接下来我们将通过三个不同机器的例子进行展示。
 - en: 'On the i.MX 6 platform, we have the following:'
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 i.MX 6 平台上，我们有以下配置：
 - en: '[PRE36]'
+  id: totrans-200
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'On the Pi 4, we have the following:'
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 Pi 4 上，我们有以下配置：
 - en: '[PRE37]'
+  id: totrans-202
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'On my x86 running machine, we have the following:'
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我的 x86 运行的机器上，我们有以下配置：
 - en: '[PRE38]'
+  id: totrans-204
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'For the sake of readability, the choice has been made to read two entries only,
     and from what we have read, we can conclude the following:'
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了提高可读性，我们决定仅读取两个条目，从我们读取的内容中可以得出以下结论：
 - en: Clock event devices are backed by the same hardware timer, which is different
     from the hardware timer backing the clock source device.
+  id: totrans-206
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 时钟事件设备由相同的硬件定时器支持，这与支持时钟源设备的硬件定时器不同。
 - en: At least two hardware timers are needed to support the high-resolution timer
     interface, one playing the clock source role and one (ideally per-CPU) baking
     clock event devices.
+  id: totrans-207
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 至少需要两个硬件定时器来支持高分辨率定时器接口，一个充当时钟源角色，另一个（理想情况下是每个 CPU）支持时钟事件设备。
 - en: 'A clock event device can be configured to work in either one-shot mode or in
     periodic mode, as outlined here:'
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: 时钟事件设备可以被配置为在单次模式或周期模式下工作，如下所示：
 - en: In periodic mode, it is configured to generate a tick every 1/HZ second and
     does all the things the legacy (low-resolution) timer-based tick did, such as
     updating jiffies, accounting CPU time, and so on. In other words, in periodic
     mode, it is used the same way as the legacy low-resolution timer was, but it is
     run out of the new infrastructure.
+  id: totrans-209
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在周期模式下，它被配置为每 1/HZ 秒生成一个滴答，并执行所有传统（低分辨率）定时器滴答所做的工作，如更新 jiffies、统计 CPU 时间等。换句话说，在周期模式下，它的使用方式与传统低分辨率定时器相同，但是在新基础设施下运行。
 - en: One-shot mode makes the hardware generate a tick after a specific number of
     cycles from the current time. It is mostly used to program the next interrupt
     that will wake the CPU before it goes idle.
+  id: totrans-210
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 单次模式使硬件在从当前时间经过特定数量的周期后生成一个滴答。它通常用于编程下一个中断，以便在 CPU 进入空闲状态之前唤醒 CPU。
 - en: To track the operating mode of a clock event device, the concept of a tick device
     was introduced. This is further explained in the next section.
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了跟踪时钟事件设备的工作模式，引入了滴答设备的概念。这个概念将在下一节中进一步解释。
 - en: Tick devices
+  id: totrans-212
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 滴答设备
 - en: Tick devices are software extensions of clock event devices to provide a continuous
     stream of tick events that happen at regular time intervals. A tick device is
     automatically created by the kernel when a new clock event device is registered
     and always selects the best clock event device. It then goes without saying that
     a tick device is bound to a clock event device and that a tick device is backed
     by a clock event device.
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 滴答设备是时钟事件设备的软件扩展，提供按规律时间间隔发生的连续滴答事件。每当注册一个新的时钟事件设备时，内核会自动创建一个滴答设备，并始终选择最合适的时钟事件设备。因此，毫无疑问，滴答设备与时钟事件设备绑定，且滴答设备由时钟事件设备支持。
 - en: 'The definition of a tick-device data structure is shown in the following code
     snippet:'
+  id: totrans-214
   prefs: []
   type: TYPE_NORMAL
+  zh: 滴答设备数据结构的定义如下代码片段所示：
 - en: '[PRE39]'
+  id: totrans-215
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: 'In this data structure, `evtdev` is the clock event device that is abstracted
     by the tick device. `mode` is used to track the working mode of the underlying
     clock event. Therefore, when a tick device is said to be in periodic mode, it
     also means that the underlying clock event device is configured to work in this
     mode. The following diagram illustrates this:'
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个数据结构中，`evtdev` 是由滴答设备抽象出的时钟事件设备。`mode` 用于跟踪底层时钟事件的工作模式。因此，当说一个滴答设备处于周期模式时，也意味着底层的时钟事件设备被配置为以这种模式工作。以下图示说明了这一点：
 - en: '![Figure 3.3 – Clockevent and tick-device correlation'
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: '![图 3.3 – 时钟事件与滴答设备的关联'
 - en: '](img/B17934_03_003.jpg)'
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: '](img/B17934_03_003.jpg)'
 - en: Figure 3.3 – Clockevent and tick-device correlation
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 3.3 – 时钟事件与滴答设备的关联
 - en: 'A tick device can either be global to the system or local (per-CPU tick device).
     Whether a tick device must be global or not is decided by the framework, by selecting
     one local tick device based on the features of the underlying clock event device
     of this tick device. The descriptions of each type of tick device is as follows:'
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个滴答设备可以是全局性的（系统范围）或局部的（每个 CPU 的滴答设备）。是否必须是全局滴答设备由框架决定，框架根据底层时钟事件设备的特性选择一个本地滴答设备。每种类型的滴答设备的描述如下：
 - en: A per-CPU tick device is used to provide local CPU functionality such as process
     accounting, profiling, and—obviously—CPU local periodic tick (in periodic mode)
     and CPU local next event interrupt (non-periodic mode), for CPU local hrtimers
     management (see the `update_process_times()` function to learn how all that is
     handled). In the timer core code, there is a `tick_cpu_device` per-CPU variable
     that represents the instance of the tick device for each CPU in the system.
+  id: totrans-221
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 每个 CPU 的滴答设备用于提供本地 CPU 功能，例如进程会计、性能分析，显然还包括 CPU 本地的周期性滴答（周期模式）和 CPU 本地的下一个事件中断（非周期模式），以及
+    CPU 本地的 hrtimers 管理（参见 `update_process_times()` 函数了解如何处理这些）。在定时器核心代码中，存在一个 `tick_cpu_device`
+    每 CPU 变量，它表示系统中每个 CPU 的滴答设备实例。
 - en: A global tick device is responsible for providing the period ticks that mainly
     run the `do_timer()` and `update_wall_time()` functions. Thus, the first one updates
     the global `jiffies` value and updates the system load average, while the latter
@@ -1115,19 +1601,28 @@
     has the role of the global tick device—the one that executes `do_timer()`. There
     is another global variable, `tick_next_period`, which keeps track of the next
     time the global tick device will fire.
+  id: totrans-222
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 全局滴答设备负责提供主要运行 `do_timer()` 和 `update_wall_time()` 函数的周期性滴答。因此，第一个函数更新全局 `jiffies`
+    值并更新系统负载平均值，而后者更新墙时间（存储在 `xtime` 中，记录从 1970 年 1 月 1 日至今的时间差），并运行任何已过期的动态定时器（例如，运行本地进程定时器）。在定时器核心代码中，存在
+    `tick_do_timer_cpu` 全局变量，它保存具有全局滴答设备角色的 CPU 编号——即执行 `do_timer()` 的那个 CPU。还有另一个全局变量
+    `tick_next_period`，它跟踪全局滴答设备下次触发的时间。
 - en: Note
+  id: totrans-223
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 注意
 - en: This also means that the `jiffies` variable is always managed from one core
     at a time, but its function management affinity can jump from one core to the
     another as and when `tick_do_timer_cpu` changes.
+  id: totrans-224
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这也意味着 `jiffies` 变量始终由一个核心管理，但其功能管理亲和性可以随着 `tick_do_timer_cpu` 的变化而从一个核心跳到另一个核心。
 - en: 'From its interrupt routine, the driver of the underlying clock event device
     must invoke `evtdev->event_handler()`, which is the default handler of the clock
     device installed by the framework. While it is transparent for the device driver,
@@ -1135,8 +1630,11 @@
     two kernel configuration options (`CONFIG_HIGH_RES_TIMERS` and `CONFIG_NO_HZ`),
     the underlying hardware timer resolution, and whether the tick device is operating
     in dynamic mode or one-shot mode.'
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 从其中断例程中，底层时钟事件设备的驱动程序必须调用 `evtdev->event_handler()`，这是由框架安装的时钟设备的默认处理程序。虽然设备驱动程序对此透明，但该处理程序是由框架根据其他参数设置的，如下所示：两个内核配置选项（`CONFIG_HIGH_RES_TIMERS`
+    和 `CONFIG_NO_HZ`）、底层硬件定时器的分辨率，以及滴答设备是以动态模式运行还是单次模式运行。
 - en: '`NO_HZ` is the kernel option enabling dynamic tick support, and `HIGH_RES_TIMERS`
     allows the use of hrtimer APIs. With hrtimers enabled, the base code is still
     tick-driven, but the periodic tick interrupt is replaced by timers under hrtimers
@@ -1144,109 +1642,165 @@
     will work in high-resolution mode depends on the underlying hardware timer being
     high-resolution or not. If not, the hrtimers will be fed by the old low-resolution
     tick-based timer.'
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: '`NO_HZ` 是启用动态滴答支持的内核选项，而 `HIGH_RES_TIMERS` 允许使用 hrtimer API。启用 hrtimers 后，基础代码仍然是基于滴答驱动的，但周期性滴答中断被
+    hrtimers 下的定时器所取代（在定时器软中断上下文中调用 `softirq`）。然而，hrtimers 是否能够以高分辨率模式工作，取决于底层硬件定时器是否为高分辨率。如果不是，hrtimers
+    将由旧的低分辨率基于滴答的定时器提供支持。'
 - en: 'A tick device can operate in either one-shot mode or periodic mode. In periodic
     mode, the framework uses a per-CPU hrtimer via a control structure to emulate
     the ticks so that the base code is still tick-driven, but the periodic tick interrupt
     is replaced by timers under hrtimers embedded in the control structure. This control
     structure is a `tick_sched` struct, defined as follows:'
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: Tick 设备可以在单次模式或周期模式下运行。在周期模式下，框架通过控制结构使用每个 CPU 的 hrtimer 来模拟 ticks，这样基础代码依然是由
+    tick 驱动的，但周期性 tick 中断被嵌入控制结构中的 hrtimer 定时器所替代。这个控制结构是一个 `tick_sched` 结构，定义如下：
 - en: '[PRE40]'
+  id: totrans-228
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'Then, a per-CPU instance of this control structure is declared, as follows:'
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，声明一个每个 CPU 实例的控制结构，如下所示：
 - en: '[PRE41]'
+  id: totrans-230
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: This per-CPU instance allows a per-CPU tick emulation, which will drive the
     low-res timer processing via the `sched_timer` element, periodically reprogrammed
     to the next-low-res-timer-expires interval. This seems, however, obvious since
     each CPU has its own runqueue and ready processes list to manage.
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个每个 CPU 的实例允许每个 CPU 执行 tick 模拟，通过 `sched_timer` 元素驱动低分辨率定时器的处理，并定期重新编程为下一个低分辨率定时器过期的时间间隔。然而，这似乎显而易见，因为每个
+    CPU 都有自己的运行队列和就绪进程列表来管理。
 - en: 'A `tick_sched` element can be configured by the framework to work in three
     different modes, described as follows:'
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: '`tick_sched` 元素可以由框架配置为三种不同的模式，描述如下：'
 - en: '`NOHZ_MODE_INACTIVE`: This mode means no dynamic tick and no hrtimers support.
     It is the state the system is in during initialization. In this mode, the local
     per-CPU tick-device event handler is `tick_handle_periodic()`, and entering `idle`
     will be interrupted by the tick timer interrupt.'
+  id: totrans-233
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`NOHZ_MODE_INACTIVE`：该模式表示没有动态 tick 也没有 hrtimer 支持。它是系统初始化期间的状态。在此模式下，本地每个
+    CPU 的 tick 设备事件处理程序是 `tick_handle_periodic()`，并且进入 `idle` 时会被 tick 定时器中断打断。'
 - en: '`NOHZ_MODE_LOWRES`: This is also the `lowres` mode, which means a dynamic tick
     enabled in low-resolution mode. It means no high-resolution hardware timer has
     been found on the system to allow hrtimers to work in high-resolution mode and
     that they work in low-precision mode, which has the same precision as the low-precision
     timer (`tick_nohz_handler()`, and entering `idle` will not be interrupted by the
     tick timer interrupt.'
+  id: totrans-234
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`NOHZ_MODE_LOWRES`：这也是 `lowres` 模式，意味着启用了低分辨率模式下的动态 tick。这意味着系统未找到高分辨率硬件定时器，因此
+    hrtimer 无法以高分辨率模式工作，而是以低精度模式工作，精度与低精度定时器相同（`tick_nohz_handler()`），并且进入 `idle`
+    状态时不会被 tick 定时器中断打断。'
 - en: '`NOHZ_MODE_HIGHRES`: This is also the `highres` mode. In this mode, both dynamic
     tick and hrtimer "high-resolution" modes are enabled. The local per-CPU tick-device
     event handler is `hrtimer_interrupt()`. Here, hrtimers work in high-precision
     mode, which has the same accuracy as the hardware timer (`tick_device`, and the
     conventional tick timer is converted into a sub-timer of hrtimer.'
+  id: totrans-235
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`NOHZ_MODE_HIGHRES`：这也是 `highres` 模式。在此模式下，启用了动态 tick 和 hrtimer 的“高分辨率”模式。每个
+    CPU 的本地 tick 设备事件处理程序是 `hrtimer_interrupt()`。在这里，hrtimer 以高精度模式工作，精度与硬件定时器相同（`tick_device`，而传统的
+    tick 定时器被转换为 hrtimer 的子定时器）。'
 - en: Tick core-related source code in the kernel is in the `kernel/time/` directory,
     implemented in `tick-*.c` files. These are `tick-broadcast.c`, `tick-common.c`,
     `tick-broadcast-hrtimer.c`, `tick-legacy.c`, `tick-oneshot.c`, and `tick-sched.c`.
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 核心相关的源代码位于`kernel/time/`目录中，具体实现位于`tick-*.c`文件中。这些文件包括`tick-broadcast.c`、`tick-common.c`、`tick-broadcast-hrtimer.c`、`tick-legacy.c`、`tick-oneshot.c`和`tick-sched.c`。
 - en: Broadcast tick device
+  id: totrans-237
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 广播 tick 设备
 - en: On platforms implementing CPU power management, most (if not all) of the hardware
     timers backing clock event devices will be turned off in some `CPUidle` states.
     To keep the software timers functional, the kernel relies on an always-on clock
     event device (that is, backed by an always-on timer) to be present in the platform
     to relay the interrupt signaling when the timer expires. This always-on timer
     is called a `broadcast` directory in `/sys/devices/system/clockevents/`.
+  id: totrans-238
   prefs: []
   type: TYPE_NORMAL
+  zh: 在实现 CPU 电源管理的平台上，大多数（如果不是所有）支持时钟事件设备的硬件定时器会在某些 `CPUidle` 状态下关闭。为了保持软件定时器的功能，内核依赖于平台中始终开启的时钟事件设备（即由始终开启的定时器支持），用于在定时器过期时中继中断信号。这个始终开启的定时器在
+    `/sys/devices/system/clockevents/` 中被称为 `broadcast` 目录。
 - en: Note
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: A broadcast tick device is able to wake up any CPU by issuing an `wake_up_nohz_cpu()`,
     which is used for this purpose.
+  id: totrans-240
   prefs: []
   type: TYPE_NORMAL
+  zh: 广播 tick 设备能够通过发出 `wake_up_nohz_cpu()` 来唤醒任何 CPU，专门用于此目的。
 - en: To see the underlying timer backing the broadcast device, you can read the `current_device`
     variable in its directory.
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 要查看支持广播设备的底层定时器，可以读取其目录中的 `current_device` 变量。
 - en: 'On the x86 platform, we have the following output:'
+  id: totrans-242
   prefs: []
   type: TYPE_NORMAL
+  zh: 在x86平台上，我们得到以下输出：
 - en: '[PRE42]'
+  id: totrans-243
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'The Pi 4 output is shown here:'
+  id: totrans-244
   prefs: []
   type: TYPE_NORMAL
+  zh: Pi 4的输出如下：
 - en: '[PRE43]'
+  id: totrans-245
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Finally, the i.MX 6 broadcast device is backed by the following timer:'
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，i.MX 6的广播设备由以下定时器支持：
 - en: '[PRE44]'
+  id: totrans-247
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: From the preceding output showing the timer backing the broadcast device, we
     can conclude that clock source, clock event, and broadcast device timers are all
     different.
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
+  zh: 从前面的输出可以看出，支持广播设备的定时器不同于时钟源、时钟事件和广播设备的定时器。
 - en: Whether a tick device can be used as a broadcast device or not is decided by
     the `tick_install_broadcast_device()` core function, invoked at each tick-device
     registration. This function will exclude tick devices with `CLOCK_EVT_FEAT_C3STOP`
@@ -1257,16 +1811,20 @@
     that has the role of a broadcast device. When a tick device is selected as a broadcast
     device, its next event handler is set to `tick_handle_periodic_broadcast()`, instead
     of to `tick_handle_periodic()`.
+  id: totrans-249
   prefs: []
   type: TYPE_NORMAL
+  zh: 是否可以将滴答设备用作广播设备，由`tick_install_broadcast_device()`核心函数决定，该函数在每次滴答设备注册时调用。此函数会排除带有`CLOCK_EVT_FEAT_C3STOP`标志的滴答设备（意味着底层时钟事件设备的定时器在`C3`空闲状态下停止），并依赖其他标准（例如支持单次模式——即设置了`CLOCK_EVT_FEAT_ONESHOT`标志）。最后，`kernel/time/tick-broadcast.c`中定义的`tick_broadcast_device`全局变量包含作为广播设备的滴答设备。当选择滴答设备作为广播设备时，其下一个事件处理程序将设置为`tick_handle_periodic_broadcast()`，而不是`tick_handle_periodic()`。
 - en: There are, however, platforms implementing CPU core gating that do not have
     an always-on hardware timer. For such platforms, the kernel provides a kernel
     hrtimer-based clock event device that is unconditionally registered upon boot
     (and can be chosen as a tick broadcast device) with the lowest possible rating
     value so that any broadcast-capable hardware clock event device present on the
     system will be chosen in preference to the tick broadcast device.
+  id: totrans-250
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，一些平台实现了CPU核心门控，但没有始终开启的硬件定时器。对于这样的平台，内核提供了一个基于内核hrtimer的时钟事件设备，该设备在启动时无条件注册（并可以选择作为滴答广播设备），其评分值最低，以便系统中任何支持广播的硬件时钟事件设备都会优先选择，而不是滴答广播设备。
 - en: This hrtimer-backed clock event device relies on a dynamically chosen CPU (such
     that if there is a CPU about to enter into deep sleep with its wake-up time earlier
     than the hrtimer expiration time, this CPU becomes the new broadcast CPU) to be
@@ -1275,32 +1833,45 @@
     registered as `ce_broadcast_hrtimer` with the `name` field set to `bc_hrtimer`.
     It is, for instance, as you can see, the broadcast tick device used by the Pi
     4 platform.
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个基于hrtimer的时钟事件设备依赖于一个动态选择的CPU（以便如果有一个CPU即将进入深度睡眠状态，且其唤醒时间早于hrtimer到期时间，则该CPU成为新的广播CPU）始终保持供电。然后，这个CPU将通过其硬件本地定时器设备将定时器中断传递给处于深度空闲状态的其他CPU。它实现于`kernel/time/tick-broadcast-hrtimer.c`，注册为`ce_broadcast_hrtimer`，其`name`字段设置为`bc_hrtimer`。例如，如你所见，它是Pi
+    4平台使用的广播滴答设备。
 - en: Note
+  id: totrans-252
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: It goes without saying that having an always-on CPU has implications for power
     management platform capabilities and makes `CPUidle` suboptimal since at least
     a CPU is kept always in a shallow idle state by the kernel to relay timer interrupts.
     It is a trade-off between CPU power management and a high-resolution timer interface,
     which at least leaves the kernel with a functional system with some working power
     management capabilities.
+  id: totrans-253
   prefs: []
   type: TYPE_NORMAL
+  zh: 不言而喻，保持一个始终开启的CPU对电源管理平台功能有影响，并使得`CPUidle`子优化，因为内核至少会让一个CPU始终处于浅空闲状态以传递定时器中断。这是在CPU电源管理和高分辨率定时器接口之间的折衷，至少它让内核保持一个具有某些工作电源管理功能的系统。
 - en: Understanding the sched_clock function
+  id: totrans-254
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 理解`sched_clock`函数
 - en: '`sched_clock()` is a kernel timekeeping and timestamping function that returns
     the number of nanoseconds since the system started. It is weakly defined (to allow
     its overriding by architecture or platform code) in `kernel/sched/clock.c`, as
     follows:'
+  id: totrans-255
   prefs: []
   type: TYPE_NORMAL
+  zh: '`sched_clock()`是一个内核时间跟踪和时间戳功能，它返回系统启动以来的纳秒数。它在`kernel/sched/clock.c`中被弱定义（以允许架构或平台代码重写），如下所示：'
 - en: '[PRE45]'
+  id: totrans-256
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: 'It is, for instance, the function that provides a timestamp to `printk()` or
     is invoked when using `ktime_get_boottime()` or related kernel APIs. It defaults
     to a jiffy-backed implementation (which could affect scheduling accuracy). If
@@ -1312,40 +1883,56 @@
     When this is the case, the registers to read the main clock source device value
     and the registers from where the `sched_clock()` value comes are the same: see
     `drivers/clocksource/bcm2835_timer.c`.'
+  id: totrans-257
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，它是提供时间戳给`printk()`的功能，或者在使用`ktime_get_boottime()`或相关内核 API 时被调用。默认情况下，它采用基于跳跃（jiffy）实现的方式（这可能影响调度的准确性）。如果被重写，新的实现必须返回一个
+    64 位的单调时间戳，单位为纳秒，表示自上次重启以来的纳秒数。大多数平台通过直接读取计时器寄存器来实现这一点。在缺乏计时器的的平台上，这一功能是通过与主时钟源设备相同的计时器来实现的。例如，在
+    Raspberry Pi 上就是这种情况。当出现这种情况时，读取主时钟源设备值的寄存器和读取`_sched_clock()`值的寄存器是相同的：参见 `drivers/clocksource/bcm2835_timer.c`。
 - en: The timer driving `sched_clock()` has to be very fast compared with the clock
     source timers. As its name states, it is mainly used by the scheduler, which means
     it is called much more often. If you have to do trade-offs between accuracy compared
     to the clock source, you may sacrifice accuracy for speed in `sched_clock()`.
+  id: totrans-258
   prefs: []
   type: TYPE_NORMAL
+  zh: 驱动`_sched_clock()`的计时器必须比时钟源计时器更快。如其名称所示，它主要供调度器使用，这意味着它被调用的频率远高于其他计时器。如果必须在与时钟源的准确性之间做出权衡，可能会在`_sched_clock()`中牺牲准确性以提高速度。
 - en: When `sched_clock()` is not overridden directly, the kernel time core provides
     a `sched_clock_register()` helper to supply a platform-dependent timer reading
     function as well as a rating value. Anyway, this timer reading function will end
     up in the `cd` kernel time framework variable, which is of type `struct clock_data`
     (assuming that the rate of the new underlying timer is greater than the rate of
     the timer driving the current function).
+  id: totrans-259
   prefs: []
   type: TYPE_NORMAL
+  zh: 当`_sched_clock()`没有被直接重写时，内核时间核心提供了一个 `sched_clock_register()` 助手函数，用来提供一个平台相关的计时器读取函数以及一个评级值。无论如何，这个计时器读取函数最终会出现在`cd`内核时间框架变量中，该变量的类型为
+    `struct clock_data`（假设新的底层计时器的速率大于当前函数所驱动的计时器的速率）。
 - en: Dynamic tick/tickless kernel
+  id: totrans-260
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 动态滴答/无滴答内核
 - en: Dynamic ticks are the logical consequence of migration to a high-resolution
     timer interface. Before they were introduced, periodic ticks periodically issued
     interrupts (`HZ` times per second) to drive the operating system. This kept the
     system awake even when there were no tasks or timer handlers to run. With this
     approach, long rests were impossible for the CPUs, which had to wake for no real
     purpose.
+  id: totrans-261
   prefs: []
   type: TYPE_NORMAL
+  zh: 动态滴答是迁移到高分辨率计时器接口的逻辑结果。在引入动态滴答之前，周期性滴答会定期发出中断（每秒 `HZ` 次）来驱动操作系统。即使没有任务或计时器处理程序需要运行，这也会让系统保持唤醒状态。使用这种方法时，CPU
+    无法进行长时间休息，必须在没有实际目的的情况下唤醒。
 - en: The dynamic tick mechanism came with a solution, allowing periodic ticks to
     be stopped during certain time intervals to save power. With this new approach,
     periodic ticks are enabled back only when some tasks need to be performed; otherwise,
     they are disabled.
+  id: totrans-262
   prefs: []
   type: TYPE_NORMAL
+  zh: 动态滴答机制提供了解决方案，允许在某些时间间隔内停止周期性滴答以节省电力。采用这种新方法时，只有当有任务需要执行时，周期性滴答才会被重新启用；否则，它们会被禁用。
 - en: 'How does it work? When a CPU has no more tasks to run (that is, the idle task
     is scheduled on this CPU), only two events can create new work to do after the
     CPU goes idle: the expiration of one of the internal kernel timers, which is predictable,
@@ -1354,13 +1941,19 @@
     next periodic tick, it reprograms the per-CPU clock event device to this later
     event. This will allow the idle CPU to enter longer idle sleeps without being
     interrupted unnecessarily by a periodic tick.'
+  id: totrans-263
   prefs: []
   type: TYPE_NORMAL
+  zh: 它是如何工作的？当 CPU 没有更多任务运行（即空闲任务已调度到此 CPU 上）时，只有两种事件可以在 CPU 空闲后产生新的工作：一个是内部内核计时器的到期，这是可预测的，另一个是
+    I/O 操作的完成。当 CPU 进入空闲状态时，计时器框架会检查下一个调度的计时器事件，如果该事件晚于下一个周期性滴答，它会将每个 CPU 的时钟事件设备重新编程为这个较晚的事件。这样可以使空闲的
+    CPU 进入更长时间的空闲休眠，而不被周期性滴答不必要地打断。
 - en: There are, however, systems with low power states where even the per-CPU clock
     event device would stop. On such platforms, it is the broadcast tick device that
     is programmed with the next future event.
+  id: totrans-264
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，某些系统有低功耗状态，在这些系统中，甚至每个CPU的时钟事件设备也会停止。在这样的平台上，是广播tick设备被编程为触发下一个未来事件。
 - en: Just before a CPU enters such an idle state (the `do_idle()` function), it calls
     into the tick broadcast framework (`tick_nohz_idle_enter()`), and the periodic
     tick of its `tick_device` variable is disabled (see `tick_nohz_idle_stop_tick()`).
@@ -1374,19 +1967,25 @@
     clock event device backing the broadcast tick device. The `tick_cpu_device` variable
     of the CPU that is about to enter a deep idle state is now put in shutdown mode,
     which means that it is no longer functional.
+  id: totrans-265
   prefs: []
   type: TYPE_NORMAL
+  zh: 在CPU进入此类空闲状态（`do_idle()`函数）之前，它会调用tick广播框架（`tick_nohz_idle_enter()`），并禁用其`tick_device`变量的周期性tick（见`tick_nohz_idle_stop_tick()`）。然后，将该CPU添加到待唤醒CPU的列表中，方法是设置`tick_broadcast_mask`“广播映射”变量中与该CPU对应的位，该位图表示处于睡眠模式的处理器列表。接着，框架计算该CPU必须被唤醒的时间（即其下一个事件时间）；如果该时间早于当前`tick_broadcast_device`已编程的时间，则更新`tick_broadcast_device`应中断的时间，以反映新值，并将该新值编程到支持广播tick设备的时钟事件设备中。即将进入深度空闲状态的CPU的`tick_cpu_device`变量现在进入关闭模式，这意味着它不再工作。
 - en: The foregoing procedures are repeated each time a CPU enters a deep idle state,
     and the `tick_broadcast_device` variable is programmed to fire at the earliest
     of the wake-up times of the CPUs in deep idle states.
+  id: totrans-266
   prefs: []
   type: TYPE_NORMAL
+  zh: 前述过程会在每次CPU进入深度空闲状态时重复，`tick_broadcast_device`变量被编程为在进入深度空闲状态的CPU的最早唤醒时间触发。
 - en: When the tick broadcast device next event pokes, it will look into the bitmask
     of sleeping CPUs, looking for the CPU(s) owning the timer(s) that might have expired
     and will send an IPI to any remote CPU in this bitmask that might host an expired
     timer.
+  id: totrans-267
   prefs: []
   type: TYPE_NORMAL
+  zh: 当tick广播设备下一事件触发时，它会查看睡眠中的CPU的位掩码，寻找拥有可能已过期定时器的CPU，并向位掩码中任何可能托管过期定时器的远程CPU发送IPI。
 - en: If, however, a CPU leaves the idle state upon an interrupt (the architecture
     code calls `handle_IRQ()`, which indirectly calls `tick_irq_enter()`), this CPU
     tick device is enabled (first in one-shot mode), and before it performs any task,
@@ -1394,152 +1993,223 @@
     to date so that the interrupt handler does not have to deal with a stale jiffy
     value, and then it resumes the periodic tick, which is kept active until the next
     call to `tick_nohz_idle_stop_tick()` (which is essentially called from `do_idle()`).
+  id: totrans-268
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，如果CPU因中断而离开空闲状态（架构代码调用`handle_IRQ()`，间接调用`tick_irq_enter()`），则启用该CPU的tick设备（首先以单次模式），并在执行任何任务之前，调用`tick_nohz_irq_enter()`函数，确保`jiffies`是最新的，以便中断处理程序不必处理过时的jiffy值，然后恢复周期性tick，该tick会一直保持活动状态，直到下一次调用`tick_nohz_idle_stop_tick()`（实际上是从`do_idle()`调用的）。
 - en: Using standard kernel low-precision (low-res) timers
+  id: totrans-269
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 使用标准的内核低精度（低分辨率）定时器
 - en: Standard (now legacy and also referred to as low-resolution) timers are kernel
     timers operating on the granularity of `jiffies`. The resolution of these timers
     is bound to the resolution of the regular system tick, which depends on the architecture
     and configuration (that is, `CONFIG_HZ` or, simply, `HZ`) used by the kernel to
     control the scheduling and execution of a function at a certain point in the future
     (based on jiffies).
+  id: totrans-270
   prefs: []
   type: TYPE_NORMAL
+  zh: 标准（现为遗留的，也称为低分辨率）定时器是以`jiffies`粒度运行的内核定时器。这些定时器的分辨率绑定于常规系统tick的分辨率，而系统tick的分辨率取决于内核用于控制调度和执行函数在未来某一时刻（基于jiffies）的架构和配置（即`CONFIG_HZ`，或简单地说`HZ`）。
 - en: Jiffies and HZ
+  id: totrans-271
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: Jiffies 和 HZ
 - en: A jiffy is a kernel unit of time whose duration depends on the value of `HZ`,
     which represents the incrementation frequency of the `jiffies` variable in the
     kernel. Each increment event is called a tick. The clock source based on `jiffies`
     is the lowest common denominator clock source that should function on any system.
+  id: totrans-272
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个jiffy是内核时间单位，其持续时间取决于`HZ`的值，`HZ`代表内核中`jiffies`变量的增量频率。每个增量事件称为一个tick。基于`jiffies`的时钟源是最小公倍数时钟源，应该在任何系统上运行。
 - en: Since the `jiffies` variable is incremented `HZ` times every second, if `HZ
     = 1,000`, then it is incremented 1,000 times per second (that is, one tick every
     1/1,000 seconds, or 1 millisecond). On most `HZ` defaults to `100`, while it defaults
     to `250` on x86, which would result in a resolution of 10 milliseconds or 4 milliseconds.
+  id: totrans-273
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于`jiffies`变量每秒增加`HZ`次，如果`HZ = 1,000`，则它每秒增加1,000次（即每1/1,000秒增加一次tick，或者说是1毫秒）。大多数情况下，`HZ`默认值为`100`，而在x86上默认值为`250`，这将导致分辨率为10毫秒或4毫秒。
 - en: 'Here are different `HZ` values on two running systems:'
+  id: totrans-274
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是两个运行系统上不同`HZ`值：
 - en: '[PRE46]'
+  id: totrans-275
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: 'The preceding code has been executed on a running x86 machine. On an ARM running
     machine, we have the following:'
+  id: totrans-276
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的代码已经在运行的x86机器上执行。在运行的ARM机器上，我们有如下情况：
 - en: '[PRE47]'
+  id: totrans-277
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: The preceding code says the current `HZ` value is `100`.
+  id: totrans-278
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的代码表示当前`HZ`值为`100`。
 - en: Kernel timer APIs
+  id: totrans-279
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 内核定时器API
 - en: 'A timer is represented in the kernel as an instance of `struct timer_list`,
     defined as follows:'
+  id: totrans-280
   prefs: []
   type: TYPE_NORMAL
+  zh: 在内核中，定时器表示为`struct timer_list`的一个实例，定义如下：
 - en: '[PRE48]'
+  id: totrans-281
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: In the preceding data structure, `expires` is an absolute value in jiffies that
     defines when this timer will expire in the future. `entry` is internally used
     by the kernel to track this timer in a per-CPU global list of timers. `flags`
     are OR'ed bitmasks that represent the timer flags, such as the way the timer is
     managed and the CPU on which the callback will be scheduled, and `function` is
     the callback to be executed when this timer expires.
+  id: totrans-282
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的数据结构中，`expires`是jiffies中的绝对值，定义了该定时器未来何时过期。`entry`是内核用于在每个CPU的定时器全局列表中跟踪该定时器的字段。`flags`是按位或的位掩码，表示定时器标志，如定时器的管理方式以及回调将在哪个CPU上调度，`function`是当定时器过期时执行的回调函数。
 - en: You can dynamically define a timer using `timer_setup()` or statically create
     one with `DEFINE_TIMER()`.
+  id: totrans-283
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以使用`timer_setup()`动态定义一个定时器，或者使用`DEFINE_TIMER()`静态创建一个定时器。
 - en: Note
+  id: totrans-284
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: In Linux kernel versions prior to 4.15, `setup_timer()` was used as the dynamic
     variant.
+  id: totrans-285
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Linux内核版本4.15之前，`setup_timer()`用作动态版本。
 - en: 'Here are the definitions of both macros:'
+  id: totrans-286
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是两个宏的定义：
 - en: '[PRE49]'
+  id: totrans-287
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'After the timer has been initialized, you must set its expiration delay before
     starting it using one of the following APIs:'
+  id: totrans-288
   prefs: []
   type: TYPE_NORMAL
+  zh: 在定时器初始化之后，必须设置其过期延迟，然后才能使用以下API之一启动定时器：
 - en: '[PRE50]'
+  id: totrans-289
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: The `mod_timer()` function is used to either set an initial expiration delay
     or to update its value on an active timer, which means that calling this function
     on an inactive timer will activate this timer.
+  id: totrans-290
   prefs: []
   type: TYPE_NORMAL
+  zh: '`mod_timer()`函数用于设置初始过期延迟或更新活动定时器的值，这意味着在非活动定时器上调用此函数将激活该定时器。'
 - en: Note
+  id: totrans-291
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Activating a timer here means arming and queueing this timer. That said, when
     a timer is just armed, queued, and counting down, waiting for its expiration before
     running the callback function, it is said to be pending.
+  id: totrans-292
   prefs: []
   type: TYPE_NORMAL
+  zh: 启动定时器意味着准备并排队此定时器。也就是说，当定时器只是准备好、排队并倒计时，等待过期后运行回调函数时，它被称为挂起。
 - en: 'You should prefer this function over `add_timer()`, which is another function
     to start inactive timers exclusively. Before calling `add_timer()`, you must have
     set the timer expiration delay and the callback as follows:'
+  id: totrans-293
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该更倾向于使用这个函数，而不是`add_timer()`，后者是专门用于启动非活动定时器的函数。在调用`add_timer()`之前，必须设置定时器的过期延迟和回调函数，如下所示：
 - en: '[PRE51]'
+  id: totrans-294
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: The value `mod_timer()` returns depends on the state of the timer prior to it
     being invoked. Calling `mod_timer()` on an inactive timer returns `0` on success,
     while it returns `1` when successfully invoked on a pending timer or a timer whose
     callback function is being executed. This means it is totally safe to execute
     `mod_timer()` from the timer callback. When invoked on an active timer, it is
     equivalent to `del_timer(timer); timer->expires = expires; add_timer(timer);`.
+  id: totrans-295
   prefs: []
   type: TYPE_NORMAL
+  zh: '`mod_timer()`返回的值取决于定时器在调用之前的状态。在非活动定时器上调用`mod_timer()`时，成功返回`0`，而在挂起定时器或回调函数正在执行的定时器上成功调用时，返回`1`。这意味着从定时器回调中执行`mod_timer()`是完全安全的。当在活动定时器上调用时，它等同于`del_timer(timer);
+    timer->expires = expires; add_timer(timer);`。'
 - en: 'Once done with the timer, it can be released or cancelled using one of the
     following functions:'
+  id: totrans-296
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成计时器的使用后，可以通过以下函数之一将其释放或取消：
 - en: '[PRE52]'
+  id: totrans-297
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: '`del_timer()` removes (dequeues) the `timer` object from the timer management
     queue. On success, it returns a different value depending on whether it is invoked
     on an inactive timer or on an active timer. In the first case, it returns `0`,
     while it returns `1` in the latter case, even if the function callback of this
     timer is currently being executed.'
+  id: totrans-298
   prefs: []
   type: TYPE_NORMAL
+  zh: '`del_timer()`从计时器管理队列中移除（出队）`timer`对象。如果成功，它会返回一个不同的值，具体取决于它是在非活动计时器上调用还是在活动计时器上调用。在第一种情况下，它返回`0`，而在第二种情况下，即使该计时器的回调函数正在执行，它也会返回`1`。'
 - en: 'Let''s consider the following execution flow, where a timer is being deleted
     on a CPU while its callback is being executed on another CPU:'
+  id: totrans-299
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们考虑以下执行流程，其中一个计时器在一个 CPU 上被删除，而其回调在另一个 CPU 上执行：
 - en: '[PRE53]'
+  id: totrans-300
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: 'In the preceding code snippet, using `del_timer()` does not guarantee that
     the callback is not running anymore. Here is another example:'
+  id: totrans-301
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，使用`del_timer()`并不能保证回调函数不再运行。这里有另一个例子：
 - en: '[PRE54]'
+  id: totrans-302
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: When `del_timer()` returns, it only guarantees that the timer is deactivated
     and unqueued, ensuring that it will not be executed in the future. However, on
     a multiprocessing machine, the timer function might already be executing on another
@@ -1553,175 +2223,257 @@
     it will result in a deadlock. This makes the `del_timer()` context agnostic as
     it is asynchronous, while `del_timer_sync()` is to be used in a non-atomic context
     exclusively.
+  id: totrans-303
   prefs: []
   type: TYPE_NORMAL
+  zh: 当`del_timer()`返回时，它仅保证计时器已被停用并从队列中移除，确保它未来不会被执行。然而，在多处理器机器上，计时器函数可能已经在另一个处理器上执行。在这种情况下，应该使用`del_timer_sync()`，它将停用计时器并等待任何正在执行的处理程序退出后再返回。此函数会检查每个处理器，确保给定的计时器没有在其他地方运行。通过在前述竞态条件示例中使用`del_timer_sync()`，可以在不担心资源是否在回调中使用的情况下调用`kfree()`。您应该几乎总是使用`del_timer_sync()`，而不是`del_timer()`。驱动程序不能持有锁，阻止处理程序完成；否则会导致死锁。这使得`del_timer()`在上下文上是不可知的，因为它是异步的，而`del_timer_sync()`仅应在非原子上下文中使用。
 - en: 'Moreover, for sanity purposes, we can independently check whether the timer
     is pending or not using the following API:'
+  id: totrans-304
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，为了确保正确性，我们可以使用以下 API 独立检查计时器是否待处理：
 - en: '[PRE55]'
+  id: totrans-305
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: This function checks whether this timer is armed and pending.
+  id: totrans-306
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个函数检查该计时器是否已经启动并待处理。
 - en: 'The following code snippet shows a basic usage of standard kernel timers:'
+  id: totrans-307
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下代码片段展示了标准内核计时器的基本用法：
 - en: '[PRE56]'
+  id: totrans-308
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: 'In the preceding example, we demonstrated a basic usage of standard timers.
     We request 500 milliseconds of timeout. That said, the unit of time of this kind
     of timer is a jiffy. So, in order to pass a timeout value in a human format (seconds
     or milliseconds), you must use conversion helpers. You can see some here:'
+  id: totrans-309
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的示例中，我们演示了标准计时器的基本用法。我们请求500毫秒的超时。也就是说，这种计时器的时间单位是滴答。所以，要以人类易读的格式（秒或毫秒）传递超时值，必须使用转换辅助函数。这里列出了一些：
 - en: '[PRE57]'
+  id: totrans-310
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: With the preceding helper functions, you should not expect any accuracy better
     than a jiffy. For example, using `usecs_to_jiffies(100)` will return a jiffy.
     The returned value is rounded up to the closest jiffy value.
+  id: totrans-311
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用前述的辅助函数，您不应期望有比“滴答”（jiffy）更高的精度。例如，使用`usecs_to_jiffies(100)`会返回一个滴答值。返回的值会被四舍五入到最接近的滴答值。
 - en: 'In order to pass additional arguments to the timer callback, the preferred
     way is to embed them as elements into a structure together with the timer and
     use the `from_timer()` macro on the element to retrieve the bigger structure,
     from which you can access each element. This macro is defined as follows:'
+  id: totrans-312
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了将额外的参数传递给计时器回调，首选的方式是将它们作为元素嵌入到一个结构中，与计时器一起使用，并在元素上使用`from_timer()`宏来检索更大的结构，然后可以访问每个元素。这个宏定义如下：
 - en: '[PRE58]'
+  id: totrans-313
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: 'As an example, let''s consider we need to pass two elements to the timer callback:
     the first one is of type `struct sometype` and the second one is an integer. In
     order to pass arguments, we define an additional structure, as follows:'
+  id: totrans-314
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，假设我们需要向定时器回调传递两个元素，第一个元素是`struct sometype`类型，第二个元素是一个整数。为了传递参数，我们定义一个额外的结构体，如下所示：
 - en: '[PRE59]'
+  id: totrans-315
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: 'After this, we pass the embedded timer to the setup function, as follows:'
+  id: totrans-316
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们将嵌入式定时器传递给设置函数，如下所示：
 - en: '[PRE60]'
+  id: totrans-317
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: 'Later in the callback, you must use the `from_timer` variable to retrieve the
     bigger structure from which you can access arguments. Here is an example of this
     in use:'
+  id: totrans-318
   prefs: []
   type: TYPE_NORMAL
+  zh: 在回调函数中，你必须使用`from_timer`变量来检索较大的结构体，从中可以访问参数。下面是一个使用示例：
 - en: '[PRE61]'
+  id: totrans-319
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: In the preceding code snippet, we described how to pass data to the timer callback
     and how to get this data, using a container structure. By default, a pointer to
     `timer_list` is passed to the callback function, instead of the `unsigned long`
     data type in versions prior to 4.15.
+  id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，我们描述了如何将数据传递给定时器回调以及如何使用容器结构来获取该数据。默认情况下，指向`timer_list`的指针被传递给回调函数，而不是在4.15之前版本中使用的`unsigned
+    long`数据类型。
 - en: High-resolution timers (hrtimers)
+  id: totrans-321
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 高分辨率定时器（hrtimers）
 - en: While the legacy timer implementation is bound to ticks, high-precision timers
     provide us with nanosecond-level and tick-agnostic timing accuracy to meet the
     urgent need for precise time applications or kernel drivers. This has been introduced
     in kernel v2.6.16 and can be enabled in the build using the `CONFIG_HIGH_RES_TIMERS`
     option in the kernel configuration.
+  id: totrans-322
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然传统的定时器实现与滴答时间相关联，但高精度定时器提供了纳秒级和与滴答时间无关的定时精度，满足了对精确时间应用或内核驱动程序的紧迫需求。该功能已在内核v2.6.16中引入，并可以通过在内核配置中启用`CONFIG_HIGH_RES_TIMERS`选项来启用。
 - en: 'While the standard timer interface keeps/represents time values in `jiffies`,
     the high-resolution timer interface came with a new data type, allowing us to
     keep the time value: `ktime_t`, which is a simple 64-bit scalar.'
+  id: totrans-323
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然标准定时器接口使用`jiffies`表示时间值，但高分辨率定时器接口引入了一种新的数据类型，允许我们保存时间值：`ktime_t`，它是一个简单的64位标量值。
 - en: Note
+  id: totrans-324
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意
 - en: Prior to kernel 3.17, the `ktime_t` type was represented differently on 32-
     or 64-bit machines. On 64-bit CPUs, it was represented as a plain 64-bit nanosecond
     value as it is nowadays all over the kernel, while it was represented as a two-32-bit-fields
     data structure ([`seconds – nanoseconds`] pair) on 32-bit CPUs.
+  id: totrans-325
   prefs: []
   type: TYPE_NORMAL
+  zh: 在内核3.17之前，`ktime_t`类型在32位或64位机器上有不同的表示方式。在64位CPU上，它被表示为纯64位的纳秒值，就像现在内核中的所有地方一样；而在32位CPU上，它则被表示为一个由两个32位字段组成的数据结构（[`seconds
+    - nanoseconds`]对）。
 - en: 'Hrtimer APIs require a `#include <linux/hrtimer.h>` header. That said, in the
     header file, the structure that characterizes a high-resolution timer is defined
     as follows:'
+  id: totrans-326
   prefs: []
   type: TYPE_NORMAL
+  zh: Hrtimer API需要`#include <linux/hrtimer.h>`头文件。也就是说，在该头文件中，表征高分辨率定时器的结构体定义如下：
 - en: '[PRE62]'
+  id: totrans-327
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: The elements in the data structure have been shortened to the strict minimum
     to cover the needs of the book. For the rest, we'll now look at their meaning.
+  id: totrans-328
   prefs: []
   type: TYPE_NORMAL
+  zh: 数据结构中的元素已缩短到最严格的最小值，以覆盖本书的需求。接下来，我们将讨论它们的含义。
 - en: 'Before using the hrtimer, it must be initialized with `hrtimer_init()`, defined
     as follows:'
+  id: totrans-329
   prefs: []
   type: TYPE_NORMAL
+  zh: 在使用hrtimer之前，必须先用`hrtimer_init()`进行初始化，定义如下：
 - en: '[PRE63]'
+  id: totrans-330
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: 'In the preceding function, `timer` is a pointer to the hrtimer to initialize.
     `clock_id` tells which type of clock must be used to feed this hrtimer. The following
     are common options:'
+  id: totrans-331
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的函数中，`timer`是指向要初始化的hrtimer的指针。`clock_id`指示必须使用哪种类型的时钟来为该hrtimer提供时间。以下是一些常见的选项：
 - en: '`CLOCK_REALTIME`: This selects the real-time time—that is, the wall time. If
     the system time changes, it can affect this timer.'
+  id: totrans-332
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`CLOCK_REALTIME`：选择实时时间，即墙钟时间。如果系统时间发生变化，它可能会影响该定时器。'
 - en: '`CLOCK_MONOTONIC`: This is an incremental time, not affected by system changes.
     However, it stops incrementing when the system goes to sleep or suspends.'
+  id: totrans-333
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`CLOCK_MONOTONIC`：这是增量时间，不受系统变化的影响。然而，当系统进入休眠或挂起时，它会停止增加。'
 - en: '`CLOCK_BOOTTIME`: The running time of the system. Similar to `CLOCK_MONOTONIC`,
     the difference is that it includes sleep time. When suspended, it will still increase.'
+  id: totrans-334
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`CLOCK_BOOTTIME`：系统的运行时间。与`CLOCK_MONOTONIC`类似，区别在于它包括了睡眠时间。当系统挂起时，它仍会增加。'
 - en: 'In the preceding code snippet, the `mode` parameter tells how the hrtimer should
     be working. Here are some possible options:'
+  id: totrans-335
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，`mode`参数指示hrtimer应如何工作。以下是一些可能的选项：
 - en: '`HRTIMER_MODE_ABS`: This means that this timer expires after an absolute specified
     time.'
+  id: totrans-336
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`HRTIMER_MODE_ABS`：这意味着定时器在指定的绝对时间后到期。'
 - en: '`HRTIMER_MODE_REL`: This timer expires after a specified relative from now.'
+  id: totrans-337
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`HRTIMER_MODE_REL`：该定时器将在指定的相对时间后过期。'
 - en: '`HRTIMER_MODE_PINNED`: This hrtimer is bound to a CPU. This is only considered
     when starting the hrtimer so that the hrtimer fires and executes the callback
     on the same CPU on which it is queued.'
+  id: totrans-338
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`HRTIMER_MODE_PINNED`：该hrtimer绑定到一个CPU上。仅在启动hrtimer时才考虑此标志，以确保定时器触发并在与队列相同的CPU上执行回调。'
 - en: '`HRTIMER_MODE_ABS_PINNED`: This is a combination of the first and the third
     flags.'
+  id: totrans-339
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`HRTIMER_MODE_ABS_PINNED`：这是第一和第三个标志的组合。'
 - en: '`HRTIMER_MODE_REL_PINNED`: This is a combination of the second and third flags.'
+  id: totrans-340
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`HRTIMER_MODE_REL_PINNED`：这是第二个和第三个标志的组合。'
 - en: 'After the hrtimer has been initialized, it must be assigned a callback function
     that will be executed upon the timer expiration. The following code snippet shows
     the expected prototype:'
+  id: totrans-341
   prefs: []
   type: TYPE_NORMAL
+  zh: 在初始化hrtimer后，必须为其分配一个回调函数，当定时器过期时，该回调函数将被执行。以下代码片段显示了预期的原型：
 - en: '[PRE64]'
+  id: totrans-342
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: '`hrtimer_restart` is the type to be returned by the callback. It must be either
     `HRTIMER_NORESTART` to indicate that the timer must not be restarted (used to
     perform a one-shot operation) or `HRTIMER_RESTART` to indicate that the timer
@@ -1731,43 +2483,61 @@
     the timer restart is implicit as it will be handled by the kernel. However, the
     driver needs to reset the timeout before returning from the callback. In order
     to do so, the driver can use `hrtimer_forward()`, defined as follows:'
+  id: totrans-343
   prefs: []
   type: TYPE_NORMAL
+  zh: '`hrtimer_restart`是回调返回的类型。它必须是`HRTIMER_NORESTART`，表示定时器不需要重新启动（用于执行一次性操作），或者是`HRTIMER_RESTART`，表示定时器需要重新启动（用于模拟周期模式）。在第一种情况下，当返回`HRTIMER_NORESTART`时，如果需要，驱动程序必须显式地重新启动定时器（例如使用`hrtimer_start()`）。而当返回`HRTIMER_RESTART`时，定时器的重新启动是隐式的，由内核处理。然而，驱动程序在回调返回之前需要重置超时时间。为了做到这一点，驱动程序可以使用`hrtimer_forward()`，其定义如下：'
 - en: '[PRE65]'
+  id: totrans-344
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: In the preceding code snippet, `timer` is the hrtimer to forward, `now` is the
     point from where the timer must be forwarded, and `interval` is how long in the
     future the timer must be forwarded. Do, however, note that this only updates the
     timer expiry value and does not requeue the timer.
+  id: totrans-345
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，`timer`是需要转发的hrtimer，`now`是定时器必须从哪个时间点开始转发，而`interval`是定时器需要转发的未来时间。需要注意的是，这仅更新定时器的过期时间，而不会重新排队定时器。
 - en: 'The `now` parameter can be obtained in different ways, either by using `ktime_get()`,
     which would return the current monotonic clock time or with `hrtimer_get_expires()`,
     which would return the time when the timer is supposed to expire before forwarding.
     This is illustrated in the following code snippet:'
+  id: totrans-346
   prefs: []
   type: TYPE_NORMAL
+  zh: '`now`参数可以通过不同方式获取，可以使用`ktime_get()`来获取当前的单调时钟时间，或者使用`hrtimer_get_expires()`来返回定时器应该过期的时间，之后再进行转发。以下代码片段说明了这一点：'
 - en: '[PRE66]'
+  id: totrans-347
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: 'In the first line of the preceding example, the hrtimer is forwarded 500 milliseconds
     from the current time, while in the second line, it is forwarded 450 nanoseconds
     from the time when it was supposed to expire. The first line in the example is
     equivalent to `hrtimer_forward_now()`, which forwards the hrtimer to a specified
     time from the current time (from now). It is declared as follows:'
+  id: totrans-348
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面示例的第一行中，hrtimer从当前时间开始向前推移500毫秒，而第二行则是从定时器原本应该过期的时间点开始，向前推移450纳秒。示例中的第一行等同于`hrtimer_forward_now()`，它将hrtimer从当前时间开始推送到指定时间（从现在开始）。其声明如下：
 - en: '[PRE67]'
+  id: totrans-349
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: 'Now that the timer has been set up and its callback defined, it can be armed
     (started) using `hrtimer_start()`, which has the following prototype:'
+  id: totrans-350
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在定时器已经设置并且回调函数已定义，可以使用`hrtimer_start()`启动定时器，函数原型如下：
 - en: '[PRE68]'
+  id: totrans-351
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: 'In the preceding code snippet, `mode` represents the timer expiry mode, and
     it should be either `HRTIMER_MODE_ABS` for an absolute time value or `HRTIMER_MODE_REL`
     for a time value relative to now. This parameter must be consistent with the initialization
@@ -1775,53 +2545,81 @@
     Finally, `time` is the expiry time of the hrtimer. Since it is of type `ktime_t`,
     various helper functions allow us to generate a `ktime_t` element from various
     input time units. These are shown here:'
+  id: totrans-352
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，`mode`表示定时器的过期模式，可以是`HRTIMER_MODE_ABS`，表示绝对时间值，或者是`HRTIMER_MODE_REL`，表示相对于当前时间的时间值。此参数必须与初始化时的模式参数一致。`timer`参数是指向已初始化的hrtimer的指针。最后，`time`是hrtimer的过期时间。由于它是`ktime_t`类型，提供了多种辅助函数，可以从不同的时间单位生成`ktime_t`元素，具体如下：
 - en: '[PRE69]'
+  id: totrans-353
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: In the preceding list, `ktime_set()` generates a `ktime_t` element from a given
     number of seconds and nanoseconds. `ns_to_ktime()` or `ms_to_ktime()` generate
     a `ktime_t` element from a given number of nanoseconds or milliseconds, respectively.
+  id: totrans-354
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的列表中，`ktime_set()` 会根据给定的秒数和纳秒数生成一个 `ktime_t` 元素。`ns_to_ktime()` 或 `ms_to_ktime()`
+    分别会根据给定的纳秒数或毫秒数生成一个 `ktime_t` 元素。
 - en: 'You may also be interested in returning the number of nano-/microseconds, given
     a `ktime_t` input element using the following functions:'
+  id: totrans-355
   prefs: []
   type: TYPE_NORMAL
+  zh: 您也可能对返回纳秒/微秒数感兴趣，可以使用以下函数，给定一个 `ktime_t` 输入元素：
 - en: '[PRE70]'
+  id: totrans-356
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE70]'
 - en: 'Moreover, given one or two `ktime_t` elements, you can perform some arithmetical
     operations using the following helpers:'
+  id: totrans-357
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，给定一个或两个 `ktime_t` 元素，您可以使用以下助手函数进行一些算术运算：
 - en: '[PRE71]'
+  id: totrans-358
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE71]'
 - en: To subtract or add `ktime` objects, you can use `ktime_sub()` and `ktime_add()`,
     respectively. `ktime_add_ns()` increments a `ktime_t` element by a specified number
     of nanoseconds. `ktime_add_us()` is another variant for microseconds. For subtraction,
     `ktime_sub_ns()` and `ktime_sub_us()` can be used.
+  id: totrans-359
   prefs: []
   type: TYPE_NORMAL
+  zh: 要对 `ktime` 对象进行加减运算，可以分别使用 `ktime_sub()` 和 `ktime_add()`。`ktime_add_ns()` 会将
+    `ktime_t` 元素按指定的纳秒数进行递增。`ktime_add_us()` 是另一个微秒级的变体。对于减法操作，可以使用 `ktime_sub_ns()`
+    和 `ktime_sub_us()`。
 - en: After calling `hrtimer_start()`, the hrtimer will be armed (activated) and enqueued
     in a (time-ordered) per-CPU bucket, waiting for its expiration. This bucket will
     be local to the CPU on which `hrtimer_start()` has been invoked, but it is not
     guaranteed that the callback will run on this CPU (migration might happen). For
     a CPU-bound hrtimer, you should use a `*_PINNED` mode variant when you initialize
     the hrtimer.
+  id: totrans-360
   prefs: []
   type: TYPE_NORMAL
+  zh: 在调用 `hrtimer_start()` 后，hrtimer 将被激活（启用）并入队到一个（按时间顺序排列的）每 CPU 桶中，等待到期。这个桶将局部于调用
+    `hrtimer_start()` 的 CPU，但不能保证回调会在这个 CPU 上运行（可能会发生迁移）。对于绑定到特定 CPU 的 hrtimer，您应当在初始化
+    hrtimer 时使用 `*_PINNED` 模式变体。
 - en: 'An enqueued hrtimer is always started. Once the timer expires, its callback
     is invoked, and depending on the return value, the hrtimer can be requeued or
     not. In order to cancel a timer, drivers can use `hrtimer_cancel()` or `hrtimer_try_to_cancel()`,
     declared as follows:'
+  id: totrans-361
   prefs: []
   type: TYPE_NORMAL
+  zh: 入队的 hrtimer 始终会启动。一旦定时器到期，其回调函数会被调用，取决于返回值，hrtimer 可能会重新排队，也可能不会。为了取消定时器，驱动程序可以使用
+    `hrtimer_cancel()` 或 `hrtimer_try_to_cancel()`，声明如下：
 - en: '[PRE72]'
+  id: totrans-362
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE72]'
 - en: Both functions return `0` when the timer is not active during the call. `hrtimer_try_to_cancel()`
     will return `1` if the timer is active (running but not executing the callback
     function) and has been successfully canceled or will fail, returning `-1` if the
@@ -1830,170 +2628,257 @@
     it to finish if it is being executed. When `hrtimer_cancel()` returns, the caller
     can be guaranteed that the timer is no longer active and that its expiration function
     is not running.
+  id: totrans-363
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果定时器在调用时未处于激活状态，两个函数都会返回 `0`。`hrtimer_try_to_cancel()` 如果定时器处于激活状态（正在运行但未执行回调函数）且已成功取消，将返回
+    `1`，如果回调函数正在执行，则返回 `-1`。另一方面，`hrtimer_cancel()` 如果回调函数尚未运行，将取消定时器；如果回调函数正在执行，将等待回调函数完成。当
+    `hrtimer_cancel()` 返回时，可以保证定时器已不再激活，并且其过期函数未在运行。
 - en: 'Drivers can, however, independently check whether the hrtimer callback is still
     running with the following code:'
+  id: totrans-364
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，驱动程序可以使用以下代码独立检查 hrtimer 回调是否仍在运行：
 - en: '[PRE73]'
+  id: totrans-365
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE73]'
 - en: For instance, `hrtimer_try_to_cancel()` internally calls `hrtimer_callback_running()`
     and returns `-1` if the callback is running.
+  id: totrans-366
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，`hrtimer_try_to_cancel()` 内部会调用 `hrtimer_callback_running()`，如果回调正在运行，则返回
+    `-1`。
 - en: 'Let''s write a module example to put our hrtimer knowledge into practice. We
     first start by writing the callback function, as follows:'
+  id: totrans-367
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们编写一个模块示例，将我们的 hrtimer 知识付诸实践。我们首先从编写回调函数开始，如下所示：
 - en: '[PRE74]'
+  id: totrans-368
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE74]'
 - en: In the preceding hrtimer callback function, we can decide to run in one-shot
     mode or periodic mode. For periodic mode, the user must define `PERIODIC_MS_500`,
     in which case the timer will be forwarded 500 milliseconds in the future from
     the current hrtimer clock base time before being requeued.
+  id: totrans-369
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的 hrtimer 回调函数中，我们可以决定以单次模式或周期模式运行。对于周期模式，用户必须定义 `PERIODIC_MS_500`，在这种情况下，定时器将在当前
+    hrtimer 时钟基准时间的基础上向前推迟 500 毫秒，然后重新排队。
 - en: 'Then, the rest of the module implementation looks like this:'
+  id: totrans-370
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，模块的其余实现如下所示：
 - en: '[PRE75]'
+  id: totrans-371
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE75]'
 - en: In the preceding implementation, we generated an initial `ktime_t` element of
     1 second and 1,000 nanoseconds—that is, 1 second and 1 millisecond, which is used
     as initial expiration duration. When the hrtimer expires for the first time, our
     callback is invoked. If `PERIODIC_MS_500` is defined, the hrtimer will be forwarded
     to 500 milliseconds later, and the callback will be periodically invoked (every
     500 milliseconds) after the initial invocation; otherwise, it is a one-shot invocation.
+  id: totrans-372
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的实现中，我们生成了一个初始的`ktime_t`元素，表示1秒和1000纳秒——即1秒和1毫秒，作为初始过期时长。当hrtimer第一次超时时，我们的回调函数被调用。如果定义了`PERIODIC_MS_500`，则hrtimer会延迟500毫秒触发，回调会在初始调用后定期触发（每500毫秒触发一次）；否则，它是一次性调用。
 - en: Implementing work-deferring mechanisms
+  id: totrans-373
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 实现工作延迟机制
 - en: 'Deferring is a method by which you schedule a piece of work to be executed
     in the future. It''s a way to report an action later. Obviously, the kernel provides
     facilities to implement such a mechanism; it allows you to defer functions, whatever
     their type, to be called and executed later. There are three of them in the kernel,
     as outlined here:'
+  id: totrans-374
   prefs: []
   type: TYPE_NORMAL
+  zh: 延迟是一个将任务安排到未来执行的方式。这是一种推迟报告动作的方式。显然，内核提供了实现这种机制的设施；它允许您推迟函数（无论其类型如何）的调用，并在稍后执行。在内核中有三种这样的机制，如下所述：
 - en: '**Softirqs**: Executed in an atomic context'
+  id: totrans-375
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**软中断**：在原子上下文中执行'
 - en: '**Tasklets**: Executed in an atomic context'
+  id: totrans-376
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**任务let**：在原子上下文中执行'
 - en: '**Workqueues**: Executed in a process context'
+  id: totrans-377
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**工作队列**：在进程上下文中执行'
 - en: In the next three sections, we will learn in detail the implementation of each
     of them.
+  id: totrans-378
   prefs: []
   type: TYPE_NORMAL
+  zh: 在接下来的三节中，我们将详细了解它们的实现。
 - en: Softirqs
+  id: totrans-379
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 软中断
 - en: As the name suggests, `kernel/softirq.c` in the kernel source tree, and drivers
     that wish to use this API need to include `<linux/interrupt.h>`.
+  id: totrans-380
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如其名称所示，`kernel/softirq.c`位于内核源代码树中，驱动程序若希望使用此API，需包含`<linux/interrupt.h>`。
 - en: 'Softirqs are represented by `struct softirq_action` structures and are defined
     as follows:'
+  id: totrans-381
   prefs: []
   type: TYPE_NORMAL
+  zh: 软中断通过`struct softirq_action`结构表示，定义如下：
 - en: '[PRE76]'
+  id: totrans-382
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE76]'
 - en: 'This structure embeds a pointer to the function to run when the softirq is
     raised. Thus, the prototype of your softirq handler should look like this:'
+  id: totrans-383
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个结构体嵌入了一个指针，指向当软中断被触发时要执行的函数。因此，您的软中断处理程序的原型应该如下所示：
 - en: '[PRE77]'
+  id: totrans-384
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE77]'
 - en: 'Running a softirq handler results in executing this action function, which
     has only one parameter: a pointer to the corresponding `softirq_action` structure.
     You can register the softirq handler at runtime by means of the `open_softirq()`
     function, as illustrated here:'
+  id: totrans-385
   prefs: []
   type: TYPE_NORMAL
+  zh: 运行软中断处理程序会执行这个动作函数，它只有一个参数：指向相应`softirq_action`结构的指针。您可以通过`open_softirq()`函数在运行时注册软中断处理程序，如下所示：
 - en: '[PRE78]'
+  id: totrans-386
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE78]'
 - en: '`nr` represents the softirq index, which is also considered as the softirq
     priority (where 0 is the highest). `action` is a pointer to the softirq handler.
     Possible indexes are enumerated in the following code snippet:'
+  id: totrans-387
   prefs: []
   type: TYPE_NORMAL
+  zh: '`nr`表示软中断的索引，也被认为是软中断的优先级（其中0为最高优先级）。`action`是指向软中断处理程序的指针。可能的索引在以下代码片段中列出：'
 - en: '[PRE79]'
+  id: totrans-388
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE79]'
 - en: 'Softirqs with lower indexes (highest priority) run before those with higher
     indexes (lowest priority). The name of all the available softirqs in the kernel
     are listed in the following array:'
+  id: totrans-389
   prefs: []
   type: TYPE_NORMAL
+  zh: 索引较低的软中断（优先级较高）会在索引较高的软中断（优先级较低）之前运行。内核中所有可用软中断的名称列在以下数组中：
 - en: '[PRE80]'
+  id: totrans-390
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE80]'
 - en: 'It''s easy to check some in the output of the `/proc/softirqs` virtual file,
     as follows:'
+  id: totrans-391
   prefs: []
   type: TYPE_NORMAL
+  zh: 很容易在`/proc/softirqs`虚拟文件的输出中检查一些内容，如下所示：
 - en: '[PRE81]'
+  id: totrans-392
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE81]'
 - en: 'A `NR_SOFTIRQS`-entry array of `struct softirq_action` is declared in `kernel/softirq.c`,
     as follows:'
+  id: totrans-393
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`kernel/softirq.c`中声明了一个`NR_SOFTIRQS`条目的`struct softirq_action`数组，如下所示：
 - en: '[PRE82]'
+  id: totrans-394
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE82]'
 - en: 'Each entry in this array may contain one—and only one—softirq. Consequently,
     there can be a maximum of `NR_SOFTIRQS` (actually, 10 in v5.10, the last stable
     version at the time of writing) registered softirqs. The following code snippet
     from `kernel/softirq.c` illustrates this:'
+  id: totrans-395
   prefs: []
   type: TYPE_NORMAL
+  zh: 该数组中的每一项可能包含一个——且只能包含一个——软中断。因此，最多可以注册`NR_SOFTIRQS`个软中断（实际上，在写作时的最后一个稳定版本v5.10中为10个）。以下是`kernel/softirq.c`中的代码片段：
 - en: '[PRE83]'
+  id: totrans-396
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE83]'
 - en: 'A concrete example is the network subsystem, which registers the softirqs it
     needs (in `net/core/dev.c`), as follows:'
+  id: totrans-397
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个具体的例子是网络子系统，它注册了它需要的软中断（在`net/core/dev.c`中），如下所示：
 - en: '[PRE84]'
+  id: totrans-398
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE84]'
 - en: 'Before a registered softirq can execute, it should be activated/scheduled.
     In order to do so, you have to call `raise_softirq()` or `raise_softirq_irqoff()`
     (if interrupts are already off), as illustrated in the following code snippet:'
+  id: totrans-399
   prefs: []
   type: TYPE_NORMAL
+  zh: 在已注册的软中断执行之前，它需要被激活或调度。为此，您需要调用`raise_softirq()`或`raise_softirq_irqoff()`（如果中断已关闭），如下所示的代码片段：
 - en: '[PRE85]'
+  id: totrans-400
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE85]'
 - en: 'The first function simply sets the appropriate bit in the per-CPU softirq bitmap
     (the `__softirq_pending` field in the `struct irq_cpustat_t` data structure allocated
     per CPU in `kernel/softirq.c`), as follows:'
+  id: totrans-401
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个函数简单地在每 CPU 软中断位图中设置适当的位（在 `kernel/softirq.c` 中为每 CPU 分配的 `struct irq_cpustat_t`
+    数据结构中的 `__softirq_pending` 字段），如下所示：
 - en: '[PRE86]'
+  id: totrans-402
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE86]'
 - en: When the flag is checked, this allows it to run. This function is described
     here for study purposes and should not be used directly.
+  id: totrans-403
   prefs: []
   type: TYPE_NORMAL
+  zh: 当检查标志时，允许其运行。此函数在此处仅用于学习目的，不应直接使用。
 - en: '`raise_softirq_irqoff` needs to be called with interrupts disabled. First,
     it internally calls `__raise_softirq_irqoff()`, described previously, to activate
     the softirq. Afterward, it checks whether it has been called from within an interrupt
@@ -2007,163 +2892,229 @@
     an interrupt context. However, if `in_interrupt() == 0`, it invokes `wakeup_softirqd()`,
     responsible for waking the local CPU `ksoftirqd` thread up (it schedules it, actually)
     in order to ensure the softirq runs soon but in a process context this time.'
+  id: totrans-404
   prefs: []
   type: TYPE_NORMAL
+  zh: '`raise_softirq_irqoff` 需要在禁用中断时调用。首先，它内部调用之前描述的 `__raise_softirq_irqoff()`
+    来激活软中断。之后，它通过 `in_interrupt()` 宏来检查是否从中断上下文（硬中断或软中断）中调用（该宏简单返回 `current_thread_info()->preempt_count`
+    的值，其中 0 表示启用了抢占，表明我们不在中断上下文中，大于 0 的值表示我们在中断上下文中）。如果 `in_interrupt() > 0`，则在中断上下文中不执行任何操作，因为软中断标志在任何
+    I/O IRQ 处理程序的退出路径上都会被检查（请参见 ARM 的 `asm_do_IRQ()` 或 x86 平台的 `do_IRQ()`，它们调用 `irq_exit()`）。在这里，软中断在中断上下文中运行。但是，如果
+    `in_interrupt() == 0`，它将调用 `wakeup_softirqd()`，负责唤醒本地 CPU 的 `ksoftirqd` 线程（实际上是调度它），以确保尽快但这次在进程上下文中运行软中断。'
 - en: '`raise_softirq`, on the other hand, first calls `local_irq_save()` (which disables
     interrupts on the local processor after saving its current interrupt flags). It
     then calls `raise_softirq_irqoff()`, described previously, in order to schedule
     the softirq on the local CPU (remember—this function must be invoked with IRQs
     disabled on the local CPU). Finally, it calls `local_irq_restore()` in order to
     restore the previously saved interrupt flags.'
+  id: totrans-405
   prefs: []
   type: TYPE_NORMAL
+  zh: '`raise_softirq`，另一方面，首先调用 `local_irq_save()`（保存当前中断标志并在本地处理器上禁用中断）。然后调用之前描述的
+    `raise_softirq_irqoff()`，以便在本地 CPU 上调度软中断（请记住——此函数必须在本地 CPU 上禁用 IRQ 时调用）。最后，调用
+    `local_irq_restore()` 以恢复先前保存的中断标志。'
 - en: 'Here are a few things to remember about softirqs:'
+  id: totrans-406
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关软中断的几点需要记住：
 - en: A softirq can never preempt another softirq. Only hardware interrupts can. Softirqs
     are executed at a high priority, with scheduler preemption disabled but IRQs enabled.
     This makes softirqs suitable for the most time-critical and important deferred
     processing on the system.
+  id: totrans-407
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个软中断永远不能抢占另一个软中断。只有硬件中断可以。软中断以高优先级执行，调度程序抢占被禁用但 IRQ 已启用。这使得软中断适合系统上最关键和重要的延迟处理。
 - en: While a handler runs on a CPU, other softirqs on this CPU are disabled. Softirqs
     run concurrently, however. While a softirq is running, another softirq (even the
     same one) can run on another processor. This is one of the main advantages of
     softirqs over hardirqs and is the reason why they are used in the networking subsystem,
     which may require heavy CPU power.
+  id: totrans-408
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 当处理程序在 CPU 上运行时，此 CPU 上的其他软中断被禁用。但是，软中断可以同时运行。在一个软中断运行时，另一个软中断（甚至是相同的软中断）可以在另一个处理器上运行。这是软中断相对于硬中断的主要优势之一，也是它们在可能需要大量
+    CPU 力的网络子系统中使用的原因。
 - en: 'Softirqs are mostly scheduled in the return path of hardware interrupt handlers.
     If any is scheduled out of the interrupt context, it will run in a process context
     if it is still pending when the local `ksoftirqd` thread is given to the CPU.
     Their execution may be triggered in the following cases:'
+  id: totrans-409
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 大多数情况下，在硬件中断处理程序的返回路径中调度软中断。如果在退出中断上下文时仍然挂起，它将在本地 `ksoftirqd` 线程被分配到 CPU 时在进程上下文中运行。它们的执行可能在以下情况下被触发：
 - en: By the local per-CPU timer interrupt (on SMP system only, with `CONFIG_SMP`
     enabled). See `timer_tick()`, `update_process_times()`, and `run_local_timers()`.
+  id: totrans-410
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过本地每 CPU 定时器中断（仅在 SMP 系统上，启用 `CONFIG_SMP`）。参见 `timer_tick()`、`update_process_times()`
+    和 `run_local_timers()`。
 - en: By a call to the `local_bh_enable()` function (mostly invoked by the network
     subsystem for handling packet-receiving/-transmitting softirqs).
+  id: totrans-411
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过调用`local_bh_enable()`函数（主要由网络子系统调用，用于处理接收/发送软中断）。
 - en: On the exit path of any I/O IRQ handler (see `do_IRQ`, which makes a call to
     `irq_exit()`, in turn invoking `invoke_softirq()`.
+  id: totrans-412
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在任何 I/O IRQ 处理程序的退出路径上（参见`do_IRQ`，它调用`irq_exit()`，进而调用`invoke_softirq()`）。
 - en: When the local `ksoftirqd` thread is given to the CPU (aka awakened).
+  id: totrans-413
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 当本地`ksoftirqd`线程被分配给 CPU 时（即被唤醒）。
 - en: 'The actual kernel function responsible for walking through the softirqs'' pending
     bitmap and running them is `__do_softirq()`, defined in `kernel/softirq.c`. This
     function is always invoked with interrupts disabled on the local CPU. It does
     the following tasks:'
+  id: totrans-414
   prefs: []
   type: TYPE_NORMAL
+  zh: 负责遍历软中断待处理位图并执行它们的实际内核函数是`__do_softirq()`，该函数定义在`kernel/softirq.c`中。此函数总是在禁用本地
+    CPU 中断的情况下被调用。它完成以下任务：
 - en: Once invoked, the function first saves the current per-CPU pending softirqs'
     bitmap in a variable named `pending`, and locally disables softirqs by means of
     `__local_bh_disable_ip`.
+  id: totrans-415
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一旦被调用，该函数首先将当前每个 CPU 的待处理软中断位图保存在名为`pending`的变量中，并通过`__local_bh_disable_ip`在本地禁用软中断。
 - en: It then resets the current per-CPU pending bitmask (which has already been saved)
     and then re-enables interrupts (softirqs run with interrupts enabled).
+  id: totrans-416
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 然后，它重置当前每个 CPU 的待处理位图（该位图已被保存），然后重新启用中断（软中断在启用中断时运行）。
 - en: After this, it enters a `while` loop, checking for pending softirqs in the saved
     bitmap. If there is no softirq pending, it will execute the handler of each pending
     softirq, taking care to increment their execution statistics.
+  id: totrans-417
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 此后，它进入一个`while`循环，检查保存的位图中的待处理软中断。如果没有待处理的软中断，它将执行每个待处理软中断的处理程序，并小心地增加其执行统计数据。
 - en: After all pending IRQ handlers have been executed (we are out of the `while`
     loop), `__do_softirq()` again reads the per-CPU pending bitmask in order to check
     if any softirqs were scheduled again when it was in the `while` loop. If there
     are any pending softirqs, the whole process will restart (based on a `goto` loop),
     starting from *Step 2*. This helps in handling, for example, softirqs that rescheduled
     themselves.
+  id: totrans-418
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在所有待处理的 IRQ 处理程序执行完毕后（即我们已经脱离了`while`循环），`__do_softirq()`再次读取每个 CPU 的待处理位图，以检查在`while`循环期间是否有新的软中断被调度。如果有待处理的软中断，整个过程将重新启动（基于`goto`循环），从*第2步*开始。这有助于处理例如自我重新调度的软中断。
 - en: 'However, `__do_softirq()` will not repeat if one of the following conditions
     occurs:'
+  id: totrans-419
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，如果发生以下条件之一，`__do_softirq()`将不会重复执行：
 - en: It has already repeated up to `MAX_SOFTIRQ_RESTART` times, which is set to 10
     in `kernel/softirq.c`. This is the limit of the softirqs' processing loop, not
     the upper bound of the previously described `while` loop.
+  id: totrans-420
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它已经重复执行了最多`MAX_SOFTIRQ_RESTART`次，该值在`kernel/softirq.c`中被设置为10。这是软中断处理循环的上限，而不是前面描述的`while`循环的上限。
 - en: It has hogged the CPU more than `MAX_SOFTIRQ_TIME`, which is set to 2 milliseconds
     (`msecs_to_jiffies(2)`) in `kernel/softirq.c`, since this would prevent the scheduler
     from being enabled.
+  id: totrans-421
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它已经占用了 CPU 超过了`MAX_SOFTIRQ_TIME`，该值在`kernel/softirq.c`中被设置为2毫秒（`msecs_to_jiffies(2)`），因为这会阻止调度程序被启用。
 - en: If one of the two aforementioned situations occurs, `__do_softirq()` will break
     its loop and call `wakeup_softirqd()` in order to wake the local `ksoftirqd` thread,
     which will later execute the pending softirqs in a process context. Since `do_softirq`
     is called at many points in the kernel, it is likely that another invocation of
     `__do_softirqs` handles pending softirqs before the `ksoftirqd` thread has a chance
     to run.
+  id: totrans-422
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果发生前述两种情况之一，`__do_softirq()`将中断其循环并调用`wakeup_softirqd()`，以唤醒本地的`ksoftirqd`线程，后者将以进程上下文的方式执行待处理的软中断。由于`do_softirq`在内核中的多个点被调用，因此很可能会有另一次调用`__do_softirq()`来处理待处理的软中断，而`ksoftirqd`线程还没有机会运行。
 - en: Some words about ksoftirqd
+  id: totrans-423
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 关于 ksoftirqd 的一些说明
 - en: '`ksoftirqd` is a per-CPU kernel thread raised to handle unserviced software
     interrupts. It is spawned early during the kernel boot process, as stated in `kernel/softirq.c`
     and shown here:'
+  id: totrans-424
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ksoftirqd`是一个每个 CPU 上的内核线程，用于处理未服务的软中断。它会在内核启动过程中很早被创建，如`kernel/softirq.c`中所述，并在这里展示：'
 - en: '[PRE87]'
+  id: totrans-425
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE87]'
 - en: After running the top command in the preceding code snippet, we can see some
     `ksoftirqd/<n>` entries, where `<n>` is the logical CPU index of the CPU running
     the `ksoftirqd` thread. As `ksoftirqd` threads run in a process context, they
     are equal to classic processes/threads, so they compete for the CPU. `ksoftirqd`
     threads hogging CPUs for a long time may indicate a system under heavy load.
+  id: totrans-426
   prefs: []
   type: TYPE_NORMAL
+  zh: 在执行前述代码片段中的`top`命令后，我们可以看到一些`ksoftirqd/<n>`条目，其中`<n>`是运行`ksoftirqd`线程的CPU的逻辑CPU索引。由于`ksoftirqd`线程在进程上下文中运行，因此它们等同于经典的进程/线程，因此它们会争夺CPU。如果`ksoftirqd`线程长时间占用CPU，可能表明系统负载过重。
 - en: Tasklets
+  id: totrans-427
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 任务let
 - en: Before starting to discuss about **tasklets**, you must notice that these are
     scheduled for removal in the Linux kernel, thus the purpose of this section is
     purely for pedagogic reasons, to help you understanding their use in older kernel
     modules. Consequently, you must not use these in your developments.
+  id: totrans-428
   prefs: []
   type: TYPE_NORMAL
+  zh: 在开始讨论**任务let**之前，您必须注意到这些任务将会被移除出Linux内核，因此本节的目的纯粹是为了教学目的，帮助您理解它们在旧版内核模块中的使用。因此，您不应在开发中使用这些。
 - en: Tasklets are bottom halves that are built on top of `HI_SOFTIRQ` and `TASKLET_SOFTIRQ`
     `HI_SOFTIRQ`-based tasklets run before `TASKLET_SOFTIRQ`-based ones. Simply put,
     tasklets are softirqs and obey the same rules. Unlike softirqs, however, two of
     the same tasklets never run concurrently. The tasklet API is quite basic and intuitive.
+  id: totrans-429
   prefs: []
   type: TYPE_NORMAL
+  zh: 任务let是基于`HI_SOFTIRQ`和`TASKLET_SOFTIRQ`构建的下半部。基于`HI_SOFTIRQ`的任务let在基于`TASKLET_SOFTIRQ`的任务let之前运行。简而言之，任务let是softirq并遵循相同的规则。然而，与softirq不同的是，相同的任务let永远不会并发运行。任务let
+    API非常基础且直观。
 - en: 'Tasklets are represented by a `struct tasklet_struct` structure defined in
     `<linux/interrupt.h>`. Each instance of this structure represents a unique tasklet,
     as illustrated in the following code snippet:'
+  id: totrans-430
   prefs: []
   type: TYPE_NORMAL
+  zh: 任务let由`<linux/interrupt.h>`中定义的`struct tasklet_struct`结构表示。这个结构的每个实例表示一个独特的任务let，如以下代码片段所示：
 - en: '[PRE88]'
+  id: totrans-431
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE88]'
 - en: Though this API is scheduled for removal, it has been slightly modernized as
     compared to its legacy implementation. The callback function is stored in the
     `callback()` field rather than `func()`, which is kept for compatibility with
@@ -2171,56 +3122,78 @@
     structure as its one argument. The handler will be executed by the underlying
     softirq. It is the equivalent of `action` to a softirq, with the same prototype
     and the same argument meaning. `data` will be passed as its sole argument.
+  id: totrans-432
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管此API计划被移除，但与其旧版实现相比，它已略微现代化。回调函数存储在`callback()`字段中，而不是`func()`，后者仍然保留以兼容旧实现。这个新回调仅接受一个指向`tasklet_struct`结构的指针作为唯一参数。处理程序将由底层的softirq执行。它相当于softirq中的`action`，具有相同的原型和相同的参数意义。`data`将作为其唯一参数传递。
 - en: 'Whether `callback()` handler or `func()` handler is executed depends on the
     way the tasklet is initialized. A tasklet can be statically initialized using
     either `DECLARE_TASKLET()` macro or `DECLARE_TASKLET_OLD()` macro. These macros
     are defined as follows:'
+  id: totrans-433
   prefs: []
   type: TYPE_NORMAL
+  zh: 执行`callback()`处理程序或`func()`处理程序，取决于任务let的初始化方式。任务let可以使用`DECLARE_TASKLET()`宏或`DECLARE_TASKLET_OLD()`宏静态初始化。这些宏的定义如下：
 - en: '[PRE89]'
+  id: totrans-434
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE89]'
 - en: 'From what we can see, by using `DECLARE_TASKLET_OLD()`, the legacy implementation
     is kept and `func()` is used as the callback. Therefore, the prototype of the
     provided handler must be as follows:'
+  id: totrans-435
   prefs: []
   type: TYPE_NORMAL
+  zh: 从我们可以看到的情况，使用`DECLARE_TASKLET_OLD()`时，保留了旧的实现方式，并且将`func()`作为回调函数。因此，提供的处理程序原型必须如下所示：
 - en: '[PRE90]'
+  id: totrans-436
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE90]'
 - en: 'By using `DECLARE_TASKLET()`, the `callback` field is used as the handler and
     `use_callback` filed is set to `true` (this is because the tasklet core checks
     this value to determine the handler that must be invoked). In this case, the protype
     of the callback is as follows:'
+  id: totrans-437
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过使用`DECLARE_TASKLET()`，`callback`字段作为处理程序，并且`use_callback`字段被设置为`true`（这是因为任务let核心检查这个值来确定必须调用的处理程序）。在这种情况下，回调的原型如下所示：
 - en: '[PRE91]'
+  id: totrans-438
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE91]'
 - en: 'In the previous snipped, `t` pointer is passed by the tasklet core while invoking
     the handler. It will point to your tasklet. Since a pointer to the tasklet is
     passed as argument to the callback, it is common to embed the tasklet object within
     a larger, user-specific structure, the pointer to which can be obtained with the
     `container_of()` macro. In order to do so, you should rather use the dynamic initialization,
     which can be achieved thanks to `tasklet_setup()` function, defined as follows:'
+  id: totrans-439
   prefs: []
   type: TYPE_NORMAL
+  zh: 在之前的代码段中，`t`指针在调用处理程序时由任务核心传递。它将指向你的任务。由于指向任务的指针作为参数传递给回调，通常将任务对象嵌入到一个更大的、用户特定的结构体中，指向该结构体的指针可以通过`container_of()`宏获得。为了实现这一点，你应该使用动态初始化，这可以通过`tasklet_setup()`函数来实现，其定义如下：
 - en: '[PRE92]'
+  id: totrans-440
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE92]'
 - en: According to the previous prototype, we can guess that by using the dynamic
     initialization, we have no choice but to use the new implementation where `callback`
     field is used as the tasklet handler.
+  id: totrans-441
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据之前的原型，我们可以猜测，使用动态初始化时，我们别无选择，只能使用新的实现，其中`callback`字段被用作任务处理程序。
 - en: Using static or dynamic method depends on what you need to achieve, for example,
     if you want the tasklet to be unique for the whole module or to be private per
     probed device, or even more, if you need to have a direct or indirect reference
     to the tasklet.
+  id: totrans-442
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用静态或动态方法取决于你需要实现的目标，例如，如果你希望任务对整个模块是唯一的，或者希望每个探测的设备拥有独立的任务，甚至更多，如果你需要对任务有直接或间接的引用。
 - en: 'By default, an initialized tasklet is runnable when it is scheduled: *it is
     said to be enabled*. `DECLARE_TASKLET_DISABLED` is an alternative to statically
     initialize default-disabled tasklets. There is no such alternative for a dynamically
@@ -2238,11 +3211,17 @@
     is enforced and verified by the kernel thanks to the `count` field in the `struct
     tasklet` object). The definition of the previously mentioned tasklet APIs is illustrated
     in the following snippet:'
+  id: totrans-443
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，当任务被调度时，初始化后的任务是可运行的：*它被认为是启用的*。`DECLARE_TASKLET_DISABLED`是静态初始化默认禁用任务的替代方法。对于动态初始化的任务，除非在其动态初始化后调用`tasklet_disable()`，否则没有这种替代方法。禁用的任务将需要调用`tasklet_enable()`函数才能使其可运行。任务是通过`tasklet_schedule()`和`tasklet_hi_schedule()`函数进行调度的（类似于触发softirq）。你可以使用`tasklet_disable()`
+    API来禁用已调度或正在运行的任务。此函数会禁用任务，且仅当任务完成执行（假设它正在运行）后才返回。之后，任务仍然可以被调度，但在再次启用之前不会在CPU上运行。异步变种`tasklet_disable_nosync()`也可以使用，它会立即返回，即使任务的终止尚未发生。此外，一个已经被禁用多次的任务，应该启用相同次数（这是由内核通过`struct
+    tasklet`对象中的`count`字段强制执行并验证的）。以下代码段说明了上述提到的任务API的定义：
 - en: '[PRE93]'
+  id: totrans-444
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE93]'
 - en: The kernel maintains normal-priority and high-priority tasklets in two per-CPU
     queues (each CPU maintains its low- and high-priority queue pair). `tasklet_schedule()`
     adds the tasklet into the normal priority list of the CPU on which it is invoked,
@@ -2254,6 +3233,7 @@
     is set, and the `TASKLET_STATE_SCHED` state is removed, thus making the tasklet
     re-schedulable during its execution, either by the tasklet itself or from within
     an interrupt handler.
+  id: totrans-445
   prefs: []
   type: TYPE_NORMAL
 - en: '`tasklet_schedule()` on a tasklet already scheduled and whose execution has
@@ -2266,34 +3246,45 @@
     its completion before killing it if the tasklet is currently scheduled to run.
     If a tasklet re-schedules itself, you should first prevent the tasklet from re-scheduling
     itself prior to calling this function:'
+  id: totrans-446
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE94]'
+  id: totrans-447
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE94]'
 - en: Writing your tasklet handler
+  id: totrans-448
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
 - en: 'All that being said, let''s see some use cases, as follows:'
+  id: totrans-449
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE95]'
+  id: totrans-450
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE95]'
 - en: In the preceding code snippet, we statically declare our `my_tasklet` tasklet
     and the function supposed to be invoked when this tasklet is scheduled. Since
     we did not used the `_OLD` variant, we defined the handler prototype the same
     as `callback` field in the tasklet object.
+  id: totrans-451
   prefs: []
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-452
   prefs: []
   type: TYPE_NORMAL
 - en: Tasklet API is deprecated, and you should consider using threaded IRQs instead.
+  id: totrans-453
   prefs: []
   type: TYPE_NORMAL
 - en: Workqueues
+  id: totrans-454
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -2304,10 +3295,12 @@
     are using a threaded interrupt. That said, workqueues are built on top of kernel
     threads, and for this simple reason, we will not implicitly cover kernel threads
     in this book.
+  id: totrans-455
   prefs: []
   type: TYPE_NORMAL
 - en: 'At the core of the workqueue subsystem, there are two data structures that
     fairly well explain the concept behind this, as follows:'
+  id: totrans-456
   prefs: []
   type: TYPE_NORMAL
 - en: 'The work to be deferred (referred to as a work item), represented in the kernel
@@ -2317,37 +3310,44 @@
     item is a simple structure that only contains a pointer to the function that is
     to be scheduled for asynchronous execution. To summarize, we can enumerate two
     types of work item structures, as follows:'
+  id: totrans-457
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: A `work_struct` structure, which schedules a task to run as soon as possible
     when the system allows it
+  id: totrans-458
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
 - en: A `delayed_work` structure, which schedules a task to run after at least a given
     time interval
+  id: totrans-459
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
 - en: The workqueue itself, which is represented by a `struct workqueue_struct` instance
     and is the structure onto which work is placed. It is a queue of work items.
+  id: totrans-460
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Apart from these data structures, there are two generic terms you should be
     familiar with, as follows:'
+  id: totrans-461
   prefs: []
   type: TYPE_NORMAL
 - en: '**Worker threads**, which are dedicated threads that execute and pull the functions
     off the queue, one by one, one after the other.'
+  id: totrans-462
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '**Worker pools**: This is a collection of worker threads (a thread pool) that
     are used to better manage the worker threads.'
+  id: totrans-463
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2358,42 +3358,57 @@
     macro. If you need delayed work, you can use the `INIT_DELAYED_WORK` macro for
     dynamic allocation and initialization or `DECLARE_DELAYED_WORK` for a static one.
     You can see the macros in action in the following code snippet:'
+  id: totrans-464
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE96]'
+  id: totrans-465
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE96]'
 - en: 'Here is what our work item structure looks like:'
+  id: totrans-466
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE97]'
+  id: totrans-467
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE97]'
 - en: 'The `func` field, which is of type `work_func_t`, tells us a bit more about
     the header of a `work` function, as illustrated here:'
+  id: totrans-468
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE98]'
+  id: totrans-469
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE98]'
 - en: '`work` is an input parameter that corresponds to the work structure to be scheduled.
     If you submitted delayed work, it would correspond to the `delayed_work.work`
     field. It would then be necessary to use the `to_delayed_work()` function in order
     to get the underlying delayed work structure, as illustrated in the following
     code snippet:'
+  id: totrans-470
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE99]'
+  id: totrans-471
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE99]'
 - en: 'Workqueue infrastructure allows drivers to create a dedicated kernel thread
     (a workqueue) called a worker thread to run work functions. A new workqueue can
     be created with the following functions:'
+  id: totrans-472
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE100]'
+  id: totrans-473
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE100]'
 - en: '`create_workqueue()` creates a dedicated thread (a worker thread) per CPU on
     the system. For example, on an 8-core system, it will result in 8 kernel threads
     created to run the works submitted to your workqueue. Unless you have strong reasons
@@ -2404,42 +3419,55 @@
     the same queue. In order to schedule works on your created workqueue, you can
     use either `queue_work()` or `queue_delayed_work()`, depending on the nature of
     the work. These functions are defined as follows:'
+  id: totrans-474
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE101]'
+  id: totrans-475
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE101]'
 - en: 'These functions return `false` if the work was already on a queue and `true`
     otherwise. `queue_dalayed_work()` is to be used to schedule a work item (a delayed
     one) for later execution after a given delay. The time unit for the delay is a
     jiffy. There are, however, APIs to convert milliseconds and microseconds to jiffies,
     defined as follows:'
+  id: totrans-476
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE102]'
+  id: totrans-477
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE102]'
 - en: 'The following example uses 200 milliseconds as a delay:'
+  id: totrans-478
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE103]'
+  id: totrans-479
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE103]'
 - en: 'You should not expect this delay to be accurate as the delay will be rounded
     up to the closest jiffy value. Thus, even when requesting 200 us, you should expect
     a jiffy. Submitted work items can be canceled by calling either `cancel_delayed_work()`,
     `cancel_delayed_work_sync()`, or `cancel_work_sync()`. These cancelation functions
     are defined as follows:'
+  id: totrans-480
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE104]'
+  id: totrans-481
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE104]'
 - en: '`cancel_work_sync()` synchronously cancels the given work—in other words, it
     cancels work and waits for its execution to finish. The kernel guarantees `work`
     not to be pending or executing on any CPU on return from this function, even if
     the work migrates to another workqueue or requeues itself. It returns `true` if
     `work` was pending and `false` otherwise.'
+  id: totrans-482
   prefs: []
   type: TYPE_NORMAL
 - en: '`cancel_delayed_work()` asynchronously cancels a delayed entry. It returns
@@ -2449,20 +3477,26 @@
     work really ran to its end, you may want to use `flush_workqueue()`, which flushes
     every work item in the given queue, or `cancel_delayed_work_sync()`, which is
     the synchronous version of `cancel_delayed_work()`.'
+  id: totrans-483
   prefs: []
   type: TYPE_NORMAL
 - en: 'When you are done with a workqueue, you should destroy it with `destroy_workqueue()`,
     as illustrated here:'
+  id: totrans-484
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE105]'
+  id: totrans-485
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE105]'
 - en: While waiting for any pending work to execute, the `_sync` variant functions
     sleep and thus can be called only from a process context.
+  id: totrans-486
   prefs: []
   type: TYPE_NORMAL
 - en: Kernel-global workqueue – the shared queue
+  id: totrans-487
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -2472,21 +3506,26 @@
     You may then want to use the kernel shared queue, which already has its set of
     kernel threads pre-allocated (early during the boot, via the `workqueue_init_early()`
     function) for running works.
+  id: totrans-488
   prefs: []
   type: TYPE_NORMAL
 - en: This kernel-global workqueue is the so-called `system_wq` workqueue, defined
     in `kernel/workqueue.c`. There is actually one instance per CPU, each backed by
     a dedicated thread named `events/n`, where `n` is the processor number (or index)
     to which the thread is bound.
+  id: totrans-489
   prefs: []
   type: TYPE_NORMAL
 - en: 'You can queue a work item in the default system workqueue using one of the
     following functions:'
+  id: totrans-490
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE106]'
+  id: totrans-491
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE106]'
 - en: '`schedule_work()` immediately schedules the work that will be executed as soon
     as possible after the worker thread on the current processor wakes up. With `schedule_delayed_work()`,
     the work will be put in the queue in the future, after the delay timer ticks.
@@ -2494,47 +3533,60 @@
     absolutely need to be the current one). Each of these functions queue works on
     the system''s shared workqueue, `system_wq`, defined in `kernel/workqueue.c` as
     follows:'
+  id: totrans-492
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE107]'
+  id: totrans-493
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE107]'
 - en: You should also note that since this system workqueue is shared, you should
     not queue works which can run for too long, otherwise it may slow down other contender
     works, which could then wait for longer than they should before being executed.
+  id: totrans-494
   prefs: []
   type: TYPE_NORMAL
 - en: 'In order to flush the kernel-global workqueue—that is, ensure a given batch
     of work is completed—we can use `flush_scheduled_work()`, as follows:'
+  id: totrans-495
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE108]'
+  id: totrans-496
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE108]'
 - en: '`flush_scheduled_work()` is a wrapper that calls `flush_workqueue()` on `system_wq`.
     Note that there may be works in the `system_wq` workqueue that you have not submitted
     and have no control over. Flushing this workqueue entirely is thus overkill, and
     it is recommended to run `cancel_delayed_work_sync()` or `cancel_work_sync()`
     instead.'
+  id: totrans-497
   prefs: []
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-498
   prefs: []
   type: TYPE_NORMAL
 - en: Unless you have a strong reason for creating a dedicated thread, the default
     (kernel-global) thread is preferred.
+  id: totrans-499
   prefs: []
   type: TYPE_NORMAL
 - en: Workqueues' new generation
+  id: totrans-500
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'The original (now legacy) workqueue implementation used two kinds of workqueues:
     those with a single thread system-wide, and those with a thread per CPU. However,
     for a growing number of CPUs, this led to some limitations, as outlined here:'
+  id: totrans-501
   prefs: []
   type: TYPE_NORMAL
 - en: On very large systems, the kernel could run out of `init` process started.
+  id: totrans-502
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2542,10 +3594,12 @@
     compete for the CPU with each other threads on the system. As there were more
     CPU contenders, this introduced some overhead—that is, more context switches than
     necessary.
+  id: totrans-503
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: The consumption of far more resources than were really needed.
+  id: totrans-504
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2557,9 +3611,11 @@
     (**cmwq**), using per-CPU worker pools shared by all workqueues in order to automatically
     provide a dynamic and flexible level of concurrency, abstracting such details
     for the API users.
+  id: totrans-505
   prefs: []
   type: TYPE_NORMAL
 - en: cmwq
+  id: totrans-506
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -2569,13 +3625,17 @@
     it on success, and `NULL` on failure. The returned workqueue can be freed using
     the `destroy_workqueue()` function. You can see an illustration of the code in
     the following snippet:'
+  id: totrans-507
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE109]'
+  id: totrans-508
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE109]'
 - en: '`fmt` is the `printf` format for the name of the workqueue, and `args...` are
     arguments for `fmt`.'
+  id: totrans-509
   prefs: []
   type: TYPE_NORMAL
 - en: '`destroy_workqueue()` is to be called on the workqueue once you are done with
@@ -2588,11 +3648,13 @@
     other hand, `alloc_ordered_workqueue()` creates a workqueue that processes each
     work item one by one in queued order (that is, **first-in, first-out** (**FIFO**)
     order).'
+  id: totrans-510
   prefs: []
   type: TYPE_NORMAL
 - en: '`flags` controls how and when work items are queued, assigned execution resources,
     scheduled, and executed. There are various flags used in this new API on which
     we should spend some time, as follows:'
+  id: totrans-511
   prefs: []
   type: TYPE_NORMAL
 - en: '`WQ_UNBOUND`: Legacy workqueues had a worker thread per CPU and were designed
@@ -2605,6 +3667,7 @@
     is no more locality, and the scheduler can reschedule workers on any CPU as it
     sees fit. The scheduler has the last word now and can balance CPU load, especially
     for long and sometimes CPU-intensive works.'
+  id: totrans-512
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2615,6 +3678,7 @@
     guaranteed to have at least a ready-to-use worker thread—a so-called rescuer thread—reserved
     for it, regardless of memory pressure, so that it can progress forward. There''s
     one rescuer thread allocated for each workqueue that has this flag set.'
+  id: totrans-513
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2632,14 +3696,17 @@
     memory to allocate. This pre-allocated thread is a so-called `WQ_MEM_RECLAIM`
     flag if you think the workqueue is likely to be used in the memory reclaim path.
     This flag replaces the legacy `WQ_RESCUER` flag as of this commit: [https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=493008a8e475771a2126e0ce95a73e35b371d277](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=493008a8e475771a2126e0ce95a73e35b371d277).'
+  id: totrans-514
   prefs: []
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-515
   prefs: []
   type: TYPE_NORMAL
 - en: Memory reclaim is a Linux mechanism on a memory allocation path that consists
     of allocating memory only after throwing the current content of that memory somewhere
     else.
+  id: totrans-516
   prefs: []
   type: TYPE_NORMAL
 - en: '`WQ_FREEZABLE`: This flag is used for power-management purposes. A workqueue
@@ -2657,6 +3724,7 @@
     hibernation/suspend/resume process of the system. More information on this topic
     can be found in `Documentation/power/freezing-of-tasks.txt` and by having a look
     at the `freeze_workqueues_begin()` and `thaw_workqueues()` internal kernel functions.'
+  id: totrans-517
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2672,6 +3740,7 @@
     not block much. Use this flag if you do not want your work item competing for
     CPU with normal- or lower-priority tasks. Crypto and block devices subsystems
     use this, for example.'
+  id: totrans-518
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2685,25 +3754,30 @@
     subsystems use such workqueues. To prevent such tasks from delaying the execution
     of other non-CPU-intensive work items, they will not be considered when the workqueue
     code determines whether the CPU is available or not.'
+  id: totrans-519
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'To be compliant and feature-compatible with the old workqueue API, the following
     mappings are done to keep this API compatible with the original one:'
+  id: totrans-520
   prefs: []
   type: TYPE_NORMAL
 - en: '`create_workqueue(name)` is mapped onto `alloc_workqueue(name,WQ_MEM_RECLAIM,
     1)`'
+  id: totrans-521
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`create_singlethread_workqueue(name)` is mapped onto `alloc_ordered_workqueue(name,
     WQ_MEM_RECLAIM)`'
+  id: totrans-522
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`create_freezable_workqueue(name)` is mapped onto `alloc_workqueue(name,WQ_FREEZABLE
     | WQ_UNBOUND|WQ_MEM_RECLAIM, 1)`'
+  id: totrans-523
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2711,15 +3785,18 @@
     and `create_singlethread_workqueue()` (as per this commit: [https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=81dcaf6516d8](https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=81dcaf6516d8)).
     Workqueues allocated with `alloc_ordered_workqueue()` are unbound and have `max_active`
     set to `1`.'
+  id: totrans-524
   prefs: []
   type: TYPE_NORMAL
 - en: When it comes to scheduling items in a workqueue, the work items that have been
     queued to a specific CPU using `queue_work_on()` will execute on that CPU. Work
     items queued via `queue_work()` will prefer the queueing CPU, but locality is
     not guaranteed.
+  id: totrans-525
   prefs: []
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-526
   prefs: []
   type: TYPE_NORMAL
 - en: 'Note that `schedule_work()` is a wrapper that calls `queue_work()` on the system
@@ -2727,15 +3804,18 @@
     Also, keep in mind the following: `system_wq = alloc_workqueue("events", 0, 0);`.
     You can have a look at the `workqueue_init_early()` function in `kernel/workqueue.c`
     in kernel sources to see how other system-wide workqueues are created.'
+  id: totrans-527
   prefs: []
   type: TYPE_NORMAL
 - en: We are done with the new Linux kernel workqueue management implementation—that
     is, cmwq. Because workqueues can be used to defer works from interrupt handlers,
     we can move on to the next section and learn how to handle interrupts from the
     Linux kernel.
+  id: totrans-528
   prefs: []
   type: TYPE_NORMAL
 - en: Kernel interrupt handling
+  id: totrans-529
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -2746,30 +3826,36 @@
     attention. Prior to an interrupt being visible to the CPU, this interrupt should
     be enabled by the interrupt controller, which is a device on its own whose main
     job consists of routing interrupts to CPUs.
+  id: totrans-530
   prefs: []
   type: TYPE_NORMAL
 - en: The Linux kernel allows the provision of handlers for interrupts we are interested
     in so that when those interrupts are triggered, our handlers are executed.
+  id: totrans-531
   prefs: []
   type: TYPE_NORMAL
 - en: An interrupt is how a device halts the kernel, telling it that something interesting
     or important has happened. These are called IRQs on Linux systems. The main advantage
     interrupts offer is to avoid device polling. It is up to the device to tell if
     there is a change in its state; it is not up to us to poll it.
+  id: totrans-532
   prefs: []
   type: TYPE_NORMAL
 - en: To be notified when an interrupt occurs, you need to register with that IRQ,
     providing a function called an interrupt handler that will be called every time
     that interrupt is raised.
+  id: totrans-533
   prefs: []
   type: TYPE_NORMAL
 - en: Designing and registering an interrupt handler
+  id: totrans-534
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'When an interrupt handler is executed, it runs with interrupts disabled on
     the local CPU. This involves respecting certain constraints while designing an
     **interrupt service routine** (**ISR**), as outlined here:'
+  id: totrans-535
   prefs: []
   type: TYPE_NORMAL
 - en: '**Execution time**: As IRQ handlers run with interrupts disabled on the local
@@ -2777,6 +3863,7 @@
     a fast re-enabling of the previously disabled CPU-local interrupts in order not
     to miss any further occurring IRQs. Time-consuming IRQ handlers may considerably
     alter the real-time properties of the system and slow it down.'
+  id: totrans-536
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2785,6 +3872,7 @@
     kernel to user space or vice versa, and so on) is forbidden. Any part of the code
     requiring or involving sleeping must be deferred into another, safer context (that
     is, a process context).'
+  id: totrans-537
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2792,18 +3880,24 @@
     the handler for, and a **unique device ID** (**UDI**) of the peripheral (mostly
     used as a context data structure—that is, a pointer to the per-device or private
     structure of the associated hardware device)—as illustrated here:'
+  id: totrans-538
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE110]'
+  id: totrans-539
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE110]'
 - en: 'The device driver wishing to register an interrupt handler for a given IRQ
     should call `devm_request_irq()`, defined in `<linux/interrupt.h>` as follows:'
+  id: totrans-540
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE111]'
+  id: totrans-541
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE111]'
 - en: The preceding function argument list, `dev`, is the device responsible for the
     IRQ line, `irq` represents the interrupt line (that is, the interrupt number of
     the issuing device) to register `handler` for. Prior to validating the request,
@@ -2817,19 +3911,24 @@
     (and potentially useful to the handler) data structure, since when an interrupt
     occurs, both the interrupt line (`irq`) and this parameter will be passed to the
     registered handler, which can use this data as context data for further processing.
+  id: totrans-542
   prefs: []
   type: TYPE_NORMAL
 - en: '`flags` mangles the state or the behavior of the IRQ line or its handler by
     means of the following masks, which can be OR''ed to form a final desired bitmask
     according to your needs:'
+  id: totrans-543
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE112]'
+  id: totrans-544
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE112]'
 - en: 'Note that `flags` can be `0` as well. Let''s now explain some important flags—we
     leave the rest for the user to explore in `include/linux/interrupt.h`, but these
     are the ones we''ll look at in more detail:'
+  id: totrans-545
   prefs: []
   type: TYPE_NORMAL
 - en: '`IRQF_NOBALANCING` excludes the interrupt from IRQ balancing, which is a mechanism
@@ -2838,6 +3937,7 @@
     from being changed. This flag may be useful to provide a flexible setup for clock
     source or clock event devices, to prevent misattribution of the event to the wrong
     core. This flag is meaningful on multi-core systems only.'
+  id: totrans-546
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2845,6 +3945,7 @@
     intended to fix interrupt problems, meaning this handler should be added to the
     list of known interrupt handlers that can be looked for when a given interrupt
     is not handled.'
+  id: totrans-547
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2854,6 +3955,7 @@
     It must be set on threaded interrupts (we will discuss this later) for which the
     interrupt line must remain disabled until the threaded handler has completed,
     after which it will be re-enabled.'
+  id: totrans-548
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2864,11 +3966,13 @@
     if the IRQ is shared, every registered handler for this shared line will be executed,
     not only the one that installed this flag. You should avoid as much as possible
     using `IRQF_NO_SUSPEND` and `IRQF_SHARED` at the same time.'
+  id: totrans-549
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`IRQF_FORCE_RESUME` enables the IRQ in the system resume path even if `IRQF_NO_SUSPEND`
     is set.'
+  id: totrans-550
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2877,6 +3981,7 @@
     to be threaded. This flag has been introduced to address the non-threadability
     of some interrupts (for example, timers, which cannot be threaded even when all
     interrupt handlers are forced to be threaded).'
+  id: totrans-551
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2884,24 +3989,28 @@
     It helps not to disable the timer IRQ during system suspension to ensure normal
     resumption and not thread them when full preemption (that is, `PREEMPT_RT`) is
     enabled. It is just an alias for `IRQF_NO_SUSPEND | IRQF_NO_THREAD`.'
+  id: totrans-552
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`IRQF_EARLY_RESUME` resumes IRQ early at resume time of **system core** (**syscore**)
     operations instead of at device resume time. The following link points to the
     message of the commit introducing its support: [https://lkml.org/lkml/2013/11/20/89](https://lkml.org/lkml/2013/11/20/89).'
+  id: totrans-553
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`IRQF_SHARED` allows for the sharing of the interrupt line among several devices.
     However, each device driver that needs to share the given interrupt line must
     set with this flag; otherwise, the handler registration will fail.'
+  id: totrans-554
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'We must also consider the `irqreturn_t` return type of interrupt handlers since
     it may involve further actions after the return of the handler. Possible return
     values are listed here:'
+  id: totrans-555
   prefs: []
   type: TYPE_NORMAL
 - en: '`IRQ_NONE`: On a shared interrupt line, once the interrupt occurs, the kernel
@@ -2916,12 +4025,14 @@
     is stuck in some manner, drops a diagnostic, and tries to turn the IRQ off. For
     more information on this, you can have a look at the `__report_bad_irq()` function
     in the kernel source tree.'
+  id: totrans-556
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: '`IRQ_HANDLED`: This value should be returned if the interrupt has been handled
     successfully. On a threaded IRQ, this value does acknowledge the interrupt (at
     a controller level) without waking the thread handler up.'
+  id: totrans-557
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -2929,45 +4040,56 @@
     the hard-IRQ handler to wake the handler thread. In this case, `IRQ_HANDLED` must
     only be returned by that threaded handler, previously registered with `devm_request_threaded_irq()`.
     We will discuss this later in the chapter.'
+  id: totrans-558
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-559
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: You should never re-enable IRQs from within your IRQ handler as this would involve
     allowing "interrupt reentrancy".
+  id: totrans-560
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
 - en: '`devm_request_irq()` is the managed version of `request_irq()`, defined as
     follows:'
+  id: totrans-561
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE113]'
+  id: totrans-562
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE113]'
 - en: 'They both have the same variable meanings. If the driver used the managed version,
     the IRQ core will take care of releasing the resources. In other cases, such as
     at the unloading path or when the device leaves, the driver will have to release
     the IRQ resources by unregistering the interrupt handler using `free_irq()`, declared
     as follows:'
+  id: totrans-563
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE114]'
+  id: totrans-564
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE114]'
 - en: '`free_irq()` removes the handler (identified by `dev_id` when it comes to shared
     interrupts) and disables the line. If the interrupt line is shared, the handler
     is just removed from the list of handlers for this `irq`, and the interrupt line
     is disabled in the future when the last handler is removed. Moreover, if possible,
     your code must make sure the interrupt is really disabled on the card it drives
     before calling this function, since omitting this may lead to spurious IRQ.'
+  id: totrans-565
   prefs: []
   type: TYPE_NORMAL
 - en: 'There are a few things worth mentioning here about interrupts that you should
     never forget, as follows:'
+  id: totrans-566
   prefs: []
   type: TYPE_NORMAL
 - en: On Linux systems, when the handler of an IRQ is being executed by a CPU, all
@@ -2979,27 +4101,32 @@
     the current line is always disabled, as well as further interrupts on the local
     CPU. As a result, the same interrupt handler is never invoked concurrently to
     service a nested interrupt. This makes writing your interrupt handler a lot easier.
+  id: totrans-567
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Critical regions that need to run with interrupts disabled should be limited
     as much as possible. To remember this, tell yourself that your interrupt handler
     has interrupted other code and needs to give the CPU back.
+  id: totrans-568
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: The interrupt context has its own (fixed and quite low) stack size. It thus
     totally makes sense to disable IRQs while running an ISR as reentrancy could cause
     stack overflow if too many preemptions happen.
+  id: totrans-569
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Interrupt handlers cannot block; they do not run in a process context. Thus,
     you may not perform the following operations from within an interrupt handler:'
+  id: totrans-570
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: You cannot transfer data to/from user space since this may block.
+  id: totrans-571
   prefs:
   - PREF_IND
   - PREF_UL
@@ -3007,16 +4134,19 @@
 - en: You cannot sleep or rely on code that may lead to sleep, such as invoking `wait_event()`,
     memory allocation with any flag other than `GFP_ATOMIC`, or using a mutex/semaphore.
     The threaded handler can handle this.
+  id: totrans-572
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
 - en: You cannot trigger or call `schedule()`.
+  id: totrans-573
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-574
   prefs:
   - PREF_IND
   - PREF_IND
@@ -3025,6 +4155,7 @@
     level, it will not be processed at all (masked in the flow handler), but an interrupt
     will instantaneously occur if it is still pending (at a device level) when the
     IRQ is enabled (or unmasked).
+  id: totrans-575
   prefs:
   - PREF_IND
   - PREF_IND
@@ -3032,11 +4163,13 @@
 - en: The concept of non-reentrancy for an interrupt means that, if an interrupt is
     already in an active state, it cannot enter it again until the active status is
     cleared.
+  id: totrans-576
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_NORMAL
 - en: Understanding the concept of top and bottom halves
+  id: totrans-577
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -3046,6 +4179,7 @@
     We also stated that interrupt processing—that is, the hard-IRQ handler at least—must
     be very fast not only to keep the system responsive but also not to miss other
     interrupt events.
+  id: totrans-578
   prefs: []
   type: TYPE_NORMAL
 - en: The idea here is to split the interrupt handler into two parts. The first part
@@ -3058,6 +4192,7 @@
     function, with interrupts re-enabled, and which is the second part of the interrupt.
     The bottom half could then perform time-consuming operations (such as buffer processing)
     and tasks that may sleep, as it runs in a thread.
+  id: totrans-579
   prefs: []
   type: TYPE_NORMAL
 - en: This splitting would considerably increase system responsiveness as the time
@@ -3067,24 +4202,29 @@
     the handler registered using `devm_request_irq()`. When using `devm_request_threaded_irq()`,
     as we will see in the next section, the top half is the first handler given to
     the function.
+  id: totrans-580
   prefs: []
   type: TYPE_NORMAL
 - en: As described previously in the *Implementing work-deferring mechanisms* section,
     a bottom half represents nowadays any task (or work) scheduled from within an
     interrupt handler. Bottom halves are designed using work-deferring mechanisms,
     which we have seen previously.
+  id: totrans-581
   prefs: []
   type: TYPE_NORMAL
 - en: Depending on which one you choose, it may run in a (software) interrupt context
     or in a process context. These are softirqs, tasklets, workqueues, and threaded
     IRQs.
+  id: totrans-582
   prefs: []
   type: TYPE_NORMAL
 - en: Note
+  id: totrans-583
   prefs: []
   type: TYPE_NORMAL
 - en: Tasklets and softirqs have nothing to do with the "thread interrupt" mechanism
     since they run in their own special (atomic) contexts.
+  id: totrans-584
   prefs: []
   type: TYPE_NORMAL
 - en: Since softirq handlers run at a high priority with the scheduler preemption
@@ -3094,6 +4234,7 @@
     the softirq handler should take to complete in order not to slow the system down
     as the kernel would not be able to give CPU time to other processes. I would say
     no longer than half a jiffy.
+  id: totrans-585
   prefs: []
   type: TYPE_NORMAL
 - en: 'The hard IRQ (top half, actually) must be as fast as possible, and most of
@@ -3102,29 +4243,35 @@
     and not interrupt-related work not performed by the top half. There is no clear
     guideline on the repartition of work between the top and bottom halves. Here is
     some advice:'
+  id: totrans-586
   prefs: []
   type: TYPE_NORMAL
 - en: Hardware-related or time-sensitive work can be performed in the top half.
+  id: totrans-587
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: If the work really need not be interrupted, it can be performed in the top half.
+  id: totrans-588
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: From my point of view, everything else can be deferred and thus performed in
     the bottom half, which will run with interrupts enabled and when the system is
     less busy.
+  id: totrans-589
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: If the hard IRQ is fast enough to process and acknowledge interrupts within
     a few microseconds consistently, then there is absolutely no need to use bottom-half
     delegations.
+  id: totrans-590
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Working with threaded IRQ handlers
+  id: totrans-591
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -3137,19 +4284,24 @@
     Moreover, the dedicated kernel thread can have its real-time priority set, though
     it runs at normal real-time priority (that is, `MAX_USER_RT_PRIO/2`, as you can
     see in the `setup_irq_thread()` function in `kernel/irq/manage.c`).
+  id: totrans-592
   prefs: []
   type: TYPE_NORMAL
 - en: 'The general rule behind threaded interrupts is simple: keep the hard-IRQ handler
     as minimal as possible and defer as much work to the kernel thread as possible
     (preferably, all work). You should use `devm_request_threaded_irq()` if you wish
     to request a threaded interrupt handling. Here is its prototype:'
+  id: totrans-593
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE115]'
+  id: totrans-594
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE115]'
 - en: 'This function accepts two special parameters on which we should spend some
     time, `handler`, and `thread_fn`. They are outlined in more detail here:'
+  id: totrans-595
   prefs: []
   type: TYPE_NORMAL
 - en: '`handler` immediately runs when the interrupt occurs, in an interrupt context,
@@ -3157,6 +4309,7 @@
     cause (in the device''s status register) to determine whether or how to handle
     the interrupt (this is frequent on `IRQ_NONE`. This return value usually only
     makes sense on shared interrupt lines.'
+  id: totrans-596
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -3169,6 +4322,7 @@
     this case, the hard-IRQ handler should return `IRQ_WAKE_THREAD` to awake the threaded
     handler. Returning `IRQ_WAKE_THREAD` makes sense only when the `thread_fn` handler
     is also provided.
+  id: totrans-597
   prefs: []
   type: TYPE_NORMAL
 - en: '`thread_fn` is the threaded handler added to the scheduler runqueue when the
@@ -3181,6 +4335,7 @@
     `IRQ_HANDLED` when it has completed the interrupt handling. After that, the associated
     kernel thread will be taken off the runqueue and put in a blocked state until
     woken up again by the hard-IRQ function.'
+  id: totrans-598
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
@@ -3188,21 +4343,27 @@
     and `thread_fn != NULL`. This is the default primary handler. It does nothing
     but return `IRQ_WAKE_THREAD` to wake up the associated kernel thread that will
     execute the `thread_fn` handler.
+  id: totrans-599
   prefs: []
   type: TYPE_NORMAL
 - en: 'It is implemented as follows:'
+  id: totrans-600
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE116]'
+  id: totrans-601
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE116]'
 - en: This makes it possible to move the execution of interrupt handlers entirely
     to the process context, thus preventing buggy drivers (buggy IRQ handlers, actually)
     from breaking the whole system and reducing interrupt latency.
+  id: totrans-602
   prefs: []
   type: TYPE_NORMAL
 - en: In new kernel releases, `request_irq()` simply wraps `request_threaded_irq()`
     with the `thread_fn` parameter set to `NULL` (the same goes for the `devm_` variant).
+  id: totrans-603
   prefs: []
   type: TYPE_NORMAL
 - en: Note that the interrupt is acknowledged at an interrupt controller level when
@@ -3212,6 +4373,7 @@
     again, resulting in stack overflows (or being stuck in the hard-IRQ handler forever)
     for level-triggered interrupts since the issuing device will still have the interrupt
     line asserted.
+  id: totrans-604
   prefs: []
   type: TYPE_NORMAL
 - en: For threaded interrupt implementation, when drivers needed to run the bottom
@@ -3221,6 +4383,7 @@
     is not mandatory anymore as it helps keep the IRQ disabled at a controller level
     even when the threaded handler runs. Drivers must, however, clear the device interrupt
     in the threaded handler before it completes.
+  id: totrans-605
   prefs: []
   type: TYPE_NORMAL
 - en: Using `devm_request_threaded()` (or the non-managed variant), it is possible
@@ -3228,28 +4391,35 @@
     In this case, it is mandatory to set the `IRQF_ONESHOT` flag, else the kernel
     will complain because the threaded handler would run with the interrupt unmasked
     at both device and controller levels.
+  id: totrans-606
   prefs: []
   type: TYPE_NORMAL
 - en: 'Here is an example of this:'
+  id: totrans-607
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE117]'
+  id: totrans-608
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE117]'
 - en: In the preceding example, our device sits on an I2C bus, so accessing the device
     may put the underlying task to sleep. Such an operation must never be performed
     in the hard-interrupt handler.
+  id: totrans-609
   prefs: []
   type: TYPE_NORMAL
 - en: 'Here is an excerpt from the message in the link that introduced the `IRQF_ONESHOT`
     flag and which explains what it does (the whole message can be found via this
     link: [http://lkml.iu.edu/hypermail/linux/kernel/0908.1/02114.html](http://lkml.iu.edu/hypermail/linux/kernel/0908.1/02114.html)):'
+  id: totrans-610
   prefs: []
   type: TYPE_NORMAL
 - en: '"*It allows drivers to request that the interrupt is not unmasked (at controller
     level) after the hard interrupt context handler has been executed and the thread
     has been woken. The interrupt line is unmasked after the thread handler function
     has been executed*."'
+  id: totrans-611
   prefs: []
   type: TYPE_NORMAL
 - en: If one driver has set either `IRQF_SHARED` or `IRQF_ONESHOT` flags on a given
@@ -3257,6 +4427,7 @@
     file lists IRQs with their number of processing per CPU, the IRQ name as given
     during the requesting step, and a comma-separated list of drivers that registered
     a handler for that interrupt.
+  id: totrans-612
   prefs: []
   type: TYPE_NORMAL
 - en: Threading the IRQs is the best choice for interrupt processing that can hog
@@ -3270,15 +4441,18 @@
     processors can handle ISRs registered for this IRQ. This way, you can—for example—decide
     to set the affinity of the hard-interrupt handler to one CPU, while setting the
     affinity of the threaded handler to another CPU.
+  id: totrans-613
   prefs: []
   type: TYPE_NORMAL
 - en: Requesting a context-agnostic IRQ
+  id: totrans-614
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
 - en: A driver requesting an IRQ must know in advance the nature of the interrupt
     and decide whether its handler can run in a hard-IRQ context or not, which may
     influence the choice between `devm_request_irq()` and `devm_request_threaded_irq()`.
+  id: totrans-615
   prefs: []
   type: TYPE_NORMAL
 - en: 'The problem with those approaches is that sometimes, a driver requesting an
@@ -3290,11 +4464,14 @@
     our device comes from an interrupt controller that may not sleep (a memory-mapped
     one) or from one that can sleep (behind an I2C/SPI bus), there will be no need
     to change the code. Its prototype looks like this:'
+  id: totrans-616
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE118]'
+  id: totrans-617
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE118]'
 - en: '`devm_request_any_context_irq()` and `devm_request_irq()` have the same interface
     but different semantics. Depending on the underlying context (the hardware platform),
     `devm_request_any_context_irq()` selects either a hard-interrupt handling using
@@ -3304,6 +4481,7 @@
     (meaning a threaded one is used). With this function, the behavior of the interrupt
     handler is decided at runtime. For more information, you can have a look at the
     commit introducing it in the kernel by following this link: [https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=ae731f8d0785](https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=ae731f8d0785).'
+  id: totrans-618
   prefs: []
   type: TYPE_NORMAL
 - en: The advantage of using `devm_request_any_context_irq()` is that the driver does
@@ -3313,26 +4491,32 @@
     to a controller that sits on an I2C or SPI bus (GPIO access may sleep), the handler
     will be threaded. Otherwise (that is, the GPIO access does not sleep and is memory-mapped
     as it is part of the SoC), the handler will run in a hard-IRQ handler.
+  id: totrans-619
   prefs: []
   type: TYPE_NORMAL
 - en: 'In the following example, the device expects an IRQ line mapped to a GPIO.
     The driver cannot assume that the given GPIO line will be memory-mapped, coming
     from the SoC. It may come from a discrete I2C or SPI GPIO controller as well.
     A good practice would be to use `request_any_context_irq()` here:'
+  id: totrans-620
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE119]'
+  id: totrans-621
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE119]'
 - en: The preceding code is simple enough but quite safe since `devm_request_any_context_irq()`
     does the job, which prevents it from mistaking the type of the underlying GPIO.
     The advantage of this approach is that you do not need to care about the nature
     of the interrupt controller that provides the IRQ line. In our example, if the
     GPIO belongs to a controller sitting on an I2C or SPI bus, the handler will be
     threaded. Otherwise (memory-mapped), the handler will run in a hard-IRQ context.
+  id: totrans-622
   prefs: []
   type: TYPE_NORMAL
 - en: Using a workqueue to defer the bottom half
+  id: totrans-623
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -3340,46 +4524,61 @@
     now preferable to give an example here. This example is not error-free and has
     not been tested. It is just a demonstration to highlight the concept of bottom-half
     deferring by means of a workqueue.
+  id: totrans-624
   prefs: []
   type: TYPE_NORMAL
 - en: 'Let''s start by defining a data structure that will hold the elements we need
     for further development, as follows:'
+  id: totrans-625
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE120]'
+  id: totrans-626
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE120]'
 - en: 'In the preceding data structure, our work structure is represented by the `my_work`
     element. We do not use a pointer here because we will need to use a `container_of()`
     macro in order to grab back the pointer to the initial data structure. Next, we
     can define a method that will be invoked in the worker thread, as follows:'
+  id: totrans-627
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE121]'
+  id: totrans-628
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE121]'
 - en: 'In the preceding work structure, we start data processing when enough data
     has been buffered. We can now provide our IRQ handler, which is responsible for
     scheduling our work, as follows:'
+  id: totrans-629
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE122]'
+  id: totrans-630
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE122]'
 - en: 'The comments in the IRQ handler code are meaningful enough. `schedule_work()`
     is the function that schedules our work. Finally, we can write our probe method
     that will request our IRQ and register the previous handler, as follows:'
+  id: totrans-631
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE123]'
+  id: totrans-632
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE123]'
 - en: The structure of the preceding probe method shows without a doubt that we are
     facing a platform device driver. Generic IRQ and workqueue APIs have been used
     here for initializing our workqueue and registering our handler.
+  id: totrans-633
   prefs: []
   type: TYPE_NORMAL
 - en: Locking from within an interrupt handler
+  id: totrans-634
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
@@ -3387,33 +4586,45 @@
     at the CPU level. Therefore, if a resource is shared only with a threaded bottom
     half (that is, it is never accessed from the hard IRQ), it is better to use mutexes,
     as we see in the following example:'
+  id: totrans-635
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE124]'
+  id: totrans-636
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE124]'
 - en: 'However, if the shared resource is accessed from within the hard-interrupt
     handler, you must use the `_irqsave` variant of the spinlock, as in the following
     example, starting with the probe method:'
+  id: totrans-637
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE125]'
+  id: totrans-638
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE125]'
 - en: 'Now that the probe method has been implemented, let''s implement the top half—that
     is, the hard-IRQ handler—as follows:'
+  id: totrans-639
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE126]'
+  id: totrans-640
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE126]'
 - en: 'The return value of the top half will wake the threaded bottom half, which
     is implemented as follows:'
+  id: totrans-641
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE127]'
+  id: totrans-642
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE127]'
 - en: There is a case where protection may not be necessary between the hard IRQ and
     its threaded counterpart when the `IRQF_ONESHOT` flag is set while requesting
     the IRQ line. This flag keeps the interrupt disabled after the hard-interrupt
@@ -3421,9 +4632,11 @@
     handler has been run. This way, the hard handler and its threaded counterpart
     will never compete, and a lock for a resource shared between the two might not
     be necessary.
+  id: totrans-643
   prefs: []
   type: TYPE_NORMAL
 - en: Summary
+  id: totrans-644
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -3431,9 +4644,11 @@
     presenting all the mechanisms frequently used in drivers such as work scheduling
     and time management, interrupt handling, and locking primitives. This chapter
     is very important since it discusses topics other chapters in this book rely on.
+  id: totrans-645
   prefs: []
   type: TYPE_NORMAL
 - en: For instance, the next chapter, dealing with character devices, will use some
     of the elements discussed in this chapter.
+  id: totrans-646
   prefs: []
   type: TYPE_NORMAL
