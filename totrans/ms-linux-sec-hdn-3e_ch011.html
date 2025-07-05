@@ -6,14 +6,12 @@
 <meta charset="utf-8"/>
 <meta name="generator" content="packt"/>
 <title>10 Implementing Mandatory Access Control with SELinux and AppArmor</title>
-<link rel="stylesheet" type="text/css" href="../styles/stylesheet1.css"/>
-<link rel="stylesheet" type="text/css" href="../styles/stylesheet2.css"/>
+
+
 
 </head>
 <body>
-<div class="pkt">
-<section id="section-3-advanced-system-hardening-techniques" class="level2" data-number="10.14">
-<h2 data-number="10.14">Section 3: Advanced System Hardening Techniques</h2>
+<div><h2 data-number="10.14">Section 3: Advanced System Hardening Techniques</h2>
 <p>This section will teach you how to harden a Linux system with <strong>Mandatory Access Control</strong> (<strong>MAC</strong>), security profiles, and process isolation techniques. Audit a Linux system with auditd and logging services.</p>
 <p>The section contains the following chapters:</p>
 <ul>
@@ -25,14 +23,14 @@
 <li><em>Chapter 15</em>, <em>Blocking Applications with fapolicyd</em></li>
 <li><em>Chapter 16</em>, <em>Security Tips and Tricks for the Busy Bee</em></li>
 </ul>
-</section>
-<section id="implementing-mandatory-access-control-with-selinux-and-apparmor" class="level1" data-number="11">
+
+
 <h1 data-number="11">10 Implementing Mandatory Access Control with SELinux and AppArmor</h1>
-<section id="join-our-book-community-on-discord-9" class="level2" data-number="11.1">
+
 <h2 data-number="11.1">Join our book community on Discord</h2>
 <p><a href="https://packt.link/SecNet">https://packt.link/SecNet</a></p>
 <figure>
-<img src="../media/file60.png" style="width:10em" />
+<img src="img/file60.png" style="width:10em" />
 </figure>
 <p>As we saw in previous chapters, <strong>Discretionary Access Control</strong> (<strong>DAC</strong>) allows users to control who can access their own files and directories. But what if your company needs to have more administrative control over who accesses what? For this, we need some sort of <strong>Mandatory Access Control</strong> (<strong>MAC</strong>).</p>
 <p>The best way I know to explain the difference between DAC and MAC is to hearken back to my Navy days. I was riding submarines at the time, and I had to have a Top Secret clearance to do my job. With DAC, I had the physical ability to take one of my Top Secret books to the mess decks, and hand it to a cook who didn't have that level of clearance. With MAC, there were rules that prevented me from doing so. On operating systems, things work pretty much the same way.</p>
@@ -50,8 +48,8 @@
 <li>Exploiting a system with an evil Docker container</li>
 </ul>
 <p>Let's start out by looking at SELinux and how you can benefit from it.</p>
-</section>
-<section id="how-selinux-can-benefit-a-systems-administrator" class="level2" data-number="11.2">
+
+
 <h2 data-number="11.2">How SELinux can benefit a systems administrator</h2>
 <p>SELinux is a free open source software project that was developed by the U.S. National Security Agency. While it can theoretically be installed on any Linux distribution, Red Hat-type distributions are the only ones that come with it already set up and enabled. It uses code in Linux kernel modules, along with extended filesystem attributes, to help ensure that only authorized users and processes can access either sensitive files or system resources. There are three ways in which SELinux can be used:</p>
 <ul>
@@ -71,19 +69,17 @@
 <p>On web servers, you can use SELinux to prevent the execution of malicious CGI scripts or PHP scripts. If you don't need your server to run CGI or PHP scripts, you can disable them in SELinux.</p>
 <p>With Docker and without SELinux, it's trivially easy for a normal user to break out of a Docker container and gain root-level access to the host machine. As we'll see at the end of this chapter, SELinux is a useful tool for hardening servers that run Docker containers.</p>
 <p>So now, you're likely thinking that everyone would use such a great tool, right? Sadly, that's not the case. In its beginning, SELinux got a reputation for being difficult to work with, and many administrators would just disable it. In fact, a lot of tutorials you see on the web or on YouTube have disabling SELinux as the first step. In this section, I'd like to show you that things have improved and that SELinux no longer deserves its bad reputation.</p>
-</section>
-<section id="setting-security-contexts-for-files-and-directories" class="level2" data-number="11.3">
+
+
 <h2 data-number="11.3">Setting security contexts for files and directories</h2>
 <p>Think of SELinux as a glorified labeling system. It adds labels, known as security contexts, to files and directories through extended file attributes. It also adds the same type of label, known as domains, to system processes. To see these contexts and domains on your CentOS or AlmaLinux machines, use the <code>-Z</code> option with either <code>ls</code> or <code>ps.</code> For example, files and directories in my own home directory would look like the following:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ ls -Z
+<div><pre><code>[donnie@localhost ~]$ ls -Z
 drwxrwxr-x. donnie donnie unconfined_u:object_r:user_home_t:s0 acl_demo_dir
 -rw-rw-r--. donnie donnie unconfined_u:object_r:user_home_t:s0 yum_list.txt
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>Processes on my system would look something like the following:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ ps -Z
+<div><pre><code>[donnie@localhost ~]$ ps -Z
 LABEL                             PID TTY          TIME CMD
 unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 1322 pts/0 00:00:00 bash
 unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 3978 pts/0 00:00:00 ps
@@ -103,26 +99,22 @@ unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 3978 pts/0 00:00:00 ps
 <blockquote>
 <p>The targeted policy, which comes installed by default, is what a normal Linux administrator will use in his or her day-to-day duties. If you look in the repositories of your CentOS virtual machine, you'll see that there are also several others, which we won't cover in this book.</p>
 </blockquote>
-<section id="installing-the-selinux-tools" class="level3" data-number="11.3.1">
+
 <h3 data-number="11.3.1">Installing the SELinux tools</h3>
 <p>For some bizarre reason that I'll never understand, the tools that you need to administer SELinux don't get installed by default, even though SELinux itself does. So, the first thing you'll need to do on your CentOS virtual machine is to install them.</p>
 <p>On CentOS 7, run this command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo yum install setools policycoreutils policycoreutils-python</code></pre>
+<div><pre><code>sudo yum install setools policycoreutils policycoreutils-python</code></pre>
 </div>
 <p>On CentOS 8, run this command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo dnf install setools policycoreutils policycoreutils-python-utils</code></pre>
+<div><pre><code>sudo dnf install setools policycoreutils policycoreutils-python-utils</code></pre>
 </div>
 <p>Later on in this chapter, in the <em>Troubleshooting with setroubleshoot</em> section, we'll look at how to use <code>setroubleshoot </code>to help diagnose SELinux problems. In order to have some cool error messages to look at when we get there, go ahead and install <code>setroubleshoot </code>now, and activate it by restarting the <code>auditd</code> daemon. (There's no <code>setroubleshoot</code> daemon, because <code>setroubleshoot </code>is meant to be controlled by the <code>auditd</code> daemon.) Install <code>setroubleshoot</code> like so.</p>
 <p>For CentOS 7, use these commands:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo yum install setroubleshoot
+<div><pre><code>sudo yum install setroubleshoot
 sudo service auditd restart</code></pre>
 </div>
 <p>For AlmaLinux 8 and 9, use these commands:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo dnf install setroubleshoot
+<div><pre><code>sudo dnf install setroubleshoot
 sudo service auditd restart</code></pre>
 </div>
 <p>One of the little systemd quirks that we have to deal with on Red Hat-type systems is that you can't stop or restart the <code>auditd</code> daemon with the normal <code>systemctl</code> command. However, the old-fashioned <code>service</code> command works. For some reason that I don't understand, the Red Hat folk configured the <code>auditd</code> service file to disable the normal systemd way of doing things.</p>
@@ -130,30 +122,26 @@ sudo service auditd restart</code></pre>
 <p>Depending on the type of installation that you chose when installing CentOS or AlmaLinux, you might or might not already have <code>setroubleshoot</code> installed. To be sure, go ahead and run the command to install it. It won't hurt anything if <code>setroubleshoot</code> is already there.</p>
 </blockquote>
 <p>You now have what you need to get started. Let's now look at what SELinux can do for a busy web server administrator.</p>
-</section>
-<section id="creating-web-content-files-with-selinux-enabled" class="level3" data-number="11.3.2">
+
+
 <h3 data-number="11.3.2">Creating web content files with SELinux enabled</h3>
 <p>Now, let's look at what can happen if you have web content files that are set with the wrong SELinux type. First, we'll install, enable, and start the Apache web server on our CentOS virtual machines. (Note that including the --now option allows us to enable and start a daemon all in one single step.) Do the following on CentOS 7:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo yum install httpd
+<div><pre><code>sudo yum install httpd
 sudo systemctl enable --now httpd</code></pre>
 </div>
 <p>On CentOS 8, use the following command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo dnf install httpd
+<div><pre><code>sudo dnf install httpd
 sudo systemctl enable --now httpd</code></pre>
 </div>
 <p>If you haven't done so already, configure the firewall to allow access to the web server:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --permanent --add-service=http
+<div><pre><code>[donnie@localhost ~]$ sudo firewall-cmd --permanent --add-service=http
 success
 [donnie@localhost ~]$ sudo firewall-cmd --reload
 success
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>When we look at the SELinux information for Apache processes, we'll see the following:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ ps ax -Z | grep httpd
+<div><pre><code>[donnie@localhost ~]$ ps ax -Z | grep httpd
 system_u:system_r:httpd_t:s0     3689 ?        Ss     0:00 /usr/sbin/httpd -DFOREGROUND
 system_u:system_r:httpd_t:s0     3690 ?        S      0:00 /usr/sbin/httpd -DFOREGROUND
 system_u:system_r:httpd_t:s0     3691 ?        S      0:00 /usr/sbin/httpd -DFOREGROUND
@@ -164,23 +152,20 @@ unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 3705 pts/0 R+   0:00 grep 
 </div>
 <p>As I said before, we're not interested in the user or the role. However, we are interested in the type, which in this case is <code>httpd_t</code>.</p>
 <p>On Red Hat-type systems, we would normally place web content files in the <code>/var/www/html/</code> directory. Let's look at the SELinux context for that <code>html</code> directory:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost www]$ pwd
+<div><pre><code>[donnie@localhost www]$ pwd
 /var/www
 [donnie@localhost www]$ ls -Zd html/
 drwxr-xr-x. root root system_u:object_r:httpd_sys_content_t:s0 html/
 [donnie@localhost www]$</code></pre>
 </div>
 <p>The type is <code>httpd_sys_content</code>, so it stands to reason that the <code>httpd</code> daemon should be able to access this directory. It's currently empty, so let's <code>cd</code> into it and create a simple index file:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost www]$ cd html
+<div><pre><code>[donnie@localhost www]$ cd html
 [donnie@localhost html]$ pwd
 /var/www/html
 [donnie@localhost html]$ sudo vim index.html</code></pre>
 </div>
 <p>Here's what I'll put into the file:</p>
-<div class="C0-SHCodePACKT">
-<pre><code>&lt;html&gt;
+<div><pre><code>&lt;html&gt;
 &lt;head&gt;
 &lt;title&gt;
 Test of SELinux
@@ -193,26 +178,23 @@ Let&#39;s see if this SELinux stuff really works!
 </div>
 <p>Okay, as I said, it's simple, since my HTML hand-coding skills aren't what they used to be. But still, it serves our present purposes.</p>
 <p>Looking at the SELinux context, we see that the file has the same type as the <code>html</code> directory:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ ls -Z
+<div><pre><code>[donnie@localhost html]$ ls -Z
 -rw-r--r--. root root unconfined_u:object_r:httpd_sys_content_t:s0 index.html
 [donnie@localhost html]$</code></pre>
 </div>
 <p>I can now navigate to this page from the web browser of my trusty OpenSUSE workstation:</p>
 <figure>
-<img src="../media/file61.png" />
+<img src="img/file61.png" />
 </figure>
 <p>Now, though, let's see what happens if I decide to create content files in my own home directory and then move them to the <code>html</code> directory. First, let's see what the SELinux context is for my new file:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ pwd
+<div><pre><code>[donnie@localhost ~]$ pwd
 /home/donnie
 [donnie@localhost ~]$ ls -Z index.html
 -rw-rw-r--. donnie donnie unconfined_u:object_r:user_home_t:s0 index.html
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>The context type is now <code>user_home_t</code>, which is a sure-fire indicator that I created this in my home directory. I'll now move the file to the <code>html</code> directory, overwriting the old file:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo mv index.html /var/www/html/
+<div><pre><code>[donnie@localhost ~]$ sudo mv index.html /var/www/html/
 [sudo] password for donnie:
 [donnie@localhost ~]$ cd /var/www/html
 [donnie@localhost html]$ ls -Z
@@ -221,7 +203,7 @@ Let&#39;s see if this SELinux stuff really works!
 </div>
 <p>Even though I moved the file over to the /var/www/html directory, the SELinux type is still associated with users' home directories. Now, I'll go to the browser of my host machine to refresh the page:</p>
 <figure>
-<img src="../media/file62.png" />
+<img src="img/file62.png" />
 </figure>
 <p>So, I have a slight problem. The type that's assigned to my file doesn't match the type of the httpd daemon processes, so SELinux doesn't allow the <code>httpd</code> processes to access the file.</p>
 <blockquote>
@@ -230,8 +212,8 @@ Let&#39;s see if this SELinux stuff really works!
 <p>Had I copied the file to the <code>html</code> directory instead of moving it, the SELinux context would have automatically changed to match that of the destination directory.</p>
 </blockquote>
 </blockquote>
-</section>
-<section id="fixing-an-incorrect-selinux-context" class="level3" data-number="11.3.3">
+
+
 <h3 data-number="11.3.3">Fixing an incorrect SELinux context</h3>
 <p>Okay, so I have this web content file that nobody can access, and I really don't feel up to creating a new one. So, what do I do? Actually, we have three different utilities for fixing this:</p>
 <ul>
@@ -240,11 +222,10 @@ Let&#39;s see if this SELinux stuff really works!
 <li><strong>semanage</strong></li>
 </ul>
 <p>Let's look at each of them.</p>
-<section id="using-chcon" class="level4" data-number="11.3.3.1">
+
 <h4 data-number="11.3.3.1">Using chcon</h4>
 <p>There are two ways to use <code>chcon</code> to fix an incorrect SELinux type on a file or directory. The first is to just manually specify the proper type:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ sudo chcon -t httpd_sys_content_t index.html
+<div><pre><code>[donnie@localhost html]$ sudo chcon -t httpd_sys_content_t index.html
 [sudo] password for donnie:
 [donnie@localhost html]$ ls -Z
 -rw-rw-r--. donnie donnie unconfined_u:object_r:httpd_sys_content_t:s0 index.html
@@ -252,15 +233,13 @@ Let&#39;s see if this SELinux stuff really works!
 </div>
 <p>We can use <code>chcon</code> to change any part of the context, but as I keep saying we're only interested in the type, which gets changed with the <code>-t</code> option. You can see in the <code>ls -Z</code> output that the command was successful.</p>
 <p>The other way to use <code>chcon</code> is to reference a file that has the proper context. For demo purposes, I changed the <code>index.html</code> file back to the home directory type and created a new file within the <code>/var/www/html/</code> directory:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ ls -Z
+<div><pre><code>[donnie@localhost html]$ ls -Z
 -rw-rw-r--. donnie donnie unconfined_u:object_r:user_home_t:s0 index.html
 -rw-r--r--. root   root   unconfined_u:object_r:httpd_sys_content_t:s0 some_file.html
 [donnie@localhost html]$</code></pre>
 </div>
 <p>As you can see, any files that I create within this directory will automatically have the proper SELinux context settings. Now, let's use that new file as a reference in order to set the proper context on the <code>index.html</code> file:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ sudo chcon --reference some_file.html index.html
+<div><pre><code>[donnie@localhost html]$ sudo chcon --reference some_file.html index.html
 [sudo] password for donnie:
 [donnie@localhost html]$ ls -Z
 -rw-rw-r--. donnie donnie unconfined_u:object_r:httpd_sys_content_t:s0 index.html
@@ -268,12 +247,11 @@ Let&#39;s see if this SELinux stuff really works!
 [donnie@localhost html]$</code></pre>
 </div>
 <p>So, I used the <code>--reference</code> option and specified the file that I wanted to use as a reference. The file that I wanted to change is listed at the end of the command. Now, that's all to the good, but I want to find an easier way that doesn't require quite as much typing. After all, I am an old man, and I don't want to overexert myself. So, let's take a look at the <code>restorecon</code> utility.</p>
-</section>
-<section id="using-restorecon" class="level4" data-number="11.3.3.2">
+
+
 <h4 data-number="11.3.3.2">Using restorecon</h4>
 <p>Using <code>restorecon</code> is easy. Just type <code>restorecon</code>, followed by the name of the file that you need to change. Once again, I've changed the context of the <code>index.html</code> file back to the home directory type. This time, though, I'm using <code>restorecon</code> to set the correct type:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ ls -Z
+<div><pre><code>[donnie@localhost html]$ ls -Z
 -rw-rw-r--. donnie donnie unconfined_u:object_r:user_home_t:s0 index.html
 [donnie@localhost html]$ sudo restorecon index.html
 [donnie@localhost html]$ ls -Z
@@ -293,8 +271,7 @@ sudo restorecon -R /var/www/html/</code></pre>
 <p>(Remember: <code>-R</code> stands for recursive.)</p>
 </blockquote>
 <p>There's still one last thing to take care of, even though it isn't really affecting our ability to access this file. That is, I need to change ownership of the file to the Apache user:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ sudo chown apache: index.html
+<div><pre><code>[donnie@localhost html]$ sudo chown apache: index.html
 [sudo] password for donnie:
 [donnie@localhost html]$ ls -l
 total 4
@@ -302,13 +279,12 @@ total 4
 [donnie@localhost html]$</code></pre>
 </div>
 <p>Let's now look at the final utility which is <code>semanage</code>.</p>
-</section>
-<section id="using-semanage" class="level4" data-number="11.3.3.3">
+
+
 <h4 data-number="11.3.3.3">Using semanage</h4>
 <p>In the scenario I've just presented, either <code>chcon</code> or <code>restorecon</code> will suit your needs just fine. The active SELinux policy mandates what security contexts in certain directories are supposed to look like. As long as you're using <code>chcon</code> or <code>restorecon</code> within directories that are defined in the active SELinux policy, you're good. But let's say that you've created a directory elsewhere that you want to use to serve out web content files. You would need to set the <code>httpd_sys_content_t</code> type on that directory and all of the files within it. However, if you use <code>chcon</code> or <code>restorecon</code> for that, the change won't survive a system reboot. To make the change permanent, you'll need to use <code>semanage</code>.</p>
 <p>Let's say that, for some strange reason, I want to serve web content out of a directory that I've created in the <code>/home/</code> directory:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost home]$ pwd
+<div><pre><code>[donnie@localhost home]$ pwd
 /home
 [donnie@localhost home]$ sudo mkdir webdir
 [sudo] password for donnie:
@@ -317,14 +293,12 @@ drwxr-xr-x. root root unconfined_u:object_r:home_root_t:s0 webdir
 [donnie@localhost home]$</code></pre>
 </div>
 <p>Because I had to use my <code>sudo</code> powers to create the directory here, it's associated with the root user's <code>home_root_t</code> type, instead of the normal <code>user_home_dir_t</code> type. Any files that I create within this directory will have the same type:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost webdir]$ ls -Z
+<div><pre><code>[donnie@localhost webdir]$ ls -Z
 -rw-r--r--. root root unconfined_u:object_r:home_root_t:s0 index.html
 [donnie@localhost webdir]$</code></pre>
 </div>
 <p>The next step is to use <code>semanage</code> to add a permanent mapping of this directory and the <code>httpd_sys_content_t</code> type to the active policy's context list:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost home]$ sudo semanage fcontext -a -t httpd_sys_content_t &quot;/home/webdir(/.*)?&quot;
+<div><pre><code>[donnie@localhost home]$ sudo semanage fcontext -a -t httpd_sys_content_t &quot;/home/webdir(/.*)?&quot;
 [donnie@localhost home]$ ls -Zd /home/webdir
 drwxr-xr-x. root root unconfined_u:object_r:httpd_sys_content_t:s0 /home/webdir
 [donnie@localhost home]$</code></pre>
@@ -337,8 +311,7 @@ drwxr-xr-x. root root unconfined_u:object_r:httpd_sys_content_t:s0 /home/webdir
 <li><strong>/home/webdir(/.*)?</strong>: This bit of gibberish is what's known as a <strong>regular expression</strong>. I can't go into the nitty-gritty details of regular expressions here, so suffice it to say that <strong>Regular Expressions</strong> is a language that we use to match text patterns. (And yes, I did mean to say <em>is</em> instead of <em>are</em>, since Regular Expressions is the name of the overall language.) In this case, I had to use this particular regular expression in order to make this <code>semanage</code> command recursive because <code>semanage</code> doesn't have the <code>-R</code> option switch. With this regular expression, I'm saying that I want anything that gets created in this directory to have the same SELinux type as the directory itself.</li>
 </ul>
 <p>The final step is to do a <code>restorecon -R</code> on this directory to ensure that the proper labels have been set:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost home]$ sudo restorecon -R webdir
+<div><pre><code>[donnie@localhost home]$ sudo restorecon -R webdir
 [donnie@localhost home]$ ls -Zd /home/webdir
 drwxr-xr-x. root root unconfined_u:object_r:httpd_sys_content_t:s0 /home/webdir
 [donnie@localhost home]$</code></pre>
@@ -350,39 +323,34 @@ drwxr-xr-x. root root unconfined_u:object_r:httpd_sys_content_t:s0 /home/webdir
 <p>For more information on how to use <code>semanage</code> to manage security contexts, refer to the relevant man page by entering <code>man semanage-fcontext</code>.</p>
 </blockquote>
 </blockquote>
-</section>
-<section id="hands-on-lab-selinux-type-enforcement" class="level4" data-number="11.3.3.4">
+
+
 <h4 data-number="11.3.3.4">Hands-on lab – SELinux type enforcement</h4>
 <p>In this lab, you'll install the Apache web server and the appropriate SELinux tools. You'll then view the effects of having the wrong SELinux type assigned to a web content file if you're ready, let's go:</p>
 <ol>
 <li>Install Apache, along with all the required SELinux tools on CentOS 7:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo yum install httpd setroubleshoot setools policycoreutils policycoreutils-python</code></pre>
+<div><pre><code>sudo yum install httpd setroubleshoot setools policycoreutils policycoreutils-python</code></pre>
 </div>
 <p>On CentOS 8, use the following command:</p>
-<div class="C1-SHConPACKT">
-<pre><code>sudo dnf install httpd setroubleshoot setools policycoreutils policycoreutils-python-utils</code></pre>
+<div><pre><code>sudo dnf install httpd setroubleshoot setools policycoreutils policycoreutils-python-utils</code></pre>
 </div>
 <ol>
 <li>Activate <code>setroubleshoot</code> by restarting the <code>auditd</code> service:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo service auditd restart</code></pre>
+<div><pre><code>sudo service auditd restart</code></pre>
 </div>
 <ol>
 <li>Enable and start the Apache service and open port <code>80</code> on the firewall:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo systemctl enable --now httpd
+<div><pre><code>sudo systemctl enable --now httpd
 sudo firewall-cmd --permanent --add-service=http
 sudo firewall-cmd --reload</code></pre>
 </div>
 <ol>
 <li>In the <code>/var/www/html/</code> directory, create an <code>index.html</code> file with the following contents:</li>
 </ol>
-<div class="C1-SHCodePACKT">
-<pre><code>&lt;html&gt;
+<div><pre><code>&lt;html&gt;
    &lt;head&gt;
       &lt;title&gt;SELinux Test Page&lt;/title&gt;
    &lt;/head&gt;
@@ -394,40 +362,36 @@ sudo firewall-cmd --reload</code></pre>
 <ol>
 <li>View the information about the <code>index.html</code> file:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>ls -Z index.html</code></pre>
+<div><pre><code>ls -Z index.html</code></pre>
 </div>
 <ol>
 <li>In your host machine's web browser, navigate to the IP address of the CentOS virtual machine. You should be able to view the page.</li>
 <li>Induce an SELinux violation by changing the type of the <code>index.html</code> file to something that's incorrect:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo chcon -t tmp_t index.html
+<div><pre><code>sudo chcon -t tmp_t index.html
 ls -Z index.html</code></pre>
 </div>
 <ol>
 <li>Go back to your host machine's web browser and reload the document. You should now see a <code>Forbidden</code> message.</li>
 <li>Use <code>restorecon</code> to change the file back to its correct type:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo restorecon index.html</code></pre>
+<div><pre><code>sudo restorecon index.html</code></pre>
 </div>
 <ol>
 <li>Reload the page in your host machine's web browser. You should now be able to view the page.</li>
 <li>End of lab.</li>
 </ol>
 <p>Now that we've seen how to use basic SELinux commands, let's look at a cool tool that makes troubleshooting much easier.</p>
-</section>
-</section>
-</section>
-<section id="troubleshooting-with-setroubleshoot" class="level2" data-number="11.4">
+
+
+
+
 <h2 data-number="11.4">Troubleshooting with setroubleshoot</h2>
 <p>So, you're now scratching your head and saying, <em>When I can't access something that I should be able to, how do I know that it's an SELinux problem?</em> Ah, I'm glad you asked.</p>
-<section id="viewing-setroubleshoot-messages" class="level3" data-number="11.4.1">
+
 <h3 data-number="11.4.1">Viewing setroubleshoot messages</h3>
 <p>Whenever something happens that violates an SELinux rule, it gets logged in the <code>/var/log/audit/audit.log</code> file. Tools are available that can let you directly read that log, but to diagnose SELinux problems it's way better to use <code>setroubleshoot</code>. The beauty of <code>setroubleshoot </code>is that it takes cryptic, hard-to-interpret SELinux messages from the <code>audit.log</code> file and translates them into plain, natural language. The messages that it sends to the <code>/var/log/messages</code> file even contain suggestions about how to fix the problem. To show how this works, let's go back to our problem where a file in the <code>/var/www/html/</code> directory has been assigned the wrong SELinux type. Of course, we knew right away what the problem was because there was only one file in that directory and a simple <code>ls -Z</code> showed what was wrong with it. However, let's ignore that for the moment and say that we didn't know what the problem was. By opening the <code>/var/log/messages</code> file in <code>less</code> and searching for <code>sealert</code>, we'll find this message:</p>
-<div class="C0-SHConPACKT">
-<pre><code>Nov 26 21:30:21 localhost python: SELinux is preventing httpd from open access on the file /var/www/html/index.html.#012#012*****  Plugin restorecon (92.2 confidence) suggests   ************************#012#012If you want to fix the label. #012/var/www/html/index.html default label should be httpd_sys_content_t.#012Then you can run restorecon.#012Do#012# /sbin/restorecon -v /var/www/html/index.html#012#012*****  Plugin catchall_boolean (7.83 confidence) suggests   ******************#012#012If you want to allow httpd to read user content#012Then you must tell SELinux about this by enabling the &#39;httpd_read_user_content&#39; boolean.#012#012Do#012setsebool -P httpd_read_user_content 1#012#012*****  Plugin catchall (1.41 confidence) suggests   **************************#012#012If you believe that httpd should be allowed open access on the index.html file by default.#012Then you should report this as a bug.#012You can generate a local policy module to allow this access.#012Do#012allow this access for now by executing:#012# ausearch -c &#39;httpd&#39; --raw | audit2allow -M my-httpd#012# semodule -i my-httpd.pp#012</code></pre>
+<div><pre><code>Nov 26 21:30:21 localhost python: SELinux is preventing httpd from open access on the file /var/www/html/index.html.#012#012*****  Plugin restorecon (92.2 confidence) suggests   ************************#012#012If you want to fix the label. #012/var/www/html/index.html default label should be httpd_sys_content_t.#012Then you can run restorecon.#012Do#012# /sbin/restorecon -v /var/www/html/index.html#012#012*****  Plugin catchall_boolean (7.83 confidence) suggests   ******************#012#012If you want to allow httpd to read user content#012Then you must tell SELinux about this by enabling the &#39;httpd_read_user_content&#39; boolean.#012#012Do#012setsebool -P httpd_read_user_content 1#012#012*****  Plugin catchall (1.41 confidence) suggests   **************************#012#012If you believe that httpd should be allowed open access on the index.html file by default.#012Then you should report this as a bug.#012You can generate a local policy module to allow this access.#012Do#012allow this access for now by executing:#012# ausearch -c &#39;httpd&#39; --raw | audit2allow -M my-httpd#012# semodule -i my-httpd.pp#012</code></pre>
 </div>
 <p>The first line of this message tells us what the problem is. It's saying that SELinux is preventing us from accessing the <code>/var/www/html/index.html</code> file because it's set with the wrong type. It then gives us several suggestions on how to fix the problem, with the first one being to run the <code>restorecon</code> command, as I've already shown you how to do.</p>
 <blockquote>
@@ -436,47 +400,44 @@ ls -Z index.html</code></pre>
 <p>A good rule-of-thumb to remember when reading these setroubleshoot messages is that the first suggestion in the message is normally the one that will fix the problem.</p>
 </blockquote>
 </blockquote>
-</section>
-<section id="using-the-graphical-setroubleshoot-utility" class="level3" data-number="11.4.2">
+
+
 <h3 data-number="11.4.2">Using the graphical setroubleshoot utility</h3>
 <p>So far, I've only talked about using setroubleshoot on text-mode servers. After all, it's very common to see Linux servers running in text-mode, so all of us Linux folk have to be text-mode warriors. But on desktop systems or on servers that have a desktop interface installed, there is a graphical utility that will automatically alert you when setroubleshoot detects a problem:</p>
 <figure>
-<img src="../media/file63.png" />
+<img src="img/file63.png" />
 </figure>
 <p>Click on that alert icon, and you'll see something like this:</p>
 <figure>
-<img src="../media/file64.png" />
+<img src="img/file64.png" />
 </figure>
 <p>Click the <strong>Troubleshoot</strong> button, and you'll see a list of suggestions on how to fix the problem:</p>
 <figure>
-<img src="../media/file65.png" />
+<img src="img/file65.png" />
 </figure>
 <blockquote>
 <p>Note that these screenshots are from a CentOS 7 machine, but they would look the same on either an AlmaLinux 8 or an AlmaLinux 9 machine.</p>
 </blockquote>
 <p>As is often the case with GUI thingies, this is mostly self-explanatory, so you shouldn't have any problem figuring it out.</p>
-</section>
-<section id="troubleshooting-in-permissive-mode" class="level3" data-number="11.4.3">
+
+
 <h3 data-number="11.4.3">Troubleshooting in permissive mode</h3>
 <p>If you're dealing with a simple problem like the one I've just shown you, then you can probably assume that you can safely do what the first suggestion in the setroubleshoot message tells you to do. But there will be times when things get a bit more complex, where you might have more than one problem. For times like these, you need to use permissive mode.</p>
 <p>When you first install your Red Hat or CentOS system, SELinux is in enforcing mode, which is the default. This means that SELinux will actually stop actions that are in violation of the active SELinux policy. This also means that, if you have multiple SELinux problems when you try to perform a certain action, SELinux will stop the action from taking place after the first violation occurs. When it happens, SELinux won't even see the remaining problems, and they won't show up in the <code>messages</code> log file. If you try to troubleshoot these types of problem while in enforcing mode, you'll be like the proverbial dog who chases its own tail. You'll go round and round and will accomplish nothing.</p>
 <p>In permissive mode, SELinux allows actions that violate policy to occur, but it will log them. By switching to permissive mode and doing something to induce the problem that you were seeing, the prohibited actions will take place but <code>setroubleshoot </code>will log all of them in the <code>messages</code> file. This way, you'll get a better view of what you need to do to get things working properly.</p>
 <p>First, let's use <code>getenforce</code> to verify what our current mode is:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo getenforce
+<div><pre><code>[donnie@localhost ~]$ sudo getenforce
 Enforcing
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>Now, let's temporarily place the system into permissive mode:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo setenforce 0
+<div><pre><code>[donnie@localhost ~]$ sudo setenforce 0
 [donnie@localhost ~]$ sudo getenforce
 Permissive
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>When I say <em>temporarily</em>, I mean that this will only last until you do a system reboot. After a reboot, you'll be back in enforcing mode. Also, note that a <code>0</code> after <code>setenforce</code> denotes that I'm setting permissive mode. To get back to enforcing mode after you're done with troubleshooting, replace the <code>0</code> with a <code>1</code>:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo setenforce 1
+<div><pre><code>[donnie@localhost ~]$ sudo setenforce 1
 [donnie@localhost ~]$ sudo getenforce
 Enforcing
 [donnie@localhost ~]$</code></pre>
@@ -484,8 +445,7 @@ Enforcing
 <p>We're now back in enforcing mode.</p>
 <p>At times, you may need to make permissive mode persist after a system reboot. An example of this would be if you ever have to deal with a system that has had SELinux disabled for a long period of time. In a case like that, you wouldn't want to just put SELinux into enforcing mode and reboot. If you try that, it will take forever for the system to properly create the file and directory labels that make SELinux work, and the system might lock up before it's done. By placing the system into permissive mode first, you'll avoid having the system lock up, although it will still take a long time for the relabeling process to complete.</p>
 <p>To make permissive mode persistent across system reboots, you'll edit the <code>selinux</code> file in the <code>/etc/sysconfig/</code> directory. Here's what it looks like by default:</p>
-<div class="C0-SHConPACKT">
-<pre><code># This file controls the state of SELinux on the system.
+<div><pre><code># This file controls the state of SELinux on the system.
 # SELINUX= can take one of these three values:
 #     enforcing - SELinux security policy is enforced.
 #     permissive - SELinux prints warnings instead of enforcing.
@@ -498,8 +458,7 @@ SELINUX=enforcing
 SELINUXTYPE=targeted</code></pre>
 </div>
 <p>The two important things you see here are that SELinux is in enforcing mode, and that it's using the targeted policy. To switch to permissive mode, just change the SELINUX= line, and save the file:</p>
-<div class="C0-SHConPACKT">
-<pre><code># This file controls the state of SELinux on the system.
+<div><pre><code># This file controls the state of SELinux on the system.
 # SELINUX= can take one of these three values:
 #     enforcing - SELinux security policy is enforced.
 #     permissive - SELinux prints warnings instead of enforcing.
@@ -512,8 +471,7 @@ SELINUX=permissive
 SELINUXTYPE=targeted</code></pre>
 </div>
 <p>The <code>sestatus</code> utility shows us lots of cool information about what's going on with SELinux:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo sestatus
+<div><pre><code>[donnie@localhost ~]$ sudo sestatus
 SELinux status:                 enabled
 SELinuxfs mount:                /sys/fs/selinux
 SELinux root directory:         /etc/selinux
@@ -526,16 +484,15 @@ Max kernel policy version:      28
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>The two items that interest us here are the current mode and the mode from a configuration file. By changing the configuration file to permissive, we haven't changed the current running mode. So, we're still in enforcing mode. The switch to permissive won't happen until I either reboot this machine or until I manually switch by issuing a <code>sudo setenforce 0</code> command. And of course, you don't want to stay in permissive mode forever. As soon as you no longer need permissive mode, change the configuration file back to <strong>enforcing</strong> and do <code>sudo setenforce 1</code> to change the running mode.</p>
-</section>
-</section>
-<section id="working-with-selinux-policies" class="level2" data-number="11.5">
+
+
+
 <h2 data-number="11.5">Working with SELinux policies</h2>
 <p>So far, all we've looked at is what happens when we have an incorrect SELinux type set on a file and what to do to set the correct type. Another problem we may have would comes about if we need to allow an action that is prohibited by the active SELinux policy.</p>
-<section id="viewing-booleans" class="level3" data-number="11.5.1">
+
 <h3 data-number="11.5.1">Viewing Booleans</h3>
 <p>Booleans are part of what makes up an SELinux policy, and each Boolean represents a binary choice. In SELinux policies, a Boolean either allows something or it prohibits something. To see all Booleans on your system, run the <code>getsebool -a</code> command. (It's a long list, so I'll only show partial output here.):</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ getsebool -a
+<div><pre><code>[donnie@localhost ~]$ getsebool -a
 abrt_anon_write --&gt; off
 abrt_handle_event --&gt; off
 abrt_upload_watch_anon_write --&gt; on
@@ -551,15 +508,13 @@ zoneminder_run_sudo --&gt; off
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>To view more than one Boolean, the <code>-a</code> switch is mandatory. If you just happen to know the name of the Boolean that you want to see, leave the <code>-a</code> out and list it. In keeping with the Apache web server theme that we've had going, let's see whether we're allowing Apache to access files in users' home directories:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ getsebool httpd_enable_homedirs
+<div><pre><code>[donnie@localhost html]$ getsebool httpd_enable_homedirs
 httpd_enable_homedirs --&gt; off
 [donnie@localhost html]$</code></pre>
 </div>
 <p>The fact that this Boolean is <code>off </code>means that the Apache server daemon isn't allowed to access any content within the users' home directories. This is an important protection, and you really don't want to change it. Instead, just put web content files elsewhere so that you don't have to change this Boolean.</p>
 <p>You'll rarely want to look at the entire list, and you likely won't know the name of the specific Boolean that you want to see. Rather, you'll probably want to filter the output through <code>grep</code> in order to look at just certain things. For example, to see all of the Booleans that affect a web server, do this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ getsebool -a | grep &#39;http&#39;
+<div><pre><code>[donnie@localhost html]$ getsebool -a | grep &#39;http&#39;
 httpd_anon_write --&gt; off
 httpd_builtin_scripting --&gt; on
 httpd_can_check_spam --&gt; off
@@ -576,12 +531,11 @@ prosody_bind_http_port --&gt; off
 [donnie@localhost html]$</code></pre>
 </div>
 <p>It's also a rather long list, but scroll down a little and you'll find the Boolean that you seek.</p>
-</section>
-<section id="configuring-the-booleans" class="level3" data-number="11.5.2">
+
+
 <h3 data-number="11.5.2">Configuring the Booleans</h3>
 <p>Realistically, you'll likely never have reason to allow users to serve web content out of their home directories. It's much more probable that you'll set up something like a Samba server, which would allow users on Windows machines to use their graphical Windows Explorer to access their home directories on Linux servers. But if you set up a Samba server and don't do anything with SELinux, users will complain about how they don't see any of their files in their home directories of the Samba server. Because you're the proactive type and you want to avoid the pain of listening to complaining users, you'll surely just go ahead and configure SELinux to allow the Samba daemon to access users' home directories. You might not know the exact name of the Boolean, but you can find it easily enough, as follows:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ getsebool -a | grep &#39;home&#39;
+<div><pre><code>[donnie@localhost html]$ getsebool -a | grep &#39;home&#39;
 git_cgi_enable_homedirs --&gt; off
 git_system_enable_homedirs --&gt; off
 httpd_enable_homedirs --&gt; off
@@ -596,28 +550,25 @@ xdm_write_home --&gt; off
 [donnie@localhost html]$</code></pre>
 </div>
 <p>Okay, you knew that the Boolean name probably had the word <code>home</code> in it, so you filtered for that word. About half-way down the list, you see <code>samba_enable_home_dirs --&gt; off</code>. You'll need to change this to <code>on</code> to let users access their home directories from their Windows machines:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ sudo setsebool samba_enable_home_dirs on
+<div><pre><code>[donnie@localhost html]$ sudo setsebool samba_enable_home_dirs on
 [sudo] password for donnie:
 [donnie@localhost html]$ getsebool samba_enable_home_dirs
 samba_enable_home_dirs --&gt; on
 [donnie@localhost html]$</code></pre>
 </div>
 <p>Users can now access their home directories as they should be able to, but only until you do a system reboot. Without the <code>-P</code> option, any changes you make with <code>setsebool</code> will only be temporary. So, let's make the change permanent with <code>-P</code>:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost html]$ sudo setsebool -P samba_enable_home_dirs on
+<div><pre><code>[donnie@localhost html]$ sudo setsebool -P samba_enable_home_dirs on
 [donnie@localhost html]$ getsebool samba_enable_home_dirs
 samba_enable_home_dirs --&gt; on
 [donnie@localhost html]$</code></pre>
 </div>
 <p>Congratulations, you've just made your first change to an SELinux policy.</p>
-</section>
-<section id="protecting-your-web-server" class="level3" data-number="11.5.3">
+
+
 <h3 data-number="11.5.3">Protecting your web server</h3>
 <p>Look at the output of the <code>getsebool -a | grep 'http'</code> command again, and you'll see that most httpd-related Booleans are turned off by default, with only a few turned on. There are two of them that you'll commonly need to turn on when setting up a web server.</p>
 <p>If you ever need to set up a website with some sort of PHP-based content management system, such as Joomla or WordPress, you may have to turn on the <code>httpd_unified</code> Boolean. With this Boolean turned off, the Apache web server won't be able to interact properly with all of the components of the PHP engine:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ getsebool httpd_unified
+<div><pre><code>[donnie@localhost ~]$ getsebool httpd_unified
 httpd_unified --&gt; off
 [donnie@localhost ~]$ sudo setsebool -P httpd_unified on
 [sudo] password for donnie:
@@ -626,8 +577,7 @@ httpd_unified --&gt; on
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>The other Boolean that you'll commonly need to turn on is the <code>httpd_can_sendmail</code> Boolean. If you ever need a website to send mail out through a form (or if you need to set up a mail server with a web-based frontend), you'll definitely need to set this to <code>on</code>:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ getsebool httpd_can_sendmail
+<div><pre><code>[donnie@localhost ~]$ getsebool httpd_can_sendmail
 httpd_can_sendmail --&gt; off
 [donnie@localhost ~]$ sudo setsebool -P httpd_can_sendmail on
 [donnie@localhost ~]$ getsebool httpd_can_sendmail
@@ -635,21 +585,19 @@ httpd_can_sendmail --&gt; on
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>On the other hand, there are some Booleans that are turned on by default, and you might want to consider whether you really need them turned on. For example, allowing CGI scripts to run on a web server does represent a potential security risk. If an intruder were to somehow upload a malicious CGI script to the server and run it, much damage could occur as a result. Yet, for some bizarre reason, the default SELinux policy allows CGI scripts to run. If you're absolutely certain that nobody who hosts websites on your server will ever need to run CGI scripts, you might want to consider turning this Boolean off:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ getsebool httpd_enable_cgi
+<div><pre><code>[donnie@localhost ~]$ getsebool httpd_enable_cgi
 httpd_enable_cgi --&gt; on
 [donnie@localhost ~]$ sudo setsebool -P httpd_enable_cgi off
 [donnie@localhost ~]$ getsebool httpd_enable_cgi
 httpd_enable_cgi --&gt; off
 [donnie@localhost ~]$</code></pre>
 </div>
-</section>
-<section id="protecting-network-ports" class="level3" data-number="11.5.4">
+
+
 <h3 data-number="11.5.4">Protecting network ports</h3>
 <p>Each network daemon that's running on your system has a specific network port or set of network ports assigned to it, on which it will listen. The <code>/etc/services</code> file contains a list of common daemons and their associated network ports, but it doesn't prevent someone from configuring a daemon to listen on some non-standard port. So, without some mechanism to prevent it, some sneaky intruder could potentially plant some sort of malware that would cause a daemon to listen on a non-standard port, possibly listening for commands from its master.</p>
 <p>SELinux protects against this sort of malicious activity by only allowing daemons to listen on certain ports. Use <code>semanage</code> to look at the list of allowed ports:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo semanage port -l
+<div><pre><code>[donnie@localhost ~]$ sudo semanage port -l
 SELinux Port Type              Proto    Port Number
 afs3_callback_port_t           tcp      7001
 afs3_callback_port_t           udp      7001
@@ -664,8 +612,7 @@ zope_port_t                    tcp      8021
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>This is yet another of those very long lists, so I'm only showing partial output. However, let's narrow things down a bit. Let's say that I only want to look at a list of ports on which the Apache web server can listen. For this, I'll use my good friend <code>grep</code>:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo semanage port -l | grep &#39;http&#39;
+<div><pre><code>[donnie@localhost ~]$ sudo semanage port -l | grep &#39;http&#39;
 [sudo] password for donnie:
 http_cache_port_t              tcp      8080, 8118, 8123, 10001-10010
 http_cache_port_t              udp      3130
@@ -676,30 +623,24 @@ pegasus_https_port_t           tcp      5989
 </div>
 <p>Several <code>http</code> items come up, but I'm only interested in the <code>http_port_t</code> item because it's the one that affects normal web server operation. We see here that SELinux will allow Apache to listen on ports <code>80</code>, <code>81</code>, <code>443</code>, <code>488</code>, <code>8008</code>, <code>8009</code>, <code>8443</code>, and <code>9000</code>. Since the Apache server is one of the few daemons for which you'd ever have a legitimate reason for adding a non-standard port, let's demo with it.</p>
 <p>First, let's go into the <code>/etc/httpd/conf/httpd.conf</code> file and look at the ports on which Apache is currently listening. Search for <code>Listen</code>, and you'll see the following line:</p>
-<div class="C0-SHConPACKT">
-<pre><code>Listen 80</code></pre>
+<div><pre><code>Listen 80</code></pre>
 </div>
 <p>I don't have the SSL module installed on this machine, but if I did I would have an <code>ssl.conf</code> file in the <code>/etc/httpd/conf.d/</code> directory with this line:</p>
-<div class="C0-SHConPACKT">
-<pre><code>Listen 443</code></pre>
+<div><pre><code>Listen 443</code></pre>
 </div>
 <p>So for normal, non-encrypted website connections, the default configuration only has Apache listening on port <code>80</code>. For secure, encrypted website connections, Apache listens on port <code>443</code>. Now, let's go into the <code>httpd.conf</code> file and change <code>Listen 80</code> to a port number that SELinux doesn't allow, for example, port <code>82</code>:</p>
-<div class="C0-SHConPACKT">
-<pre><code>Listen 82</code></pre>
+<div><pre><code>Listen 82</code></pre>
 </div>
 <p>After saving the file, I'll restart Apache to read in the new configuration:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo systemctl restart httpd
+<div><pre><code>[donnie@localhost ~]$ sudo systemctl restart httpd
 Job for httpd.service failed because the control process exited with error code. See &quot;systemctl status httpd.service&quot; and &quot;journalctl -xe&quot; for details.
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>Yes, I have a problem. I'll look in the <code>/var/log/messages</code> file to see if <code>setroubleshoot</code> gives me a clue:</p>
-<div class="C0-SHConPACKT">
-<pre><code>Nov 29 16:39:21 localhost python: SELinux is preventing /usr/sbin/httpd from name_bind access on the tcp_socket port 82.#012#012***** Plugin bind_ports (99.5 confidence) suggests ************************#012#012If you want to allow /usr/sbin/httpd to bind to network port 82#012Then you need to modify the port type.#012Do#012# semanage port -a -t PORT_TYPE -p tcp 82#012 where PORT_TYPE is one of the following: http_cache_port_t, http_port_t, jboss_management_port_t, jboss_messaging_port_t, ntop_port_t, puppet_port_t.#012#012***** Plugin catchall (1.49 confidence) suggests **************************#012#012If you believe that httpd should be allowed name_bind access on the port 82 tcp_socket by default.#012Then you should report this as a bug.#012You can generate a local policy module to allow this access.#012Do#012allow this access for now by executing:#012# ausearch -c &#39;httpd&#39; --raw | audit2allow -M my-httpd#012# semodule -i my-httpd.pp#012</code></pre>
+<div><pre><code>Nov 29 16:39:21 localhost python: SELinux is preventing /usr/sbin/httpd from name_bind access on the tcp_socket port 82.#012#012***** Plugin bind_ports (99.5 confidence) suggests ************************#012#012If you want to allow /usr/sbin/httpd to bind to network port 82#012Then you need to modify the port type.#012Do#012# semanage port -a -t PORT_TYPE -p tcp 82#012 where PORT_TYPE is one of the following: http_cache_port_t, http_port_t, jboss_management_port_t, jboss_messaging_port_t, ntop_port_t, puppet_port_t.#012#012***** Plugin catchall (1.49 confidence) suggests **************************#012#012If you believe that httpd should be allowed name_bind access on the port 82 tcp_socket by default.#012Then you should report this as a bug.#012You can generate a local policy module to allow this access.#012Do#012allow this access for now by executing:#012# ausearch -c &#39;httpd&#39; --raw | audit2allow -M my-httpd#012# semodule -i my-httpd.pp#012</code></pre>
 </div>
 <p>The first line of the message details how SELinux is preventing <code>httpd</code> from binding to port <code>82</code>. The first suggestion we see for fixing this is to use <code>semanage</code> to add the port to the list of allowed ports. So, let's do that and then look at the list of Apache ports:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo semanage port -a 82 -t http_port_t -p tcp
+<div><pre><code>[donnie@localhost ~]$ sudo semanage port -a 82 -t http_port_t -p tcp
 [donnie@localhost ~]$ sudo semanage port -l | grep &#39;http_port_t&#39;
 http_port_t                    tcp      82, 80, 81, 443, 488, 8008, 8009, 8443, 9000
 pegasus_http_port_t            tcp      5988
@@ -707,8 +648,7 @@ pegasus_http_port_t            tcp      5988
 </div>
 <p>It's not clear in the <code>setroubleshoot</code> message, but you need to specify the port number that you want to add after <code>port -a</code>. The <code>-t http_port_t</code> part specifies the <strong>type</strong> for which you want to add the port, and <code>-p tcp</code> specifies that you want to use the TCP protocol.</p>
 <p>Now for the moment of truth. Will the Apache daemon start this time? Let's see:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo systemctl restart httpd
+<div><pre><code>[donnie@localhost ~]$ sudo systemctl restart httpd
 [sudo] password for donnie:
 [donnie@localhost ~]$ sudo systemctl status httpd
 ● httpd.service - The Apache HTTP Server
@@ -719,45 +659,39 @@ pegasus_http_port_t            tcp      5988
 . . .</code></pre>
 </div>
 <p>It works, and we have achieved coolness. But now, I've decided that I no longer need this oddball port. Deleting it is just as easy as adding it:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo semanage port -d 82 -t http_port_t -p tcp
+<div><pre><code>[donnie@localhost ~]$ sudo semanage port -d 82 -t http_port_t -p tcp
 [donnie@localhost ~]$ sudo semanage port -l | grep &#39;http_port_t&#39;
 http_port_t                    tcp      80, 81, 443, 488, 8008, 8009, 8443, 9000
 pegasus_http_port_t            tcp      5988
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>All I had to do was to replace <code>port -a</code> with <code>port -d</code>. And of course, I still need to go into the <code>/etc/httpd/conf/httpd.conf</code> file to change <code>Listen 82</code> back to <code>Listen 80</code>.</p>
-</section>
-<section id="creating-custom-policy-modules" class="level3" data-number="11.5.5">
+
+
 <h3 data-number="11.5.5">Creating custom policy modules</h3>
 <p>Sometimes, you'll run into a problem that you can't fix either by changing the type or by setting a Boolean. In times like these, you'll need to create a custom policy module, and you'll use the <code>audit2allow</code> utility to do that.</p>
 <p>Here’s a screenshot of a problem I had several years ago, when I was helping a client set up a Postfix mail server on CentOS 7:</p>
 <figure>
-<img src="../media/file66.png" />
+<img src="img/file66.png" />
 </figure>
 <p>So, for some strange reason that I never understood, SELinux wouldn't allow Dovecot, the <strong>Mail Delivery Agent</strong> (<strong>MDA</strong>) component of the mail server, to read its own <code>dict</code> file. There's no Boolean to change and there wasn't a type problem, so <code>setroubleshoot</code> suggested that I create a custom policy module. It's easy enough to do, but you do need to be aware that this won't work with <code>sudo</code> on your normal user account. This is one of those rare times when you'll just have to go to the root user command prompt, and you'll also need to be in the root user's home directory:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo su -</code></pre>
+<div><pre><code>sudo su -</code></pre>
 </div>
 <p>Before you do it, be sure to put SELinux into permissive mode and then do something to induce the SELinux error. This way, you'll be sure that one problem isn't masking others.</p>
 <p>When you run the command to create the new policy module, be sure to replace <code>mypol</code> with a custom policy name of your own choosing. In my case, I named the module <code>dovecot_dict</code>, and the command looked like this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>grep dict /var/log/audit/audit.log | audit2allow -M dovecot_dict</code></pre>
+<div><pre><code>grep dict /var/log/audit/audit.log | audit2allow -M dovecot_dict</code></pre>
 </div>
 <p>I’m using <code>grep</code> to search through the <code>audit.log</code> file for SELinux messages that contain the word <code>dict</code>. I then pipe the output of that into <code>audit2allow</code> and use the <code>-M</code> option to create a custom module with the name <code>dovecot_dict</code>.</p>
 <p>After I created the new policy module, I inserted it into the SELinux policy like so:</p>
-<div class="C0-SHConPACKT">
-<pre><code>semodule -i dovecot_dict.pp</code></pre>
+<div><pre><code>semodule -i dovecot_dict.pp</code></pre>
 </div>
 <p>There was a also a second problem that required another custom module, but I just repeated this procedure to produce another module of a different name. After I got all that done, I reloaded the SELinux policy, in order to get my new modules to take effect:</p>
-<div class="C0-SHConPACKT">
-<pre><code>semodule -R</code></pre>
+<div><pre><code>semodule -R</code></pre>
 </div>
 <p>With <code>semodule</code>, the <code>-R</code> switch stands for reload, rather than recursive, as it does with most Linux commands.</p>
 <p>With all that done, I put SELinux back into enforcing mode and exited back to my own user account. And I tested the setup to make sure that I had fixed the problem.</p>
 <p>Of course, you also want to bear in mind that you don't want to just modify SELinux policy or contexts every time you see an <code>sealert</code> message in the log files. For example, consider this snippet from the <code>messages</code> file of my Oracle Linux 7 machine, which I set up mainly to run Docker and Docker containers:</p>
-<div class="C0-SHConPACKT">
-<pre><code>Jun  8 19:32:17 docker-1 setroubleshoot: SELinux is preventing /usr/bin/docker from getattr access on the file /etc/exports. For complete SELinux messages. run sealert -l b267929a-d3ad-45d5-806e-907449fc2739
+<div><pre><code>Jun  8 19:32:17 docker-1 setroubleshoot: SELinux is preventing /usr/bin/docker from getattr access on the file /etc/exports. For complete SELinux messages. run sealert -l b267929a-d3ad-45d5-806e-907449fc2739
 Jun  8 19:32:17 docker-1 python: SELinux is preventing /usr/bin/docker from getattr access on the file /etc/exports.#012#012*****  Plugin catchall (100. confidence) suggests   **************************#012#012If you believe that docker should be allowed getattr access on the exports file by default.#012Then you should report this as a bug.#012You can generate a local policy module to allow this access.#012Do#012allow this access for now by executing:#012# grep docker /var/log/audit/audit.log | audit2allow -M mypol#012# semodule -i mypol.pp#012
 Jun  8 19:32:17 docker-1 setroubleshoot: SELinux is preventing /usr/bin/docker from getattr access on the file /etc/shadow.rpmnew. For complete SELinux messages. run sealert -l
 . . .</code></pre>
@@ -769,50 +703,45 @@ Jun  8 19:32:17 docker-1 setroubleshoot: SELinux is preventing /usr/bin/docker f
 <p>Be sure to get your copy of The SELinux Coloring Book from <a href="https://opensource.com/business/13/11/selinux-policy-guide">https://opensource.com/business/13/11/selinux-policy-guide</a>.</p>
 </blockquote>
 </blockquote>
-<section id="hands-on-lab-selinux-booleans-and-ports" class="level4" data-number="11.5.5.1">
+
 <h4 data-number="11.5.5.1">Hands-on lab – SELinux Booleans and ports</h4>
 <p>In this lab, you'll view the effects of having Apache try to listen on an unauthorized port:</p>
 <ol>
 <li>View the ports that SELinux allows the Apache web server daemon to use:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo semanage port -l | grep &#39;http&#39;</code></pre>
+<div><pre><code>sudo semanage port -l | grep &#39;http&#39;</code></pre>
 </div>
 <ol>
 <li>Open the <code>/etc/httpd/conf/httpd.conf</code> file in your favorite text editor. Find the line that says <code>Listen 80</code> and change it to <code>Listen 82</code>. Restart Apache by entering the following:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo systemctl restart httpd</code></pre>
+<div><pre><code>sudo systemctl restart httpd</code></pre>
 </div>
 <ol>
 <li>View the error message you receive by entering:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo tail -20 /var/log/messages</code></pre>
+<div><pre><code>sudo tail -20 /var/log/messages</code></pre>
 </div>
 <ol>
 <li>Add port <code>82</code> to the list of authorized ports and restart Apache:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo semanage port -a 82 -t http_port_t -p tcp
+<div><pre><code>sudo semanage port -a 82 -t http_port_t -p tcp
 sudo semanage port -l
 sudo systemctl restart httpd</code></pre>
 </div>
 <ol>
 <li>Delete the port that you just added:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo semanage -d 82 -t http_port_t -p tcp</code></pre>
+<div><pre><code>sudo semanage -d 82 -t http_port_t -p tcp</code></pre>
 </div>
 <ol>
 <li>Go back into the <code>/etc/httpd/conf/httpd.conf</code> file and change <code>Listen 82</code> back to <code>Listen 80</code>. Restart the Apache daemon to return to normal operation.</li>
 <li>End of lab.</li>
 </ol>
 <p>Okay, you've seen how SELinux can protect you against various bad things, and how to troubleshoot things that go wrong. Let's turn our attention to AppArmor.</p>
-</section>
-</section>
-</section>
-<section id="how-apparmor-can-benefit-a-systems-administrator" class="level2" data-number="11.6">
+
+
+
+
 <h2 data-number="11.6">How AppArmor can benefit a systems administrator</h2>
 <p>AppArmor is the MAC system that comes installed with the SUSE and the Ubuntu families of Linux. Although it's designed to do pretty much the same job as SELinux, its mode of operation is substantially different:</p>
 <ul>
@@ -824,15 +753,13 @@ sudo systemctl restart httpd</code></pre>
 <li>Just as SELinux can, AppArmor can help prevent malicious actors from ruining your day and can help protect user data.</li>
 </ul>
 <p>So, you see that there are advantages and disadvantages to both SELinux and AppArmor, and a lot of Linux administrators have strong feelings about which one they prefer. (To avoid being subjected to a flame-war, I'll refrain from stating my own preference.) Also, note that even though we're working with an Ubuntu virtual machine, the information I present here, other than the Ubuntu-specific package installation commands, also works with the SUSE Linux distros.</p>
-<section id="looking-at-apparmor-profiles" class="level3" data-number="11.6.1">
+
 <h3 data-number="11.6.1">Looking at AppArmor profiles</h3>
 <p>To begin, we’ll install the lxc package so that we can have more to look at:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo apt install lxc</code></pre>
+<div><pre><code>sudo apt install lxc</code></pre>
 </div>
 <p>In the <code>/etc/apparmor.d/ </code>directory, you'll see the AppArmor profiles for your system. (SELinux folk say <em>policies</em>, but AppArmor folk say <em>profiles</em>.):</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu3:/etc/apparmor.d$ ls -l
+<div><pre><code>donnie@ubuntu3:/etc/apparmor.d$ ls -l
 total 72
 drwxr-xr-x 5 root root  4096 Oct 29 15:21 abstractions
 drwxr-xr-x 2 root root  4096 Nov 15 09:34 cache
@@ -864,8 +791,7 @@ donnie@ubuntu3:/etc/apparmor.d$</code></pre>
 </blockquote>
 </blockquote>
 <p>Here’s a partial listing of the abstraction files:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu3:/etc/apparmor.d/abstractions$ ls -l
+<div><pre><code>donnie@ubuntu3:/etc/apparmor.d/abstractions$ ls -l
 total 320
 -rw-r--r-- 1 root root  695 Mar 15  2017 apache2-common
 drwxr-xr-x 2 root root 4096 Oct 29 15:21 apparmor_api
@@ -882,8 +808,7 @@ drwxr-xr-x 2 root root 4096 Oct 29 15:21 apparmor_api
 donnie@ubuntu3:/etc/apparmor.d/abstractions$</code></pre>
 </div>
 <p>To get a feel for how AppArmor rules work, let's peek inside the <code>web-data</code> abstraction file:</p>
-<div class="C0-SHCodePACKT">
-<pre><code>  /srv/www/htdocs/ r,
+<div><pre><code>  /srv/www/htdocs/ r,
   /srv/www/htdocs/** r,
   # virtual hosting
   /srv/www/vhosts/ r,
@@ -906,8 +831,7 @@ donnie@ubuntu3:/etc/apparmor.d/abstractions$</code></pre>
 <li>Note that there's no specific rule that prohibits Apache from reading from other locations. It's just understood that anything that's not listed here is off-limits to the Apache web server daemon.</li>
 </ul>
 <p>The <code>tunables</code> subdirectory contains files that have predefined variables. You can also use this directory to either define new variables or make profile tweaks:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu3:/etc/apparmor.d/tunables$ ls -l
+<div><pre><code>donnie@ubuntu3:/etc/apparmor.d/tunables$ ls -l
 total 56
 -rw-r--r-- 1 root root  624 Mar 15  2017 alias
 -rw-r--r-- 1 root root  376 Mar 15  2017 apparmorfs
@@ -949,16 +873,14 @@ donnie@ubuntu3:/etc/apparmor.d/tunables$</code></pre>
 </tbody>
 </table>
 <p>Now that you know about AppArmor profiles, let's look at some basic AppArmor utilities.</p>
-</section>
-<section id="working-with-apparmor-command-line-utilities" class="level3" data-number="11.6.2">
+
+
 <h3 data-number="11.6.2">Working with AppArmor command-line utilities</h3>
 <p>Whether or not you have all the AppArmor utilities you need will depend on which Linux distribution you have. On my OpenSUSE Leap workstation, the utilities were there out of the box. On my Ubuntu Server virtual machine, I had to install them myself:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo apt install apparmor-utils</code></pre>
+<div><pre><code>sudo apt install apparmor-utils</code></pre>
 </div>
 <p>First, let's look at the status of AppArmor on the Ubuntu machine. Since it's a rather long output, we'll look at it in sections. Here's the first section:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu2204-packt:~$ sudo aa-status
+<div><pre><code>donnie@ubuntu2204-packt:~$ sudo aa-status
 apparmor module is loaded.
 61 profiles are loaded.
 43 profiles are in enforce mode.
@@ -975,8 +897,7 @@ apparmor module is loaded.
 </div>
 <p>The first thing to note here is that AppArmor has an <strong>enforce</strong> mode and a <strong>complain</strong> mode. The enforce mode that's shown here does the same job as its enforcing mode counterpart in SELinux. It prevents system processes from doing things that the active policy doesn't allow, and it logs any violations.</p>
 <p>Now, here's the second section:</p>
-<div class="C0-SHConPACKT">
-<pre><code>. . .
+<div><pre><code>. . .
 . . .
 0 processes are in enforce mode.
 1 processes are in complain mode.
@@ -993,8 +914,7 @@ donnie@ubuntu2204-packt:~$</code></pre>
 </blockquote>
 <p>Curiously, when you install a daemon package on Ubuntu, you'll sometimes get a predefined profile for that daemon and sometimes you won't. Even when a profile does come with the package that you've installed, it's sometimes already in enforce mode and sometimes isn't. For example, if you're setting up a <strong>Domain Name Service</strong> (<strong>DNS</strong>) server and you install the <code>bind9</code> package for it, you'll get an AppArmor profile that's already in enforce mode. If you're setting up a database server and install the <code>mysql-server</code> package, you'll also get a working profile that's already in enforce mode.</p>
 <p>But, if you're setting up a database server and you prefer to install the <code>mariadb-server</code> instead of <code>mysql-server</code>, you'll get an AppArmor profile that's completely disabled and that can't be enabled. When you look in the <code>usr.sbin.mysqld</code> profile file that gets installed with the <code>mariadb-server</code> package, you'll see this:</p>
-<div class="C0-SHConPACKT">
-<pre><code># This file is intentionally empty to disable apparmor by default for newer
+<div><pre><code># This file is intentionally empty to disable apparmor by default for newer
 # versions of MariaDB, while providing seamless upgrade from older versions
 # and from mysql, where apparmor is used.
 #
@@ -1012,18 +932,15 @@ donnie@ubuntu2204-packt:~$</code></pre>
 </div>
 <p>Okay, so apparently AppArmor isn't good for everything. (And whoever wrote this needs to take spelling lessons.)</p>
 <p>And then there's Samba, which is a special case in more ways than one. When you install the <code>samba</code> package to set up a Samba server, you don't get any AppArmor profiles at all. For Samba and several other different applications as well, you'll need to install AppArmor profiles separately:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo apt install apparmor-profiles apparmor-profiles-extra</code></pre>
+<div><pre><code>sudo apt install apparmor-profiles apparmor-profiles-extra</code></pre>
 </div>
 <p>When you install these two profile packages, the profiles will all be in <strong>complain</strong> mode. That's okay, because we have a handy utility to put them into <strong>enforce</strong> mode. Since Samba has two different daemons that we need to protect, there are two different profiles that we'll need to place into <strong>enforce</strong> mode:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu5:/etc/apparmor.d$ ls *mbd
+<div><pre><code>donnie@ubuntu5:/etc/apparmor.d$ ls *mbd
 usr.sbin.nmbd  usr.sbin.smbd
 donnie@ubuntu5:/etc/apparmor.d$</code></pre>
 </div>
 <p>We'll use <code>aa-enforce</code> to activate <strong>enforce</strong> mode for both of these profiles:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu5:/etc/apparmor.d$ sudo aa-enforce /usr/sbin/nmbd usr.sbin.nmbd
+<div><pre><code>donnie@ubuntu5:/etc/apparmor.d$ sudo aa-enforce /usr/sbin/nmbd usr.sbin.nmbd
 Setting /usr/sbin/nmbd to enforce mode.
 Setting /etc/apparmor.d/usr.sbin.nmbd to enforce mode.
 donnie@ubuntu5:/etc/apparmor.d$ sudo aa-enforce /usr/sbin/smbd usr.sbin.smbd
@@ -1054,22 +971,20 @@ donnie@ubuntu5:/etc/apparmor.d$</code></pre>
 </tbody>
 </table>
 <p>Okay, we're moving right along. You now know about basic AppArmor commands. Next up, we'll look at troubleshooting AppArmor problems.</p>
-</section>
-<section id="troubleshooting-apparmor-problems" class="level3" data-number="11.6.3">
+
+
 <h3 data-number="11.6.3">Troubleshooting AppArmor problems</h3>
 <p>When I wrote the first edition of this book back in 2017, I sat here racking my brains for several days, trying to come up with a good troubleshooting scenario. It turns out that I didn't need to. The Ubuntu folk handed me a good scenario on a silver platter in the form of a buggy Samba profile. At the time, I was working with Ubuntu 16.04, which had the original version of the bug. The original bug got fixed for Ubuntu 18.04, but was replaced by two others. In Ubuntu 22.04, the profile is finally bug-free. I still want to show you how to troubleshoot AppArmor problems though, so I’ve left the 16.04 and 18.04 write-ups intact. (It’s still possible to download and install Ubuntu 16.04 and 18.04, so you can create some virtual machines to follow along if you’d like. I’ll leave that decision up to you.)</p>
-</section>
-<section id="troubleshooting-an-apparmor-profile-ubuntu-16.04" class="level3" data-number="11.6.4">
+
+
 <h3 data-number="11.6.4">Troubleshooting an AppArmor profile – Ubuntu 16.04</h3>
 <p>As you've just seen, I used <code>aa-enforce</code> to put the two Samba-related profiles into enforce mode. But watch what happens now when I try to restart Samba in order to get the profiles to take effect:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu3:/etc/apparmor.d$ sudo systemctl restart smbd
+<div><pre><code>donnie@ubuntu3:/etc/apparmor.d$ sudo systemctl restart smbd
 Job for smbd.service failed because the control process exited with error code. See &quot;systemctl status smbd.service&quot; and &quot;journalctl -xe&quot; for details.
 donnie@ubuntu3:/etc/apparmor.d$</code></pre>
 </div>
 <p>Okay, that's not good. Looking at the status for the <code>smbd</code> service, I see the following:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu3:/etc/apparmor.d$ sudo systemctl status smbd
+<div><pre><code>donnie@ubuntu3:/etc/apparmor.d$ sudo systemctl status smbd
 ● smbd.service - LSB: start Samba SMB/CIFS daemon (smbd)
    Loaded: loaded (/etc/init.d/smbd; bad; vendor preset: enabled)
    Active: failed (Result: exit-code) since Tue 2017-12-05 14:56:35 EST; 13s ago
@@ -1083,8 +998,7 @@ Dec 05 14:56:35 ubuntu3 smbd[31171]:    ...fail!
 </div>
 <p>The important things to note here are all the places where some form of the word <code>fail</code> shows up.</p>
 <p>The original error message said to use <code>journalctl -xe</code> to view the log message. You can do that if you like, or you can just use either <code>less</code> or <code>tail</code> to look in the <code>/var/log/syslog</code> log file:</p>
-<div class="C0-SHConPACKT">
-<pre><code>Dec  5 20:09:10 ubuntu3 smbd[14599]:  * Starting SMB/CIFS daemon smbd
+<div><pre><code>Dec  5 20:09:10 ubuntu3 smbd[14599]:  * Starting SMB/CIFS daemon smbd
 Dec  5 20:09:10 ubuntu3 kernel: [174226.392671] audit: type=1400 audit(1512522550.765:510): apparmor=&quot;DENIED&quot; operation=&quot;mknod&quot; profile=&quot;/usr/sbin/smbd&quot; name=&quot;/run/samba/msg.
 lock/14612&quot; pid=14612 comm=&quot;smbd&quot; requested_mask=&quot;c&quot; denied_mask=&quot;c&quot; fsuid=0 ouid=0
 Dec  5 20:09:10 ubuntu3 smbd[14599]:    ...fail!
@@ -1096,24 +1010,21 @@ Dec  5 20:09:10 ubuntu3 systemd[1]: smbd.service: Failed with result &#39;exit-c
 <p>So, we see <code>apparmor=DENIED</code>. Obviously, Samba is trying to do something that the profile doesn't allow. Samba needs to write temporary files to the <code>/run/samba/msg.lock</code> directory, but it isn't allowed to. I'm guessing that the profile lacks a rule that allows that to happen.</p>
 <p>But even if this log file entry gave me no clue at all, I could just cheat, using a troubleshooting technique that has served me well for many years. That is, I could just copy and paste the error message from the log file into my favorite search engine. Pretty much every time I've ever done that, I've found that other people before me have already had the same problem:</p>
 <figure>
-<img src="../media/file67.png" />
+<img src="img/file67.png" />
 </figure>
 <p>Okay, I didn't paste in the entire error message, but I did paste in enough for DuckDuckGo to work with. And lo and behold, it worked:</p>
 <figure>
-<img src="../media/file68.png" />
+<img src="img/file68.png" />
 </figure>
 <p>Hmmm, it looks like my profile file might be missing an important line. So, I'll open the <code>usr.sbin.smbd</code> file and place this line at the end of the rule set:</p>
-<div class="C0-SHConPACKT">
-<pre><code>/run/samba/** rw,</code></pre>
+<div><pre><code>/run/samba/** rw,</code></pre>
 </div>
 <p>This line will allow read and write access to everything in the <code>/run/samba/</code> directory. After making the edit, I'll need to reload this profile because it's already been loaded with <code>aa-enforce</code>. For this, I'll use the <code>apparmor_parser</code> utility:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu3:/etc/apparmor.d$ sudo apparmor_parser -r usr.sbin.smbd
+<div><pre><code>donnie@ubuntu3:/etc/apparmor.d$ sudo apparmor_parser -r usr.sbin.smbd
 donnie@ubuntu3:/etc/apparmor.d$</code></pre>
 </div>
 <p>All you need to do is use the <code>-r</code> option for reloading and list the name of the profile file. Now, let's try to restart Samba:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu3:/etc/apparmor.d$ sudo systemctl restart smbd
+<div><pre><code>donnie@ubuntu3:/etc/apparmor.d$ sudo systemctl restart smbd
 donnie@ubuntu3:/etc/apparmor.d$ sudo systemctl status smbd
 ● smbd.service - LSB: start Samba SMB/CIFS daemon (smbd)
    Loaded: loaded (/etc/init.d/smbd; bad; vendor preset: enabled)
@@ -1138,47 +1049,41 @@ donnie@ubuntu3:/etc/apparmor.d$</code></pre>
 </div>
 <p>And it works! The two Samba profiles are in enforce mode, and Samba finally starts up just fine.</p>
 <p>The odd part about this is that I had this same problem with both Ubuntu 16.04 and Ubuntu 17.10. So, the bug has been there for a long time.</p>
-</section>
-<section id="troubleshooting-an-apparmor-profile-ubuntu-18.04" class="level3" data-number="11.6.5">
+
+
 <h3 data-number="11.6.5">Troubleshooting an AppArmor profile – Ubuntu 18.04</h3>
 <p>As I said before, the bug in Ubuntu 16.04 got replaced by two others in Ubuntu 18.04. So, let’s look at that.</p>
 <p>I installed Samba and the additional AppArmor profiles on my Ubuntu 18.04 VM, and then set the two Samba profiles into <strong>enforce</strong> mode, the same way that I've already shown you for Ubuntu 16.04. When I tried to restart Samba, the restart failed. So, I looked in the <code>/var/log/syslog</code> file and found these two messages:</p>
-<div class="C0-SHConPACKT">
-<pre><code>Oct 15 19:22:05 ubuntu-ufw kernel: [ 2297.955842] audit: type=1400 audit(1571181725.419:74): apparmor=&quot;DENIED&quot; operation=&quot;capable&quot; profile=&quot;/usr/sbin/smbd&quot; pid=15561 comm=&quot;smbd&quot; capability=12  capname=&quot;net_admin&quot;
+<div><pre><code>Oct 15 19:22:05 ubuntu-ufw kernel: [ 2297.955842] audit: type=1400 audit(1571181725.419:74): apparmor=&quot;DENIED&quot; operation=&quot;capable&quot; profile=&quot;/usr/sbin/smbd&quot; pid=15561 comm=&quot;smbd&quot; capability=12  capname=&quot;net_admin&quot;
 Oct 15 19:22:05 ubuntu-ufw kernel: [ 2297.960193] audit: type=1400 audit(1571181725.427:75): apparmor=&quot;DENIED&quot; operation=&quot;sendmsg&quot; profile=&quot;/usr/sbin/smbd&quot; name=&quot;/run/systemd/notify&quot; pid=15561 comm=&quot;smbd&quot; requested_mask=&quot;w&quot; denied_mask=&quot;w&quot; fsuid=0 ouid=0</code></pre>
 </div>
 <p>Now that we know how to read the AppArmor error messages, this is easy to figure out. It looks like we need to allow the SMBD service to have <code>net_admin</code> capabilities so that it can properly access the network. And, it looks like we also need to add a rule to allow SMBD to write to the <code>/run/systemd/notify</code> socket file. So, let's edit the <code>/etc/apparmor.d/usr.sbin.smbd</code> file and add the two missing lines.</p>
 <p>First, in the stanza with all of the <code>capability</code> lines, I'll add this line to the bottom:</p>
-<div class="C0-SHConPACKT">
-<pre><code>capability net_admin,</code></pre>
+<div><pre><code>capability net_admin,</code></pre>
 </div>
 <p>Then, at the bottom of the rules list, just under the <code>/var/spool/samba/** rw,</code> line, I'll add this line:</p>
-<div class="C0-SHConPACKT">
-<pre><code>/run/systemd/notify rw,</code></pre>
+<div><pre><code>/run/systemd/notify rw,</code></pre>
 </div>
 <p>It's now just a matter of reloading the policy and restarting the SMBD service, the same as we did for Ubuntu 16.04.</p>
-<section id="hands-on-lab-troubleshooting-an-apparmor-profile" class="level4" data-number="11.6.5.1">
+
 <h4 data-number="11.6.5.1">Hands-on lab – Troubleshooting an AppArmor profile</h4>
 <p>Perform this lab on an Ubuntu 18.04 VM. Carry out the following steps for troubleshooting:</p>
 <ol>
 <li>Install the AppArmor utilities and the extra profiles:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo apt install apparmor-utils apparmor-profiles apparmor-profiles-extra</code></pre>
+<div><pre><code>sudo apt install apparmor-utils apparmor-profiles apparmor-profiles-extra</code></pre>
 </div>
 <ol>
 <li>Install Samba and verify that it's running:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo apt install samba
+<div><pre><code>sudo apt install samba
 sudo systemctl status smbd
 sudo systemctl status nmbd</code></pre>
 </div>
 <ol>
 <li>Set the two aforementioned Samba policies to enforce mode and try to restart Samba:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>cd /etc/apparmor.d
+<div><pre><code>cd /etc/apparmor.d
 sudo aa-enforce /usr/sbin/smbd usr.sbin.smbd
 sudo aa-enforce /usr/sbin/nmbd usr.sbin.nmbd
 sudo systemctl restart smbd</code></pre>
@@ -1188,50 +1093,44 @@ sudo systemctl restart smbd</code></pre>
 <li>Look in the <code>/var/log/syslog</code> file to see if you can spot the problem.</li>
 <li>Edit the <code>/etc/apparmor.d/usr.sbin.smbd</code> file. In the <code>capability</code> stanza, add this line:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>capability net_admin,</code></pre>
+<div><pre><code>capability net_admin,</code></pre>
 </div>
 <ol>
 <li>At the bottom of the rules sections, under the <code>/var/spool/samba/** rw,</code> line, add this line:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>/run/systemd/notify rw,</code></pre>
+<div><pre><code>/run/systemd/notify rw,</code></pre>
 </div>
 <ol>
 <li>Save the file and reload the policy:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo apparmor_parser -r usr.sbin.smbd</code></pre>
+<div><pre><code>sudo apparmor_parser -r usr.sbin.smbd</code></pre>
 </div>
 <ol>
 <li>As before, try to restart the Samba service, and verify that it started properly:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo systemctl restart smbd
+<div><pre><code>sudo systemctl restart smbd
 sudo systemctl status smbd</code></pre>
 </div>
 <ol>
 <li>End of lab.</li>
 </ol>
 <p>Okay, you've just explored the basics of troubleshooting buggy AppArmor profiles. This is good knowledge to have, especially when your organization needs to deploy its own custom profiles that could end up being just as buggy.</p>
-</section>
-</section>
-<section id="troubleshooting-samba-problems-in-ubuntu-22.04" class="level3" data-number="11.6.6">
+
+
+
 <h3 data-number="11.6.6">Troubleshooting Samba problems in Ubuntu 22.04</h3>
 <p>I told you before that the buggy AppArmor profile for Samba has been fixed in Ubuntu 22.04. So, hallelujah for that, right? Well, not so fast. As I’m writing this in November, 2022, there’s now a bug in certain versions of Samba that prevents Samba from starting if the AppArmor profile is enabled.</p>
 <blockquote>
 <p>This bug was also in SUSE 15.3, but has been fixed in SUSE 15.4. It has also been fixed in Ubuntu 22.10. By the time you read this, it might also have gotten fixed in Ubuntu 22.04.</p>
 </blockquote>
 <p>First, install the <code>samba</code>, <code>apparmor-profiles</code>, <code>apparmor-profiles-extra</code>, and <code>apparmor-util</code> packages, as I described in the preceding sections. Doing a <code>systemctl status smbd</code> command should show that the Samba service is running normally. Next, we’ll set the two Samba profiles to <strong>enforce</strong> mode:</p>
-<div class="C0-SHConPACKT">
-<pre><code>cd /etc/apparmor.d
+<div><pre><code>cd /etc/apparmor.d
 sudo aa-enforce /usr/sbin/smbd usr.sbin.smbd
 sudo aa-enforce /usr/sbin/nmbd usr.sbin.nmbd
 sudo systemctl restart smbd</code></pre>
 </div>
 <p>This time, you won’t see any error message until you do <code>systemctl status smbd</code>:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu2204-packt:~$ systemctl status smbd
+<div><pre><code>donnie@ubuntu2204-packt:~$ systemctl status smbd
 × smbd.service - Samba SMB Daemon
      Loaded: loaded (/lib/systemd/system/smbd.service; enabled; vendor preset: enabled)
      Active: failed (Result: exit-code) since Mon 2022-11-14 21:01:28 UTC; 7s ago
@@ -1246,48 +1145,43 @@ sudo systemctl restart smbd</code></pre>
         CPU: 133ms</code></pre>
 </div>
 <p>Unlike before, searching through the system log file won’t tell you anything. If you search through the <code>usr.sbin.smbd</code> file, you’ll see no problems at all. Instead, the problem this time is with the print service function of the Samba service. Fortunately, it’s an easy fix, as long as you don’t mind doing without Samba print sharing. Just open the <code>/etc/samba/smb.conf</code> file in your text editor, and add the following line to the <code>[global]</code> section:</p>
-<div class="C0-SHConPACKT">
-<pre><code>disable spoolss = yes</code></pre>
+<div><pre><code>disable spoolss = yes</code></pre>
 </div>
 <p>The Samba service should now start up without issues.</p>
 <p>Now, I have to confess that I don’t know what the exact impact of this directive will be. The <code>smb.conf</code> man page says that printing might be impacted for Windows NT/2000 systems, but it doesn’t say anything about how it affects newer versions of Windows. At any rate, I’ll leave this experimentation up to you if you really need Samba print server support.</p>
 <p>All right, enough of this Samba business. Let’s move on to something that’s evil, but also fun.</p>
-</section>
-</section>
-<section id="exploiting-a-system-with-an-evil-docker-container" class="level2" data-number="11.7">
+
+
+
 <h2 data-number="11.7">Exploiting a system with an evil Docker container</h2>
 <p>You might think that containers are somewhat like virtual machines, and you'd be partly correct. The difference is that a virtual machine runs an entire self-contained operating system, and a container doesn't. Instead, a container comes with the guest's operating system's package management and libraries, but it uses the kernel resources of the host operating system. That makes containers much more lightweight. So, you can pack more containers on a server than you can virtual machines, which helps cut down on hardware and energy costs. Containers have been around for quite a few years, but they didn't become all that popular until Docker came on the scene.</p>
 <p>But, the very thing that makes containers so lightweight—the fact that they use the host machine's kernel resources—can also make for some interesting security problems. Using some form of MAC is one thing you can do to help mitigate these problems.</p>
 <p>One problem is that, to run Docker, a person needs either to have the proper <code>sudo</code> privileges, or be a member of the <code>docker</code> group. Either way, anyone who logs into a container will be at the root command prompt for that container. By creating a container that mounts the root filesystem of the host machine, a non-privileged user can take complete control of the host system.</p>
-<section id="hands-on-lab-creating-an-evil-docker-container" class="level3" data-number="11.7.1">
+
 <h3 data-number="11.7.1">Hands-on lab – Creating an evil Docker container</h3>
 <p>To demonstrate, I'll use a CentOS 7 VM in order to show how SELinux can help protect you. (I'm using CentOS 7 because the RHEL 8/9-type distros use <code>podman</code> instead of <code>docker</code>, which won’t allow this exploit to happen.) Also, you'll need to do this from the local console of the VM because the root user will be locked out from logging in via SSH (you'll see what I mean in just a bit):</p>
 <ol>
 <li>On your CentOS 7 VM, install Docker and enable the daemon:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo yum install docker
+<div><pre><code>sudo yum install docker
 sudo systemctl enable --now docker</code></pre>
 </div>
 <ol>
 <li>Create the <code>docker</code> group.</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo groupadd docker</code></pre>
+<div><pre><code>sudo groupadd docker</code></pre>
 </div>
 <ol>
 <li>Create a user account for Katelyn, my teenage calico kitty, adding her to the <code>docker</code> group at the same time:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo useradd -G docker katelyn
+<div><pre><code>sudo useradd -G docker katelyn
 sudo passwd katelyn</code></pre>
 </div>
 <ol>
 <li>Log out of your own user account and log back in as Katelyn.</li>
 <li>Have Katelyn create a Debian container that mounts the <code>/</code> partition of the host machine in the <code>/homeroot</code> mountpoint, and that opens a Bash shell session for the root user:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>docker run -v /:/homeroot -it debian bash</code></pre>
+<div><pre><code>docker run -v /:/homeroot -it debian bash</code></pre>
 </div>
 <blockquote>
 <p>Note how Katelyn has done this without having to use any <code>sudo</code> privileges. Also note that there are no blank spaces in the <code>/:/homeroot</code> part.</p>
@@ -1295,15 +1189,13 @@ sudo passwd katelyn</code></pre>
 <ol>
 <li>The goal is for Katelyn to make herself the root user on the host machine. In order to do that, she'll need to edit the <code>/etc/passwd</code> file to change her own user ID to <code>0</code>. To do that, she'll need to install a text editor. (Katelyn prefers vim, but you can use nano if you really want to.) While still within the Debian container, run the following:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>apt update
+<div><pre><code>apt update
 apt install vim</code></pre>
 </div>
 <ol>
 <li>Have Katelyn <code>cd</code> into the host machine's <code>/etc/ </code>directory and attempt to open the <code>passwd</code> file in the text editor:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>cd /homeroot/etc
+<div><pre><code>cd /homeroot/etc
 vim passwd</code></pre>
 </div>
 <ol>
@@ -1312,16 +1204,14 @@ vim passwd</code></pre>
 <li>Log out from Katelyn's account and then log back into your own account.</li>
 <li>Place SELinux into permissive mode:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo setenforce 0</code></pre>
+<div><pre><code>sudo setenforce 0</code></pre>
 </div>
 <ol>
 <li>Log out from your own account and log back in as Katelyn.</li>
 <li>Repeat <em>steps</em> <em>5</em> through <em>7</em>. This time, Katelyn will be able to open the <code>/etc/passwd</code> file in her text editor.</li>
 <li>In the <code>passwd</code> file, have Katelyn find the line for her own user account. Have her change her user ID number to <code>0</code>. The line should now look something like this:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>katelyn:x:0:1002::/home/katelyn:/bin/bash</code></pre>
+<div><pre><code>katelyn:x:0:1002::/home/katelyn:/bin/bash</code></pre>
 </div>
 <ol>
 <li>Save the file, and type <code>exit</code> to have Katelyn exit the container. Have Katelyn log out of the virtual machine, and then log back in. This time, you'll see that she has successfully logged into the root user shell.</li>
@@ -1337,16 +1227,16 @@ vim passwd</code></pre>
 </blockquote>
 </blockquote>
 <p>I do believe that this wraps things up for our discussion of MAC.</p>
-</section>
-</section>
-<section id="summary-9" class="level2" data-number="11.8">
+
+
+
 <h2 data-number="11.8">Summary</h2>
 <p>In this chapter, we looked at the basic principles of MAC and compared two different MAC systems. We saw what SELinux and AppArmor are and how they can help safeguard your systems against malicious actors. We then looked at the basics of how to use them and the basics of how to troubleshoot them. We also saw that, even though they're both meant to do the same job, they work in vastly different ways. We wrapped things up by showing you a practical example of how SELinux can protect you from evil Docker containers.</p>
 <p>Whether you're working with AppArmor or with SELinux, you'll always want to thoroughly test a new system in either <strong>complain</strong> or <strong>permissive</strong> mode before you put it into production. Make sure that what you want to protect gets protected, while at the same time what you want to allow gets allowed. After you place the machine into production, don't just assume that you can automatically change a policy setting every time you see a policy violation occur. It could be that nothing is wrong with your MAC setup and that MAC is just doing its job, protecting you from the bad guys.</p>
 <p>There's a lot more to both of these topics than we can cover here. Hopefully, though, I've given you enough to whet your appetite and help you out in your day-to-day duties.</p>
 <p>In the next chapter, we'll look at more techniques for hardening the kernel and isolating processes. I'll see you there.</p>
-</section>
-<section id="questions-9" class="level2" data-number="11.9">
+
+
 <h2 data-number="11.9">Questions</h2>
 <ol>
 <li>Which of the following would represent a MAC principle?</li>
@@ -1418,8 +1308,8 @@ vim passwd</code></pre>
 <p>B. enforce</p>
 <p>C. testing</p>
 <p>D. complain</p>
-</section>
-<section id="further-reading-9" class="level2" data-number="11.10">
+
+
 <h2 data-number="11.10">Further reading</h2>
 <p>SELinux:</p>
 <ul>
@@ -1436,8 +1326,8 @@ vim passwd</code></pre>
 <li>The comprehensive guide to AppArmor: <a href="https://medium.com/information-and-technology/so-what-is-apparmor-64d7ae211ed">https://medium.com/information-and-technology/so-what-is-apparmor-64d7ae211ed</a></li>
 <li>Samba print server bug: <a href="https://www.reddit.com/r/openSUSE/comments/q9cpcc/samba_share_doesnt_work_since_snapshot_20211012/">https://www.reddit.com/r/openSUSE/comments/q9cpcc/samba_share_doesnt_work_since_snapshot_20211012/</a></li>
 </ul>
-</section>
-<section id="answers-7" class="level2" data-number="11.11">
+
+
 <h2 data-number="11.11">Answers</h2>
 <ol>
 <li>C</li>
@@ -1451,8 +1341,8 @@ vim passwd</code></pre>
 <li>D</li>
 <li>D</li>
 </ol>
-</section>
-</section>
+
+
 </div>
 </body>
 </html>

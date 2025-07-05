@@ -6,18 +6,18 @@
 <meta charset="utf-8"/>
 <meta name="generator" content="packt"/>
 <title>11 Kernel Hardening and Process Isolation</title>
-<link rel="stylesheet" type="text/css" href="../styles/stylesheet1.css"/>
-<link rel="stylesheet" type="text/css" href="../styles/stylesheet2.css"/>
+
+
 
 </head>
 <body>
-<section id="kernel-hardening-and-process-isolation" class="level1 pkt" data-number="12">
+
 <h1 data-number="12">11 Kernel Hardening and Process Isolation</h1>
-<section id="join-our-book-community-on-discord-10" class="level2" data-number="12.1">
+
 <h2 data-number="12.1">Join our book community on Discord</h2>
 <p><a href="https://packt.link/SecNet">https://packt.link/SecNet</a></p>
 <figure>
-<img src="../media/file69.png" style="width:10em" />
+<img src="img/file69.png" style="width:10em" />
 </figure>
 <p>Although the Linux kernel is already fairly secure by design, there are still a few ways to lock it down even more. It's simple to do, once you know what to look for. Tweaking the kernel can help prevent certain network attacks and certain types of information leaks. (But fear not – you don't have to recompile a whole new kernel to take advantage of this.)</p>
 <p>With process isolation, our aim is to prevent malicious users from performing either a vertical or a horizontal privilege escalation. By isolating processes from each other, we can help prevent someone from taking control of either a root user process or a process that belongs to some other user. Either of these types of privilege escalation could help an attacker either take control of a system or access sensitive information.</p>
@@ -38,8 +38,8 @@
 <li>Sandboxing with Flatpak</li>
 </ul>
 <p>So, if you're ready and raring, we'll start by looking at the <code>/proc</code> filesystem.</p>
-</section>
-<section id="understanding-the-proc-filesystem" class="level2" data-number="12.2">
+
+
 <h2 data-number="12.2">Understanding the /proc filesystem</h2>
 <p>If you <code>cd</code> into the <code>/proc/</code> directory of any Linux distro and take a look around, you'll be excused for thinking that there's nothing special about it. You'll see files and directories, so it looks like it could just be another directory. In reality, though, it's very special. It's one of several different <strong>pseudo-filesystems</strong> on the Linux system. (The definition of the word pseudo is <em>fake</em>, so you can also think of it as a fake filesystem.)</p>
 <p>If you were to pull the primary operating system drive out of a Linux machine and mount it as the secondary drive on another machine, you'll see a <code>/proc/</code> directory on that drive, but you won't see anything in it. That's because the contents of the <code>/proc/</code> directory are created from scratch every time you boot a Linux machine, and then cleared out every time you shut down the machine. Within <code>/proc/</code>, you'll find two general classes of information:</p>
@@ -48,11 +48,10 @@
 <li>Information about what's going on at the kernel-level of the operating system</li>
 </ul>
 <p>We'll look at user-mode processes first.</p>
-<section id="looking-at-user-mode-processes" class="level3" data-number="12.2.1">
+
 <h3 data-number="12.2.1">Looking at user-mode processes</h3>
 <p>If you invoke the <code>ls</code> command within <code>/proc/</code>, you'll see a whole bunch of directories that have numbers as their names. Here's a partial listing from my CentOS VM:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost proc]$ ls -l
+<div><pre><code>[donnie@localhost proc]$ ls -l
 total 0
 dr-xr-xr-x. 9 root root 0 Oct 19 14:23 1
 dr-xr-xr-x. 9 root root 0 Oct 19 14:23 10
@@ -72,8 +71,7 @@ dr-xr-xr-x. 9 root root 0 Oct 19 14:23 17
 <p>On Debian/Ubuntu systems, the name of PID 1 is <code>init</code>. On <code>RHEL/CentOS/AlmaLinux</code> systems, it's called <code>systemd</code>. All of these distros run the <code>systemd</code> <code>init</code> system, but the Debian/Ubuntu folk have chosen to retain the old <code>init</code> name for PID 1.</p>
 </blockquote>
 <p>Within each numbered directory, you'll see various files and subdirectories that contain information about a particular running process. For example, in the <code>1</code> directory, you'll see what pertains to the <code>init</code> process. Here's the partial listing:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost 1]$ ls -l
+<div><pre><code>[donnie@localhost 1]$ ls -l
 ls: cannot read symbolic link &#39;cwd&#39;: Permission denied
 ls: cannot read symbolic link &#39;root&#39;: Permission denied
 ls: cannot read symbolic link &#39;exe&#39;: Permission denied
@@ -89,8 +87,7 @@ dr-xr-xr-x. 2 root root 0 Oct 19 14:23 attr
 . . .</code></pre>
 </div>
 <p>As you see, there are a few symbolic links that we can't access without root privileges. When we use <code>sudo</code>, we can see where the symbolic links point:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost 1]$ sudo ls -l
+<div><pre><code>[donnie@localhost 1]$ sudo ls -l
 total 0
 dr-xr-xr-x. 2 root root 0 Oct 19 14:23 attr
 -rw-r--r--. 1 root root 0 Oct 19 15:08 autogroup
@@ -116,12 +113,11 @@ lrwxrwxrwx. 1 root root 0 Oct 19 15:08 cwd -&gt; /
 </blockquote>
 </blockquote>
 <p>Next, let's look at the kernel information.</p>
-</section>
-<section id="looking-at-kernel-information" class="level3" data-number="12.2.2">
+
+
 <h3 data-number="12.2.2">Looking at kernel information</h3>
 <p>Within the top level of <code>/proc/</code>, the files and directories that have actual names contain information about what's going on with the Linux kernel. Here's a partial view:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost proc]$ ls -l
+<div><pre><code>[donnie@localhost proc]$ ls -l
 total 0
 . . .
 dr-xr-xr-x. 2 root root 0 Oct 19 14:24 acpi
@@ -135,8 +131,7 @@ dr-xr-xr-x. 4 root root 0 Oct 19 14:24 bus
 . . .</code></pre>
 </div>
 <p>As with the user-mode stuff, you can use <code>cat</code> to look at some of the different files. For example, here's a partial output of the <code>cpuinfo</code> file:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost proc]$ cat cpuinfo
+<div><pre><code>[donnie@localhost proc]$ cat cpuinfo
 processor    : 0
 vendor_id    : AuthenticAMD
 cpu family    : 16
@@ -157,8 +152,7 @@ cpu cores    : 1
 <p>Yes, you did read that right. I wrote parts of the original version of this book on an antique, Opteron-equipped HP workstation from 2009. I got it from eBay for a very cheap price, and it runs beautifully with the LXDE spin of Fedora. And, the openSUSE machine that you'll see mentioned in other parts of this book is the exact same model and came from the same vendor. (So, now you know just how cheap I really am.) Sadly though, the RHEL 9-type distros won’t run on the first generation of x86_64 CPUs, so I’m now using something newer to write this <em>Third Edition</em>.</p>
 </blockquote>
 <p>However, for our present purposes, we don't need to go into the nitty-gritty details of everything that's in <code>/proc/</code>. What's more important to our present discussion is the different parameters that can be set from within <code>/proc/</code>. For example, within the <code>/proc/sys/net/ipv4/</code> directory, we can see lots of different items that can be tweaked to change IPv4 network performance. Here's a partial listing:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ipv4]$ pwd
+<div><pre><code>[donnie@localhost ipv4]$ pwd
 /proc/sys/net/ipv4
 [donnie@localhost ipv4]$ ls -l
 total 0
@@ -175,8 +169,7 @@ dr-xr-xr-x. 1 root root 0 Oct 19 14:23 conf
 . . .</code></pre>
 </div>
 <p>We can use the <code>cat</code> command to view each of these parameters, like so:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ipv4]$ cat icmp_echo_ignore_all 
+<div><pre><code>[donnie@localhost ipv4]$ cat icmp_echo_ignore_all 
 0
 [donnie@localhost ipv4]$</code></pre>
 </div>
@@ -189,29 +182,26 @@ dr-xr-xr-x. 1 root root 0 Oct 19 14:23 conf
 <li>Run a command from within a shell script.</li>
 </ul>
 <p>Let's go ahead and look at these different methods in detail.</p>
-</section>
-</section>
-<section id="setting-kernel-parameters-with-sysctl" class="level2" data-number="12.3">
+
+
+
 <h2 data-number="12.3">Setting kernel parameters with sysctl</h2>
 <p>The traditional method that you'll see in older Linux textbooks is to <code>echo</code> a value into a <code>/proc/</code> parameter. This doesn't directly work with <code>sudo</code>, so you'll need to use the <code>bash -c</code> command to force the command to execute. Here, you can see me changing the value for the <code>icmp_echo_ignore_all</code> parameter:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo bash -c &quot;echo &#39;1&#39; &gt; /proc/sys/net/ipv4/icmp_echo_ignore_all&quot;
+<div><pre><code>[donnie@localhost ~]$ sudo bash -c &quot;echo &#39;1&#39; &gt; /proc/sys/net/ipv4/icmp_echo_ignore_all&quot;
 [donnie@localhost ~]$ cat /proc/sys/net/ipv4/icmp_echo_ignore_all
 1
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>With the value set to <code>1</code>, this machine will now ignore all ping packets, regardless of how the firewall is configured. Any value you set like this is temporary and will go back to its default setting when you reboot the machine.</p>
 <p>Next in the list after this one is the <code>icmp_echo_ignore_broadcasts</code> setting, which looks like this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ipv4]$ cat icmp_echo_ignore_broadcasts 
+<div><pre><code>[donnie@localhost ipv4]$ cat icmp_echo_ignore_broadcasts 
 1
 [donnie@localhost ipv4]$</code></pre>
 </div>
 <p>It's already enabled by default, so out of the box, Linux is already immune to <strong>Denial-of-Service</strong> (<strong>DoS</strong>) attacks that involve ICMP broadcast flooding.</p>
 <p>Configuring <code>/proc/</code> parameters with <code>echo</code> is old hat, and personally, I don't like to do it. It's better to use <code>sysctl</code>, which is the more modern way of doing business. It's easy to use, and you can read all about it in the <code>sysctl</code> man page.</p>
 <p>To see a list of all the parameter settings, just do this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo sysctl -a
+<div><pre><code>[donnie@localhost ~]$ sudo sysctl -a
 abi.vsyscall32 = 1
 crypto.fips_enabled = 1
 debug.exception-trace = 1
@@ -228,26 +218,24 @@ fs.aio-max-nr = 65536
 . . .</code></pre>
 </div>
 <p>To set a parameter, use the <code>-w</code> option to write the new value. The trick to this is that the forward slashes in the directory path are replaced by dots, and you ignore the <code>/proc/sys/</code> part of the path. So, to change the <code>icmp_echo_ignore_all</code> value back to <code>0</code>, we'll do this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo sysctl -w net.ipv4.icmp_echo_ignore_all=0
+<div><pre><code>[donnie@localhost ~]$ sudo sysctl -w net.ipv4.icmp_echo_ignore_all=0
 net.ipv4.icmp_echo_ignore_all = 0
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>In this case, the change is permanent because I'm just changing the parameter back to its default setting. Normally, though, any changes we make like this only last until we reboot the machine. Sometimes, that's okay. Other times, we might need to make the changes permanent.</p>
-</section>
-<section id="configuring-the-sysctl.conf-file" class="level2" data-number="12.4">
+
+
 <h2 data-number="12.4">Configuring the sysctl.conf file</h2>
 <p>There are some significant differences between the default configurations of Ubuntu and CentOS/AlmaLinux. They all use the <code>/etc/sysctl.conf</code> file, but on CentOS and AlmaLinux, that file doesn't have anything except for some explanatory comments. Ubuntu and CentOS/AlmaLinux all have files with default settings in the <code>/usr/lib/sysctl.d/</code> directory, but there are more for CentOS and AlmaLinux than there are for Ubuntu. On Ubuntu, you'll find other files with default values in the <code>/etc/sysctl.d/</code> directory. On CentOS and AlmaLinux, that directory only contains a symbolic link that points back to the <code>/etc/sysctl.conf</code> file. Also, you'll find that some things are hardcoded into the Linux kernel and aren't mentioned in any of the configuration files. In true Linux fashion, every distro has a different way of configuring all this, just to ensure that users remain thoroughly confused. One thing that’s consistent is that on any of your virtual machines, you can use the <code>systemd-analyze cat-config sysctl.d</code> command to view a summary of the kernel settings that are defined in these files. (To see the complete list of kernel settings though, you’ll still need to use the <code>sysctl -a</code> command.)</p>
 <blockquote>
 <p>In the <code>/usr/lib/sysctl.d/README</code> file on the AlmaLinux machine, you’ll find additional information about how this works.</p>
 </blockquote>
 <p>Now, with the introductory part out of the way, let’s see if we can make sense of all this.</p>
-<section id="configuring-sysctl.conf-ubuntu" class="level3" data-number="12.4.1">
+
 <h3 data-number="12.4.1">Configuring sysctl.conf – Ubuntu</h3>
 <p>In the <code>/etc/sysctl.conf</code> file on an Ubuntu machine, you'll see lots of comments and a few examples of things that you can tweak. The comments provide good explanations of what the various settings do. So, we'll start with it.</p>
 <p>Much of this file contains settings that can help improve networking security. Toward the top of the file, we see this:</p>
-<div class="C0-SHConPACKT">
-<pre><code># Uncomment the next two lines to enable Spoof protection (reverse-path filter)
+<div><pre><code># Uncomment the next two lines to enable Spoof protection (reverse-path filter)
 # Turn on Source Address Verification in all interfaces to
 # prevent some spoofing attacks
 #net.ipv4.conf.default.rp_filter=1
@@ -255,21 +243,18 @@ net.ipv4.icmp_echo_ignore_all = 0
 </div>
 <p>A spoofing attack involves a bad actor who sends you network packets with spoofed IP addresses. Spoofing can be used for a few different things, such as DoS attacks, anonymous port scanning, or tricking access controls. These settings, when enabled, cause the operating system to verify if it can reach the source address that's in the packet header. If it can't, the packet is rejected. You may be wondering why this is disabled since it seems like such a good thing. However, this isn't the case. It is enabled in another file. If you look in the <code>/etc/sysctl.d/10-network-security.conf</code> file, you'll see it enabled there. So, there's no need to uncomment these two lines.</p>
 <p>Next, we see this:</p>
-<div class="C0-SHConPACKT">
-<pre><code># Uncomment the next line to enable TCP/IP SYN cookies
+<div><pre><code># Uncomment the next line to enable TCP/IP SYN cookies
 # See http://lwn.net/Articles/277146/
 # Note: This may impact IPv6 TCP sessions too
 #net.ipv4.tcp_syncookies=1</code></pre>
 </div>
 <p>One form of DoS attack involves sending massive amounts of SYN packets to a target machine, without completing the rest of the three-way handshake. This can cause the victim machine to have lots of half-open network connections, which would eventually exhaust the machine's ability to accept any more legitimate connections. Turning on SYN cookies can help prevent this type of attack. On Ubuntu 18.04, which is what I used to write the previous edition of this book, SYN cookies are already turned on in the <code>/etc/sysctl.d/10-network-security.conf</code> file. On Ubuntu 22.04, that setting is nowhere to be found in any of the <code>sysctl</code> configuration files, other than the disabled setting in the <code>sysctl.conf</code> file. However, a <code>sudo sysctl -a</code> command on the 22.04 machine will show us that SYN cookies are indeed enabled:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu-2204:~$ sudo sysctl -a | grep syncookie
+<div><pre><code>donnie@ubuntu-2204:~$ sudo sysctl -a | grep syncookie
 net.ipv4.tcp_syncookies = 1
 donnie@ubuntu-2204:~$</code></pre>
 </div>
 <p>To find where this is set, we’ll need to do a bit of clever detective work. In the <code>/boot/ </code>directory of the 22.04 machine, you’ll see one <code>config</code> file for each installed kernel. When I used <code>grep -i</code> to perform a case-insensitive search for the <code>syncookies</code> text string in one of the <code>config</code> files, I couldn’t find anything. So, I broadened the search for all <code>syn</code> text strings. Here’s what that looks like:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu-2204:/boot$ grep -i &#39;syn&#39; config-5.15.0-52-generic 
+<div><pre><code>donnie@ubuntu-2204:/boot$ grep -i &#39;syn&#39; config-5.15.0-52-generic 
 . . .
 . . .
 CONFIG_SYN_COOKIES=y
@@ -278,22 +263,19 @@ CONFIG_SYN_COOKIES=y
 </div>
 <p>So, we see that on Ubuntu 22.04, the developers chose to hard-code the SYN cookies setting into the kernel rather than to set it in a <code>sysctl</code> configuration file. So, as we saw before with the Ubuntu 18.04 machine, there’s no need to uncomment the <code>syncookies</code> line in the <code>sysctl.conf</code> file.</p>
 <p>Here's the next thing we see:</p>
-<div class="C0-SHConPACKT">
-<pre><code># Uncomment the next line to enable packet forwarding for IPv4
+<div><pre><code># Uncomment the next line to enable packet forwarding for IPv4
 #net.ipv4.ip_forward=1</code></pre>
 </div>
 <p>Uncommenting this line would allow network packets to flow from one network interface to another in machines that have multiple network interfaces. Unless you're setting up a router or a Virtual Private Network server, leave this setting as is.</p>
 <p>We've been looking at nothing but IPv4 stuff so far. Here's one for IPv6:</p>
-<div class="C0-SHConPACKT">
-<pre><code># Uncomment the next line to enable packet forwarding for IPv6
+<div><pre><code># Uncomment the next line to enable packet forwarding for IPv6
 #  Enabling this option disables Stateless Address Autoconfiguration
 #  based on Router Advertisements for this host
 #net.ipv6.conf.all.forwarding=1</code></pre>
 </div>
 <p>In general, you'll also want to leave this one commented out, as it is now. Disabling <strong>Stateless Address Autoconfiguration</strong> on machines in an IPv6 environment would mean that you'd need to either set up a DHCPv6 server or set static IPv6 addresses on all hosts.</p>
 <p>The next section controls ICMP redirects:</p>
-<div class="C0-SHConPACKT">
-<pre><code># Do not accept ICMP redirects (prevent MITM attacks)
+<div><pre><code># Do not accept ICMP redirects (prevent MITM attacks)
 #net.ipv4.conf.all.accept_redirects = 0
 #net.ipv6.conf.all.accept_redirects = 0
 # _or_
@@ -303,8 +285,7 @@ CONFIG_SYN_COOKIES=y
 #</code></pre>
 </div>
 <p>Allowing ICMP redirects can potentially allow a <strong>Man-in-the-Middle</strong> (<strong>MITM</strong>) attack to be successful. Uncommenting the two lines in the top section of this snippet would completely disable ICMP redirects. The bottom line in the bottom section allows redirects, but only if they come from a trusted gateway. This one is a bit deceiving, because even though this line is commented out, and even though there's nothing about this in any of the other configuration files, secure redirects are actually enabled by default. We can see this by filtering our <code>sysctl -a</code> output through <code>grep</code>:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu-2204:/etc$ sudo sysctl -a | grep &#39;secure_redirects&#39;
+<div><pre><code>donnie@ubuntu-2204:/etc$ sudo sysctl -a | grep &#39;secure_redirects&#39;
 net.ipv4.conf.all.secure_redirects = 1
 net.ipv4.conf.default.secure_redirects = 1
 net.ipv4.conf.enp0s3.secure_redirects = 1
@@ -313,25 +294,22 @@ donnie@ubuntu-2204:/etc$</code></pre>
 </div>
 <p>Here, we can see that secure redirects are enabled on all network interfaces. But if you're sure that your machine will never get used as a router, it's still best to completely disable ICMP redirects. (We'll do that in just a bit.)</p>
 <p>The final networking item in this file involves Martian packets:</p>
-<div class="C0-SHConPACKT">
-<pre><code># Log Martian Packets
+<div><pre><code># Log Martian Packets
 #net.ipv4.conf.all.log_martians = 1
 #</code></pre>
 </div>
 <p>Now, if you're as old as I am, you might remember a really silly television show from the '60s called <em>My Favorite Martian</em>. But, this setting has nothing to do with that. Martian packets have a source address that normally can't be accepted by a particular network interface. For example, if your Internet-facing server receives packets with a private IP address or a loopback device address, that's a Martian packet. Why are they called Martian packets? Well, it's because of someone's statement that these packets are not of this earth. Regardless, Martian packets can exhaust network resources, so it's good to know about them. You can enable logging for them either by uncommenting the line in the preceding snippet or by placing an override file in the <code>/etc/sysctl.d/</code> directory. (We'll also do that in just a bit.)</p>
 <p>The following snippet is a kernel parameter for the <strong>Magic system request key</strong>:</p>
-<div class="C0-SHConPACKT">
-<pre><code># Magic system request key
+<div><pre><code># Magic system request key
 # 0=disable, 1=enable all
 # Debian kernels have this set to 0 (disable the key)
 # See https://www.kernel.org/doc/Documentation/sysrq.txt
 # for what other values do
 #kernel.sysrq=438</code></pre>
 </div>
-<p>When this parameter is enabled, you can perform certain functions, such as shutting down or rebooting the system, sending signals to processes, dumping process debug information, and several other things, by pressing a sequence of <strong>Magic Keys</strong>. You would do this by pressing the <span class="KeystrokePACKT">Alt</span> + <span class="KeystrokePACKT">SysReq</span> + <span class="KeystrokePACKT">command-key</span> sequence. (The <span class="KeystrokePACKT">SysReq</span> key is the <span class="KeystrokePACKT">PrtScr</span> key on some keyboards, while the command-key is the key that invokes some specific command.) A value of <code>0</code> for this would completely disable it, and a value of <code>1</code> would enable all Magic Key functions. A value greater than <code>1</code> would enable only specific functions. In this file, this option appears to be disabled. However, it's actually enabled in the <code>/etc/sysctl.d/10-magic-sysrq.conf</code> file. If you're dealing with a server that's locked away in a server room and that can't be remotely accessed from a serial console, this might not be a big deal. However, for a machine that's out in the open or that can be accessed from a serial console, you might want to disable this. (We'll do that in a bit as well.)</p>
+<p>When this parameter is enabled, you can perform certain functions, such as shutting down or rebooting the system, sending signals to processes, dumping process debug information, and several other things, by pressing a sequence of <strong>Magic Keys</strong>. You would do this by pressing the Alt + SysReq + command-key sequence. (The SysReq key is the PrtScr key on some keyboards, while the command-key is the key that invokes some specific command.) A value of <code>0</code> for this would completely disable it, and a value of <code>1</code> would enable all Magic Key functions. A value greater than <code>1</code> would enable only specific functions. In this file, this option appears to be disabled. However, it's actually enabled in the <code>/etc/sysctl.d/10-magic-sysrq.conf</code> file. If you're dealing with a server that's locked away in a server room and that can't be remotely accessed from a serial console, this might not be a big deal. However, for a machine that's out in the open or that can be accessed from a serial console, you might want to disable this. (We'll do that in a bit as well.)</p>
 <p>Under certain circumstances, bad guys could possibly create links to sensitive files so that they can easily access them. Link protection is turned on in the <code>/etc/sysctl.d/10-link-restrictions.conf</code> file on Ubuntu 18.04, and in the <code>/usr/lib/sysctl.d/99-protect-links.conf</code> file on Ubuntu 22.04. Here’s what that looks like on 22.04:</p>
-<div class="C0-SHConPACKT">
-<pre><code># Protected links
+<div><pre><code># Protected links
 #
 # Protects against creating or following links under certain conditions
 # Debian kernels have both set to 1 (restricted) 
@@ -342,20 +320,18 @@ fs.protected_regular = 2
 fs.protected_symlinks = 1</code></pre>
 </div>
 <p>That pretty much covers what we have in Ubuntu. Now, let's look at CentOS and AlmaLinux.</p>
-</section>
-<section id="configuring-sysctl.conf-centos-and-almalinux" class="level3" data-number="12.4.2">
+
+
 <h3 data-number="12.4.2">Configuring sysctl.conf – CentOS and AlmaLinux</h3>
 <p>On CentOS and AlmaLinux, the <code>/etc/sysctl.conf</code> file is empty, except for a few comments. These comments tell you to look elsewhere for the default configuration files and to make changes by creating new configuration files in the <code>/etc/sysctl.d/</code> directory.</p>
 <p>The default security settings for CentOS and AlmaLinux are pretty much the same as they are for Ubuntu, except they're configured in different places. For example, on CentOS and AlmaLinux, the spoof protection (<code>rp_filter</code>) parameters and the link protection parameters are in the <code>/usr/lib/sysctl.d/50-default.conf</code> file.</p>
 <p>By piping a <code>sysctl -a</code> command into <code>grep</code>, you'll also see that SYN cookies are enabled:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@alma9 ~]$ sudo sysctl -a | grep &#39;syncookie&#39;
+<div><pre><code>[donnie@alma9 ~]$ sudo sysctl -a | grep &#39;syncookie&#39;
 net.ipv4.tcp_syncookies = 1
 [donnie@alma9 ~]$</code></pre>
 </div>
 <p>The same is true for <code>secure_redirects</code>:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@alma9 ~]$ sudo sysctl -a | grep &#39;secure_redirects&#39;
+<div><pre><code>[donnie@alma9 ~]$ sudo sysctl -a | grep &#39;secure_redirects&#39;
 net.ipv4.conf.all.secure_redirects = 1
 net.ipv4.conf.default.secure_redirects = 1
 net.ipv4.conf.enp0s3.secure_redirects = 1
@@ -365,21 +341,19 @@ net.ipv4.conf.virbr0-nic.secure_redirects = 1
 [donnie@alma9 ~]$</code></pre>
 </div>
 <p>As was the case with Ubuntu, the SYN cookies setting is hard-coded into the Linux kernel, as we see here:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@alma9 ~]$ cd /boot
+<div><pre><code>[donnie@alma9 ~]$ cd /boot
 [donnie@alma9 boot]$ grep -i cookies config-5.14.0-70.30.1.el9_0.x86_64 
 CONFIG_SYN_COOKIES=y
 [donnie@alma9 boot]$</code></pre>
 </div>
 <p>Okay, so far so good. Let’s continue on.</p>
-</section>
-<section id="setting-additional-kernel-hardening-parameters" class="level3" data-number="12.4.3">
+
+
 <h3 data-number="12.4.3">Setting additional kernel-hardening parameters</h3>
 <p>What we've seen so far isn't too bad. Most of the parameters that we've looked at are already set to their most secure values. But is there room for improvement? Indeed there is. You wouldn't know it by looking at any of the configuration files, though. On Ubuntu, CentOS, and AlmaLinux, quite a few items have default values that aren't set in any of the normal configuration files. The best way to see this is to use a system scanner, such as <strong>Lynis</strong>.</p>
 <p>Lynis is a security scanner that shows lots of information about a system. (We'll cover it in more detail in <em>Chapter 14</em>, <em>Vulnerability Scanning and Intrusion Detection</em>.) For now, we'll just cover what it can tell us about hardening the Linux kernel.</p>
 <p>After you run a scan, you'll see a <code>[+] Kernel Hardening</code> section in the screen output. It's fairly lengthy, so here's just part of it:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[+] Kernel Hardening
+<div><pre><code>[+] Kernel Hardening
 ------------------------------------
  - Comparing sysctl key pairs with scan profile
  - fs.protected_hardlinks (exp: 1) [ OK ]
@@ -395,35 +369,30 @@ CONFIG_SYN_COOKIES=y
 . . .</code></pre>
 </div>
 <p>Everything that's marked as <code>OK</code> is as it should be for best security. What's marked as <code>DIFFERENT</code> should be changed to the suggested <code>exp:</code> value that's within the pair of parentheses. (<strong>exp</strong> stands for <strong>expected</strong>.) Let's do that now in a hands-on lab.</p>
-<section id="hands-on-lab-scanning-kernel-parameters-with-lynis" class="level4" data-number="12.4.3.1">
+
 <h4 data-number="12.4.3.1">Hands-on lab – scanning kernel parameters with Lynis</h4>
 <p>Lynis is in the normal repositories for Ubuntu and in the EPEL repository for CentOS and AlmaLinux. It's always a few versions behind what you can get directly from the author's website, but for now, that's okay. When we get to <em>Chapter 14</em>, <em>Vulnerability Scanning and Intrusion Detection</em>, I'll show you how to get the newest version. Let's get started:</p>
 <ol>
 <li>Install Lynis from the repository for Ubuntu, like this:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo apt update
+<div><pre><code>sudo apt update
 sudo apt install lynis</code></pre>
 </div>
 <p>Do this for CentOS 07:</p>
-<div class="C1-SHConPACKT">
-<pre><code>sudo yum install lynis</code></pre>
+<div><pre><code>sudo yum install lynis</code></pre>
 </div>
 <p>Do this for AlmaLinux 8 or 9:</p>
-<div class="C1-SHConPACKT">
-<pre><code>sudo dnf install lynis</code></pre>
+<div><pre><code>sudo dnf install lynis</code></pre>
 </div>
 <ol>
 <li>Scan the system by using the following command:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo lynis audit system</code></pre>
+<div><pre><code>sudo lynis audit system</code></pre>
 </div>
 <ol>
 <li>When the scan completes, scroll back up to the <code>[+] Kernel Hardening</code> section of the output. Copy and paste the <code>sysctl</code> key pairs into a text file. Save it as <code>secure_values.conf</code> in your own home directory. The contents of the file should look something like this:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code> - fs.protected_hardlinks (exp: 1) [ OK ]
+<div><pre><code> - fs.protected_hardlinks (exp: 1) [ OK ]
  - fs.protected_symlinks (exp: 1) [ OK ]
  - fs.suid_dumpable (exp: 0) [ OK ]
  - kernel.core_uses_pid (exp: 1) [ OK ]
@@ -441,14 +410,12 @@ sudo apt install lynis</code></pre>
 <ol>
 <li>Use <code>grep</code> to send all of the <code>DIFFERENT</code> lines to a new file. Name it <code>60-secure_values.conf</code>:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>grep &#39;DIFFERENT&#39; secure_values.conf &gt; 60-secure_values.conf</code></pre>
+<div><pre><code>grep &#39;DIFFERENT&#39; secure_values.conf &gt; 60-secure_values.conf</code></pre>
 </div>
 <ol>
 <li>Edit the <code>60-secure_values.conf</code> file to convert it into the <code>sysctl</code> configuration format. Set each parameter to the <code>exp</code> value that's currently within the pairs of parentheses. The finished product should look something like this:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>kernel.dmesg_restrict = 1
+<div><pre><code>kernel.dmesg_restrict = 1
 kernel.kptr_restrict = 2
 kernel.sysrq = 0
 kernel.yama.ptrace_scope = 1 2 3
@@ -463,14 +430,12 @@ net.ipv6.conf.default.accept_redirects = 0</code></pre>
 <ol>
 <li>Copy the file to the <code>/etc/sysctl.d/</code> directory:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo cp 60-secure_values.conf /etc/sysctl.d/</code></pre>
+<div><pre><code>sudo cp 60-secure_values.conf /etc/sysctl.d/</code></pre>
 </div>
 <ol>
 <li>Reboot the machine to read in the values from the new file:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo shutdown -r now</code></pre>
+<div><pre><code>sudo shutdown -r now</code></pre>
 </div>
 <p>Repeat <em>step 2</em>. Most items should now show up with their most secure values. However, you might see a few <code>DIFFERENT</code> lines come up. That's okay; just move the lines for those parameters into the main <code>/etc/sysctl.conf</code> file and reboot the machine again.</p>
 <p>That's the end of the lab—congratulations!</p>
@@ -481,13 +446,12 @@ net.ipv6.conf.default.accept_redirects = 0</code></pre>
 <li><code>kernel.yama.ptrace_scope = 1 2 3</code>: This places restrictions on the <code>ptrace</code> utility, which is a debugging program that the bad guys can also use. <code>1</code> restricts <code>ptrace</code> to only debugging parent processes. <code>2</code> means that only someone with root privileges can use <code>ptrace</code>, while <code>3</code> prevents anyone from tracing processes with <code>ptrace</code>.</li>
 </ul>
 <p>In this section, you learned how to configure various kernel parameters to help lock down your system. Next, we'll lock things down even more by restricting who can view process information.</p>
-</section>
-</section>
-<section id="preventing-users-from-seeing-each-others-processes" class="level3" data-number="12.4.4">
+
+
+
 <h3 data-number="12.4.4">Preventing users from seeing each others' processes</h3>
 <p>By default, users can use a utility such as <code>ps</code> or <code>top</code> to see everyone else's processes, as well as their own. To demonstrate this, let's look at the following partial output from a <code>ps aux</code> command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ ps aux
+<div><pre><code>[donnie@localhost ~]$ ps aux
 USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
 root         1  0.0  0.7 179124 13752 ?        Ss   12:05   0:03 /usr/lib/systemd/systemd --switched-root --system --deserialize 17
 root         2  0.0  0.0      0     0 ?        S    12:05   0:00 [kthreadd]
@@ -507,12 +471,10 @@ donnie 2307 0.0 0.6 1248768 12656 ? S&lt;sl 12:06 0:00 /usr/bin/pulseaudio --dae
 <p>This feature has been disabled for the RHEL 9-type distros. So, don’t try this on any of your AlmaLinux 9 machines. Not only will it not work, it could break your machine.</p>
 </blockquote>
 <p>On an Ubuntu, CentOS 7, or AlmaLinux 8 VM, you can do this by adding a line to the end of the <code>/etc/fstab</code> file, like so:</p>
-<div class="C0-SHConPACKT">
-<pre><code>proc    /proc    proc    hidepid=2   0    0</code></pre>
+<div><pre><code>proc    /proc    proc    hidepid=2   0    0</code></pre>
 </div>
 <p>Then, remount <code>/proc</code>, like so:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo mount -o remount proc</code></pre>
+<div><pre><code>sudo mount -o remount proc</code></pre>
 </div>
 <p>Now, any user who doesn't have <code>sudo</code> privileges can only view his or her own processes. (Pretty slick, eh?)</p>
 <blockquote>
@@ -528,16 +490,16 @@ donnie 2307 0.0 0.6 1248768 12656 ? S&lt;sl 12:06 0:00 /usr/bin/pulseaudio --dae
 </blockquote>
 </blockquote>
 <p>Now that you've seen the inner workings of the <code>/proc</code> filesystem and how to configure it for best security, let's look at <strong>process isolation</strong>.</p>
-</section>
-</section>
-<section id="understanding-process-isolation" class="level2" data-number="12.5">
+
+
+
 <h2 data-number="12.5">Understanding process isolation</h2>
 <p>A primary objective of any network intruder is to gain the privileges that are required to perform his or her dirty deeds. This normally involves logging in as a normal user and then performing some sort of <strong>privilege escalation</strong>. A <strong>vertical escalation</strong> involves obtaining root privileges, while a <strong>horizontal escalation</strong> involves gaining the privileges of some other normal user. If the other normal user has any sensitive documents in folders that he or she can access, then a horizontal escalation might be all that the intruder requires. Discretionary Access Control and Mandatory Access Control can help out, but we also want to isolate processes from each other and ensure that processes run with only the lowest possible privileges.</p>
 <blockquote>
 <p>When planning a defense against these types of attacks, consider that the attacks could come from either outsiders or insiders. So yes, you do need to guard against attacks from your organization's own employees.</p>
 </blockquote>
 <p>In this section, we'll look at the various Linux kernel features that facilitate process isolation. Then, we'll look at some cool ways to use these features.</p>
-<section id="understanding-control-groups-cgroups" class="level3" data-number="12.5.1">
+
 <h3 data-number="12.5.1">Understanding Control Groups (cgroups)</h3>
 <p>Control Groups, more commonly called <strong>cgroups</strong>, were introduced back in 2010 in Red Hat Enterprise Linux 6. Originally, they were just an add-on feature, and a user had to jump through some hoops to manually create them. Nowadays, with the advent of the <code>systemd</code> <code>init</code> system, cgroups are an integral part of the operating system, and each process runs in its own cgroup by default.</p>
 <blockquote>
@@ -553,17 +515,14 @@ donnie 2307 0.0 0.6 1248768 12656 ? S&lt;sl 12:06 0:00 /usr/bin/pulseaudio --dae
 <li><strong>Assign processes to specific CPU cores</strong>: This is one of the cool features that come with Version 2.</li>
 </ul>
 <p>There's not enough space to look at all of these functions, but that's okay. Right now, our primary interest is setting resource limits. With only some minor exceptions, things work the same on all <code>systemd</code>-based Linux distros. For now, let’s look at it on an AlmaLinux 9 machine. To start, we’ll install the Apache web server package, like this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo dnf install httpd
+<div><pre><code>sudo dnf install httpd
 sudo systemctl enable --now httpd</code></pre>
 </div>
 <p>By default, each cgroup on the system has no defined resource limits. The first step in defining them is to enable accounting for CPU usage, memory usage, and I/O usage. We could do that by hand-editing the <code>systemd</code> service file for each service that we want to limit, but it's easier to just run a <code>systemctl</code> command, like so:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo systemctl set-property httpd.service MemoryAccounting=1 CPUAccounting=1 BlockIOAccounting=1</code></pre>
+<div><pre><code>sudo systemctl set-property httpd.service MemoryAccounting=1 CPUAccounting=1 BlockIOAccounting=1</code></pre>
 </div>
 <p>We've just turned on the accounting functions for the Apache web server on our AlmaLinux 9 machine. (The command would be the same on an Ubuntu machine, except that we would have <code>apache2.service</code> instead of <code>httpd.service</code>.) Now, when we look in the <code>/etc/systemd/system.control/</code> directory, we'll see that we've created an <code>httpd.service.d</code> directory. Within that directory are the files that turn on our accounting functions:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost httpd.service.d]$ pwd
+<div><pre><code>[donnie@localhost httpd.service.d]$ pwd
 /etc/systemd/system.control/httpd.service.d
 [donnie@localhost httpd.service.d]$ ls -l
 total 12
@@ -573,8 +532,7 @@ total 12
 [donnie@localhost httpd.service.d]$</code></pre>
 </div>
 <p>Inside each file, we can see two lines that modify the original <code>httpd.service</code> file in order to turn on accounting. For example, here's the one for <code>CPUAccounting</code>:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost httpd.service.d]$ cat 50-CPUAccounting.conf 
+<div><pre><code>[donnie@localhost httpd.service.d]$ cat 50-CPUAccounting.conf 
 # This is a drop-in unit file extension, created via &quot;systemctl set-property&quot;
 # or an equivalent operation. Do not edit.
 [Service]
@@ -582,13 +540,11 @@ CPUAccounting=yes
 [donnie@localhost httpd.service.d]$</code></pre>
 </div>
 <p>Now that we've enabled accounting for the Apache service, we can place some resource limits on it. (By default, there are no limits.) Let's say that we want to limit Apache to only 40% of CPU usage and 500 MB of memory usage. We'll set both limits with the following command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo systemctl set-property httpd.service CPUQuota=40% MemoryLimit=500M
+<div><pre><code>[donnie@localhost ~]$ sudo systemctl set-property httpd.service CPUQuota=40% MemoryLimit=500M
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>This command created two more files in the <code>/etc/systemd/system.control/httpd.service.d/</code> directory:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost httpd.service.d]$ ls -l
+<div><pre><code>[donnie@localhost httpd.service.d]$ ls -l
 total 20
 -rw-r--r--. 1 root root 153 Oct 30 15:07 50-BlockIOAccounting.conf
 -rw-r--r--. 1 root root 149 Oct 30 15:07 50-CPUAccounting.conf
@@ -598,8 +554,7 @@ total 20
 [donnie@localhost httpd.service.d]$</code></pre>
 </div>
 <p>Let's <code>cat</code> one of them, just to see the format of the files:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost httpd.service.d]$ cat 50-CPUQuota.conf 
+<div><pre><code>[donnie@localhost httpd.service.d]$ cat 50-CPUQuota.conf 
 # This is a drop-in unit file extension, created via &quot;systemctl set-property&quot;
 # or an equivalent operation. Do not edit.
 [Service]
@@ -611,14 +566,12 @@ CPUQuota=40%
 <p>LAMP is the bedrock for many popular Content Management Systems, such as WordPress and Joomla.</p>
 </blockquote>
 <p>We can also place resource limits on user accounts. For example, let's limit Katelyn to 20% of CPU usage and 500 MB of memory usage. First, we need to get Katelyn's User ID number. We'll do that with the <code>id</code> command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ id katelyn
+<div><pre><code>[donnie@localhost ~]$ id katelyn
 uid=1001(katelyn) gid=1001(katelyn) groups=1001(katelyn)
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>So, her UID is <code>1001</code>. Let's enable accounting for her and set her limits:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo systemctl set-property user-1001.slice MemoryAccounting=1 CPUAccounting=1 BlockIOAccounting=1
+<div><pre><code>[donnie@localhost ~]$ sudo systemctl set-property user-1001.slice MemoryAccounting=1 CPUAccounting=1 BlockIOAccounting=1
 [donnie@localhost ~]$ sudo systemctl set-property user-1001.slice CPUQuota=20% MemoryLimit=500M
 [donnie@localhost ~]</code></pre>
 </div>
@@ -631,8 +584,8 @@ uid=1001(katelyn) gid=1001(katelyn) groups=1001(katelyn)
 <li>Using them to limit resource usage can help prevent DoS attacks.</li>
 </ul>
 <p>Next up, we'll take a brief look at the concepts of namespaces and namespace isolation.</p>
-</section>
-<section id="understanding-namespace-isolation" class="level3" data-number="12.5.2">
+
+
 <h3 data-number="12.5.2">Understanding namespace isolation</h3>
 <p><strong>Namespaces</strong> are a kernel security feature that was introduced in Linux kernel version 2.4.19, all the way back in 2002. A namespace allows a process to have its own set of computer resources that other processes can't see. They're especially handy for times when you might have multiple customers sharing resources on the same server. The processes for each user will have their own namespaces. Currently, there are seven types of namespaces:</p>
 <ul>
@@ -645,8 +598,7 @@ uid=1001(katelyn) gid=1001(katelyn) groups=1001(katelyn)
 <li><strong>User</strong>: The User namespace allows a user to have different levels of privilege on different processes. For example, a user could have root-level privileges on one process, but only normal-user privileges on another process.</li>
 </ul>
 <p>To see these namespaces, just go into any numbered directory within the <code>/proc</code> filesystem and view the contents of the <code>ns</code> directory. Here's an example from one of my machines:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ns]$ pwd
+<div><pre><code>[donnie@localhost ns]$ pwd
 /proc/7669/ns
 [donnie@localhost ns]$ sudo ls -l
 total 0
@@ -663,13 +615,12 @@ lrwxrwxrwx. 1 donnie donnie 0 Oct 30 16:16 uts -&gt; &#39;uts:[4026531838]&#39;
 <p>The sharp-eyed among you will see that there's an extra item in this directory that we haven't covered. The <code>pid_for_children</code> item tracks PIDs in child namespaces.</p>
 <p>Although it's certainly possible for you to create your own namespaces, you likely never will, unless you're a software developer. Most likely, you'll just use products that have namespace technologies already built into them. Some modern web browsers use namespaces to create a sandbox for each open tab. You can use a product such as Firejail to run a normal program within its own security sandbox. (We'll look at this a bit later.) Then, there's Docker, which uses namespaces to help isolate Docker containers from each other and from the host operating system.</p>
 <p>We've just had a high-level overview of what namespaces are all about. Next, let's look at kernel capabilities.</p>
-</section>
-<section id="understanding-kernel-capabilities" class="level3" data-number="12.5.3">
+
+
 <h3 data-number="12.5.3">Understanding kernel capabilities</h3>
 <p>When you perform a <code>ps aux</code> command — or a <code>sudo ps aux</code> command if you've mounted <code>/proc</code> with the <code>hidepid=1</code> or <code>hidepid=2</code> option — you'll see many processes that are owned by the root user. This is because these processes have to access some sort of system resource that unprivileged users can't access. However, having services run with full root privileges can be a bit of a security problem. Fortunately, there are some ways to mitigate that.</p>
 <p>For example, any web server service, such as Apache or Nginx, needs to start with root privileges in order to bind to ports <code>80</code> and <code>443</code>, which are privileged ports. However, both Apache and Nginx mitigate this problem by either dropping root privileges once the service has started or by spawning child processes that belong to a non-privileged user. Here, we can see that the main Apache process spawns child processes that belong to the non-privileged <code>apache</code> user:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@centos7-tm1 ~]$ ps aux | grep http
+<div><pre><code>[donnie@centos7-tm1 ~]$ ps aux | grep http
 root 1015 0.0 0.5 230420 5192 ? Ss 15:36 0:00 /usr/sbin/httpd -DFOREGROUND
 apache 1066 0.0 0.2 230420 3000 ? S 15:36 0:00 /usr/sbin/httpd -DFOREGROUND
 apache 1067 0.0 0.2 230420 3000 ? S 15:36 0:00 /usr/sbin/httpd -DFOREGROUND
@@ -682,55 +633,46 @@ donnie 1323 0.0 0.0 112712 964 pts/0 R+ 15:38 0:00 grep --color=auto http
 <p>But not all software can do this. Some programs are designed to run with root privileges all the time. For some cases — not all, but some — you can fix that by applying a kernel capability to the program executable file.</p>
 <p>Capabilities allow the Linux kernel to divide what the root user can do into distinct units. Let's say that you've just written a cool custom program that needs to access a privileged network port. Without capabilities, you'd either have to start that program with root privileges and let it run with root privileges, or jump through the hoops of programming it so that it can drop root privileges once it's been started. By applying the appropriate capability, a non-privileged user would be able to start it, and it would run with only the privileges of that user. (More about that later.)</p>
 <p>There are too many capabilities to list here (there are about 40 in all), but you can see the full list with this command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>man capabilities</code></pre>
+<div><pre><code>man capabilities</code></pre>
 </div>
 <p>Returning to our previous example, let's say that we need to use Python to set up a very primitive web server that any non-privileged user can start. (We have to do this with Python 2, because it doesn't work with Python 3.) Let’s do this on an AlmaLinux 8 machine, because Python 2 isn’t available for either AlmaLinux 9 or Ubuntu 22.04.</p>
 <p>The command for running a simple Python web server is:</p>
-<div class="C0-SHConPACKT">
-<pre><code>python2 -m SimpleHTTPServer 80</code></pre>
+<div><pre><code>python2 -m SimpleHTTPServer 80</code></pre>
 </div>
 <p>However, this won't work because it needs to bind to port <code>80</code>, which is the privileged port that's normally used by web servers. At the bottom of the output from this command, you'll see the problem:</p>
-<div class="C0-SHConPACKT">
-<pre><code>socket.error: [Errno 13] Permission denied</code></pre>
+<div><pre><code>socket.error: [Errno 13] Permission denied</code></pre>
 </div>
 <p>Prefacing the command with <code>sudo</code> will fix the problem and allow the web server to run. However, we don't want that. We'd much rather allow non-privileged users to start it, and we'd much rather have it run without root user privileges. The first step in fixing this is to find the Python executable file, like so:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ which python2
+<div><pre><code>[donnie@localhost ~]$ which python2
 /usr/bin/python2
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>Most times, the <code>python</code> or <code>python2</code> command is a symbolic link that points to another executable file. We'll verify that with a simple <code>ls -l</code> command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ ls -l /usr/bin/python2
+<div><pre><code>[donnie@localhost ~]$ ls -l /usr/bin/python2
 lrwxrwxrwx. 1 root root 9 Oct  8 17:08 /usr/bin/python2 -&gt; python2.7
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>So, the <code>python2</code> link points to the <code>python2.7</code> executable file. Now, let's see if there are any capabilities assigned to this file:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ getcap /usr/bin/python2.7 
+<div><pre><code>[donnie@localhost ~]$ getcap /usr/bin/python2.7 
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>No output means that there are none. When we consult the capabilities man page, we'll find that the <code>CAP_NET_BIND_SERVICE</code> capability seems to be what we need. The one-line description for it is: <em>bind a socket to Internet domain privileged ports</em> (<em>port numbers less than 1024</em>). Okay, that sounds good to me. So, let's set that on the <code>python2.7</code> executable file and see what happens. Since we used <code>getcap</code> to look at the file capabilities, you can probably guess that we'll use <code>setcap</code> to set a capability. (And, you'd be correct.) Let's do that now:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ sudo setcap &#39;CAP_NET_BIND_SERVICE+ep&#39; /usr/bin/python2.7
+<div><pre><code>[donnie@localhost ~]$ sudo setcap &#39;CAP_NET_BIND_SERVICE+ep&#39; /usr/bin/python2.7
 [sudo] password for donnie: 
 [donnie@localhost ~]$ getcap /usr/bin/python2.7 
 /usr/bin/python2.7 = cap_net_bind_service+ep
 [donnie@localhost ~]$</code></pre>
 </div>
 <p>The <code>+ep</code> at the end of the capability name means that we're adding the capability as <strong>effective</strong> (activated) and <strong>permitted</strong>. Now, when I try to run this web server with just my own normal privileges, it will work just fine:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ python2 -m SimpleHTTPServer 80
+<div><pre><code>[donnie@localhost ~]$ python2 -m SimpleHTTPServer 80
 Serving HTTP on 0.0.0.0 port 80 ...</code></pre>
 </div>
 <p>When I use Firefox on my host machine to connect to this server, I will see a file and directory listing of everything that's in my home directory:</p>
 <figure>
-<img src="../media/file70.png" alt="Figure 11.1: Directory listing with SimpleHTTPServer" /><figcaption aria-hidden="true">Figure 11.1: Directory listing with SimpleHTTPServer</figcaption>
+<img src="img/file70.png" alt="Figure 11.1: Directory listing with SimpleHTTPServer" /><figcaption aria-hidden="true">Figure 11.1: Directory listing with SimpleHTTPServer</figcaption>
 </figure>
 <p>Linux capabilities can also be quite useful in other ways. On any Linux system, the ping utility needs root privileges in order to craft the network packets that it needs to do its job. However, everybody and his brother can use ping as just a normal user. If you look at the ping executable file on certain Linux distros, you'll see that two capabilities have been assigned to it by the Linux maintainers, as we see here on a CentOS 7 machine:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ getcap /usr/bin/ping
+<div><pre><code>[donnie@localhost ~]$ getcap /usr/bin/ping
 /usr/bin/ping = cap_net_admin,cap_net_raw+p
 [donnie@localhost ~]$</code></pre>
 </div>
@@ -742,69 +684,61 @@ Serving HTTP on 0.0.0.0 port 80 ...</code></pre>
 <li>Performing a system update could replace executable files to which you’ve assigned capabilities. (With ping, we don't have to worry about this since the capabilities were set by the Linux maintainers.)</li>
 </ul>
 <p>Okay, so there's a good chance that you might never actually have to set any capabilities. However, this is one of the tools that my IoT Security client uses to help lock down IoT devices, so this does have a practical use. And besides, capabilities are a building block for some of the technologies that we'll look at a bit later.</p>
-<section id="hands-on-lab-setting-a-kernel-capability" class="level4" data-number="12.5.3.1">
+
 <h4 data-number="12.5.3.1">Hands-on lab – setting a kernel capability</h4>
 <p>For this lab, you'll allow a normal user to run a Python web server. You’ll need to use Python 2 for this, which isn’t in the newest Linux distros. (Python 3 won’t work.) So for this one, use your AlmaLinux 8 VM. Let's get started:</p>
 <ol>
 <li>If Apache is installed on your virtual machine, ensure that it's stopped:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo systemctl stop httpd</code></pre>
+<div><pre><code>sudo systemctl stop httpd</code></pre>
 </div>
 <ol>
 <li>Install Python 2:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo dnf install python2</code></pre>
+<div><pre><code>sudo dnf install python2</code></pre>
 </div>
 <ol>
 <li>From within your own home directory, attempt to start the Python <code>SimpleHTTPServer</code> with just your normal user privileges, and note the error message:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>python2 -m SimpleHTTPServer 80</code></pre>
+<div><pre><code>python2 -m SimpleHTTPServer 80</code></pre>
 </div>
 <ol>
 <li>See if any capabilities are set on the Python executable file:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>getcap /usr/bin/python2.7</code></pre>
+<div><pre><code>getcap /usr/bin/python2.7</code></pre>
 </div>
 <ol>
 <li>Set the <code>CAP_NET_BIND_SERVICE</code> capability on the Python executable file:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo setcap &#39;CAP_NET_BIND_SERVICE+ep&#39; /usr/bin/python2.7</code></pre>
+<div><pre><code>sudo setcap &#39;CAP_NET_BIND_SERVICE+ep&#39; /usr/bin/python2.7</code></pre>
 </div>
 <ol>
 <li>Repeat <em>Steps 3</em> and <em>4</em>. This time, it should work.</li>
 <li>Ensure that port <code>80</code> is open on the virtual machine firewall and use your host machine's web browser to access the server.</li>
-<li>Shut down the web server using <span class="KeystrokePACKT">Ctrl</span> + <span class="KeystrokePACKT">C</span>.</li>
+<li>Shut down the web server using Ctrl + C.</li>
 </ol>
 <ol>
 <li>View the capabilities that have been assigned to the <code>ping</code> executable:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>getcap /usr/bin/ping</code></pre>
+<div><pre><code>getcap /usr/bin/ping</code></pre>
 </div>
 <ol>
 <li>Review the capabilities of the man page, especially the part about the various capabilities that are there.</li>
 </ol>
 <p>That's the end of the lab – congratulations!</p>
 <p>So far, you've seen how to set file capabilities and what they can and can't do for you. Next, we'll look at how to control system calls.</p>
-</section>
-</section>
-<section id="understanding-seccomp-and-system-calls" class="level3" data-number="12.5.4">
+
+
+
 <h3 data-number="12.5.4">Understanding SECCOMP and system calls</h3>
 <p>Multiple system calls, or <strong>syscalls</strong>, happen pretty much every time you run any command on a Linux machine. Each syscall takes a command from a human user and passes it to the Linux kernel. This tells the Linux kernel that it needs to perform some sort of privileged action. Opening or closing files, writing to files, or changing file permissions or ownership are just a few of the actions that require making some sort of a syscall. There are approximately 330 syscalls built into the Linux kernel. I can't say exactly how many, because new syscalls get added from time to time. Apart from this, syscalls differ between the various CPU architectures. So, an ARM CPU won't have exactly the same set of syscalls as an x86_64 CPU. The best way to see the list of syscalls that are available on your machine is to look at the man page, like this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>man syscalls</code></pre>
+<div><pre><code>man syscalls</code></pre>
 </div>
 <blockquote>
 <p>Note that each individual syscall has its own man page.</p>
 </blockquote>
 <p>To get an idea of how this works, here's the <code>strace</code> command, which shows the syscalls that get made by a simple <code>ls</code> command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>[donnie@localhost ~]$ strace -c -f -S name ls 2&gt;&amp;1 1&gt;/dev/null | tail -n +3 | head -n -2 | awk &#39;{print $(NF)}&#39;
+<div><pre><code>[donnie@localhost ~]$ strace -c -f -S name ls 2&gt;&amp;1 1&gt;/dev/null | tail -n +3 | head -n -2 | awk &#39;{print $(NF)}&#39;
 access
 arch_prctl
 brk
@@ -821,8 +755,8 @@ write
 <p>In all, 22 syscalls are made from just doing <code>ls</code>. (Due to formatting restrictions, I can't show all of them here.)</p>
 <p><strong>Secure Computing</strong> (<strong>SECCOMP</strong>), originally created for the Google Chrome web browser, allows you to either enable just a certain subset of syscalls that you want for a process to use or disable certain syscalls that you want to prevent a process from using. Unless you're a software developer or a Docker container developer, you probably won't be working with this directly all that much. However, this is yet another building block for the technologies that are used daily by normal humans.</p>
 <p>Next, let's put all this cool stuff into perspective by looking at how it's used in real life.</p>
-</section>
-<section id="using-process-isolation-with-docker-containers" class="level3" data-number="12.5.5">
+
+
 <h3 data-number="12.5.5">Using process isolation with Docker containers</h3>
 <p>Container technology has been around for quite some time, but it took Docker to make containers popular. Unlike a virtual machine, a container doesn't contain an entire operating system. Rather, a container contains just enough of an operating system to run applications in their own private sandboxes. Containers lack their own operating system kernels, so they use the kernel of the host Linux machine. What makes containers so popular is that you can pack a lot more of them onto a physical server than you can with virtual machines. So, they're great for cutting the cost of running a data center.</p>
 <p>Docker containers use the technologies that we've covered in this chapter. Kernel capabilities, cgroups, namespaces, and SECCOMP all help Docker containers remain isolated from both each other and from the host operating system, unless we choose otherwise. By default, Docker containers run with a reduced set of capabilities and syscalls, and Docker developers can reduce all that even more for the containers that they create.</p>
@@ -835,8 +769,8 @@ write
 <p>Podman used to only be available for RHEL and Fedora-type Linux distros. It’s now also available for most other Linux distros.</p>
 </blockquote>
 <p>Now that I've given you a high-level overview of how the process isolation technologies are used in Docker, let's look at how they're used in technologies that a mere mortal is more likely to use. We'll begin with Firejail.</p>
-</section>
-<section id="sandboxing-with-firejail" class="level3" data-number="12.5.6">
+
+
 <h3 data-number="12.5.6">Sandboxing with Firejail</h3>
 <p><strong>Firejail</strong> uses namespaces, SECCOMP, and kernel capabilities to run untrusted applications in their own individual sandboxes. This can help prevent data leakage between applications, and it can help prevent malicious programs from damaging your system. It's in the normal repositories for Debian and its offspring, which include Raspbian for Raspberry Pi devices and probably every member of the Ubuntu family. On the Red Hat side, it’s in the EPEL repository, so you’ll need to install it first. Firejail is meant for use on single-user desktop systems, so we'll need to use a desktop version of Linux. So, go ahead and set up an AlmaLinux 9 VM with the Gnome desktop.</p>
 <blockquote>
@@ -848,13 +782,11 @@ write
 <li>You need to run untrusted applications that you've downloaded from the Internet.</li>
 </ul>
 <p>To install Firejail on your AlmaLinux 9 machine, use these commands:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo dnf install epel-release
+<div><pre><code>sudo dnf install epel-release
 sudo dnf install firejail</code></pre>
 </div>
 <p>This installs Firejail, along with a whole bunch of profiles for different applications. When you invoke an application with Firejail, it will automatically load the correct profile for that application, if one exists. If you invoke an application that doesn't have a profile, Firejail will just load a generic one. To see the profiles, <code>cd</code> into <code>/etc/firejail/</code> and take a look:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@donnie-VirtualBox:/etc/firejail$ ls -l
+<div><pre><code>donnie@donnie-VirtualBox:/etc/firejail$ ls -l
 total 4996
 -rw-r--r-- 1 root root   894 Dec 21  2017 0ad.profile
 -rw-r--r-- 1 root root   691 Dec 21  2017 2048-qt.profile
@@ -868,29 +800,24 @@ total 4996
 . . .</code></pre>
 </div>
 <p>To easily count the number of profiles, just do this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@donnie-VirtualBox:/etc/firejail$ ls -l | wc -l
+<div><pre><code>donnie@donnie-VirtualBox:/etc/firejail$ ls -l | wc -l
 1231
 donnie@donnie-VirtualBox:/etc/firejail$</code></pre>
 </div>
 <p>Subtracting the <code>total 4996</code> line from the top of the output gives us a total of 1,230 profiles.</p>
 <p>The simplest way to use Firejail is to preface the name of the application you want to run with <code>firejail</code>. Let's start with Firefox:</p>
-<div class="C0-SHConPACKT">
-<pre><code>firejail firefox</code></pre>
+<div><pre><code>firejail firefox</code></pre>
 </div>
 <p>The main problem with Firejail is that it doesn't work well consistently. A few years ago, a client had me do a writeup about Firejail, and I got it to mostly work on my Fedora workstation and on my Raspberry Pi with Raspbian. But even with the programs for which it did work, I lost some important functionality. For example, when running a web browser with Firejail on my Fedora machine, I wasn't able to watch videos on several different sites, including YouTube. Dropbox and Keepass didn't work at all under Firejail, even though there are specific profiles for both of them.</p>
 <p>On a Lubuntu virtual machine, running Firefox under Firejail just gave me a blank browser page, regardless of where I tried to surf. So, I installed <code>chromium-browser</code> and tried it. It worked much better, and I could even watch YouTube videos with it. Then, I installed LibreOffice, which seemed to run fine with Firejail.</p>
 <p>Among the many options that Firejail offers is the option to ensure that programs run either without any kernel capabilities enabled or with just the capabilities that you specify. Something that the man page recommends is to drop all capabilities for any programs that don't require root privileges. So, for Chromium, we'd do this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>firejail --caps.drop=all chromium-browser</code></pre>
+<div><pre><code>firejail --caps.drop=all chromium-browser</code></pre>
 </div>
 <p>So, what if you just want to start your applications from the <strong>Start</strong> menu, the way that you normally would, but still have Firejail protection? For that, you can do this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo firecfg</code></pre>
+<div><pre><code>sudo firecfg</code></pre>
 </div>
 <p>This command creates symbolic links in the <code>/usr/local/bin/</code> directory for each program that has a Firejail profile. They look something like this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@donnie-VirtualBox:/usr/local/bin$ ls -l
+<div><pre><code>donnie@donnie-VirtualBox:/usr/local/bin$ ls -l
 total 0
 lrwxrwxrwx 1 root root 17 Nov 14 18:14 audacious -&gt; /usr/bin/firejail
 lrwxrwxrwx 1 root root 17 Nov 14 18:14 chromium-browser -&gt; /usr/bin/firejail
@@ -904,57 +831,50 @@ lrwxrwxrwx 1 root root 17 Nov 14 18:14 galculator -&gt; /usr/bin/firejail
 <p>If you find that a program doesn't work under Firejail, just go into <code>/usr/local/bin/</code> and delete the link for it.</p>
 <p>Now, you'll want to be aware of a very curious thing with the Firejail documentation. In both the Firejail man page and on the main page of the Firejail website, it says that you can use Firejail to sandbox desktop applications, server applications, and user login sessions. However, if you click on the <strong>Documentation</strong> tab of the Firejail website, it says that Firejail is only meant for single-user desktop systems. That's because, in order to do its job, the Firejail executable has to have the SUID permission bit set. The Firejail developers consider it a security risk to allow multiple users to access a machine with this SUID program.</p>
 <p>All right, that's enough talk. Let's get some practice in.</p>
-<section id="hands-on-lab-using-firejail" class="level4" data-number="12.5.6.1">
+
 <h4 data-number="12.5.6.1">Hands-on lab – using Firejail</h4>
 <p>For this lab, you'll use an AlmaLinux 9 virtual machine with the Gnome desktop. Let's get started:</p>
 <ol>
 <li>Create an AlmaLinux virtual machine with the Gnome desktop option.</li>
 <li>Install the EPEL repository and update the VM with these commands:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo dnf install epel-release
+<div><pre><code>sudo dnf install epel-release
 sudo dnf upgrade</code></pre>
 </div>
 <p>Then, reboot the machine.</p>
 <ol>
 <li>Install Firejail, LibreOffice, and Chromium:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo dnf install firejail libreoffice-x11 chromium</code></pre>
+<div><pre><code>sudo dnf install firejail libreoffice-x11 chromium</code></pre>
 </div>
 <ol>
 <li>In one terminal window, start Chromium without any kernel capabilities:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>firejail --caps.drop=all chromium-browser</code></pre>
+<div><pre><code>firejail --caps.drop=all chromium-browser</code></pre>
 </div>
 <ol>
 <li>Surf to various websites to see if everything works as it should.</li>
 <li>In another terminal window, start LibreOffice, also without any capabilities:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>firejail --caps.drop=all libreoffice</code></pre>
+<div><pre><code>firejail --caps.drop=all libreoffice</code></pre>
 </div>
 <ol>
 <li>Create the various types of LibreOffice documents and try out various LibreOffice functions to see how much still works properly.</li>
 <li>Shut down both Chromium and LibreOffice.</li>
 <li>Configure Firejail so that it automatically sandboxes every application you start, even if you do this from the normal <strong>Start</strong> menu:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo firecfg</code></pre>
+<div><pre><code>sudo firecfg</code></pre>
 </div>
 <ol>
 <li>Look at the symbolic links that were created:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>ls -l /usr/local/bin</code></pre>
+<div><pre><code>ls -l /usr/local/bin</code></pre>
 </div>
 <ol>
 <li>Try to open Firefox from the normal menu and verify whether or not it works. Then, shut down Firefox.</li>
 <li>To be able to run Firefox without Firejail, just delete its symbolic link from the <code>/user/local/bin/ </code>directory, like so:</li>
 </ol>
-<div class="C1-SHConPACKT">
-<pre><code>sudo rm /usr/local/bin/firefox</code></pre>
+<div><pre><code>sudo rm /usr/local/bin/firefox</code></pre>
 </div>
 <ol>
 <li>Try to run Firefox again. You should see that it starts normally.</li>
@@ -962,9 +882,9 @@ sudo dnf upgrade</code></pre>
 <p>You've completed this lab – congratulations!</p>
 <p>There are a lot more Firejail options than what I can show you here. For more information, see the Firejail man page and the documentation on the Firejail website.</p>
 <p>So far, you've seen both the good and the bad of using Firejail. Next up, we'll look at a couple of universal packaging systems for Linux.</p>
-</section>
-</section>
-<section id="sandboxing-with-snappy" class="level3" data-number="12.5.7">
+
+
+
 <h3 data-number="12.5.7">Sandboxing with Snappy</h3>
 <p>In the Windows world and the Mac world, operating systems and the applications that they can run are sold independently of each other. So, you buy a computer that runs either Windows or macOS, and then you buy the applications separately. When it comes to doing updates, you have to update the operating system, and then update each application separately.</p>
 <p>In the Linux world, most applications that you'll ever need are in the repositories of your Linux distro. To install an application, you just use your distro's package management utility – <code>apt</code>, <code>yum</code>, <code>dnf</code>, or whatever else – to install it. However, this has turned out to be both a blessing and a curse. It does make it easier to keep track of your applications and to keep the latest bug fix and security updates installed. But unless you're running a rolling release distro such as Arch, the application packages will become out of date before your Linux distro's end of life. That's because distro maintainers use application versions that are current when the distro version is released, and they don't upgrade to new application versions until the next version of the distro is released. This also makes things hard for application developers, because each family of Linux distros uses its own packaging format. So, wouldn't it be nice to have a universal packaging format that works across all Linux distros, and that can be kept up to date with ease?</p>
@@ -977,8 +897,7 @@ sudo dnf upgrade</code></pre>
 <p>If you're running any recent version of Ubuntu, you’ll have the Snappy service running already. At some point (I forget when), the Ubuntu folk started including Snappy in a default installation of Ubuntu Server. It’s now also installed by default in the desktop versions of Ubuntu. In fact, Ubuntu now automatically uses Snappy to install certain packages, such as Firefox and Chromium, even if you use a normal <code>sudo apt install</code> command to install them.</p>
 <p>Snappy is also available in the repositories of many non-Ubuntu distros. It's in the normal repositories for Fedora, and in the EPEL repositories for Red Hat and all of its offspring. (Note though that I gave up on using snaps on my Fedora systems, because it was causing too many weird problems with SELinux.)</p>
 <p>So, how can Snappy be useful to a busy administrator? Well, let's say that your pointy-haired boss has just told you to set up a Nextcloud server so that employees can have a central place to store their documents. However, you're in a time crunch, and you don't want to jump through the hoops of setting up all the individual components of a LAMP system. No problem – just install a snap. First, let's see what's available for our Ubuntu server:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu2204:~$ snap search nextcloud
+<div><pre><code>donnie@ubuntu2204:~$ snap search nextcloud
 Name Version Publisher Notes Summary
 nextcloud 16.0.5snap3 nextcloud√ - Nextcloud Server - A safe home for all your data
 spreedme 0.29.5snap1 nextcloud√ - Spreed.ME audio/video calls and conferences feature for the Nextcloud Snap
@@ -989,8 +908,7 @@ nextcloud-port8080 1.01 arcticslyfox - Nextcloud Server
 . . .</code></pre>
 </div>
 <p>There are quite a few choices. We can use the <code>info</code> option to narrow things down a bit:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu2204:~$ snap info nextcloud
+<div><pre><code>donnie@ubuntu2204:~$ snap info nextcloud
 name: nextcloud
 summary: Nextcloud Server - A safe home for all your data
 publisher: Nextcloud√
@@ -1006,32 +924,30 @@ description: |
 . . .</code></pre>
 </div>
 <p>It looks like this is what I need. So, let's install it:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu2204:~$ snap install nextcloud</code></pre>
+<div><pre><code>donnie@ubuntu2204:~$ snap install nextcloud</code></pre>
 </div>
 <p>We’re not worried about using <code>sudo</code> here, because snap will prompt you for a password for this particular operation. Note that for other snap operations, this doesn’t work, so you’ll need to use <code>sudo</code>.</p>
 <p>To start it, just do this:</p>
-<div class="C0-SHConPACKT">
-<pre><code>donnie@ubuntu2204:~$ sudo snap start nextcloud
+<div><pre><code>donnie@ubuntu2204:~$ sudo snap start nextcloud
 Started.
 donnie@ubuntu2204:~$</code></pre>
 </div>
 <p>Finally, from a desktop machine, navigate to the IP address of the <strong>Nextcloud</strong> server and <strong>create an admin account</strong>. Once you've filled in all the details, click <strong>Finish Setup</strong>:</p>
 <figure>
-<img src="../media/file71.png" alt="Figure 11.2: Nextcloud" /><figcaption aria-hidden="true">Figure 11.2: Nextcloud</figcaption>
+<img src="img/file71.png" alt="Figure 11.2: Nextcloud" /><figcaption aria-hidden="true">Figure 11.2: Nextcloud</figcaption>
 </figure>
 <p>Simple, right? Imagine how long that would have taken doing it the old-fashioned way. The only slight catch is that it's running on an unencrypted HTTP connection, so you definitely don't want to expose this to the Internet. (There is a way to reconfigure this to use an encrypted connection, but that’s beyond the scope of this topic.)</p>
 <p>The Snapcraft store is Canonical's official repository for snap packages. Anyone who wants to can create an account and upload his or her own snaps. There are plenty of applications there for desktop/workstations, servers, and IoT devices. Several different machine architectures, including x86_64, ARM, and PowerPC, are supported. (So yes, this can even be useful for your Raspberry Pi device.) This can be seen in the following screenshot:</p>
 <figure>
-<img src="../media/file72.png" alt="Figure 11.3: The Snapcraft store" /><figcaption aria-hidden="true">Figure 11.3: The Snapcraft store</figcaption>
+<img src="img/file72.png" alt="Figure 11.3: The Snapcraft store" /><figcaption aria-hidden="true">Figure 11.3: The Snapcraft store</figcaption>
 </figure>
 <p>That's pretty much all there is to it. Despite the controversies, it's still a pretty cool concept.</p>
 <blockquote>
 <p>If you have to deploy IoT devices, you might want to look into Ubuntu Core. It's a stripped-down version of Ubuntu that consists wholly of snap packages. Space doesn't permit me to cover it in detail here, but you can read all about it at <a href="https://ubuntu.com/core">https://ubuntu.com/core</a>.</p>
 </blockquote>
 <p>Now that you've seen how to work with Ubuntu's Snappy system, we'll look at Fedora's Flatpak system.</p>
-</section>
-<section id="sandboxing-with-flatpak" class="level3" data-number="12.5.8">
+
+
 <h3 data-number="12.5.8">Sandboxing with Flatpak</h3>
 <p>The Flatpak system, which was created by the Fedora Linux team, works toward the same goal as Ubuntu's Snappy system, but there are significant differences in their implementation. You can have one or both systems running on any given Linux machine. With either system, you can create a universal package that runs on any machine that has Snappy or Flatpak installed. And, both systems run each of their applications in their own security sandbox.</p>
 <p>However, as I mentioned previously, there are differences:</p>
@@ -1042,8 +958,7 @@ donnie@ubuntu2204:~$</code></pre>
 <li>The Snapcraft store has packages for server, desktop, and IoT use. Flathub mainly has desktop applications.</li>
 </ul>
 <p>Depending on which distro you're running, you may or may not already have the Flatpak system installed. On Debian/Ubuntu systems, install it with these commands:</p>
-<div class="C0-SHConPACKT">
-<pre><code>sudo apt update
+<div><pre><code>sudo apt update
 sudo apt install flatpak</code></pre>
 </div>
 <p>On RHEL, CentOS, AlmaLinux, and Fedora systems, there's a good chance that it's already installed. If it isn't, just install it with the normal <code>yum</code> or <code>dnf</code> commands. After you've installed Flatpak, go to the Flatpak <strong>Quick Setup</strong> page to see how to configure it. Click on the icon for the distro that you're running and follow the directions.</p>
@@ -1056,25 +971,24 @@ sudo apt install flatpak</code></pre>
 </blockquote>
 <p>Let's say that you've browsed through the Productivity apps and found the Bookworm e-book reader. Click on the link to go to the <strong>Bookworm</strong> app page. You'll see an <strong>Install</strong> button at the top of it. If you click on that button, you'll download the install file for <strong>Bookworm</strong>. To install it, you'll still need to type a command at the command line. Your best bet is to scroll down to the bottom of the page, where you'll see the command that will both download and install the app at the same time:</p>
 <figure>
-<img src="../media/file73.png" alt="Figure 11.4: The Flathub repository" /><figcaption aria-hidden="true">Figure 11.4: The Flathub repository</figcaption>
+<img src="img/file73.png" alt="Figure 11.4: The Flathub repository" /><figcaption aria-hidden="true">Figure 11.4: The Flathub repository</figcaption>
 </figure>
 <p>There's also the command to run the app, but you might not need it. Depending on which distro you're running, you might or might not have an icon created for you in your <strong>Start</strong> menu.</p>
 <blockquote>
 <p>Flatpak sometimes requires admin privileges, and sometimes it doesn’t. Whenever it does, it will prompt you for a password, so there’s no need to preface your <code>flatpak</code> commands with <code>sudo</code>.</p>
 </blockquote>
 <p>Unlike Snappy, Flatpak doesn't automatically update its apps. You'll have to do that yourself by periodically implementing this command:</p>
-<div class="C0-SHConPACKT">
-<pre><code>flatpak update</code></pre>
+<div><pre><code>flatpak update</code></pre>
 </div>
 <p>In this section, you looked at the basics of using the Snappy and Flatpak universal packaging systems. With each one, developers can package their applications just once, instead of doing it multiple times with multiple types of packages. End users can use them so that their applications are always up to date, instead of having to stick with the more outdated versions that are in their distro repositories. And, in keeping with the overall context of this book, understand that by running applications in their own isolated sandboxes, both of these systems provide an extra measure of application security.</p>
-</section>
-</section>
-<section id="summary-10" class="level2" data-number="12.6">
+
+
+
 <h2 data-number="12.6">Summary</h2>
 <p>So, another big chapter is behind us, and we've seen lots of cool stuff. We started by looking at the <code>/proc</code> filesystem and at how to configure some of its settings for the best security possible. After that, we looked at how cgroups, namespaces, kernel capabilities, and SECCOMP can be used to isolate processes from each other. We wrapped this chapter up with some examples of utilities and package management systems that use these cool technologies.</p>
 <p>In the next chapter, we'll talk about the different ways you can scan, audit, and harden your systems. I'll see you there.</p>
-</section>
-<section id="questions-10" class="level2" data-number="12.7">
+
+
 <h2 data-number="12.7">Questions</h2>
 <ol>
 <li>Which of the following is true?
@@ -1150,8 +1064,8 @@ sudo apt install flatpak</code></pre>
 <li>Create the container with a SECCOMP profile.</li>
 </ol></li>
 </ol>
-</section>
-<section id="further-reading-10" class="level2" data-number="12.8">
+
+
 <h2 data-number="12.8">Further reading</h2>
 <ul>
 <li>Exploring the <code>/proc</code> filesystem: <a href="https://www.tecmint.com/exploring-proc-file-system-in-linux/">https://www.tecmint.com/exploring-proc-file-system-in-linux/</a></li>
@@ -1180,8 +1094,8 @@ sudo apt install flatpak</code></pre>
 <li>Flathub: <a href="https://flathub.org/home">https://flathub.org/home</a></li>
 <li>Three approaches to secrets management for Flatpak applications: <a href="https://opensource.com/article/19/11/secrets-management-flatpak-applications">https://opensource.com/article/19/11/secrets-management-flatpak-applications</a></li>
 </ul>
-</section>
-<section id="answers-8" class="level2" data-number="12.9">
+
+
 <h2 data-number="12.9">Answers</h2>
 <ol>
 <li>c</li>
@@ -1195,7 +1109,7 @@ sudo apt install flatpak</code></pre>
 <li>c</li>
 <li>d</li>
 </ol>
-</section>
-</section>
+
+
 </body>
 </html>

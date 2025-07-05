@@ -1,0 +1,147 @@
+# Preface
+
+*Mastering Linux Administration* provides the ultimate coverage of modern server and cloud administration technologies.
+
+Technology evolves at an unprecedented speed, and Linux and related technologies are at the forefront of innovation. This makes it really hard to keep up and learn new things. Present Linux administrators need to know about more than just Linux, thus containerization and cloud technologies are essential for the future DevOps expert.
+
+Linux is the operating system that powers almost everything, from IoT to personal computers to servers, and is the foundation for all cloud technologies. It enables you to master the cloud through the power of the command line.
+
+You will begin by learning about the command line, working with files, processes, users, packages, and filesystems, then you will begin administering network services and hardening security, and finally, you will learn about cloud computing, containers, and orchestration. You will learn how to work at the command line, learn about the most important Linux commands, and master users, processes, and services administration. You will also learn how to harden Linux security using iptables. At the end, you will work with containers, hypervisors, virtual machines, Ansible, and Kubernetes and learn how to deploy Linux on AWS and Azure. By the end of this book, you will have mastered Linux and you will be confident in working with Linux from bare metal to the cloud, in a pure DevOps fashion.
+
+# Who this book is for
+
+This book is for Linux administrators who want to understand the fundamentals, as well as modern concepts of Linux system administration. Windows system administrators looking to extend their knowledge to the Linux OS will also benefit from this book.
+
+# What this book covers
+
+[*Chapter 1*](B19682_01.xhtml#_idTextAnchor030), *Installing Linux*, shows you how to install Linux on physical hardware (bare-metal) and inside a virtual machine in Windows. As we are targeting future Linux system administrators, the command line will be used most of the time, with little reference to the GUI. The future Linux professional will learn how to install Linux and how the boot process works.
+
+[*Chapter 2*](B19682_02.xhtml#_idTextAnchor053), *The Linux Shell and Filesystem*, teaches you how to use the command line and introduces you to the most widely used commands in Linux. You will learn about the structure of a basic command, how the Linux filesystem is organized, the structure of the Linux operating system, and the structure of a file. By the end of the chapter, you will also know how to use VI/VIM, one of the widely used command-line text editors in Linux.
+
+[*Chapter 3*](B19682_03.xhtml#_idTextAnchor075), *Linux Software Management*, explains how to use specific software management commands, how software packages work depending on the distribution of choice, and how to build your own packages.
+
+[*Chapter 4*](B19682_04.xhtml#_idTextAnchor090), *Managing Users and Groups*, shows you how to manage user accounts in Linux. This is one of the most important tasks a Linux system administrator should master. You will be introduced to the general concepts, the specific files for user administration, and how to manage accounts. By the end of the chapter, you will know how to work with permissions and how to change them, and you will understand the special permissions and attributes.
+
+[*Chapter 5*](B19682_05.xhtml#_idTextAnchor104), *Working with Processes, Daemons, and Signals*, explores processes, signals, and services in Linux. You will learn how to manage them, how to use them, and what the differences are between them.
+
+[*Chapter 6*](B19682_06.xhtml#_idTextAnchor124), *Working with Disks and Filesystems*, teaches you how to manage disks and filesystems, understand storage in Linux, use **Logical Volume Management** (**LVM**) systems, and how to mount and partition.
+
+[*Chapter 7*](B19682_07.xhtml#_idTextAnchor139), *Networking with Linux*, discusses how networking works in Linux, including the key concepts and how to configure your network from the command line and GUI.
+
+[*Chapter 8*](B19682_08.xhtml#_idTextAnchor164), *Linux Shell Scripting*, shows you how to create and use Bash shell scripts for task automation in Linux. This will prove an invaluable asset for any system administrator.
+
+[*Chapter 9*](B19682_09.xhtml#_idTextAnchor194), *Securing Linux*, delves into advanced topics of Linux security. You will learn how to work with SELinux and AppArmor.
+
+[*Chapter 10*](B19682_10.xhtml#_idTextAnchor212), *Disaster Recovery, Diagnostics, and Troubleshooting*, shows you how to do a system backup and restore in a disaster recovery scenario. Also, you will learn how to diagnose and troubleshoot a common array of problems.
+
+[*Chapter 11*](B19682_11.xhtml#_idTextAnchor231), *Working with Virtual Machines*, describes how to set up and work with KVM virtual machines on Linux.
+
+[*Chapter 12*](B19682_12.xhtml#_idTextAnchor257), *Managing Containers with Docker*, introduces containers and discusses how to use Docker-specific tools to deploy your applications.
+
+[*Chapter 13*](B19682_13.xhtml#_idTextAnchor276), *Configuring Linux Servers*, shows you how to configure different types of Linux servers, from **Domain Name System** (**DNS**), **Dynamic Host Configuration Protocol** (**DHCP**), **Secure Shell** (**SSH**), **Samba** file-sharing servers, and **Network File System** (**NFS**). This is one of the core foundations for any good Linux system administrator.
+
+[*Chapter 14*](B19682_14.xhtml#_idTextAnchor299), *Short Introduction to* *Computing*, covers the basics of cloud computing. You will be presented with core technologies such as **infrastructure-as-a-service** (**IaaS**), **platform-as-a-service** (**PaaS**), **containers-as-a-service** (**CaaS**), **DevOps**, and cloud management tools.
+
+[*Chapter 15*](B19682_15.xhtml#_idTextAnchor326), *Deploying to the Cloud with AWS and Azure*, explains how to deploy Linux to AWS and Azure.
+
+[*Chapter 16*](B19682_16.xhtml#_idTextAnchor342), *Deploying Applications with Kubernetes*, teaches you how to use Kubernetes to monitor and secure your deployments and how to manage your containers and networks. You will learn what Kubernetes is and how to use its diverse community approaches.
+
+[*Chapter 17*](B19682_17.xhtml#_idTextAnchor359), *Infrastructure and Automation with Ansible*, introduces Ansible, including how to configure it, and how to manage playbooks, modules, and servers. At the end of this chapter, you will be a master of automation.
+
+# To get the most out of this book
+
+You will need Ubuntu Linux LTS or Debian Linux to perform the examples in this book. No prior knowledge of Linux is necessary.
+
+**If you are using the digital version of this book, we advise you to type the code yourself or access the code from the book’s GitHub repository (a link is available in the next section). Doing so will help you avoid any potential errors related to the copying and pasting** **of code.**
+
+# Download the example code files
+
+You can download the example code files for this book from GitHub at [https://github.com/PacktPublishing/Mastering-Linux-Administration-Second-Edition](https://github.com/PacktPublishing/Mastering-Linux-Administration-Second-Edition). If there’s an update to the code, it will be updated in the GitHub repository.
+
+We also have other code bundles from our rich catalog of books and videos available at [https://github.com/PacktPublishing/](https://github.com/PacktPublishing/). Check them out!
+
+# Conventions used
+
+There are a number of text conventions used throughout this book.
+
+`Code in text`: Indicates code words in text, database table names, folder names, filenames, file extensions, pathnames, dummy URLs, user input, and Twitter handles. Here is an example: “To check the contents of a binary `deb` package, you can use the `ar` command.”
+
+A block of code is set as follows:
+
+```
+spec: 
+     replicas: 1 
+```
+
+Any command-line input or output is written as follows:
+
+```
+$ sudo zypper search nmap
+```
+
+When we wish to draw your attention to a particular part of a code block or command, the relevant lines or items are set in bold:
+
+```
+uid=1004(alex2) gid=1100(admin) groups=1100(admin),1200(developers),1300(devops),1400(managers)
+```
+
+**Bold**: Indicates a new term, an important word, or words that you see onscreen. For instance, words in menus or dialog boxes appear in **bold**. Here is an example: “Navigate to **Virtual Machines**, select your instance, and click **Size** under **Availability +** **Scale**.”
+
+Tips or important notes
+
+Appear like this.
+
+# Get in touch
+
+Feedback from our readers is always welcome.
+
+**General feedback**: If you have questions about any aspect of this book, email us at [customercare@packtpub.com](mailto:customercare@packtpub.com) and mention the book title in the subject of your message.
+
+**Errata**: Although we have taken every care to ensure the accuracy of our content, mistakes do happen. If you have found a mistake in this book, we would be grateful if you would report this to us. Please visit [www.packtpub.com/support/errata](http://www.packtpub.com/support/errata) and fill in the form.
+
+**Piracy**: If you come across any illegal copies of our works in any form on the internet, we would be grateful if you would provide us with the location address or website name. Please contact us at [copyright@packt.com](mailto:copyright@packt.com) with a link to the material.
+
+**If you are interested in becoming an author**: If there is a topic that you have expertise in and you are interested in either writing or contributing to a book, please visit [authors.packtpub.com](http://authors.packtpub.com).
+
+# Share Your Thoughts
+
+Once you’ve read *Mastering Linux Administration*, we’d love to hear your thoughts! Please [click here to go straight to the Amazon review page](https://packt.link/r/1837630690) for this book and share your feedback.
+
+Your review is important to us and the tech community and will help us make sure we’re delivering excellent quality content.
+
+# Download a free PDF copy of this book
+
+Thanks for purchasing this book!
+
+Do you like to read on the go but are unable to carry your print books everywhere?
+
+Is your eBook purchase not compatible with the device of your choice?
+
+Don’t worry, now with every Packt book you get a DRM-free PDF version of that book at no cost.
+
+Read anywhere, any place, on any device. Search, copy, and paste code from your favorite technical books directly into your application.
+
+The perks don’t stop there, you can get exclusive access to discounts, newsletters, and great free content in your inbox daily
+
+Follow these simple steps to get the benefits:
+
+1.  Scan the QR code or visit the link below
+
+![](img/B19682_QR_Free_PDF.jpg)
+
+[https://packt.link/free-ebook/9781837630691](https://packt.link/free-ebook/9781837630691)
+
+1.  Submit your proof of purchase
+2.  That’s it! We’ll send your free PDF and other benefits to your email directly
+
+# Part 1:Basic Linux Administration
+
+In this first part, you will master the Linux command line and basic administrative tasks, such as managing users, packages, files, services, processes, signals, and disks.
+
+This part has the following chapters:
+
+*   [*Chapter 1*](B19682_01.xhtml#_idTextAnchor030), *Installing Linux*
+*   [*Chapter 2*](B19682_02.xhtml#_idTextAnchor053), *The Linux Shell and Filesystem*
+*   [*Chapter 3*](B19682_03.xhtml#_idTextAnchor075), *Linux Software Management*
+*   [*Chapter 4*](B19682_04.xhtml#_idTextAnchor090), *Managing Users and Groups*
+*   [*Chapter 5*](B19682_05.xhtml#_idTextAnchor104), *Working with Processes, Daemons, and Signals*

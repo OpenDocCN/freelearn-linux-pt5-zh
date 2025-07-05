@@ -1,0 +1,524 @@
+# Tracing the Clues
+
+In this chapter, we will cover the following topics:
+
+*   Tracing packets with `tcpdump`
+*   Finding packets with `ngrep`
+*   Tracing network routes with `ip`
+*   Tracing system calls with `strace`
+*   Tracing dynamic library functions with `ltrace`
+
+# Introduction
+
+Nothing happens without a trace. On a Linux system, we can trace events via the log files discussed in [Chapter 9](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml), *Put On The Monitor's Cap*. The `top` command shows which programs use the most CPU time, and `watch`, `df`, and `du` let us monitor disk usage.
+
+This chapter will describe ways to get more information about network packets, CPU usage, disk usage, and dynamic library calls.
+
+# Tracing packets with tcpdump
+
+Just knowing which applications are using a given port may not be sufficient information to trace down a problem. Sometimes you need to check the data that is being transferred as well.
+
+# Getting ready
+
+You need to be a root user to run `tcpdump`. The `tcpdump` application may not be installed in your system by default. So install it with your package manager:
+
+```
+$ sudo apt-get install tcpdump
+$ sudo yum install libpcap tcpdump
+
+```
+
+# How to do it...
+
+The `tcpdump` application is the frontend to Wireshark and other network sniffer programs. The GUI interface supports many of the options we'll describe shortly.
+
+This application's default behavior is to display every packet seen on the primary Ethernet link. The format of a packet report is as follows:
+
+```
+    TIMESTAMP SRC_IP:PORT > DEST_IP:PORT: NAME1 VALUE1, NAME2 VALUE2,...
+
+```
+
+The name-value pairs include:
+
+*   `Flags`: The flags associated with this packet are as follows:
+*   *   The term `S` stands for **SYN** (**Start Connection**)
+    *   The term `F` stands for **FIN** (**Finish Connection**)
+    *   The term `P` stands for **PUSH** (**Push data**)
+    *   The term `R` stands for **RST** (**Reset Connection**)
+    *   The period `.` means there are no flags
+*   `seq`: This refers to the sequence number of the packet. It will be echoed in an ACK to identify the packet being acknowledged.
+*   `ack`: This refers to the acknowledgement that indicates a packet is received. The value is the sequence number from a previous packet.
+*   `win`: This indicates the size of the buffer at the destination.
+*   `options`: This refers to the TCP options defined for this packet. It is reported as a comma-separated set of key-value pairs.
+
+The following output shows requests from a Windows computer to the SAMBA server intermingled with a DNS request. The intermingling of different packets from different sources and applications makes it difficult to track a specific application or traffic on a given host. However, the `tcpdump` command has flags that make our life easier:
+
+```
+$ tcpdump 
+22:00:25.269277 IP 192.168.1.40.49182 > 192.168.1.2.microsoft-ds: Flags [P.], seq 3265172834:3265172954, ack 850195805, win 257, length 120SMB PACKET: SMBtrans2 (REQUEST) 
+22:00:25.269417 IP 192.168.1.44.33150 > 192.168.1.7.domain: 13394+ PTR? 2.1.168.192.in-addr.arpa. (42) 
+22:00:25.269917 IP 192.168.1.2.microsoft-ds > 192.168.1.40.49182: Flags [.], ack 120, win 1298, length 0 
+22:00:25.269927 IP 192.168.1.2.microsoft-ds > 192.168.1.40.49182: Flags [P.], seq 1:105, ack 120, win 1298, length 104SMB PACKET: SMBtrans2 (REPLY)
+
+```
+
+The `-w` flag sends the `tcpdump` output to a file instead of the terminal. The output format is in binary form, which can be read with the `-r` flag. Sniffing packets must be done with root privileges, but displaying the results from a previously saved file can be done as a normal user.
+
+By default, `tcpdump` runs and collects data until it is killed using Ctrl-C or **SIGTERM**. The `-c` flag limits the number of packets:
+
+```
+# tcpdump -w /tmp/tcpdump.raw -c 50
+tcpdump: listening on eth0, link-type EN10MB (Ethernet), capture size 65535 bytes
+50 packets captured
+50 packets received by filter
+0 packets dropped by kernel
+
+```
+
+As a rule, we want to examine the activity on a single host, perhaps a single application.
+
+The last values of the `tcpdump` command line form an expression that helps us filter packets. The expression is a set of key-value pairs with modifiers and Boolean operators. The next recipes demonstrate using filters.
+
+# Displaying only HTTP packets
+
+The `port` key displays only the packets sent to or from a given port:
+
+```
+$ tcpdump -r /tmp/tcpdump.raw port http
+reading from file /tmp/tcpdump.raw, link-type EN10MB (Ethernet)
+10:36:50.586005 IP 192.168.1.44.59154 > ord38s04-in-f3.1e100.net.http: Flags [.], ack 3779320903, win 431, options [nop,nop,TS val 2061350532 ecr 3014589802], length 0
+
+10:36:50.586007 IP ord38s04-in-f3.1e100.net.http > 192.168.1.44.59152: Flags [.], ack 1, win 350, options [nop,nop,TS val 3010640112 ecr 2061270277], length 0
+
+```
+
+# Displaying only HTTP packets generated by this host
+
+If you are trying to track web usage on your network, you may only need to see the packets generated on your site. The `src` modifier specifies only these packets, with given values, in the source file. The `dst` modifier specifies only the destination:
+
+```
+$ tcpdump -r /tmp/tcpdump.raw src port http
+reading from file /tmp/tcpdump.raw, link-type EN10MB (Ethernet)
+
+10:36:50.586007 IP ord38s04-in-f3.1e100.net.http > 192.168.1.44.59152: Flags [.], ack 1, win 350, options [nop,nop,TS val 3010640112 ecr 2061270277], length 0
+10:36:50.586035 IP ord38s04-in-f3.1e100.net.http > 192.168.1.44.59150: Flags [.], ack 1, win 350, options [nop,nop,TS val 3010385005 ecr 2061270277], length 0
+
+```
+
+# Viewing the packet payload as well as headers
+
+If you need to track down the host that's swamping the network, all you need is headers. If you are trying to debug a web or database application, you probably need to see the contents of the packets as well as the headers.
+
+The `-X` flag will include the packet data in the output.
+
+The host keyword can be combined with port information to limit the report to data to and from a given host.
+
+The two tests are connected with **and** to perform the Boolean **and** operation, and they report only those packets that are to or from noucorp.com and/or the `HTTP` server. The sample output shows the start of a `GET` request and the server's reply:
+
+```
+$ tcpdump -X -r /tmp/tcpdump.raw host noucorp.com and port http
+reading from file /tmp/tcpdump.raw, link-type EN10MB (Ethernet)
+11:12:04.708905 IP 192.168.1.44.35652 > noucorp.com.http: Flags [P.], seq 2939551893:2939552200, ack 1031497919, win 501, options [nop,nop,TS val 2063464654 ecr 28236429], length 307
+ 0x0000:  4500 0167 1e54 4000 4006 70a5 c0a8 012c  E..g.T@.@.p....,
+ 0x0010:  98a0 5023 8b44 0050 af36 0095 3d7b 68bf  ..P#.D.P.6..={h.
+ 0x0020:  8018 01f5 abf1 0000 0101 080a 7afd f8ce  ............z...
+ 0x0030:  01ae da8d 4745 5420 2f20 4854 5450 2f31  ....GET./.HTTP/1
+ 0x0040:  2e31 0d0a 486f 7374 3a20 6e6f 7563 6f72  .1..Host:.noucor
+ 0x0050:  702e 636f 6d0d 0a55 7365 722d 4167 656e  p.com..User-Agen
+ 0x0060:  743a 204d 6f7a 696c 6c61 2f35 2e30 2028  t:.Mozilla/5.0.(
+ 0x0070:  5831 313b 204c 696e 7578 2078 3836 5f36  X11;.Linux.x86_6
+ 0x0080:  343b 2072 763a 3435 2e30 2920 4765 636b  4;.rv:45.0).Geck
+ 0x0090:  6f2f 3230 3130 3031 3031 2046 6972 6566  o/20100101.Firef
+ 0x00a0:  6f78 2f34 352e 300d 0a41 6363 6570 743a  ox/45.0..Accept:
+...
+11:12:04.731343 IP noucorp.com.http > 192.168.1.44.35652: Flags [.], seq 1:1449, ack 307, win 79, options [nop,nop,TS val 28241838 ecr 2063464654], length 1448
+ 0x0000:  4500 05dc 0491 4000 4006 85f3 98a0 5023  E.....@.@.....P#
+ 0x0010:  c0a8 012c 0050 8b44 3d7b 68bf af36 01c8  ...,.P.D={h..6..
+ 0x0020:  8010 004f a7b4 0000 0101 080a 01ae efae  ...O............
+ 0x0030:  7afd f8ce 4854 5450 2f31 2e31 2032 3030  z...HTTP/1.1.200
+ 0x0040:  2044 6174 6120 666f 6c6c 6f77 730d 0a44  .Data.follows..D
+ 0x0050:  6174 653a 2054 6875 2c20 3039 2046 6562  ate:.Thu,.09.Feb
+ 0x0060:  2032 3031 3720 3136 3a31 323a 3034 2047  .2017.16:12:04.G
+ 0x0070:  4d54 0d0a 5365 7276 6572 3a20 5463 6c2d  MT..Server:.Tcl-
+ 0x0080:  5765 6273 6572 7665 722f 332e 352e 3220  Webserver/3.5.2.
+
+```
+
+# How it works...
+
+The `tcpdump` application sets a promiscuous flag that causes the NIC to pass all the packets to the processor. It does this instead of filtering only the ones that pertain to this host. This flag allows the recording of any packet on the physical network that the host is connected to, not just the packets intended for this host.
+
+This application is used to trace issues with overloaded network segments, hosts that generate unexpected traffic, network looping, faulty NICs, malformed packets, and more.
+
+With the `-w` and `-r` option, `tcpdump` saves data in raw format, allowing you to examine it later as a regular user. For example, if there are excessive network packet collisions at 3:00 A.M., you can set up a `cron` job to run `tcpdump` at 3:00 A.M. and then examine the data during normal working hours.
+
+# Finding packets with ngrep
+
+The `ngrep` application is a cross between `grep` and `tcpdump`. It watches network ports and displays packets that match a pattern. You must have root privileges to run `ngrep`.
+
+# Getting ready
+
+You may not have the `ngrep` package installed. However, it can be installed with most package managers:
+
+```
+# apt-get install ngrep
+# yum install ngrep
+
+```
+
+# How to do it...
+
+The `ngrep` application accepts a pattern to watch for (such as `grep`), a filter string (such as `tcpdump`), and many command-line flags to fine-tune its behavior.
+
+The following example watches the traffic on port `80` and reports any packets with the string `Linux` in them:
+
+```
+$> ngrep -q -c 64 Linux port 80
+interface: eth0 (192.168.1.0/255.255.255.0)
+filter: ( port 80 ) and (ip or ip6)
+match: Linux
+
+T 192.168.1.44:36602 -> 152.160.80.35:80 [AP]
+ GET /Training/linux_detail/ HTTP/1.1..Host: noucorp.com..Us
+ er-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20
+ 100101 Firefox/45.0..Accept: text/html,application/xhtml+xm
+ l,application/xml;q=0.9,*/*;q=0.8..Accept-Language: en-US,e
+ n;q=0.5..Accept-Encoding: gzip, deflate..Referer: http://no
+ ucorp.com/Training/..Connection: keep-alive..Cache-Control:
+ max-age=0.... 
+
+```
+
+The `-q` flag directs `ngrep` to only print the headers and payloads.
+
+The `-c` flag defines the number of columns to use for payload data. By default, the number is four, which is not useful for text-based packets.
+
+After the flags is the match string (Linux), followed by a filter expression using the same filter language as `tcpdump`.
+
+# How it works...
+
+The `ngrep` application also sets the promiscuous flag, allowing it to sniff all the visible packets, whether they relate to the host or not.
+
+The previous example displayed all of the HTTP traffic. If the host system is on a wireless network or wired via a hub (instead of a switch), it will display all of the web traffic caused by all the active users.
+
+# There's more...
+
+The `-x` option in `ngrep` displays a hex dump as well as a printable form. Combining this with `-X` allows you to search for a binary string (perhaps a virus signature or some known pattern).
+
+This example watches for a binary stream from an HTTPS connection:
+
+```
+# ngrep -xX '1703030034' port 443
+interface: eth0 (192.168.1.0/255.255.255.0)
+filter: ( port 443 ) and (ip or ip6)
+match: 0x1703030034
+#################################################
+T 172.217.6.1:443 -> 192.168.1.44:40698 [AP]
+ 17 03 03 00 34 00 00 00    00 00 00 00 07 dd b0 02    ....4...........
+ f5 38 07 e8 24 08 eb 92    3c c6 66 2f 07 94 8b 25    .8..$...<.f/...%
+ 37 b3 1c 8d f4 f0 64 c3    99 9e b3 45 44 14 64 23    7.....d....ED.d#
+ 80 85 1b a1 81 a3 d2 7a    cd                         .......z.
+
+```
+
+The hash marks indicate the packets that were scanned; they do not include the target pattern. There are many more options to `ngrep`; read the `man` page for the complete list.
+
+# Tracing network routes with ip
+
+The `ip` utility reports information about the state of your network. It can tell you how many packets are being sent and received, what types of packets are being sent, how the packets are being routed, and more.
+
+# Getting ready
+
+The `netstat` utility described in [Chapter 8](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml), *The Old-Boy Network* is standard in all Linux distributions; however, it is now being replaced by more efficient utilities, such as `ip`. These new utilities are included in the `iproute2` package, which is already installed on most modern distributions.
+
+# How to do it...
+
+The `ip` utility has many features. This recipe will discuss a few that are useful for tracing network behavior.
+
+# Reporting routes with ip route
+
+When packets don't reach their destination (`ping` or `traceroute` fail), the first thing an experienced user checks is the cables. The next thing to check is the routing tables. If a system lacks a default gateway (`0.0.0.0`), it will only find machines on its physical network. If you have multiple networks running on the same wires, you'll need to add routes to allow machines attached to one network to send packets to another.
+
+The `ip route` command reports known routes:
+
+```
+$ ip route
+10.8.0.2 dev tun0  proto kernel  scope link  src 10.8.0.1 
+192.168.87.0/24 dev vmnet1  proto kernel  scope link  src 192.168.87.1 
+192.168.1.0/24 dev eth0  proto kernel  scope link  src 192.168.1.44 
+default via 192.168.1.1 dev eth0  proto static 
+
+```
+
+The `ip route` report is space-delimited. After the first element, it consists of a set of keys and values.
+
+The first line in the preceding code describes the `10.8.0.2` address as a tunnel device that uses a kernel protocol, and this address is only valid on this tunnel device. The second line describes the `192.168.87.x` network used to communicate with virtual machines. The third line is the primary network of this system, which is connected to `/dev/eth0`. The last line defines the default route, which routes to `192.168.1.1` through `eth0`.
+
+The keys reported by `ip route` include the following:
+
+*   `via`: This refers to the address of the next hop.
+*   `proto`: This is the protocol identifier of the route. The kernel protocol is a route installed by the kernel, while static routes are defined by an administrator.
+*   `scope`: This refers to the scope where the address is valid. A link scope is only valid on this device.
+*   `dev`: This is the device associated with the address.
+
+# Tracing recent IP connections and the ARP table
+
+The `ip neighbor` command reports known relationships between the IP address, device, and hardware MAC address. It reports whether the relationship was reestablished recently or has gone stale:
+
+```
+$> ip neighbor
+192.168.1.1 dev eth0 lladdr 2c:30:33:c9:af:3e STALE
+192.168.1.4 dev eth0 lladdr 00:0a:e6:11:c7:dd STALE
+172.16.183.138 dev vmnet8 lladdr 00:50:56:20:3d:6c STALE
+
+192.168.1.2 dev eth0 lladdr 6c:f0:49:cd:45:ff REACHABLE
+
+```
+
+The output of the `ip neighbor` command shows that there has been no recent activity between either this system and the default gateway, or this system and the host at `192.168.1.4`. It also shows that there has been no recent activity in the virtual machines and the host at `192.168.1.2` is connected recently.
+
+The current status of `REACHABLE` in the preceding output means that the `arp` table is up to date and the host thinks it knows the MAC address of the remote system. The value of `STALE` here does not indicate that the system is unreachable; it merely means the values in the `arp` table have expired. When your system tries to use one of these routes, it sends an ARP request first to verify the MAC address associated with the IP address.
+
+The relationship between the MAC address and the IP address should only change when the hardware is changed or devices are reassigned.
+
+If devices on a network show intermittent connectivity, it may mean that two devices have been assigned the same IP address. It could also be possible that two DHCP servers are running or someone has manually assigned an address that's already in use.
+
+In the case of two devices with the same IP address, the reported MAC address for a given IP address will change in intervals, and the `ip neighbor` command will help track down the misconfigured device.
+
+# Tracing a route
+
+The `traceroute` command discussed in [Chapter 8](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml), *The Old-Boy Network* traces a packet's entire path from the current host to its destination. The `route get` command reports the next hop from the current machine:
+
+```
+$ ip route get 172.16.183.138
+172.16.183.138 dev vmnet8 src 172.16.183.1
+cache mtu 1500 hoplimit 64
+
+```
+
+The preceding return shows that the route to the virtual machine is through the vmnet8 interface located at `172.16.183.1`. The packets sent to this site will be split if they are larger than 1,500 bytes and discarded after 64 hops:
+
+```
+$ in route get 148.59.87.90
+148.59.87.90 via 192.168.1.1 dev eth0 src 192.168.1.3
+cache mtu 1500 hoplimit 64
+
+```
+
+To reach an address on the Internet, a packet needs to leave the local network via the default gateway, and the link to this gateway is the host's `eth0` device at `192.168.1.3`.
+
+# How it works...
+
+The `ip` command runs in the user space and interfaces in the kernel tables. Using this command, a normal user can examine the network configuration whereas a superuser can configure the network.
+
+# Tracing system calls with strace
+
+A GNU/Linux computer may have hundreds of tasks running at a time, but it will possess only one Network Interface, one disk drive, one keyboard, and so on. The Linux kernel allocates these limited resources and controls how tasks access them. This prevents two tasks from accidently intermingling data in a disk file, for example.
+
+When you run an application, it uses a combination of **User-Space libraries** (functions such as `printf` and `fopen`) and System-Space Libraries (functions such as `write` and `open`). When your program calls `printf` (or a script invokes the `echo` command), it invokes a user-space library call to `printf` to format the output string; this is followed by a system-space call to the `write` function. The system call makes sure only one task can access a resource at a time.
+
+In a perfect world, all computer programs would run with no problems. In an almost perfect world, you'd have the source code, the program would be compiled with debugging support, and it would fail consistently.
+
+In the real world, you sometimes have to cope with programs where you don't have the source, and it fails intermittently. Developers can't help you unless you give them some data to work with.
+
+The Linux `strace` command reports the system calls that an application makes; this can help us understand what it's doing even if we don't have the source code.
+
+# Getting ready
+
+The `strace` command is installed as part of the Developer package; it can be installed separately as well:
+
+```
+$ sudo apt-get install strace
+$ sudo yum install strace
+
+```
+
+# How to do it...
+
+One way to understand `strace` is to write a short C program and use `strace` to see what system calls it makes.
+
+This test program allocates memory, uses the memory, prints a short message, frees the memory, and exits.
+
+The `strace` output shows the system functions this program calls:
+
+```
+$ cat test.c  
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <string.h> 
+
+main () { 
+  char *tmp; 
+  tmp=malloc(100); 
+  strcat(tmp, "testing"); 
+  printf("TMP: %s\n", tmp); 
+  free(tmp); 
+  exit(0); 
+} 
+$ gcc test.c 
+$ strace ./a.out 
+execve("./a.out", ["./a.out"], [/* 51 vars */]) = 0 
+brk(0)                                  = 0x9fc000 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7f5000 
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory) 
+open("/etc/ld.so.cache", O_RDONLY)      = 3 
+fstat(3, {st_mode=S_IFREG|0644, st_size=95195, ...}) = 0 
+mmap(NULL, 95195, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7fc85c7dd000 
+close(3)                                = 0 
+open("/lib64/libc.so.6", O_RDONLY)      = 3 
+read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0000\356\1\16;\0\0\0"..., 832) = 832 
+fstat(3, {st_mode=S_IFREG|0755, st_size=1928936, ...}) = 0 
+mmap(0x3b0e000000, 3750184, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x3b0e000000 
+mprotect(0x3b0e18a000, 2097152, PROT_NONE) = 0 
+mmap(0x3b0e38a000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x18a000) = 0x3b0e38a000 
+mmap(0x3b0e390000, 14632, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x3b0e390000 
+close(3)                                = 0 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7dc000 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7db000 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7da000 
+arch_prctl(ARCH_SET_FS, 0x7fc85c7db700) = 0 
+mprotect(0x3b0e38a000, 16384, PROT_READ) = 0 
+mprotect(0x3b0de1f000, 4096, PROT_READ) = 0 
+munmap(0x7fc85c7dd000, 95195)           = 0 
+brk(0)                                  = 0x9fc000 
+brk(0xa1d000)                           = 0xa1d000 
+fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 11), ...}) = 0 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7f4000 
+write(1, "TMP: testing\n", 13)          = 13 
+exit_group(0)                           = ? 
++++ exited with 0 +++ 
+
+```
+
+# How it works...
+
+The first lines are standard start up commands for any application. The `execve` call is the system call to initialize a new executable. The `brk` call returns the current memory address, and the `mmap` call allocates 4,096 bytes of memory for dynamic libraries and other applications that load housekeeping.
+
+The attempt to access `ld.so.preload` fails because `ld.so.preload` is a hook to preload the libraries. It is not required on most production systems.
+
+The `ld.so.cache` file is the memory-resident copy of `/etc/ld.so,conf.d`, which contains the paths for loading dynamic libraries. These values are kept in memory to reduce the overhead in starting programs.
+
+The next lines with `mmap`, `mprotect`, `arch``_``prctl`, and `munmap` calls continue to load the libraries and mapping devices to memory.
+
+The two calls to `brk` are invoked by the program's `malloc` call. This allocates 100 bytes from the heap.
+
+The `strcat` call is a user-space function that doesn't generate any system calls.
+
+The `printf` call doesn't generate a system call to format the data, but it makes calls to send the formatted string to `stdout`.
+
+The `fstat` and `mmap` calls load and initialize the `stdout` device. These calls occur only once in a program that generates output to `stdout`.
+
+The `write` system call sends the string to `stdout`.
+
+Finally, the `exit_group` call exits the program, frees resources, and terminates all the threads associated with the executable.
+
+Note that there is no `brk` call associated with freeing memory. The `malloc` and `free` functions are user-space functions that manage a task's memory. They only invoke the `brk` function if the program's overall memory footprint changes. When your program allocates *N* bites, it needs to add that many bytes to its available memory. When it frees that block, the memory is marked available, but it remains a part of this program's memory pool. The next `malloc` uses memory from the pool of available memory space until it's exhausted. At this point, another `brk` call adds more memory to the program's memory pool.
+
+# Tracing dynamic library functions with ltrace
+
+Knowing the user-space library functions being called is as useful as knowing the system functions being invoked. The `ltrace` command provides a similar function to `strace`; however, it tracks user-space library calls instead of system calls.
+
+# Getting ready
+
+Have the `ltrace` command installed using the Developer tools.
+
+# How to do it...
+
+To trace user-space dynamic library calls, invoke the `strace` command, followed by the command you want to trace:
+
+```
+$ ltrace myApplication
+
+```
+
+The next example is a program with a subroutine:
+
+```
+$ cat test.c 
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <string.h> 
+
+int print (char *str) { 
+  printf("%s\n", str); 
+} 
+main () { 
+  char *tmp; 
+  tmp=malloc(100); 
+  strcat(tmp, "testing"); 
+  print(tmp); 
+  free(tmp); 
+  exit(0); 
+} 
+$ gcc test.c 
+$ ltrace ./a.out 
+(0, 0, 603904, -1, 0x1f25bc2)                            = 0x3b0de21160 
+__libc_start_main(0x4005fe, 1, 0x7ffd334a95f8, 0x400660, 0x400650 <unfinished ...> 
+malloc(100)                                              = 0x137b010 
+strcat("", "testing")                                    = "testing" 
+puts("testing")                                          = 8 
+free(0x137b010)                                          = <void> 
+exit(0 <unfinished ...> 
++++ exited (status 0) +++ 
+
+```
+
+In the `ltrace` output, we see the call to the dynamically linked `strcat`; however, we do not see the statically linked local function, namely `print`. The call to `printf` was simplified to a call to `puts`. The calls to `malloc` and `free` are shown since they are user-space function calls.
+
+# How it works...
+
+The `ltrace` and `strace` utilities use the `ptrace` function to rewrite the **Procedure Linkage Table** (**PLT**) which maps between dynamic library calls and the actual memory address of the called function. This means that `ltrace` can trap any dynamically linked function call but not a statically linked function.
+
+# There's more...
+
+The `ltrace` and `strace` commands are useful, but it would be really nice to trace both user-space and system-space function calls. The `-S` option to `ltrace` will do this. The next example shows the `ltrace -S` output from the previous executable:
+
+```
+$> ltrace -S ./a.out
+SYS_brk(NULL)                                            = 0xa9f000
+SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4ce000
+SYS_access(0x3b0dc1d380, 4, 0x3b0dc00158, 0, 0)          = -2
+SYS_open("/etc/ld.so.cache", 0, 01)                      = 4
+SYS_fstat(4, 0x7ffd70342bc0, 0x7ffd70342bc0, 0, 0xfefefefefefefeff) = 0
+SYS_mmap(0, 95195, 1, 2, 4)                              = 0x7fcdce4b6000
+SYS_close(4)                                             = 0
+SYS_open("/lib64/libc.so.6", 0, 00)                      = 4
+SYS_read(4, "\177ELF\002\001\001\003", 832)              = 832
+SYS_fstat(4, 0x7ffd70342c20, 0x7ffd70342c20, 4, 0x7fcdce4ce640) = 0
+SYS_mmap(0x3b0e000000, 0x393928, 5, 2050, 4)             = 0x3b0e000000
+SYS_mprotect(0x3b0e18a000, 0x200000, 0, 1, 4)            = 0
+SYS_mmap(0x3b0e38a000, 24576, 3, 2066, 4)                = 0x3b0e38a000
+SYS_mmap(0x3b0e390000, 14632, 3, 50, 0xffffffff)         = 0x3b0e390000
+SYS_close(4)                                             = 0
+SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4b5000
+SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4b4000
+SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4b3000
+SYS_arch_prctl(4098, 0x7fcdce4b4700, 0x7fcdce4b3000, 34, 0xffffffff) = 0
+SYS_mprotect(0x3b0e38a000, 16384, 1, 0x3b0de20fd8, 0x1f25bc2) = 0
+SYS_mprotect(0x3b0de1f000, 4096, 1, 0x4003e0, 0x1f25bc2) = 0
+(0, 0, 987392, -1, 0x1f25bc2)                            = 0x3b0de21160
+SYS_munmap(0x7fcdce4b6000, 95195)                        = 0
+__libc_start_main(0x4005fe, 1, 0x7ffd703435c8, 0x400660, 0x400650 <unfinished ...>
+malloc(100 <unfinished ...>
+SYS_brk(NULL)                                            = 0xa9f000
+SYS_brk(0xac0000)                                        = 0xac0000
+<... malloc resumed> )                                   = 0xa9f010
+strcat("", "testing")                                    = "testing"
+puts("testing" <unfinished ...>
+SYS_fstat(1, 0x7ffd70343370, 0x7ffd70343370, 0x7ffd70343230, 0x3b0e38f040) = 0
+SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4cd000
+SYS_write(1, "testing\n", 8)                             = 8
+<... puts resumed> )                                     = 8
+free(0xa9f010)                                           = <void>
+exit(0 <unfinished ...>
+SYS_exit_group(0 <no return ...>
++++ exited (status 0) +++
+
+```
+
+This shows the same type of startup call (`sbrk`, `mmap`, and so on) as the `strace` example.
+
+When a user-space function invokes a system-space function (as with the `malloc` and puts calls), the display shows that the user-space function was interrupted (`malloc(100 <unfinished...>)` and then resumed `(<... malloc resumed>)` after the system call was completed.
+
+Note that the `malloc` call needed to pass control to `sbrk` to allocate more memory for the application. However, the `free` call does not shrink the application; it just frees the memory for future use by this application.

@@ -1,6 +1,5 @@
 <html><head></head><body>
-		<div id="_idContainer024">
-			<h1 id="_idParaDest-93"><em class="italic"><a id="_idTextAnchor095"/>Chapter 6</em>: Introduction to Devices, Drivers, and Platform Abstraction </h1>
+		<div><h1 id="_idParaDest-93"><em class="italic"><a id="_idTextAnchor095"/>Chapter 6</em>: Introduction to Devices, Drivers, and Platform Abstraction </h1>
 			<p>The <strong class="bold">Linux Device Model</strong> (<strong class="bold">LDM</strong>) is <a id="_idIndexMarker451"/>a concept that was introduced in the Linux kernel to describe and manage kernel objects (those requiring reference counting, for example, such as files, devices, buses, and even drivers), as well as their hierarchies and how they are bound to others. LDM introduced object life cycle management, reference counting, an <strong class="bold">object-oriented</strong> (<strong class="bold">OO</strong>) programming style in the kernel, and other advantages (such as code reusability and refactoring, automatic resource releasing, and more), which will not be discussed here.</p>
 			<p>Since reference counting and life cycle management are at the lowest level of LDM, we will discuss higher representations, such as dealing with common kernel data objects and structures, including <strong class="bold">devices</strong>, <strong class="bold">drivers</strong>, and <strong class="bold">buses</strong>.</p>
 			<p>In this chapter, we will cover the following topics:</p>
@@ -9,199 +8,193 @@
 				<li>Device and driver matching mechanism explained</li>
 			</ul>
 			<h1 id="_idParaDest-94"><a id="_idTextAnchor096"/>Linux kernel platform abstraction and data structures</h1>
-			<p>The <a id="_idIndexMarker452"/>Linux device model is built on top of some fundamental data<a id="_idIndexMarker453"/> structures, including <strong class="source-inline">struct device</strong>, <strong class="source-inline">struct device_driver</strong>, and <strong class="source-inline">struct bus_type</strong>. The first data structure represents the device to be driven, the second is the data structure of each software entity intended to drive the device, and the latter represents the channel between the device and the CPU.</p>
+			<p>The <a id="_idIndexMarker452"/>Linux device model is built on top of some fundamental data<a id="_idIndexMarker453"/> structures, including <code>struct device</code>, <code>struct device_driver</code>, and <code>struct bus_type</code>. The first data structure represents the device to be driven, the second is the data structure of each software entity intended to drive the device, and the latter represents the channel between the device and the CPU.</p>
 			<h2 id="_idParaDest-95"><a id="_idTextAnchor097"/>Device base structure</h2>
-			<p>Devices <a id="_idIndexMarker454"/>help extract either physical or virtual devices. They are built on top of the <strong class="source-inline">struct device</strong> structure, which is worth introducing first, as described in <strong class="source-inline">include/linux/device.h</strong>:</p>
-			<p class="source-code">struct device {</p>
-			<p class="source-code">    struct device         *parent;</p>
-			<p class="source-code">    struct kobject        kobj;</p>
-			<p class="source-code">    struct bus_type       *bus;</p>
-			<p class="source-code">    struct device_driver  *driver;</p>
-			<p class="source-code">    void *platform_data;</p>
-			<p class="source-code">    void *driver_data;</p>
-			<p class="source-code">    struct dev_pm_domain  *pm_domain;</p>
-			<p class="source-code">    struct device_node    *of_node; </p>
-			<p class="source-code">    struct fwnode_handle  *fwnode;</p>
-			<p class="source-code">    dev_t       devt;</p>
-			<p class="source-code">    u32         id;</p>
-			<p class="source-code">    [...]</p>
-			<p class="source-code">};</p>
+			<p>Devices <a id="_idIndexMarker454"/>help extract either physical or virtual devices. They are built on top of the <code>struct device</code> structure, which is worth introducing first, as described in <code>include/linux/device.h</code>:</p>
+			<pre>struct device {
+    struct device         *parent;
+    struct kobject        kobj;
+    struct bus_type       *bus;
+    struct device_driver  *driver;
+    void *platform_data;
+    void *driver_data;
+    struct dev_pm_domain  *pm_domain;
+    struct device_node    *of_node; 
+    struct fwnode_handle  *fwnode;
+    dev_t       devt;
+    u32         id;
+    [...]
+};</pre>
 			<p>Let's look at each <a id="_idIndexMarker455"/>element in this structure:</p>
 			<ul>
-				<li><strong class="source-inline">parent</strong>: This is the device's "parent" device, the device that this device is attached to. In most cases, a parent device is some sort of bus or host controller. If <strong class="source-inline">parent</strong> is <strong class="source-inline">NULL</strong>, then the device is a top-level device. This is the case for bus controller devices for example.</li>
-				<li><strong class="source-inline">kobj</strong>: This is the lowest-level data structure and is used to track a kernel object (bus, driver, device, and so on). This is the centerpiece of LDM. We will discuss this in <a href="B17934_14_Epub.xhtml#_idTextAnchor203"><em class="italic">Chapter 14</em></a>, <em class="italic">Introduction to the Linux Device Model</em>.</li>
-				<li><strong class="source-inline">bus</strong>: This specifies the type of bus the device is on. It is the channel between the device and the CPU.</li>
-				<li><strong class="source-inline">driver</strong>: This specifies which driver has allocated this device.</li>
-				<li><strong class="source-inline">platform_data</strong>: This provides platform data that's specific to the device. This field is automatically set when the device is declared from within the board file. In other words, it points to board-specific structures from within the board setup file that describe the device and how it is wired. It helps minimize the use of <strong class="source-inline">#ifdefs</strong> inside the device driver code. It contains resources such as chip variants, GPIO pin roles, and interrupt lines.</li>
-				<li><strong class="source-inline">driver_data</strong>: This is a <a id="_idIndexMarker456"/>private pointer for driver-specific information. The bus controller driver is responsible for providing helper functions, which are accessors that are used to get/set this field.</li>
-				<li><strong class="source-inline">pm_domain</strong>: This specifies power management-specific callbacks that are executed during system power state changes: suspend, hibernation, system resume, and during runtime PM transitions, along with subsystem-level and driver-level callbacks.</li>
-				<li><strong class="source-inline">of_node</strong>: This is the device tree node that's associated with this device. This field is automatically filled by the <strong class="bold">Open Firmware</strong> (<strong class="bold">OF</strong>) core when the device is declared from within the device tree. You can check whether <strong class="source-inline">platform_data</strong> or <strong class="source-inline">of_node</strong> is set to determine where exactly the device has been declared.</li>
-				<li><strong class="source-inline">id</strong>: This is the device instance.</li>
+				<li><code>parent</code>: This is the device's "parent" device, the device that this device is attached to. In most cases, a parent device is some sort of bus or host controller. If <code>parent</code> is <code>NULL</code>, then the device is a top-level device. This is the case for bus controller devices for example.</li>
+				<li><code>kobj</code>: This is the lowest-level data structure and is used to track a kernel object (bus, driver, device, and so on). This is the centerpiece of LDM. We will discuss this in <a href="B17934_14_Epub.xhtml#_idTextAnchor203"><em class="italic">Chapter 14</em></a>, <em class="italic">Introduction to the Linux Device Model</em>.</li>
+				<li><code>bus</code>: This specifies the type of bus the device is on. It is the channel between the device and the CPU.</li>
+				<li><code>driver</code>: This specifies which driver has allocated this device.</li>
+				<li><code>platform_data</code>: This provides platform data that's specific to the device. This field is automatically set when the device is declared from within the board file. In other words, it points to board-specific structures from within the board setup file that describe the device and how it is wired. It helps minimize the use of <code>#ifdefs</code> inside the device driver code. It contains resources such as chip variants, GPIO pin roles, and interrupt lines.</li>
+				<li><code>driver_data</code>: This is a <a id="_idIndexMarker456"/>private pointer for driver-specific information. The bus controller driver is responsible for providing helper functions, which are accessors that are used to get/set this field.</li>
+				<li><code>pm_domain</code>: This specifies power management-specific callbacks that are executed during system power state changes: suspend, hibernation, system resume, and during runtime PM transitions, along with subsystem-level and driver-level callbacks.</li>
+				<li><code>of_node</code>: This is the device tree node that's associated with this device. This field is automatically filled by the <code>platform_data</code> or <code>of_node</code> is set to determine where exactly the device has been declared.</li>
+				<li><code>id</code>: This is the device instance.</li>
 			</ul>
-			<p>Devices are rarely represented by bare device structures since most subsystems track extra information about the devices they host; instead, the structure is frequently embedded within a higher-level representation of the device. This is the case for the <strong class="source-inline">struct i2c_client</strong>, <strong class="source-inline">struct spi_device</strong>, <strong class="source-inline">struct usb_device</strong>, and <strong class="source-inline">struct platform_device</strong> structures, which all embed a <strong class="source-inline">struct device</strong> element in their members (<strong class="source-inline">spi_device-&gt;dev</strong>, <strong class="source-inline">i2c_client-&gt;dev</strong>, <strong class="source-inline">usb_device-&gt;dev</strong>, and <strong class="source-inline">platform_device-&gt;dev</strong>).</p>
+			<p>Devices are rarely represented by bare device structures since most subsystems track extra information about the devices they host; instead, the structure is frequently embedded within a higher-level representation of the device. This is the case for the <code>struct i2c_client</code>, <code>struct spi_device</code>, <code>struct usb_device</code>, and <code>struct platform_device</code> structures, which all embed a <code>struct device</code> element in their members (<code>spi_device-&gt;dev</code>, <code>i2c_client-&gt;dev</code>, <code>usb_device-&gt;dev</code>, and <code>platform_device-&gt;dev</code>).</p>
 			<h2 id="_idParaDest-96"><a id="_idTextAnchor098"/>Device driver base structure</h2>
-			<p>The next structure <a id="_idIndexMarker457"/>we need to introduce is the <strong class="source-inline">struct device_driver</strong> structure. This structure is the base element of any device driver. In object-oriented languages, this structure would be the base class, which would be inherited by each device driver.</p>
-			<p>This data structure is defined in <strong class="source-inline">include/linux/device/driver.h</strong> like so:</p>
-			<p class="source-code">struct device_driver {</p>
-			<p class="source-code">    const char        *name;</p>
-			<p class="source-code">    struct bus_type   *bus;</p>
-			<p class="source-code">     struct module    *owner;</p>
-			<p class="source-code">     const struct of_device_id   *of_match_table;</p>
-			<p class="source-code">     const struct acpi_device_id *acpi_match_table;</p>
-			<p class="source-code">     int (*probe) (struct device *dev);</p>
-			<p class="source-code">     int (*remove) (struct device *dev);</p>
-			<p class="source-code">    void (*shutdown) (struct device *dev);</p>
-			<p class="source-code">    int (*suspend) (struct device *dev,</p>
-			<p class="source-code">                      pm_message_t state);</p>
-			<p class="source-code">    int (*resume) (struct device *dev);</p>
-			<p class="source-code">    const struct dev_pm_ops *pm;</p>
-			<p class="source-code">};</p>
+			<p>The next structure <a id="_idIndexMarker457"/>we need to introduce is the <code>struct device_driver</code> structure. This structure is the base element of any device driver. In object-oriented languages, this structure would be the base class, which would be inherited by each device driver.</p>
+			<p>This data structure is defined in <code>include/linux/device/driver.h</code> like so:</p>
+			<pre>struct device_driver {
+    const char        *name;
+    struct bus_type   *bus;
+     struct module    *owner;
+     const struct of_device_id   *of_match_table;
+     const struct acpi_device_id *acpi_match_table;
+     int (*probe) (struct device *dev);
+     int (*remove) (struct device *dev);
+    void (*shutdown) (struct device *dev);
+    int (*suspend) (struct device *dev,
+                      pm_message_t state);
+    int (*resume) (struct device *dev);
+    const struct dev_pm_ops *pm;
+};</pre>
 			<p>Let's look at each element in this structure:</p>
 			<ul>
-				<li><strong class="source-inline">name</strong>: This is the name of the device driver. It's used as a fallback (that is, it matches this name with the device name) when no matching method succeeds.</li>
-				<li><strong class="source-inline">bus</strong>: This field is mandatory. It represents the bus that the devices of this driver belong to. Driver registration will fail if this field is not set because it is its probe method that is responsible for matching the driver with devices.</li>
-				<li><strong class="source-inline">owner</strong>: This field specifies the module owner.</li>
-				<li><strong class="source-inline">of_match_table</strong>: This is the open firmware table. It represents the array of <strong class="source-inline">struct of_device_id</strong> elements that are used for device tree matching.</li>
-				<li><strong class="source-inline">acpi_match_table</strong>: This is the ACPI match table. This is the same as <strong class="source-inline">of_match_table</strong> but for ACPI matching, which will not be discussed in this tutorial.</li>
-				<li><strong class="source-inline">probe</strong>: This<a id="_idIndexMarker458"/> function is called to query the existence of a specific device, whether this driver can work with it, and then bind the driver to a specific device. The bus driver is responsible for calling this function at given moments. We will discuss this shortly.</li>
-				<li><strong class="source-inline">remove</strong>: When a device is removed from the system, this method is called to unbind it from this driver.</li>
-				<li><strong class="source-inline">shutdown</strong>: This command is issued when the device is about to be turned off.</li>
-				<li><strong class="source-inline">suspend</strong>: This is a callback that allows you to put the device into sleep mode, mostly in a low-power state.</li>
-				<li><strong class="source-inline">resume</strong>: This is invoked by the driver core to wake up a device that has been in sleep mode.</li>
-				<li><strong class="source-inline">pm</strong>: This represents a set of power management callbacks for devices that matched this driver.</li>
+				<li><code>name</code>: This is the name of the device driver. It's used as a fallback (that is, it matches this name with the device name) when no matching method succeeds.</li>
+				<li><code>bus</code>: This field is mandatory. It represents the bus that the devices of this driver belong to. Driver registration will fail if this field is not set because it is its probe method that is responsible for matching the driver with devices.</li>
+				<li><code>owner</code>: This field specifies the module owner.</li>
+				<li><code>of_match_table</code>: This is the open firmware table. It represents the array of <code>struct of_device_id</code> elements that are used for device tree matching.</li>
+				<li><code>acpi_match_table</code>: This is the ACPI match table. This is the same as <code>of_match_table</code> but for ACPI matching, which will not be discussed in this tutorial.</li>
+				<li><code>probe</code>: This<a id="_idIndexMarker458"/> function is called to query the existence of a specific device, whether this driver can work with it, and then bind the driver to a specific device. The bus driver is responsible for calling this function at given moments. We will discuss this shortly.</li>
+				<li><code>remove</code>: When a device is removed from the system, this method is called to unbind it from this driver.</li>
+				<li><code>shutdown</code>: This command is issued when the device is about to be turned off.</li>
+				<li><code>suspend</code>: This is a callback that allows you to put the device into sleep mode, mostly in a low-power state.</li>
+				<li><code>resume</code>: This is invoked by the driver core to wake up a device that has been in sleep mode.</li>
+				<li><code>pm</code>: This represents a set of power management callbacks for devices that matched this driver.</li>
 			</ul>
-			<p>In the preceding data structure, the <strong class="source-inline">shutdown</strong>, <strong class="source-inline">suspend</strong>, <strong class="source-inline">resume</strong>, and <strong class="source-inline">pm</strong> elements are optional as they are used for power management purposes. Providing these elements depends on the capability of the underlying device (whether it can be shut down, suspended, or perform other power management-related capabilities).</p>
+			<p>In the preceding data structure, the <code>shutdown</code>, <code>suspend</code>, <code>resume</code>, and <code>pm</code> elements are optional as they are used for power management purposes. Providing these elements depends on the capability of the underlying device (whether it can be shut down, suspended, or perform other power management-related capabilities).</p>
 			<h3>Driver registration</h3>
-			<p>First, you <a id="_idIndexMarker459"/>should keep in mind that registering a device consists of inserting that device into the list of devices that are maintained by its bus driver. In the same way, registering a device driver consists of pushing this driver into the list of drivers that's maintained by the driver of the bus that it sits on top of. For example, registering a USB device driver will result in inserting that driver into the list of drivers that are maintained by the USB controller driver. The same goes for registering an SPI device driver, which will queue the driver into the list of drivers that are maintained by the SPI controller driver. <strong class="source-inline">driver_register()</strong> is a low-level function that's used to register a device driver with the bus. It adds the driver to the bus's list of drivers. When a device driver is registered with the bus, the core walks through the bus's list of devices and calls the bus's <strong class="source-inline">match()</strong> callback for each device that does not have a driver associated with it to find out whether there are any devices that the driver can handle. When a match occurs, the device and the device driver are bound together. The process of associating a device with a device driver is called binding.</p>
-			<p>You probably never want to use <strong class="source-inline">driver_register()</strong> as-is; it is up to the bus driver to provide a bus-specific registration function, which will be a wrapper based on <strong class="source-inline">driver_register()</strong>. So far, bus-specific registration functions have always matched the <strong class="source-inline">{bus_name}_register_driver()</strong> pattern. For example, the registration functions for the USB, SPI, I2C, and PCI drivers would be <strong class="source-inline">usb_register_driver()</strong>, <strong class="source-inline">spi_register_driver()</strong>, <strong class="source-inline">i2c_register_driver()</strong>, and <strong class="source-inline">pci_register_driver()</strong>, respectively. </p>
-			<p>The recommended<a id="_idIndexMarker460"/> place to register/unregister the driver is within the <strong class="source-inline">init</strong>/<strong class="source-inline">exit</strong> functions of the module, which are executed at the module loading/unloading stages, respectively. In lots of cases, registering/unregistering the driver is the only action you will want to execute within those <strong class="source-inline">init</strong>/<strong class="source-inline">exit</strong> functions. In such cases, each bus core provides a specific helper macro, which will be expanded as the <strong class="source-inline">init</strong>/<strong class="source-inline">exit</strong> functions of the module and internally call the bus-specific registering/unregistering function. Those bus macros follow the <strong class="source-inline">module_{bus_name}_driver(__{bus_name}_driver);</strong> pattern, where <strong class="source-inline">__{bus_name}_driver</strong> is the driver structure of the corresponding bus. The following table shows a non-exhaustive list of buses that are supported in Linux, along with their macros:</p>
-			<div>
-				<div id="_idContainer021" class="IMG---Figure">
-					<img src="image/B17934_06_Table_1.jpg" alt="Table 6.1 – Some buses, along with their (un)registration macros&#13;&#10;"/>
+			<p>First, you <a id="_idIndexMarker459"/>should keep in mind that registering a device consists of inserting that device into the list of devices that are maintained by its bus driver. In the same way, registering a device driver consists of pushing this driver into the list of drivers that's maintained by the driver of the bus that it sits on top of. For example, registering a USB device driver will result in inserting that driver into the list of drivers that are maintained by the USB controller driver. The same goes for registering an SPI device driver, which will queue the driver into the list of drivers that are maintained by the SPI controller driver. <code>driver_register()</code> is a low-level function that's used to register a device driver with the bus. It adds the driver to the bus's list of drivers. When a device driver is registered with the bus, the core walks through the bus's list of devices and calls the bus's <code>match()</code> callback for each device that does not have a driver associated with it to find out whether there are any devices that the driver can handle. When a match occurs, the device and the device driver are bound together. The process of associating a device with a device driver is called binding.</p>
+			<p>You probably never want to use <code>driver_register()</code> as-is; it is up to the bus driver to provide a bus-specific registration function, which will be a wrapper based on <code>driver_register()</code>. So far, bus-specific registration functions have always matched the <code>{bus_name}_register_driver()</code> pattern. For example, the registration functions for the USB, SPI, I2C, and PCI drivers would be <code>usb_register_driver()</code>, <code>spi_register_driver()</code>, <code>i2c_register_driver()</code>, and <code>pci_register_driver()</code>, respectively. </p>
+			<p>The recommended<a id="_idIndexMarker460"/> place to register/unregister the driver is within the <code>init</code>/<code>exit</code> functions of the module, which are executed at the module loading/unloading stages, respectively. In lots of cases, registering/unregistering the driver is the only action you will want to execute within those <code>init</code>/<code>exit</code> functions. In such cases, each bus core provides a specific helper macro, which will be expanded as the <code>init</code>/<code>exit</code> functions of the module and internally call the bus-specific registering/unregistering function. Those bus macros follow the <code>module_{bus_name}_driver(__{bus_name}_driver);</code> pattern, where <code>__{bus_name}_driver</code> is the driver structure of the corresponding bus. The following table shows a non-exhaustive list of buses that are supported in Linux, along with their macros:</p>
+			<div><div><img src="img/B17934_06_Table_1.jpg" alt="Table 6.1 – Some buses, along with their (un)registration macros&#13;&#10;"/>
 				</div>
 			</div>
 			<p class="figure-caption">Table 6.1 – Some buses, along with their (un)registration macros</p>
-			<p>The bus controller <a id="_idIndexMarker461"/>code is responsible for providing such macros, but this is not always the case. For example, the MDIO bus driver (a 2-wire serial bus that's used to control network devices) does not provide a <strong class="source-inline">module_mdio_driver()</strong> macro. You should check whether this macro exists for the bus that the device sits on top of to write the driver before using it. The following code blocks show two examples of different buses – one using the bus-provided registering/unregistering macro, and another not using it. Let's see what the code looks like when we don't use the macro:</p>
-			<p class="source-code">static struct platform_driver mypdrv = {</p>
-			<p class="source-code">    .probe = my_pdrv_probe,</p>
-			<p class="source-code">    .remove = my_pdrv_remove,</p>
-			<p class="source-code">    .driver = {</p>
-			<p class="source-code">        .name = KBUILD_MODNAME,</p>
-			<p class="source-code">        .owner = THIS_MODULE,</p>
-			<p class="source-code">    },</p>
-			<p class="source-code">};</p>
-			<p class="source-code">static int __init my_drv_init(void)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    /* Registering with Kernel */</p>
-			<p class="source-code">    platform_driver_register(&amp;mypdrv);</p>
-			<p class="source-code">    return 0;</p>
-			<p class="source-code">}</p>
-			<p class="source-code">static void __exit my_pdrv_remove (void)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    /* Unregistering from Kernel */</p>
-			<p class="source-code">    platform_driver_unregister(&amp;my_driver);</p>
-			<p class="source-code">}</p>
-			<p class="source-code">module_init(my_drv_init);</p>
-			<p class="source-code">module_exit(my_pdrv_remove);</p>
+			<p>The bus controller <a id="_idIndexMarker461"/>code is responsible for providing such macros, but this is not always the case. For example, the MDIO bus driver (a 2-wire serial bus that's used to control network devices) does not provide a <code>module_mdio_driver()</code> macro. You should check whether this macro exists for the bus that the device sits on top of to write the driver before using it. The following code blocks show two examples of different buses – one using the bus-provided registering/unregistering macro, and another not using it. Let's see what the code looks like when we don't use the macro:</p>
+			<pre>static struct platform_driver mypdrv = {
+    .probe = my_pdrv_probe,
+    .remove = my_pdrv_remove,
+    .driver = {
+        .name = KBUILD_MODNAME,
+        .owner = THIS_MODULE,
+    },
+};
+static int __init my_drv_init(void)
+{
+    /* Registering with Kernel */
+    platform_driver_register(&amp;mypdrv);
+    return 0;
+}
+static void __exit my_pdrv_remove (void)
+{
+    /* Unregistering from Kernel */
+    platform_driver_unregister(&amp;my_driver);
+}
+module_init(my_drv_init);
+module_exit(my_pdrv_remove);</pre>
 			<p>The preceding<a id="_idIndexMarker462"/> example does not use the macro at all. Now, let's look at an example that uses the macro:</p>
-			<p class="source-code">static struct platform_driver mypdrv = {</p>
-			<p class="source-code">    .probe = my_pdrv_probe,</p>
-			<p class="source-code">    .remove = my_pdrv_remove,</p>
-			<p class="source-code">    .driver = {</p>
-			<p class="source-code">        .name = KBUILD_MODNAME,</p>
-			<p class="source-code">        .owner = THIS_MODULE,</p>
-			<p class="source-code">    },</p>
-			<p class="source-code">};</p>
-			<p class="source-code">module_platform_driver(my_driver);</p>
+			<pre>static struct platform_driver mypdrv = {
+    .probe = my_pdrv_probe,
+    .remove = my_pdrv_remove,
+    .driver = {
+        .name = KBUILD_MODNAME,
+        .owner = THIS_MODULE,
+    },
+};
+module_platform_driver(my_driver);</pre>
 			<p>Here, you can see how the code is factorized, which is a serious plus when you're writing a driver.</p>
 			<h3>Exposing the supported devices in the driver</h3>
-			<p>The kernel<a id="_idIndexMarker463"/> must be aware of the devices that are supported by a given driver and whether they are present on the system so that whenever one of them appears on the system (the bus), the kernel knows which driver is in charge of it and runs its probe function. That said, the <strong class="source-inline">probe()</strong> function of the driver will only be run if this driver is loaded (which is a userspace operation); otherwise, nothing will happen. The next section will explain how to manage driver auto-loading so that when the device appears, its driver is automatically loaded, and its probe function is called.</p>
-			<p>If we have a look at each bus-specific device driver structure (<strong class="source-inline">struct platform_driver</strong>, <strong class="source-inline">struct i2c_driver</strong>, <strong class="source-inline">struct spi_driver</strong>, <strong class="source-inline">struct pci_driver</strong>, and <strong class="source-inline">struct usb_driver</strong>), we will see that there is an <strong class="source-inline">id_table</strong> field whose type depends on the bus type. This field should be given an array of device IDs that correspond to those supported by the driver. The following table shows the common buses, along with their device ID structures:</p>
-			<div>
-				<div id="_idContainer022" class="IMG---Figure">
-					<img src="image/B17934_06_Table_2.jpg" alt="Table 6.2 – Some buses, along with their device identification data structures&#13;&#10;"/>
+			<p>The kernel<a id="_idIndexMarker463"/> must be aware of the devices that are supported by a given driver and whether they are present on the system so that whenever one of them appears on the system (the bus), the kernel knows which driver is in charge of it and runs its probe function. That said, the <code>probe()</code> function of the driver will only be run if this driver is loaded (which is a userspace operation); otherwise, nothing will happen. The next section will explain how to manage driver auto-loading so that when the device appears, its driver is automatically loaded, and its probe function is called.</p>
+			<p>If we have a look at each bus-specific device driver structure (<code>struct platform_driver</code>, <code>struct i2c_driver</code>, <code>struct spi_driver</code>, <code>struct pci_driver</code>, and <code>struct usb_driver</code>), we will see that there is an <code>id_table</code> field whose type depends on the bus type. This field should be given an array of device IDs that correspond to those supported by the driver. The following table shows the common buses, along with their device ID structures:</p>
+			<div><div><img src="img/B17934_06_Table_2.jpg" alt="Table 6.2 – Some buses, along with their device identification data structures&#13;&#10;"/>
 				</div>
 			</div>
 			<p class="figure-caption">Table 6.2 – Some buses, along with their device identification data structures</p>
-			<p>I intentionally omitted two special cases: the device tree and ACPI. They can expose devices so that they can be declared either from within the device tree or ACPI using the <strong class="source-inline">driver.of_match_table</strong> or <strong class="source-inline">driver.acpi_match_table</strong> fields, which are not direct elements of the bus-specific driver structure:</p>
-			<div>
-				<div id="_idContainer023" class="IMG---Figure">
-					<img src="image/B17934_06_Table_3.jpg" alt="Table 6.3 – Pseudo buses, along with their device identification data structures&#13;&#10;"/>
+			<p>I intentionally omitted two special cases: the device tree and ACPI. They can expose devices so that they can be declared either from within the device tree or ACPI using the <code>driver.of_match_table</code> or <code>driver.acpi_match_table</code> fields, which are not direct elements of the bus-specific driver structure:</p>
+			<div><div><img src="img/B17934_06_Table_3.jpg" alt="Table 6.3 – Pseudo buses, along with their device identification data structures&#13;&#10;"/>
 				</div>
 			</div>
 			<p class="figure-caption">Table 6.3 – Pseudo buses, along with their device identification data structures</p>
-			<p>These<a id="_idIndexMarker464"/> structures are all defined in <strong class="source-inline">include/linux/mod_devicetable.h</strong> in the kernel sources, and their names match the <strong class="source-inline">{bus_name}_device_id</strong> pattern. We have already discussed each structure in the appropriate chapters. So, let's look at an example that exposes SPI devices using both <strong class="source-inline">struct spi_device_id</strong> and <strong class="source-inline">struct of_device_id</strong> for declaring the device tree (new and recommended) of this driver (<a href="http://elixir.free-electrons.com/linux/v4.10/source/drivers/gpio/gpio-mcp23s08.c">http://elixir.free-electrons.com/linux/v4.10/source/drivers/gpio/gpio-mcp23s08.c</a>):</p>
-			<p class="source-code">static const struct spi_device_id mcp23s08_ids[] = {</p>
-			<p class="source-code">    { "mcp23s08", MCP_TYPE_S08 },</p>
-			<p class="source-code">    { "mcp23s17", MCP_TYPE_S17 },</p>
-			<p class="source-code">    { "mcp23s18", MCP_TYPE_S18 },</p>
-			<p class="source-code">    { },</p>
-			<p class="source-code">};</p>
-			<p class="source-code">static const struct of_device_id mcp23s08_spi_of_match[] = {</p>
-			<p class="source-code">    {</p>
-			<p class="source-code">        .compatible = "microchip,mcp23s08",</p>
-			<p class="source-code">        .data = (void *) MCP_TYPE_S08,</p>
-			<p class="source-code">    },</p>
-			<p class="source-code">    {</p>
-			<p class="source-code">        .compatible = "microchip,mcp23s17",</p>
-			<p class="source-code">        .data = (void *) MCP_TYPE_S17,</p>
-			<p class="source-code">    },</p>
-			<p class="source-code">    {</p>
-			<p class="source-code">        .compatible = "microchip,mcp23s18",</p>
-			<p class="source-code">        .data = (void *) MCP_TYPE_S18,</p>
-			<p class="source-code">    },</p>
-			<p class="source-code">    { },</p>
-			<p class="source-code">};</p>
-			<p class="source-code">static struct spi_driver mcp23s08_driver = {</p>
-			<p class="source-code">    .probe  = mcp23s08_probe, /* don't care about this */</p>
-			<p class="source-code">    .remove = mcp23s08_remove, /* don't care about this */</p>
-			<p class="source-code">    .id_table = mcp23s08_ids,</p>
-			<p class="source-code">    .driver = {</p>
-			<p class="source-code">        .name    = "mcp23s08",</p>
-			<p class="source-code">        .of_match_table =</p>
-			<p class="source-code">                of_match_ptr(mcp23s08_spi_of_match),</p>
-			<p class="source-code">    },</p>
-			<p class="source-code">};</p>
-			<p>The preceding excerpt shows how a driver can declare the devices it supports. Since our example is an SPI driver, the data structure that is involved is <strong class="source-inline">struct spi_device_id</strong>, in addition to <strong class="source-inline">struct  of_device_id,</strong> which is used in any driver that <a id="_idIndexMarker465"/>needs to match a device according to their <strong class="source-inline">compatible</strong> string in the driver.</p>
+			<p>These<a id="_idIndexMarker464"/> structures are all defined in <code>include/linux/mod_devicetable.h</code> in the kernel sources, and their names match the <code>{bus_name}_device_id</code> pattern. We have already discussed each structure in the appropriate chapters. So, let's look at an example that exposes SPI devices using both <code>struct spi_device_id</code> and <code>struct of_device_id</code> for declaring the device tree (new and recommended) of this driver (<a href="http://elixir.free-electrons.com/linux/v4.10/source/drivers/gpio/gpio-mcp23s08.c">http://elixir.free-electrons.com/linux/v4.10/source/drivers/gpio/gpio-mcp23s08.c</a>):</p>
+			<pre>static const struct spi_device_id mcp23s08_ids[] = {
+    { "mcp23s08", MCP_TYPE_S08 },
+    { "mcp23s17", MCP_TYPE_S17 },
+    { "mcp23s18", MCP_TYPE_S18 },
+    { },
+};
+static const struct of_device_id mcp23s08_spi_of_match[] = {
+    {
+        .compatible = "microchip,mcp23s08",
+        .data = (void *) MCP_TYPE_S08,
+    },
+    {
+        .compatible = "microchip,mcp23s17",
+        .data = (void *) MCP_TYPE_S17,
+    },
+    {
+        .compatible = "microchip,mcp23s18",
+        .data = (void *) MCP_TYPE_S18,
+    },
+    { },
+};
+static struct spi_driver mcp23s08_driver = {
+    .probe  = mcp23s08_probe, /* don't care about this */
+    .remove = mcp23s08_remove, /* don't care about this */
+    .id_table = mcp23s08_ids,
+    .driver = {
+        .name    = "mcp23s08",
+        .of_match_table =
+                of_match_ptr(mcp23s08_spi_of_match),
+    },
+};</pre>
+			<p>The preceding excerpt shows how a driver can declare the devices it supports. Since our example is an SPI driver, the data structure that is involved is <code>struct spi_device_id</code>, in addition to <code>struct  of_device_id,</code> which is used in any driver that <a id="_idIndexMarker465"/>needs to match a device according to their <code>compatible</code> string in the driver.</p>
 			<p>Now that we are done learning the way a driver can expose the device it supports, let's get deeper in the device and driver binding mechanism to understand what happens under the hood when there is a match between a device and a driver.</p>
 			<h2 id="_idParaDest-97"><a id="_idTextAnchor099"/>Device/driver matching and module (auto) loading</h2>
 			<p>Please pay attention to this section, even though we will partially repeat what we discussed previously. The <strong class="bold">bus</strong> is the <a id="_idIndexMarker466"/>fundamental element that device drivers and devices<a id="_idIndexMarker467"/> rely on. From a hardware point <a id="_idIndexMarker468"/>of view, the bus is the link between devices and the CPU, while from a software point of view, the bus driver is the link between devices and their drivers. Whenever a device or driver is added/registered with the system, it is automatically added to a list that's maintained by the driver of the bus that it sits on top of. For example, registering a list of I2C devices that can be managed by a given driver (i2c, of course) will result in queueing those devices into a global list that maintains the I2C adapter driver, as well as providing a USB device table that will insert those devices into the list of devices that's maintained by the USB controller driver. Another example involves registering a new SPI driver, which will insert this driver into the list of drivers that's maintained by the SPI controller driver. Without this, there would be no way for the kernel to know which driver should handle which device.</p>
-			<p>Every device driver should expose the list of devices it supports and should make that list accessible to the driver core (especially to the bus driver). This list of devices is called <strong class="source-inline">id_table</strong> and is declared and filled from within the driver code. This table is an array of device IDs, where each ID's type depends on the device's type (I2C, SPI, USB, and so on). In this manner, whenever a device appears on the bus, the bus driver will walk through its device driver's list and look into each ID table for the entry that corresponds to this new device. Every driver that contains the device ID in their table will have their <strong class="source-inline">probe()</strong> function run, with the new device given as a parameter. This process is called the matching loop. It works similarly for drivers. Whenever a new driver is registered with the bus, the bus driver will walk through the list of its devices and look for the device IDs that appear in the registered driver's <strong class="source-inline">id_table</strong>. For each hit, the corresponding device will be given as a parameter to the <strong class="source-inline">probe()</strong> function of the driver, which will be run as many times as there are hits.</p>
-			<p>The <a id="_idIndexMarker469"/>problem with the matching loop is that only loaded modules will have their probe functions invoked. In other words, the matching loop will be useless if the corresponding module is not loaded (<strong class="source-inline">insmod</strong>, <strong class="source-inline">modprobe</strong>) or built-in. You'll have to manually load the module before the device<a id="_idIndexMarker470"/> appears on the bus. The solution to this issue is module auto-loading. Since, most of the time, module loading is a userspace action (when the kernel does not request the module itself using the <strong class="source-inline">request_module()</strong> function), the kernel must find a way to expose drivers, along with their device tables, to the userspace. Thus came a macro called <strong class="source-inline">MODULE_DEVICE_TABLE()</strong>:</p>
-			<p class="source-code">MODULE_DEVICE_TABLE(&lt;bus_type_name&gt;,  &lt;array_of_ids&gt;)</p>
-			<p>This macro is used to support hot-plugging, which describes which devices each specific driver can support. At compilation time, the build process extracts this information out of the driver and builds a human-readable table called <strong class="source-inline">modules.alias</strong>, which is located in the <strong class="source-inline">/lib/modules/kernel_version/</strong> directory.</p>
-			<p>The <strong class="source-inline">&lt;bus_type_name&gt;</strong> parameter should be the generic name of the bus that you need to add module auto-loading support to. It should be <strong class="source-inline">spi</strong> for an SPI bus, <strong class="source-inline">of</strong> for a device tree, <strong class="source-inline">i2c</strong> for I2C, and so on. In other words, it should be one of the elements of the first column (of the <strong class="bold">bus type</strong>) of the previous table (knowing that not all the buses are listed). Let's add module auto-loading support to the same driver we used previously (gpio-mcp23s08):</p>
-			<p class="source-code">MODULE_DEVICE_TABLE(spi, mcp23s08_ids);</p>
-			<p class="source-code">MODULE_DEVICE_TABLE(of, mcp23s08_spi_of_match);</p>
-			<p>Now, let's see what these two lines do when they're added to the <strong class="source-inline">modules.alias</strong> file on an i.MX6-based board running a Yocto-based image:</p>
-			<p class="source-code">root:/lib/modules/5.10.10+fslc+g8dc0fcb# cat modules.alias</p>
-			<p class="source-code"># Aliases extracted from modules themselves.</p>
-			<p class="source-code">alias fs-msdos msdos</p>
-			<p class="source-code">alias fs-binfmt_misc binfmt_misc</p>
-			<p class="source-code">alias fs-configfs configfs</p>
-			<p class="source-code">alias iso9660 isofs</p>
-			<p class="source-code">alias fs-iso9660 isofs</p>
-			<p class="source-code">alias fs-udf udf</p>
-			<p class="source-code"><strong class="bold">alias of:N*T*Cmicrochip,mcp23s17* gpio_mcp23s08</strong></p>
-			<p class="source-code"><strong class="bold">alias of:N*T*Cmicrochip,mcp23s18* gpio_mcp23s08</strong></p>
-			<p class="source-code"><strong class="bold">alias of:N*T*Cmicrochip,mcp23s08* gpio_mcp23s08</strong></p>
-			<p class="source-code"><strong class="bold">alias spi:mcp23s17 gpio_mcp23s08</strong></p>
-			<p class="source-code"><strong class="bold">alias spi:mcp23s18 gpio_mcp23s08</strong></p>
-			<p class="source-code"><strong class="bold">alias spi:mcp23s08 gpio_mcp23s08</strong></p>
-			<p class="source-code">alias usb:v0C72p0011d*dc*dsc*dp*ic*isc*ip*in* peak_usb</p>
-			<p class="source-code">alias usb:v0C72p0012d*dc*dsc*dp*ic*isc*ip*in* peak_usb</p>
-			<p class="source-code">alias usb:v0C72p000Dd*dc*dsc*dp*ic*isc*ip*in* peak_usb</p>
-			<p class="source-code">alias usb:v0C72p000Cd*dc*dsc*dp*ic*isc*ip*in* peak_usb</p>
-			<p class="source-code">alias pci:v00008086d000015B8sv*sd*bc*sc*i* e1000e</p>
-			<p class="source-code">alias pci:v00008086d000015B7sv*sd*bc*sc*i* e1000e</p>
-			<p class="source-code">[...]</p>
-			<p class="source-code">alias usb:v0416pA91Ad*dc*dsc*dp*ic0Eisc01ip00in* uvcvideo</p>
-			<p class="source-code">alias of:N*T*Ciio-hwmon* iio_hwmon</p>
-			<p class="source-code">alias i2c:lm73 lm73</p>
-			<p class="source-code">alias spi:ad7606-4 ad7606_spi</p>
-			<p class="source-code">alias spi:ad7606-6 ad7606_spi</p>
-			<p class="source-code">alias spi:ad7606-8 ad7606_spi</p>
-			<p>The <a id="_idIndexMarker471"/>second part of the <a id="_idIndexMarker472"/>solution<a id="_idIndexMarker473"/> is the kernel informing the userspace about some events (called <strong class="bold">uevents</strong>) through <em class="italic">netlink sockets</em>. Right after a device appears on a bus, this bus code will create and emit an event that contains the corresponding module alias (for example, <strong class="source-inline">pci:v00008086d000015B8sv*sd*bc*sc*i*</strong>). This event will be caught by <a id="_idIndexMarker474"/>your system hotplug manager (<strong class="bold">udev</strong> on most machines), which will parse the <strong class="source-inline">module.alias</strong> file while looking for an entry with the same<a id="_idIndexMarker475"/> alias and load the corresponding module (for example, e1000). As soon as the module is loaded, the device will be probed. This is how the simple <strong class="source-inline">MODULE_DEVICE_TABLE()</strong> macro can change your life.</p>
+			<p>Every device driver should expose the list of devices it supports and should make that list accessible to the driver core (especially to the bus driver). This list of devices is called <code>id_table</code> and is declared and filled from within the driver code. This table is an array of device IDs, where each ID's type depends on the device's type (I2C, SPI, USB, and so on). In this manner, whenever a device appears on the bus, the bus driver will walk through its device driver's list and look into each ID table for the entry that corresponds to this new device. Every driver that contains the device ID in their table will have their <code>probe()</code> function run, with the new device given as a parameter. This process is called the matching loop. It works similarly for drivers. Whenever a new driver is registered with the bus, the bus driver will walk through the list of its devices and look for the device IDs that appear in the registered driver's <code>id_table</code>. For each hit, the corresponding device will be given as a parameter to the <code>probe()</code> function of the driver, which will be run as many times as there are hits.</p>
+			<p>The <a id="_idIndexMarker469"/>problem with the matching loop is that only loaded modules will have their probe functions invoked. In other words, the matching loop will be useless if the corresponding module is not loaded (<code>insmod</code>, <code>modprobe</code>) or built-in. You'll have to manually load the module before the device<a id="_idIndexMarker470"/> appears on the bus. The solution to this issue is module auto-loading. Since, most of the time, module loading is a userspace action (when the kernel does not request the module itself using the <code>request_module()</code> function), the kernel must find a way to expose drivers, along with their device tables, to the userspace. Thus came a macro called <code>MODULE_DEVICE_TABLE()</code>:</p>
+			<pre>MODULE_DEVICE_TABLE(&lt;bus_type_name&gt;,  &lt;array_of_ids&gt;)</pre>
+			<p>This macro is used to support hot-plugging, which describes which devices each specific driver can support. At compilation time, the build process extracts this information out of the driver and builds a human-readable table called <code>modules.alias</code>, which is located in the <code>/lib/modules/kernel_version/</code> directory.</p>
+			<p>The <code>&lt;bus_type_name&gt;</code> parameter should be the generic name of the bus that you need to add module auto-loading support to. It should be <code>spi</code> for an SPI bus, <code>of</code> for a device tree, <code>i2c</code> for I2C, and so on. In other words, it should be one of the elements of the first column (of the <strong class="bold">bus type</strong>) of the previous table (knowing that not all the buses are listed). Let's add module auto-loading support to the same driver we used previously (gpio-mcp23s08):</p>
+			<pre>MODULE_DEVICE_TABLE(spi, mcp23s08_ids);
+MODULE_DEVICE_TABLE(of, mcp23s08_spi_of_match);</pre>
+			<p>Now, let's see what these two lines do when they're added to the <code>modules.alias</code> file on an i.MX6-based board running a Yocto-based image:</p>
+			<pre>root:/lib/modules/5.10.10+fslc+g8dc0fcb# cat modules.alias
+# Aliases extracted from modules themselves.
+alias fs-msdos msdos
+alias fs-binfmt_misc binfmt_misc
+alias fs-configfs configfs
+alias iso9660 isofs
+alias fs-iso9660 isofs
+alias fs-udf udf
+<strong class="bold">alias of:N*T*Cmicrochip,mcp23s17* gpio_mcp23s08</strong>
+<strong class="bold">alias of:N*T*Cmicrochip,mcp23s18* gpio_mcp23s08</strong>
+<strong class="bold">alias of:N*T*Cmicrochip,mcp23s08* gpio_mcp23s08</strong>
+<strong class="bold">alias spi:mcp23s17 gpio_mcp23s08</strong>
+<strong class="bold">alias spi:mcp23s18 gpio_mcp23s08</strong>
+<strong class="bold">alias spi:mcp23s08 gpio_mcp23s08</strong>
+alias usb:v0C72p0011d*dc*dsc*dp*ic*isc*ip*in* peak_usb
+alias usb:v0C72p0012d*dc*dsc*dp*ic*isc*ip*in* peak_usb
+alias usb:v0C72p000Dd*dc*dsc*dp*ic*isc*ip*in* peak_usb
+alias usb:v0C72p000Cd*dc*dsc*dp*ic*isc*ip*in* peak_usb
+alias pci:v00008086d000015B8sv*sd*bc*sc*i* e1000e
+alias pci:v00008086d000015B7sv*sd*bc*sc*i* e1000e
+[...]
+alias usb:v0416pA91Ad*dc*dsc*dp*ic0Eisc01ip00in* uvcvideo
+alias of:N*T*Ciio-hwmon* iio_hwmon
+alias i2c:lm73 lm73
+alias spi:ad7606-4 ad7606_spi
+alias spi:ad7606-6 ad7606_spi
+alias spi:ad7606-8 ad7606_spi</pre>
+			<p>The <a id="_idIndexMarker471"/>second part of the <a id="_idIndexMarker472"/>solution<a id="_idIndexMarker473"/> is the kernel informing the userspace about some events (called <code>pci:v00008086d000015B8sv*sd*bc*sc*i*</code>). This event will be caught by <a id="_idIndexMarker474"/>your system hotplug manager (<code>module.alias</code> file while looking for an entry with the same<a id="_idIndexMarker475"/> alias and load the corresponding module (for example, e1000). As soon as the module is loaded, the device will be probed. This is how the simple <code>MODULE_DEVICE_TABLE()</code> macro can change your life.</p>
 			<h2 id="_idParaDest-98"><a id="_idTextAnchor100"/>Device declaration – populating devices</h2>
 			<p>Device declaration is <a id="_idIndexMarker476"/>not part of the LDM. It consists of declaring devices that are present (or not) on the system, while the module device table involves feeding the drivers with devices they support. There are three places you can declare/populate devices:</p>
 			<ul>
@@ -211,93 +204,93 @@
 			</ul>
 			<p>To be handled by a driver, any declared device should exist at least in one module device table; otherwise, the device will simply be ignored, unless a driver with this device ID in its module device table gets loaded or has already been loaded.</p>
 			<h2 id="_idParaDest-99"><a id="_idTextAnchor101"/>Bus structure</h2>
-			<p>Finally, there's<a id="_idIndexMarker477"/> the <strong class="source-inline">struct bus_type</strong> structure, which is the structure that the kernel internally represents a bus with (whether it is physical or virtual). The <strong class="bold">bus controller</strong> is the root<a id="_idIndexMarker478"/> element of any hierarchy. Physically speaking, a bus is a channel between the processor and one or more devices. From a software point of view, the bus (<strong class="source-inline">struct bus_type</strong>) is the link between devices (<strong class="source-inline">struct device</strong>) and drivers (<strong class="source-inline">struct device_driver</strong>). Without this, nothing would be appended to the system, since the bus (<strong class="source-inline">bus_type</strong>) is responsible for matching the devices and drivers:</p>
-			<p class="source-code">struct bus_type {</p>
-			<p class="source-code">    const char    *name;</p>
-			<p class="source-code">    struct device    *dev_root;</p>
-			<p class="source-code">    int (*match)(struct device *dev,</p>
-			<p class="source-code">                   struct device_driver *drv);</p>
-			<p class="source-code">    int (*probe)(struct device *dev);</p>
-			<p class="source-code">    int (*remove)(struct device *dev);</p>
-			<p class="source-code">    /* [...] */</p>
-			<p class="source-code">};</p>
+			<p>Finally, there's<a id="_idIndexMarker477"/> the <code>struct bus_type</code> structure, which is the structure that the kernel internally represents a bus with (whether it is physical or virtual). The <code>struct bus_type</code>) is the link between devices (<code>struct device</code>) and drivers (<code>struct device_driver</code>). Without this, nothing would be appended to the system, since the bus (<code>bus_type</code>) is responsible for matching the devices and drivers:</p>
+			<pre>struct bus_type {
+    const char    *name;
+    struct device    *dev_root;
+    int (*match)(struct device *dev,
+                   struct device_driver *drv);
+    int (*probe)(struct device *dev);
+    int (*remove)(struct device *dev);
+    /* [...] */
+};</pre>
 			<p>Let's look at the elements in this structure:</p>
 			<ul>
-				<li><strong class="source-inline">name</strong>: This is the bus's <a id="_idIndexMarker479"/>name as it will appear in <strong class="source-inline">/sys/bus/</strong>.</li>
-				<li><strong class="source-inline">match</strong>: This is a callback that's called whenever a new device or driver is added to the bus. The callback must be smart enough and should return a nonzero value when there is a match between a device and a driver. Both are given as parameters. The main purpose of a match callback is to allow a bus to determine whether a particular device can be handled by a given driver or the other logic if the given driver supports a given device. Most of the time, the verification process is done with a simple string comparison (the device and driver name, or a table and <strong class="bold">device tree</strong> (<strong class="bold">DT</strong>)-compatible property). For enumerated devices (such as PCI and USB), the verification process is done by comparing the device IDs that are supported by the driver with the device ID of the given device, without sacrificing bus-specific functionality.</li>
-				<li><strong class="source-inline">probe</strong>: This is a callback that's called when a new device or driver is added to the bus <em class="italic">and</em> once a match has occurred. This function is responsible for allocating the specific bus device structure and calling the given driver's probe function, which is supposed to manage the device (we allocated this earlier).</li>
-				<li><strong class="source-inline">remove</strong>: This is called when a device is removed from the bus.</li>
+				<li><code>name</code>: This is the bus's <a id="_idIndexMarker479"/>name as it will appear in <code>/sys/bus/</code>.</li>
+				<li><code>match</code>: This is a callback that's called whenever a new device or driver is added to the bus. The callback must be smart enough and should return a nonzero value when there is a match between a device and a driver. Both are given as parameters. The main purpose of a match callback is to allow a bus to determine whether a particular device can be handled by a given driver or the other logic if the given driver supports a given device. Most of the time, the verification process is done with a simple string comparison (the device and driver name, or a table and <strong class="bold">device tree</strong> (<strong class="bold">DT</strong>)-compatible property). For enumerated devices (such as PCI and USB), the verification process is done by comparing the device IDs that are supported by the driver with the device ID of the given device, without sacrificing bus-specific functionality.</li>
+				<li><code>probe</code>: This is a callback that's called when a new device or driver is added to the bus <em class="italic">and</em> once a match has occurred. This function is responsible for allocating the specific bus device structure and calling the given driver's probe function, which is supposed to manage the device (we allocated this earlier).</li>
+				<li><code>remove</code>: This is called when a device is removed from the bus.</li>
 			</ul>
 			<p>When the device that <a id="_idIndexMarker480"/>you wrote the driver for sits on a physical bus <a id="_idIndexMarker481"/>called the <strong class="bold">bus controller</strong>, it must rely on the driver of that bus, called <a id="_idIndexMarker482"/>the <strong class="bold">controller driver</strong>, which is responsible for sharing bus access between devices. The controller driver offers an abstraction layer between your device and the bus. Whenever you perform a transaction (read or write) on an I2C or USB bus, for example, the I2C/USB bus controller transparently takes care of that in the background (managing the clock, shifting data, and so on). Every bus controller driver exports a set of functions to ease the development of drivers for the devices sitting on that bus. This works for every bus (I2C, SPI, USB, PCI, SDIO, and so on).</p>
 			<p>Now that we have looked at the bus driver and how modules are loaded, we will discuss the matching mechanism, which tries to bind a particular device to its drivers.</p>
 			<h1 id="_idParaDest-100"><a id="_idTextAnchor102"/>Device and driver matching mechanism explained</h1>
-			<p>Device drivers and<a id="_idIndexMarker483"/> devices are always registered with the bus. When it comes to exporting the devices that are supported by the driver, you can use <strong class="source-inline">driver.of_match_table</strong>, <strong class="source-inline">driver.of_match_table</strong>, or <strong class="source-inline">&lt;bus&gt;_driver.id_table</strong> (which is specific to the device type; for example, <strong class="source-inline">i2c_device.id_table</strong> or <strong class="source-inline">platform_device.id_table</strong>).</p>
+			<p>Device drivers and<a id="_idIndexMarker483"/> devices are always registered with the bus. When it comes to exporting the devices that are supported by the driver, you can use <code>driver.of_match_table</code>, <code>driver.of_match_table</code>, or <code>&lt;bus&gt;_driver.id_table</code> (which is specific to the device type; for example, <code>i2c_device.id_table</code> or <code>platform_device.id_table</code>).</p>
 			<p>Each bus driver has the responsibility of providing its match function, which is run by the kernel whenever a new device or device driver is registered with this bus. That said, there are three matching mechanisms for platform devices, all of which consist of string comparison. Those matching mechanisms are based on the DT table, ACPI table, device, and driver name. Let's see how the pseudo-platform and i2c buses implement their matching functions using those mechanisms:</p>
-			<p class="source-code">static int platform_match(struct device *dev,</p>
-			<p class="source-code">                           struct device_driver *drv)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    struct platform_device *pdev =</p>
-			<p class="source-code">                         to_platform_device(dev);</p>
-			<p class="source-code">    struct platform_driver *pdrv =</p>
-			<p class="source-code">                         to_platform_driver(drv);</p>
-			<p class="source-code">     /* Only bind to the matching driver when</p>
-			<p class="source-code">     * driver_override is set</p>
-			<p class="source-code">     */</p>
-			<p class="source-code">    if (pdev-&gt;driver_override)</p>
-			<p class="source-code">        return !strcmp(pdev-&gt;driver_override, drv-&gt;name);</p>
-			<p class="source-code">    /* Attempt an OF style match first */</p>
-			<p class="source-code">    if (of_driver_match_device(dev, drv))</p>
-			<p class="source-code">        return 1;</p>
-			<p class="source-code">    /* Then try ACPI style match */</p>
-			<p class="source-code">    if (acpi_driver_match_device(dev, drv))</p>
-			<p class="source-code">    return 1;</p>
-			<p class="source-code">    /* Then try to match against the id table */</p>
-			<p class="source-code">    if (pdrv-&gt;id_table)</p>
-			<p class="source-code">        return platform_match_id(pdrv-&gt;id_table,</p>
-			<p class="source-code">                                       pdev) != NULL;</p>
-			<p class="source-code">    /* fall-back to driver name match */</p>
-			<p class="source-code">    return (strcmp(pdev-&gt;name, drv-&gt;name) == 0);</p>
-			<p class="source-code">}</p>
-			<p>The preceding<a id="_idIndexMarker484"/> code shows the <strong class="bold">pseudo-platform</strong> bus matching function, which is defined in <strong class="source-inline">drivers/base/platform.c</strong>. The following code shows the I2C bus matching function, which is defined in <strong class="source-inline">drivers/i2c/i2c-core.c</strong>:</p>
-			<p class="source-code">static const struct i2c_device_id *i2c_match_id(</p>
-			<p class="source-code">            const struct i2c_device_id *id,</p>
-			<p class="source-code">            const struct i2c_client *client)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    while (id-&gt;name[0]) {</p>
-			<p class="source-code">        if (strcmp(client-&gt;name, id-&gt;name) == 0)</p>
-			<p class="source-code">            return id;</p>
-			<p class="source-code">        id++;</p>
-			<p class="source-code">    }</p>
-			<p class="source-code">    return NULL;</p>
-			<p class="source-code">}</p>
-			<p class="source-code">static int i2c_device_match(struct device *dev, struct</p>
-			<p class="source-code">          device_driver *drv)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    struct i2c_client *client = i2c_verify_client(dev);</p>
-			<p class="source-code">    struct i2c_driver *driver;</p>
-			<p class="source-code">    if (!client)</p>
-			<p class="source-code">        return 0;</p>
-			<p class="source-code">    /* Attempt an OF style match */</p>
-			<p class="source-code">    if (of_driver_match_device(dev, drv))</p>
-			<p class="source-code">        return 1;</p>
-			<p class="source-code">    /* Then ACPI style match */</p>
-			<p class="source-code">    if (acpi_driver_match_device(dev, drv))</p>
-			<p class="source-code">        return 1;</p>
-			<p class="source-code">    driver = to_i2c_driver(drv);</p>
-			<p class="source-code">    /* match on an id table if there is one */</p>
-			<p class="source-code">    if (driver-&gt;id_table)</p>
-			<p class="source-code">        return i2c_match_id(driver-&gt;id_table,</p>
-			<p class="source-code">                               client) != NULL;</p>
-			<p class="source-code">    return 0;</p>
-			<p class="source-code">}</p>
+			<pre>static int platform_match(struct device *dev,
+                           struct device_driver *drv)
+{
+    struct platform_device *pdev =
+                         to_platform_device(dev);
+    struct platform_driver *pdrv =
+                         to_platform_driver(drv);
+     /* Only bind to the matching driver when
+     * driver_override is set
+     */
+    if (pdev-&gt;driver_override)
+        return !strcmp(pdev-&gt;driver_override, drv-&gt;name);
+    /* Attempt an OF style match first */
+    if (of_driver_match_device(dev, drv))
+        return 1;
+    /* Then try ACPI style match */
+    if (acpi_driver_match_device(dev, drv))
+    return 1;
+    /* Then try to match against the id table */
+    if (pdrv-&gt;id_table)
+        return platform_match_id(pdrv-&gt;id_table,
+                                       pdev) != NULL;
+    /* fall-back to driver name match */
+    return (strcmp(pdev-&gt;name, drv-&gt;name) == 0);
+}</pre>
+			<p>The preceding<a id="_idIndexMarker484"/> code shows the <code>drivers/base/platform.c</code>. The following code shows the I2C bus matching function, which is defined in <code>drivers/i2c/i2c-core.c</code>:</p>
+			<pre>static const struct i2c_device_id *i2c_match_id(
+            const struct i2c_device_id *id,
+            const struct i2c_client *client)
+{
+    while (id-&gt;name[0]) {
+        if (strcmp(client-&gt;name, id-&gt;name) == 0)
+            return id;
+        id++;
+    }
+    return NULL;
+}
+static int i2c_device_match(struct device *dev, struct
+          device_driver *drv)
+{
+    struct i2c_client *client = i2c_verify_client(dev);
+    struct i2c_driver *driver;
+    if (!client)
+        return 0;
+    /* Attempt an OF style match */
+    if (of_driver_match_device(dev, drv))
+        return 1;
+    /* Then ACPI style match */
+    if (acpi_driver_match_device(dev, drv))
+        return 1;
+    driver = to_i2c_driver(drv);
+    /* match on an id table if there is one */
+    if (driver-&gt;id_table)
+        return i2c_match_id(driver-&gt;id_table,
+                               client) != NULL;
+    return 0;
+}</pre>
 			<h2 id="_idParaDest-101"><a id="_idTextAnchor103"/>Case study – the OF matching mechanism</h2>
 			<p>In the device tree, each <a id="_idIndexMarker485"/>device is represented by a node and declared as a child of its bus node. At boot time, the kernel (the <strong class="bold">OF</strong> core) parses every bus node (as well as their sub-nodes, which are the devices that are sitting on it) in the device tree. For each device node, the kernel will do the following:</p>
 			<ul>
 				<li>Identify the bus that this node belongs to.</li>
-				<li>Allocate a platform device and initialize it according to the properties contained in the node using the <strong class="source-inline">of_device_alloc()</strong> function. <strong class="source-inline">built_pdev-&gt;dev.of_node</strong> will be set with the current device tree node.</li>
-				<li>Walk through the list of device drivers associated with (maintained by) the previously identified bus using the <strong class="source-inline">bus_for_each_drv()</strong> function.</li>
-				<li>For each driver in the list, the core will do the following:<ol><li>Call the bus match function, given as the parameter that the driver found and the previously built device structure; that is, <strong class="source-inline">bus_found-&gt;match(cur_drv, cur_dev);</strong>.</li><li>If the DT matching mechanism is supported by this bus driver, the bus match function will then call <strong class="source-inline">of_driver_match_device()</strong>, given the same parameters that were mentioned previously; that is, <strong class="source-inline">of_driver_match_device(ur_drv, cur_dev)</strong>.</li><li><strong class="source-inline">of_driver_match_device</strong> will walk through the <strong class="source-inline">of_match_table</strong> table (which is an array of struct <strong class="source-inline">of_device_id</strong> elements) that's associated with the current driver. For each <strong class="source-inline">of_device_id</strong> in the array, the kernel will compare the compatible property of both the current <strong class="source-inline">of_device_id</strong> element and <strong class="source-inline">built_pdev-&gt;dev.of_node</strong>. If they are the same (let's say that there's a match), the probe function of the current driver will be run.</li></ol></li>
-				<li>If no driver that<a id="_idIndexMarker486"/> supports this device is found, this device will be registered with the bus anyway. Then, the probing mechanism will be deferred to a later date so that whenever a new driver is registered with this bus, the core will walk through the list of devices that are maintained by the bus; any devices without any drivers associated with them will be probed again. For each, the compatible property of associated <strong class="source-inline">of_node</strong> will be compared to the compatible property of each <strong class="source-inline">of_device_id</strong> in the <strong class="source-inline">of_match_table</strong> array that's associated with the freshly registered driver.</li>
+				<li>Allocate a platform device and initialize it according to the properties contained in the node using the <code>of_device_alloc()</code> function. <code>built_pdev-&gt;dev.of_node</code> will be set with the current device tree node.</li>
+				<li>Walk through the list of device drivers associated with (maintained by) the previously identified bus using the <code>bus_for_each_drv()</code> function.</li>
+				<li>For each driver in the list, the core will do the following:<ol><li>Call the bus match function, given as the parameter that the driver found and the previously built device structure; that is, <code>bus_found-&gt;match(cur_drv, cur_dev);</code>.</li><li>If the DT matching mechanism is supported by this bus driver, the bus match function will then call <code>of_driver_match_device()</code>, given the same parameters that were mentioned previously; that is, <code>of_driver_match_device(ur_drv, cur_dev)</code>.</li><li><code>of_driver_match_device</code> will walk through the <code>of_match_table</code> table (which is an array of struct <code>of_device_id</code> elements) that's associated with the current driver. For each <code>of_device_id</code> in the array, the kernel will compare the compatible property of both the current <code>of_device_id</code> element and <code>built_pdev-&gt;dev.of_node</code>. If they are the same (let's say that there's a match), the probe function of the current driver will be run.</li></ol></li>
+				<li>If no driver that<a id="_idIndexMarker486"/> supports this device is found, this device will be registered with the bus anyway. Then, the probing mechanism will be deferred to a later date so that whenever a new driver is registered with this bus, the core will walk through the list of devices that are maintained by the bus; any devices without any drivers associated with them will be probed again. For each, the compatible property of associated <code>of_node</code> will be compared to the compatible property of each <code>of_device_id</code> in the <code>of_match_table</code> array that's associated with the freshly registered driver.</li>
 			</ul>
 			<p>This is how drivers are matched with devices that are declared from within the device tree. This works in the same manner for each type of device declaration (board file, ACPI, and so on).</p>
 			<h1 id="_idParaDest-102"><a id="_idTextAnchor104"/>Summary</h1>

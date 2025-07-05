@@ -1,0 +1,457 @@
+# 1
+
+# Installing Linux
+
+Recent years have been marked by a significant rise in the adoption of **Linux** as the operating system of choice for both server and desktop computing platforms. From enterprise-grade servers and large-scale cloud infrastructures to individual workstations and small-factor home appliances, Linux has become an ever-present platform for a wide range of applications.
+
+The prevalence of Linux, perhaps now more than ever, brings into the spotlight much-needed administration skills for a growing community of system administrators and developers. In this book, we take a practical approach to Linux administration essentials, with the modern-day system administrator, DevOps team member, and developer in mind.
+
+In this second edition, we will adopt a slightly different approach to installing Linux. As this is a book meant for more advanced readers, we will no longer discuss the basic aspects of installing the operating system in such detail as in the first edition. The information has been updated to the most relevant aspects available as of the beginning of 2023 with regard to operating system versioning.
+
+In this first chapter, we’ll guide you through the Linux installation process, either on physical hardware (bare metal) or using a **Virtual** **Machine** (**VM**).
+
+Here are the topics we cover in this chapter:
+
+*   Introducing the Linux operating system
+*   Installing Linux – the basics
+*   Enabling the Windows Subsystem for Linux
+*   Installing Linux – the advanced stages
+*   Linux distributions – a practical guide
+
+# Technical requirements
+
+We will use the following platforms and technologies in this chapter:
+
+*   Linux distributions: Ubuntu
+*   VM hypervisors: Oracle VM VirtualBox, VMware Workstation Player, and Hyper-V
+*   VM host platforms: Windows 11 (equally applicable on macOS)
+
+# Introducing the Linux operating system
+
+Linux is a relatively modern operating system created in 1991 by Linus Torvalds, a Finnish computer science student from Helsinki. Originally released as a free and open source platform prohibiting commercial redistribution, Linux eventually adopted the GNU **General Public Licensing** (**GPL**) model in 1992\. This move played a significant role in its wide adoption by the developer community and commercial enterprises alike. It is important to note that the Free Software Foundation community distinctly refers to Linux operating systems (or distributions) as **GNU/Linux** to emphasize the importance of GNU for free software.
+
+Initially made for Intel x86 processor-based computer architectures, Linux has since been ported to a wide variety of platforms, becoming one of the most popular operating systems currently in use. The genesis of Linux could be considered the origin of an open source alternative to its mighty predecessor, Unix. This system was a commercial-grade operating system developed at the AT&T Bell Labs research center by Ken Thompson and Dennis Ritchie in 1969.
+
+## Exploring Linux distributions
+
+A Linux operating system is typically referred to as a **distribution**. A Linux distribution, or **distro**, is the installation bundle (usually an ISO image) of an operating system that has a collection of tools, libraries, and additional software packages installed on top of the Linux **kernel**. A kernel is the core interface between a computer’s hardware and its processes, controlling the communication between the two and managing the underlying resources as efficiently as possible.
+
+The software collection bundled with the Linux kernel typically consists of a bootloader, shell, package management system, graphical user interface, and various software utilities and applications.
+
+The following diagram is a simplified illustration of a generic Linux distribution architecture:
+
+![Figure 1.1 – Simplified view of a generic Linux architecture](img/Figure_01.01_B19682.jpg)
+
+Figure 1.1 – Simplified view of a generic Linux architecture
+
+There are hundreds of Linux distributions currently available. Among the oldest and arguably most popular ones are **Debian**, **Fedora**, **openSUSE**, **Arch Linux**, and **Slackware**, with many other Linux distributions either based upon or derived from them. Some of these distros are divided into commercial and community-supported platforms.
+
+Important note
+
+As writing this second edition, CentOS became a rolling release and is the base from which future **Red Hat Enterprise Linux** (**RHEL**) versions are derived. Its place was taken by other free community distributions that use the RHEL binaries. Among those, **Rocky Linux** is a good example, and we will reference it throughout this book. One other community distribution based on RHEL is **AlmaLinux**.
+
+One of the key differences among Linux distributions is the package management system they use and the related Linux package format. We’ll get into more detail on this topic in [*Chapter 3*](B19682_03.xhtml#_idTextAnchor075). For now, the focus is on choosing the right Linux distribution based on our needs. But before being able to decide, you should first know a little about some of the most widely used distributions. Therefore, in the next section, we will briefly present to you some Linux distros.
+
+### Common Linux distributions
+
+This section summarizes the most popular and common Linux distributions at the time of writing this edition, with emphasis on their package manager type. Most of these distros are free and open source platforms. Their commercial-grade variations, if any, are noted:
+
+*   **Fedora, CentOS Stream and RHEL**: CentOS and its derivatives use **Red Hat Package Manager** (**RPM**) as their package manager. **CentOS Stream**, now a rolling release distribution, is based on the open source Fedora project. It is suited to both servers and workstations. RHEL is a commercial-grade version derived from CentOS Stream, designed to be a stable platform with long-term support. The community distribution that uses RHEL binaries is Rocky Linux.
+*   **Debian**: The package manager for Debian and most of its derivatives is **Debian Package** (**DPKG**). Debian is releasing at a much slower pace than other Linux distributions, such as Linux Mint or Ubuntu, for example, but it’s relatively more stable.
+*   **Ubuntu**: Ubuntu uses **Advanced Package Tool** (**APT**) and DKPG as package managers. Ubuntu is one of the most popular Linux distributions, releasing every 6 months, with more stable **Long Term Support** (**LTS**) releases every other year.
+*   **Linux Mint**: Linux Mint also uses APT as its package manager. Built on top of Ubuntu, Linux Mint is mostly suitable for desktop use, with a lower memory usage than Ubuntu (with the Cinnamon desktop environment, compared to Ubuntu’s GNOME). There’s also a version of Linux Mint built directly on top of Debian, called **Linux Mint Debian** **Edition** (**LMDE**).
+*   **openSUSE**: openSUSE uses **RPM**, **Yet another Setup Tool** (**YaST**), and **Zypper** as package managers. openSUSE has two versions available: one is called Tumbleweed and is a rolling release, a leading-edge Linux distribution; the other is Leap, a regular release version, which uses the same code base as SUSE Linux Enterprise. Both versions are suited to desktop and server environments. SUSE Linux Enterprise Server is a commercial-grade platform. openSUSE was regarded as one of the most user-friendly desktop Linux distributions before the days of Ubuntu.
+
+Important note
+
+In this book, our focus is mainly on the Linux distributions that are widely used in both community and commercial deployments, such as **Ubuntu**, **Fedora/Rocky Linux**, and **openSUSE**. Most of the examples in this book are equally appliable to any Linux distro. We will specify which one we use for given examples or scenarios.
+
+Now that you know a fair amount of information about the most common Linux distros, in the next section we will give you some hints on how to choose a Linux distribution.
+
+## Choosing a Linux distribution
+
+There are many aspects involved in selecting a Linux distribution, based on various functional requirements. A comprehensive analysis would be far beyond the scope of this chapter. However, considering a few essential points may help with making the right decision:
+
+*   **Platform**: The choice between a server, a desktop, or an embedded platform is probably one of the top decisions in selecting a Linux distribution. Linux server platforms and embedded systems are usually configured with the core operating system services and essential components required for specific applications (such as networking, HTTP, FTP, SSH, and email), mainly for performance and optimization considerations. On the other hand, Linux desktop workstations are loaded (or pre-loaded) with a relatively large number of software packages, including a graphical user interface for a more user-friendly experience. Some Linux distributions come with server and desktop flavors (such as **Ubuntu**, **Fedora**, and **openSUSE**), but most distros have a minimal operating system, with further configuration needed (such as **Rocky Linux**, and **Debian**). Usually, such distributions would be good candidates for Linux server platforms. There are also Linux distributions specifically designed for desktop use, such as **elementary OS**, **Pop!_OS**, or **Deepin**. For embedded systems, we have highly optimized Linux distros, such as **Raspbian** and **OpenWRT**, to accommodate small-form factor devices with limited hardware resources.
+*   **Infrastructure**: Today we see a vast array of application and server platform deployments spanning from hardware and local (on-premises) data centers to hypervisors, containers, and cloud infrastructures. Weighing a Linux distribution against any of these types of deployments should take into consideration the resources and costs involved. For example, a multi-CPU, large-memory, and generally high-footprint Linux instance may cost more to run in the cloud or a **Virtual Private Server** (**VPS**) hosting infrastructure. Lightweight Linux distributions take fewer resources and are easier to scale in environments with containerized workloads and services (for instance, with Kubernetes and Docker). Most Linux distributions now have their cloud images available for all major public cloud providers (for instance, Amazon AWS, Microsoft Azure, and Google Compute Engine). Docker container images for various Linux distributions are available for download on Docker Hub ([https://hub.docker.com](https://hub.docker.com)). Some Docker images are larger (heavier) than others. For example, the **Ubuntu Server** Docker image outweighs the **Alpine Linux** Docker image considerably, and this may tip the balance when choosing one distribution over the other. Also, to address the relatively new shift to containerized workflows and services, some Linux distributions offer a streamlined or more optimized version of their operating system to support the underlying application infrastructure. For example, Fedora features the **Fedora CoreOS** (for containerized workflows) and **Fedora IoT** (for Internet of Things ecosystems).
+*   **Performance**: Arguably, all Linux distributions can be tweaked to high-performance benchmarks in terms of CPU, GPU, memory, and storage. Performance should be considered very closely with the platform and the application of choice. An email backend won’t perform very well on a Raspberry Pi, while a media streaming server would do just fine (with some external storage attached). The configuration effort for tuning the performance should also be taken into consideration. **Rocky Linux**, **Debian**, **openSUSE**, **Fedora** and **Ubuntu** all come with server and desktop versions reasonably optimized for their use. The server versions can be easily customized for a particular application or service, by only limiting the software packages to those that are essential for the application. To further boost performance, some would go to the extent of recompiling a lightweight Linux distro (for instance, **Gentoo**) to benefit from compiler-level optimizations in the kernel for specific subsystems (for instance, the networking stack or user permissions). As with any other criteria, choosing a Linux distribution based on some application or platform performance is a balancing act, and most of the time, common Linux distros will perform exceptionally well.
+*   **Security**: When considering security, we have to keep in mind that a system is only as secure as its weakest link. An insecure application or system component would put the entire system at risk. Therefore, the security of a Linux distribution should be scrutinized as it pertains to the related application and platform environment. We can talk about *desktop security* for a Linux distro serving as a desktop workstation, for example, with the user browsing the internet, downloading media, installing various software packages, and running different applications. The safe handling of all these operations (against malware, viruses, and intrusions) would make for a good indicator of how secure a system can be. There are Linux distros that are highly specialized in application security and isolation and are well suited for desktop use: **Qubes OS**, **Kali Linux**, **Whonix**, **Tails**, and **Parrot Security OS**. Some of these distributions have been developed for penetration testing and security research.
+
+On the other hand, we may consider the *server security* aspect of Linux server distributions. In this case, regular operating system updates with the latest repositories, packages, and components would go a long way to securing the system. Removing unused network-facing services and configuring stricter firewall rules are further steps for reducing the possible attack surface. Most Linux distributions are well equipped with the required tools and services to accommodate this reconfiguration. Opting for a distro with *frequent* and *stable* upgrades or release cycles is generally the first prerequisite for a secure platform (for instance, **Rocky Linux**, **RHEL**, **Ubuntu LTS**, or **SUSE** **Enterprise Linux**).
+
+*   **Reliability**: Linux distributions with aggressive release cycles and a relatively large amount of new code added in each release are usually less stable. For such distros, it’s essential to choose a *stable* version. **Fedora**, for example, has rapid releases, being one of the fastest-progressing Linux platforms. Yet, we should not heed the myths claiming that Fedora or other similar fast-evolving Linux distros, such as openSUSE Tumbleweed, are less reliable. Don’t forget, some of the most reliable Linux distributions out there, **RHEL** and **SUSE Linux Enterprise (SLE)**, are derived from Fedora and openSUSE, respectively.
+
+There’s no magic formula for deciding on a Linux distribution. In most cases, the choice of platform (be it server, desktop or IoT) combined with your own personal preferences is what determines the Linux distribution to go for. With production-grade environments, most of the previously enumerated criteria become critical, and the available options for our Linux platform of choice would be reduced to a few industry-proven solutions.
+
+Important note
+
+In this book, our focus is mainly on the Linux distributions that are widely used in both community and commercial deployments, such as **Ubuntu**, **Fedora/Rocky Linux**, and **openSUSE**. That said, most of the examples in this book are equally applicable to any Linux distro. We will specify which one we use for given examples or scenarios.
+
+Now that you know a bit about what a Linux distribution is, along with the most commonly used ones and their use cases, in the following two sections we will present the basic and advanced aspects of Linux installation.
+
+# Installing Linux – the basics
+
+This section serves as a quick guide for the basic installation of an arbitrary Linux distribution. For hands-on examples and specific guidelines, we use Ubuntu. We also take a brief look at different environments hosting a Linux installation. There is an emerging trend of hybrid cloud infrastructures, with a mix of on-premises data center and public cloud deployments, where a Linux host can either be a bare-metal system, a hypervisor, a VM, or a Docker container.
+
+In most of these cases, the same principles apply when performing a Linux installation. For detail on Docker-containerized Linux deployments, see [*Chapter 13*](B19682_13.xhtml#_idTextAnchor276).
+
+In the following sections, we will show you how to install Linux on bare metal and on a Windows 11 host using different VM hypervisors, and using WSL. Installing on a macOS host is basically the same as installing on Windows using a VM hypervisor, and we will not cover that.
+
+## How to install Linux on bare metal
+
+This section describes the essential steps required for a Linux installation on **bare metal**. We use this term when referring to hardware such as laptops, desktops, workstations, and servers. In a nutshell, the main steps are downloading the ISO image, creating bootable media, trying out the live mode, and finally, doing the installation.
+
+The steps used here are equally applicable to virtual machine installations, as you will see in the following sections.
+
+### Step 1 – Download
+
+We start by downloading our Linux distribution of choice. Most distributions are typically available in ISO format on the distribution’s website. For example, we can download Ubuntu Desktop at [https://ubuntu.com/download/desktop](https://ubuntu.com/download/desktop).
+
+Using the ISO image, in the next step we can create the bootable media required for the Linux installation. We can also use the ISO image to install Linux in a VM, as shown in the next section.
+
+### Step 2 – Create the bootable media
+
+As we install Linux on a PC desktop or workstation (*bare-metal*) system, the bootable Linux media is generally a CD/DVD or a USB device. With a DVD-writable optical drive at hand, we can simply burn a DVD with our Linux distribution ISO. But because modern-day computers, especially laptops, rarely come equipped with a CD or a DVD unit of any kind, the more common choice for bootable media is a USB drive.
+
+Important note
+
+There’s also a third possibility of using a **Preboot eXecution Environment** (**PXE**) boot server. PXE (pronounced *pixie*) is a client-server environment where a PXE-enabled client (PC/BIOS) loads and boots a software package over a local or wide area network from a PXE-enabled server. PXE eliminates the need for physical boot devices (CD/DVD, USB) and reduces the installation overhead, especially for a large number of clients and operating systems. Probing the depths of PXE internals is beyond the scope of this chapter, but we will give you a short introduction on how it works for Linux installations by the end of this chapter. A good starting point to learn more about PXE is [https://en.wikipedia.org/wiki/Preboot_Execution_Environment](https://en.wikipedia.org/wiki/Preboot_Execution_Environment).
+
+A relatively straightforward way to produce a bootable USB drive with a Linux distribution of our choice is via using tools such a **UNetbootin** ([https://unetbootin.github.io](https://unetbootin.github.io)) or **Balena Etcher** ([https://www.balena.io/etcher](https://www.balena.io/etcher)). Both UNetbootin and Etcher are cross-platform utilities, running on Windows, Linux, and macOS.
+
+We will use Balena Etcher for this example of creating a bootable USB drive in Windows:
+
+![Figure 1.2 – Create a bootable USB drive with Balena Etcher](img/Figure_01.02_B19682.jpg)
+
+Figure 1.2 – Create a bootable USB drive with Balena Etcher
+
+Here are the basic steps for creating a bootable USB drive with Ubuntu Desktop using Balena Etcher. We assume the Ubuntu Desktop ISO image has been downloaded and Etcher is installed (in our case on Windows 11):
+
+1.  Choose the ISO file with your Linux distribution of choice.
+2.  Select the USB target destination disk.
+3.  Flash the previously selected disk with the ISO of your choice.
+
+The process should take a couple of minutes and the USB drive will be ready. Now, let’s look at how we can take the bootable media for a spin.
+
+### Step 3 – Try it out in live mode
+
+This step is optional.
+
+Most Linux distributions have their ISO image available for download as *live* media. We say most because not all of them offer this option, at least not by default. Nevertheless, among those who do offer live media by default are **Ubuntu** and **Fedora**.
+
+Once we have the bootable media created with our Linux distribution of choice, we can run a live environment of our Linux platform without actually installing it. In other words, we can evaluate and test the Linux distribution before deciding whether we want to install it or not. The live Linux operating system is loaded in the system memory (RAM) of our PC, without using any disk storage. We should make sure the PC has enough RAM to accommodate the minimum required memory of our Linux distribution.
+
+When booting the PC from a bootable media, we need to make sure the boot order in the BIOS is set to read our drive with the highest priority. On a Mac, we need to press the *Option* key immediately after the reboot start-up chime and select our USB drive to boot from. When on a PC, make sure you access your BIOS interface and select the appropriate device for boot. Depending on your system, you will either have to press one of the *F2*, *F10*, *F12*, or *F1* keys after hitting *Enter*, or the *Delete* key, as a general rule. In some specific cases, there could be another *Function* key assigned for this. The keys that you need to press are usually specified at the bottom of the initial bootup screen.
+
+Upon reboot, the first splash screen of our Linux distribution should give us the option of running in live mode, as seen in the following illustration for Ubuntu Desktop (**Try Ubuntu**):
+
+![Figure 1.3 – Choosing live mode for Ubuntu Desktop](img/Figure_01.03_B19682.jpg)
+
+Figure 1.3 – Choosing live mode for Ubuntu Desktop
+
+Next, let’s take a look at the installation procedure of our Linux distro, using the bootable media.
+
+### Step 4 – Perform the installation
+
+We start the installation of our Linux distribution by booting the PC from the bootable media created in *step 2*. To ensure the system can boot from our external device, we are sometimes required to change the boot order in the BIOS, especially if we boot from a USB drive. Do as specified in the previous paragraph to select the right boot drive.
+
+In the following sections, we showcase the installation process of Ubuntu using its ISO images. We choose the Desktop and Server versions for Ubuntu and highlight the main differences between them. As a comparison, Rocky Linux and CentOS Stream come in a single flavor, in essence, a server platform with an optional graphical user interface. Similar to those, openSUSE offers one installation medium for both desktop and server installs. Fedora, on the other hand, has different installation mediums for desktop and server.
+
+We will now walk you through the process of installing Linux inside a VM.
+
+## Linux in a VM
+
+In each of the subsections in the *Installing Linux* section, we will also provide a brief guide on how to prepare a VM environment for the related Linux platform.
+
+A VM is an isolated software abstraction of a physical machine. VMs are deployed on top of a **hypervisor**. A hypervisor provides the runtime provisioning and resource management of VMs. A couple of general-purpose hypervisors used are the following:
+
+*   **Oracle VM** **VirtualBox** ([https://www.virtualbox.org](https://www.virtualbox.org))
+*   **VMware** **Workstation** ([https://www.vmware.com/products/workstation-pro.html](https://www.vmware.com/products/workstation-pro.html))
+*   **Hyper-V** (available only in Windows Pro, Enterprise, or Education)
+
+The first two of these hypervisors are cross-platform virtualization applications and run on both Intel and AMD processor architectures on Windows, macOS, and Linux. The latter is only available on Windows Pro, versions 10 and 11.
+
+Important note
+
+At the time of writing this book, hypervisors for the Apple silicon Macs are provided only by VMware Player and Parallels. Oracle VirtualBox is still in preview for the **Advanced RISC Machines** (**ARM**) architecture. Both solutions from VMware and Parallels are paid-for software on macOS, so you will need to purchase them in order to use them.
+
+The difference between installing Linux on a VM compared to a physical machine is minor. The notable distinction is related to the VM sizing and configuration steps, making sure the minimum system requirements of the Linux distribution are met. Thus, in the following sections we will install Ubuntu on VMware Workstation under Windows.
+
+Please take into account that installing Linux on VMware Player under macOS is very similar, and we will not duplicate the process in this edition of the book. macOS functionality was discussed in the first edition of the book, but given the limited availability of hypervisors for the Apple silicon platform, we have decided to skip it in this edition. Regarding Linux availability on bare-metal Apple silicon Macs, you could visit Asahi Linux, a project that aims to bring a fully functional Linux distribution to Apple silicon computers. Asahi Linux is available at [https://asahilinux.org/](https://asahilinux.org/).
+
+In the next section, we briefly illustrate the installation of Ubuntu Server LTS. If we plan to install Ubuntu in a VM, there are some preliminary steps required for provisioning the VM environment. Otherwise, we proceed directly to the *Installation* section.
+
+### VM provisioning using VMware Workstation
+
+In the following steps, we will create a VM based on Ubuntu Server using VMware Workstation on Windows 11\. At the time of writing, version 17 of the software is available for both free and commercial use.
+
+1.  The first step after initializing the hypervisor is to click on **Create a New Virtual Machine**. This will open a new window with the new virtual machine wizard, where you can select the ISO image for the Linux distribution you want to install.
+2.  Click **Browse** and then open the image from your hard drive or download destination.
+3.  Click `Ubuntu` `Server 22.04.1`.
+4.  Click **Next**. In the following window that appears, you have to give the maximum disk size for the VM. By default, it is set to 20 GB as the recommended size for Ubuntu Server. We will leave it as is.
+5.  By clicking **Next** once more, a window with the VM settings is provided. By default, the hypervisor provides 2 CPU cores and 4 GB of RAM to the VM. You can click on the **Customize hardware** button to change the defaults, depending on your hardware availability. As a rule, we recommend having at least 16 GB of RAM on your system and an 8-core CPU to be able to create reasonable-sized VMs. When everything is set up as you want, click on the **Close** button on the lower right side of the window. You are now back to the main wizard window.
+6.  Click **Finish** to complete the setup and create and initialize the VM. In the following screenshot you can see the newly created VM, running inside VMware
+
+![Figure 1.4 – Power-up and Linux installation on a new VM](img/Figure_01.04_B19682.jpg)
+
+Figure 1.4 – Power-up and Linux installation on a new VM
+
+### Installation process
+
+Here’s the normal installation process for Ubuntu Server LTS, following the initial boot into setup mode:
+
+1.  The initial welcome screen prompts for the **language** of your choice. Select the one you prefer and press *Enter* on your keyboard.
+2.  You might be prompted to apply an *installer update* if available. You have the options to update the installer or continue without updating. We choose to update the installer if prompted.
+3.  If there is no update available, the next screen prompts you to select your **keyboard layout**. Select accordingly. In our case, it is English. Select **Done** and press *Enter*.
+4.  The next prompt asks you to choose the **base for the installation** from the following options: **Ubuntu Server** and **Ubuntu Server (minimized)**. You also have the option to search for **third-party drivers**. We choose **Ubuntu Server** and select the third-party driver option. You can make your way around the options on the screen using either *Tab* or the *Arrow* keys. To select an option, press the *Space* key. Select **Done** and press *Enter*.
+5.  The next screen will show you the **network connections**. If the defaults work for you, hit *Enter* to go to the next setup screen.
+6.  You will be asked about **proxy configuration**. If you don’t require this, just hit *Enter* to go to the next screen.
+7.  You will now be asked to configure the default Ubuntu **mirror** for the repository archives. Edit this according to your location, or just leave the defaults provided by the installer. Press *Enter*.
+8.  The next screen prompts you to configure **storage** and **partitioning**. We will just use the entire 20 GB disk with the default settings, so select **Done** and press *Enter*.
+9.  A storage **configuration summary** is provided. If everything is according to your requirements, just hit *Enter*.
+10.  A **warning** will pop up, asking whether you are definitely happy with the settings and willing to continue with the installation. Hit *Enter*.
+11.  The next screen asks for your **profile information**, including your name, the server’s name, the username, and password. Set those up and go to the next screen.
+12.  You will be asked to choose whether to **install an openSSH** **server** or not. Select the option to install openSSH. If you have any SSH key(s) you would like to import, you can provide them here. Once finished, go to the next screen.
+13.  You will be prompted to select and install `docker`, `microk8s`, `powershell`, `nextcloud`, and `livepatch`. Select what you need to meet your requirements and continue to the next screen.
+14.  The **installation process** begins. This could take a couple of minutes. Be patient and wait for the reboot option to appear once the operating system is installed.
+
+After you reboot, the login screen appears and you will be able to use your new Ubuntu Server VM from inside Windows 11 using VMware Workstation. We have now completed the Ubuntu Server installation.
+
+Installing any other distribution is very similar to installing Ubuntu. When installing desktop variants, a graphical user interface will be available. In the preceding example, as we installed a server-specific operating system, the graphical user interface was missing, having just a minimal text-based interface.
+
+We will not walk you through the installation process of any other distribution, but we will show you the Rocky Linux installation interface:
+
+![Figure 1.5 – The Rocky Linux installation GUI](img/Figure_01.05_B19682.jpg)
+
+Figure 1.5 – The Rocky Linux installation GUI
+
+So far, we have learned how to perform a basic installation of Linux. Along the way, we created a bootable USB flash drive for our installation media, most commonly used for Linux PC platform installations. We briefly covered VM-specific Linux environments using the VMware Workstation hypervisor for Windows 11.
+
+In the following section, we’ll learn how to install and run a Linux distribution on the Windows platform without the use of a standalone hypervisor by using the Windows Subsystem for Linux.
+
+## VM provisioning using Hyper-V
+
+In the following steps, we will create a VM based on Ubuntu Server, using Microsoft’s Hyper-V solution available on Windows 11 Pro.
+
+The first step is to activate the Hyper-V hypervisor, as it is not activated by default. For this, we will need to go to **Windows Features** and select the **Hyper-V** checkbox, as shown in the following figure. After activation, a restart is required.
+
+![Figure 1.6 – Activating Hyper-V on Windows 11 Pro](img/Figure_01.06_B19682.jpg)
+
+Figure 1.6 – Activating Hyper-V on Windows 11 Pro
+
+To create a new VM, you will have to start **Hyper-V Manager**. The application has a three-pane interface. In the **Actions** pane on the right, you should see the **New** option. Click on it and select the **Virtual Machine…** option. This will open a new window where you can configure the new VM with the following steps:
+
+1.  Set the name and location; we will give it the name `Ubuntu` and leave the default location as is. Click **Next**.
+2.  Set the generation of the VM. You have two options, **Generation 1** and **Generation 2**. The second option will be suitable for UEFI-based BIOS and Network installation (PXE). We will select **Generation 1** and click **Next**.
+3.  Specify the amount of RAM. By default, this is set to 4 GB minimum, with the option of dynamic memory selected. We will leave the default as is. Click **Next**.
+4.  Configure networking by selecting the appropriate option from the dropdown. You have three options: **Not Connected**, **Default Switch**, **WSL**; we will select **Default Switch** and click **Next**.
+5.  Configure a virtual hard drive by setting the size and location. Click **Next**.
+6.  In the following window, you have the option to install an operating system now or at a later time. We will select the Ubuntu Desktop ISO image from our location of choice and click **Next**.
+7.  The following window shows the summary of the VM’s configuration. You can change any of it by going back from here. Once done, click the **Finish** button and the VM will be created.
+
+The following screenshot shows the new Ubuntu VM running inside Hyper-V:
+
+![Figure 1.7 – New Ubuntu VM using Hyper-V](img/Figure_01.07_B19682.jpg)
+
+Figure 1.7 – New Ubuntu VM using Hyper-V
+
+The installation process is similar to the one shown in the previous section, thus we will not reproduce it here again. In the next section, we will use another hypervisor, this time from Oracle.
+
+## VM provisioning using Oracle’s VirtualBox
+
+Oracle’s **VirtualBox** is a free-to-use piece of software that is multi-platform, available on Windows, macOS and Linux. We will show you how to create a Linux VM from Windows 11\. We assume that you have VirtualBox already installed. Once you start it, a user-friendly interface is available. The following steps are used to create a new VM. We will use Fedora Workstation for our example:
+
+1.  Click on the **New** icon to start the process of creating a new VM. This will open a new window where information about the VM’s name and operating system type and ISO location need to be provided. This new window is in **Guided Mode** by default. You have the option on the lower right side of the window to choose the **Expert Mode**. This will give you more control over the creation process.
+2.  Provide all the needed information. In our case, we will use Fedora, so we will give it the name `Fedora`. Point to the ISO file’s location and the type of the operating system will change automatically. If you are in **Expert Mode**, you will have some more auto-hidden sections for **Unattended Install**, **Hardware**, and **Hard** **Disk** options.
+3.  Because we are installing Fedora, the **Unattended Install** section is grayed out (see *Figure 1**.11*). This option is supported by only a few operating systems (Ubuntu, RHEL, Oracle Linux, and Windows).
+4.  In the **Hardware** section, we will provide the amount of system memory and processors we want the new VM to have. Choose according to your hardware resources, but keep in mind that each operating system has specific system requirements. In our case, we will choose 4 GB of RAM and 2 vCPUs.
+5.  The **Hard Disk** section is where you choose the amount of disk space for the VM’s hard disk. Again, choose according to your resources, but keep in mind that a minimal amount is required to meet specific system requirements. In our opinion, a minimum of 20 GB of hard disk space should be provided. Choose the location of the virtual hard drive and click **Finish**.
+6.  The VM will be created and the window will close, bringing you back to the initial VirtualBox window. Here, you will see all the relevant information about the VM. To power it on, just click on the **Start** button (the one with a big green right arrow).
+7.  A new window with the VM will appear.
+
+The following screenshot shows the VM creation window inside VirtualBox:
+
+![Figure 1.8 – VirtualBox interface](img/Figure_01.08_B19682.jpg)
+
+Figure 1.8 – VirtualBox interface
+
+As you can see, creating Linux VMs with all three major hypervisors available (from VMware, Oracle, and Microsoft) is very straightforward and relatively easy to do. No matter which solution you use, the process of installing Linux in a VM is the same.
+
+Aside from VM provisioning, Microsoft Windows offers a relatively new way to run Linux, and this is by using the Windows Subsystem for Linux. We will show you how in the next section.
+
+# Enabling Windows Subsystem for Linux
+
+Software developers and system administrators often face a tough decision in choosing the appropriate hardware and operating system platform for the specific requirements of their work or environment. In the past, Windows professionals frequently discovered that some standard development tools, frameworks, or server components were available on the Linux or macOS platforms while lacking native support on Windows. **Windows Subsystem for Linux** (**WSL**) attempts to close this gap.
+
+WSL is a Windows platform feature that provides a native GNU/Linux runtime along with the Windows desktop environment available for both versions 10 and 11 of Windows. WSL enables the seamless deployment and integration of select Linux distributions on top of the Windows kernel, without the need for a dedicated hypervisor. With WSL enabled, you can easily install and run Linux as a native Windows application.
+
+Important note
+
+Without WSL, we could only deploy and run a Linux distribution on a Windows platform by using a standalone hypervisor, such as Hyper-V, Oracle VM VirtualBox, or VMware Workstation. WSL eliminates the need for a dedicated hypervisor. At the time of writing, WSL is a Windows kernel extension with a hypervisor embedded.
+
+In this section, we provide the steps required to enable WSL and run an Ubuntu distribution on Windows. Since Windows 11 version 21H2 and Windows 10 versions 21H2 and 22H2, WSL is available by default from the Windows Store, so there is no need to use the command line to install and set it up. Go to the Microsoft Store and search for `WSL`. From the list shown, select the application shown in the following figure:
+
+![Figure 1.9 – WSL application from the Windows Store](img/Figure_01.09_B19682.jpg)
+
+Figure 1.9 – WSL application from the Windows Store
+
+After installing WSL, all you need to do is to install any Linux distributions available for it. If you attempt to open the freshly installed WSL application, you will get a terminal message saying that the WSL has no distribution installed. This means that you will need to install a distro by going back to Microsoft Store and searching for one. For example, if you search for `Linux` inside Microsoft Store, you will get results including SUSE Linux Enterprise Server, Oracle Linux, Kali Linux, Ubuntu LTS, Debian, and openSUSE Leap, among others.
+
+Important note
+
+Make sure you have Hyper-V enabled in Windows, as it is the service responsible for running WSL. To enable it, go to **Windows Features**, and select **Hyper-V** from the list, then click on **OK**. After installing the necessary components, a restart is required. Hyper-V is available by default on Windows 11 Pro, Enterprise and Education, but *NOT* on Home edition.
+
+Now you can install a Linux distribution from Microsoft Store. We will try doing this with Ubuntu for our demonstration. After installation, you can open the application, create a user, and start using it inside the command line – it is that easy. To open the new Linux distribution, enter its name in the search bar, hit *Enter*, and a new terminal window with the Linux distribution is opened directly in Windows Terminal application, as shown in the following screenshot:
+
+![Figure 1.10 – Ubuntu inside a Windows Terminal window using WSL](img/Figure_01.10_B19682.jpg)
+
+Figure 1.10 – Ubuntu inside a Windows Terminal window using WSL
+
+Furthermore, you will have access to the distribution’s filesystem directly from **File Explorer** inside Windows. The following screenshot shows the Ubuntu filesystem accessible from **File Explorer**:
+
+![Figure 1.11 – The Ubuntu filesystem in the File Explorer in Windows 11](img/Figure_01.11_B19682.jpg)
+
+Figure 1.11 – The Ubuntu filesystem in the File Explorer in Windows 11
+
+WSL enables a swift adoption of Linux for a growing number of Windows professionals. As shown in this section, WSL is relatively easy to configure, and with WSL, there’s no need for a dedicated hypervisor to run a Linux instance.
+
+By now, you have learned how to install Linux on a VM inside Windows using three different hypervisors, the VMware Workstation, Microsoft’s own Hyper-V, and Oracle’s VirtualBox. As we stated earlier, the installation process on macOS is very similar and there is no need for us to spend any more space covering it, as it would only duplicate the output. The interface of VMware Fusion on macOS is similar to the one used in Windows, with minor changes.
+
+Installing on bare metal is similar; the only difference is that you require physical access to the destination machines. As stated at the beginning of this chapter, there is one more way to install Linux, and this is over the network. This is a more advanced task that requires more attention to detail along with basic networking knowledge. Also, understanding the Linux boot process is mandatory.
+
+In the next section, we will provide some details about the network installation process.
+
+# Installing Linux – the advanced stages
+
+In this section, we will cover the more advanced aspects of installing Linux. As we saw in the previous sections, installation on bare metal and VM requires direct access to the given machines. But what if we do not have access to the location? Or there are so many machines that need to be set up, that completing the task manually would be tedious at best, and infeasible at worst?
+
+Installing Linux in an enterprise environment with tens or hundreds of machines in use can be done using an automated environment by booting through the network. As we stated earlier, a detailed overview of the network boot technique is out of the scope of this book; nevertheless, we will describe the process and show you the most important aspects of it, as none of the prominent books out there discuss this.
+
+But first, to better understand how network booting works, let us take a short look at the Linux boot process.
+
+## The Linux boot process
+
+How does Linux boot? We will give you a comprehensive view of the process without getting into too many details.
+
+When you first start your Linux-powered computer or virtual machine, the **BIOS** (or boot firmware) starts loading and initiates a bootloader. The BIOS has a specific configuration and is loaded by the manufacturer onto a memory chip on the motherboard (in the case of physical computers, not VMs). The BIOS has information about the hardware and capabilities of controlling peripherals such as keyboards and monitors. It also has information about the operating system and the location of the bootloader. Some of this information is user controlled and can be changed according to the user’s needs, such as the boot sequence for example, or password protection. The BIOS also has control over the **network interface controllers** (**NICs**) and all the external ports, including USB and display ports. But this is about all it can do, as it requires a bootloader to further initiate any operating system existing on the disk.
+
+A newer version of the BIOS is the **Unified Extensible Firmware Interface** (**UEFI**). It has the same advantages as the older BIOS, but offers more interactive interfaces and better support for newer operating systems. The drawback, however, is the lack of software support from third-party vendors.
+
+There is also **Secure Boot**, a feature introduced to offer an extra layer of security for the operating system and the software that runs. Some Linux distributions support it, but not all of them. Secure Boot uses a digital signature that proves the authenticity of the operating system. In order to support Secure Boot, the operating system developer must obtain a valid certificate for the software that can be verified on boot to prove that the system is valid and has not been tampered with.
+
+Now that we know what the BIOS, UEFI and Secure Boot are, let us learn about the bootloader. Once **Power-On Self Test** (**POST**) is finished, the **bootloader** is accessed to load the operating system. POST is a series of tests that are conducted upon startup to ensure that the hardware is fully functional. What is a bootloader? It is the bridge between the hardware and the operating system. It is stored in the boot sector of the bootable storage. It can be either a partition or the very first block of the storage medium.
+
+The bootloader used on Linux is the **Grand Unified Bootloader** (**GRUB**). It is responsible for loading the kernel of the operating system. The kernel is the central component of Linux, responsible for all the software components, drivers, services, and hardware integration. All of this forms what we call user space. It is the GRUB that has the capacity to support network booting.
+
+The information provided in this section is sufficient to get a grasp of the Linux boot process. We will now detail the use of network boot to install Linux in the following section.
+
+## PXE network boot explained
+
+Earlier in this chapter we mentioned the **PXE** (pronounced *pixie*) boot option. What exactly is PXE? It is a service that uses different networking protocols for booting over the network. It is based on different protocols and standards that were introduced forty years ago to define the much-needed network boot interoperability, also known as the **Network Bootstrap** **Program** (**NBP**).
+
+The protocols that PXE is based on are **Trivial File Transfer Protocol** (**TFTP**), **Dynamic Host Configuration Protocol** (**DHCP**), and the UDP/IP stack using the **Hyper Text Transfer Protocol** (**HTTP**). These three are the base for PXE’s application programming interface. Nowadays, most network cards available on the market already have the PXE firmware installed. This makes PXE the standard for network boot on many architectures. For more information on the latest PXE version 2.1, visit the following link: [https://web.archive.org/web/20110524083740/http://download.intel.com/design/archives/wfm/downloads/pxespec.pdf](https://web.archive.org/web/20110524083740/http://download.intel.com/design/archives/wfm/downloads/pxespec.pdf).
+
+For PXE to work, we need to have a PXE server on the network. This machine will provide the necessary bootable files in response to client requests on the network. For this, at least a DHCP and a TFTP server need to be installed on the PXE server. In addition, a **Network File System** (**NFS**) server must also be installed, as this protocol is required for network file sharing and is used in modern Linux operating systems.
+
+But before we go into further detail, let us discuss how network boot works. PXE relies on a client/server environment where different machines are equipped with PXE-enabled NICs. The network configuration of the PXE environment was developed so that it does not interfere with the existing network configuration. As DHCP and TFTP are needed, the PXE environment makes sure that it does not interfere with the existing DHCP configuration of the non-PXE router from the local network. This is a well-thought-out design for corporate environments.
+
+In a basic scenario, after all clients are set up for PXE boot (an option available from the BIOS on almost every computer), the NICs send DHCP requests over the network in order to find the local PXE server. In order to be able to correctly respond to those requests, PXE uses a sort of proxy DHCP that sends IP and mask information of the TFTP server back to the PXE-enabled clients. This way, it does not interfere with the local network’s DHCP server.
+
+Setting up a PXE server is beyond the scope of this chapter, but useful information about what this is and how it works is relevant and can be found at [https://ubuntu.com/server/docs/install/netboot-amd64](https://ubuntu.com/server/docs/install/netboot-amd64) and [https://www.redhat.com/sysadmin/pxe-boot-uefi](https://www.redhat.com/sysadmin/pxe-boot-uefi). However, further details, such as how to practically set up a DHCP server, will be found in [*Chapter 13*](B19682_13.xhtml#_idTextAnchor276).
+
+For a PXE server to work, there are some specific steps to take, depending on the installation root you follow. There are several options available, as you can use iPXE (an open source network boot firmware), `cloud-init` (specific to Ubuntu), or kickstart (for Fedora-based systems). Nonetheless, setting up DHCP, TFTP, and NFS servers is required, with the DNS server being optional (details on setting up these servers are available in [*Chapter 13*](B19682_13.xhtml#_idTextAnchor276)).
+
+As you’ll see these details later, we will not include them here. This is the introductory chapter, intended to make you comfortable with different ways to install Linux, and we will slowly build upon this foundation throughout the book to get you ready for the more advanced stuff as you go through the chapters.
+
+In the next section, we will give you some scenarios of using certain Linux flavors depending on specific needs. We will present to you what we consider to be the appropriate distributions and applications to use in different case studies. Please keep in mind that installing applications and working with package managers will be discussed in more detail in [*Chapter 3*](B19682_03.xhtml#_idTextAnchor075).
+
+# Linux distributions – a practical guide
+
+The following use cases are inspired by real-world problems, taken mostly from the authors’ own experience in the system administration and software engineering field. Each of these scenarios presents the challenge of choosing the right Linux distribution for the job.
+
+## Case study – development workstation
+
+This case study is based on the following scenario made from the perspective of a software developer:
+
+I’m a backend/frontend developer, writing mostly in Java, Node.js, Python, and Golang, and using mostly IntelliJ and VS Code as my primary IDE. My development environment makes heavy use of Docker containers (both building and deploying) and I occasionally use VMs (with VirtualBox) to deploy and test my code locally. I need a robust and versatile development platform.
+
+Let’s look at the functional and system requirements before deciding which Linux distribution is fit for the job:
+
+*   **Functional requirements**: The requirements suggest a relatively powerful day-to-day development platform, either a PC/desktop or a laptop computer. The developer relies on local resources to deploy and test the code (for instance, Docker containers and VMs), perhaps frequently in an offline (airplane mode) environment if on the go.
+*   **System requirements**: The system will primarily be using the Linux desktop environment and window manager, with frequent context switching between the **Integrated Development Environment** (**IDE**) and Terminal windows. The required software packages for the IDE, Docker, hypervisor (VirtualBox), and tools should be readily available from open source or commercial vendors, ideally always being up to date and requiring minimal installation and customization effort.
+
+### Choosing the Linux distribution
+
+The choice of Linux distribution here would be the **Ubuntu Desktop Long Term Support** (**LTS**) platform. Ubuntu LTS is relatively stable, runs on virtually any hardware platform, and is mostly up to date with hardware drivers. Software packages for the required applications and tools are generally available and stable, with frequent updates. Ubuntu LTS is an enterprise-grade, cost-effective, and secure operating system suitable for organizations and home users alike.
+
+Besides Ubuntu, **Fedora** and **openSUSE** are equally suitable for a developer’s workstation. Choosing between them depends on whether you need a **Debian-** or **Red Hat**/**SUSE**-based ecosystem, and whether you need more up-to-date packages or not.
+
+## Case study – secure web server
+
+This case study is based on the following scenario made from the perspective of a DevOps engineer:
+
+I’m looking for a robust platform running a secure, relatively lightweight, and enterprise-grade web server. This web server handles HTTP/SSL requests, offloading SSL before routing requests to other backend web servers, websites, and API endpoints. No load-balancing features are needed.
+
+Let’s look at the **functional requirements** in this case study. When it comes to open source, secure, and enterprise-grade web servers, the top choices are usually NGINX, Apache HTTP Server, Node.js, Apache Tomcat, and lighttpd. Without going into the details of selecting one web server over another, let’s just assume we pick Apache HTTP Server. It has state-of-the-art SSL/TLS support, excellent performance, and is relatively easy to configure.
+
+We can deploy this web server in VPS environments, in local (*on-premises*) data centers, or the public cloud. The deployment form factor is either a VM or a Docker container. We are looking for a relatively low-footprint, enterprise-grade Linux platform.
+
+### Choosing the Linux distribution
+
+Our choice of Linux distribution is **Rocky Linux** or **AlmaLinux**. Most of the time, those two distributions are a perfect match for Apache HTTP Server. They are relatively lightweight, coming only with bare-bones server components and an operating system networking stack. Both Rocky and Alma are widely available as VPS deployment template from both private and public cloud vendors. Our Apache HTTP Server can run as a Docker container on top of Rocky Linux or AlmaLinux, as we may need to horizontally scale to multiple web server instances. More details on setting up a web server are provided in [*Chapter 13*](B19682_13.xhtml#_idTextAnchor276).
+
+## Use case – personal blog
+
+This case study is based on the following scenario made from the perspective of a software engineer and blogger:
+
+I want to create a software engineering blog. I’ll be using the Ghost blogging platform, running on top of Node.js, with MySQL as the backend database. I’m looking for a hosted Virtual Private Server (VPS) solution by one of the major cloud providers. I’ll be installing, maintaining, and managing the related platform myself. Which Linux distribution should I use?
+
+Let’s discuss the **functional requirements** for this use case. We are looking for a self-managed publicly hosted **Virtual Private Server** (**VPS**) solution. The related hosting cost is a sensitive matter. Also, the maintenance of the required software packages should be relatively easy. We foresee frequent updates, including the Linux platform itself.
+
+### Choosing the Linux distribution
+
+Our picks for the Linux distribution in this scenario would be either **Debian Stable** or **Ubuntu Server LTS**. As previously highlighted, Ubuntu is a robust, secure, and enterprise-class Linux distribution. **Debian** is equally stable and offers good options for applications. The platform maintenance and administration efforts are not demanding. The required software packages – Node.js, Ghost, and MySQL – are easily available and are well maintained. Ubuntu Server has a relatively small footprint. We can run our required software stack for blogging easily within the Ubuntu system requirements so the hosting costs would be reasonable.
+
+## Use case – media server
+
+This case study is based on the following scenario made from the perspective of a home theater aficionado:
+
+I have a moderately large collection of movies (personal DVD/Blu-ray backups), videos, photos, and other media, stored on Network Attached Storage (NAS). The NAS has its own media server incorporated, but the streaming performance is rather poor. I’m using Plex as a media player system, with Plex Media Server as the backend. What Linux platform should I use?
+
+Based on this description, let’s identify the **system requirements** for this use case. The critical system requirements of a media server are speed (for a high-quality and smooth streaming experience), security, and stability. The related software packages and streaming codecs are subject to frequent updates, so platform maintenance tasks and upgrades are quite frequent. The platform is hosted locally, on a PC desktop system, with plenty of memory and computing power in general. The media is being streamed from the NAS, over the in-house **Local Area Network** (**LAN**), where the content is available via an NFS share.
+
+### Choosing the Linux distribution
+
+Both **Debian** and **Ubuntu** would be excellent choices for a good media server platform. Debian’s *stable* release is regarded as rock solid and very reliable by the Linux community, although it’s somewhat outdated. Both feature advanced networking and security, but what may come as a decisive factor in choosing between the two is that Plex Media Server has an ARM-compatible package for Debian. The media server package for Ubuntu is only available for Intel/AMD platforms. If we owned a small-factor ARM-processor-based appliance, Debian would be the right choice. Otherwise, **Ubuntu LTS** would meet our needs here just as well.
+
+Now that you know about different use cases, it is time to pick your Linux distribution and start playing with it. In this chapter, we provided you with a plethora of information that will prove invaluable as you start your journey with Linux.
+
+# Summary
+
+In this chapter, we learned about Linux distributions, with a practical emphasis on choosing the right platform for our needs and performing the related installation procedures.
+
+Throughout the chapter, the main emphasis was on the Ubuntu distribution. In the spirit of a practical approach, we covered VM environments running Linux. We also took a short route through the Windows realm, where we touched upon WSL, a modern-day abstraction of Linux as a native Windows application.
+
+With the skills learned in this chapter, we hope you’ll have a better understanding of how to choose different flavors of Linux distros based on your needs. You’ve learned how to install and configure Linux on a variety of platforms. You will use some of these skills throughout the rest of the book, but most importantly, you’ll now be comfortable quickly deploying the Linux distribution of your choice and testing with it.
+
+Starting with the next chapter, we’ll take a closer look at the various Linux subsystems, components, services, and applications. [*Chapter 2*](B19682_02.xhtml#_idTextAnchor053), *The* *Linux Shell and* *Filesystem*, will familiarize you with the Linux filesystem internals and related tools.
+
+# Questions
+
+Here are a few questions and thought experiments that you may ponder, some based on the skills you learned in this chapter, and others revealed in later parts of the book:
+
+1.  If we have a relatively large number of Linux VM instances or distros deployed and running at the same time, how could we make it easier to manage them?
+
+**Hint**: Use **Vagrant**, a tool for building and managing VM environments.
+
+1.  Can we run multiple Linux instances in WSL?
+
+**Hint**: We can.
+
+# Further reading
+
+Here are a few Packt titles that can help you with the task of Linux installation:
+
+*   *Fundamentals of Linux*, by Oliver Pelz
+*   *Mastering Ubuntu Server – Fourth Edition*, by Jay LaCroix
+*   *Mastering Linux Administration – First Edition*, by Alexandru Calcatinge and Julian Balog

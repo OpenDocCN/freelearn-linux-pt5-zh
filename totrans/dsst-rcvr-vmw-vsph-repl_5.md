@@ -1,0 +1,400 @@
+# Chapter 5. Configuring and Using vSphere Replication 5.5
+
+In the previous chapter, we learned how to deploy the components required to form a vSphere Replication environment. Now, it is time to take the discussion further. In this chapter, we learn how replication actually works and which configuration tasks are involved with the replication of a virtual machine.
+
+We will be covering the following topics:
+
+*   Adding a remote site as a target
+*   Configuring the replication of a VM to the local site
+*   Configuring the replication of a VM to the remote site
+*   How does replication work?
+*   Using the replication seeds
+*   Monitoring a replication
+*   Reconfiguring a replication
+*   Changing the target datastore
+*   Pausing an ongoing replication
+*   Synchronizing data immediately
+*   Stopping a replication for a VM
+*   Moving a replication to another VR Server
+*   Recovering virtual machines
+*   Configuring a Failback for virtual machines
+*   Configuring SRM to leverage vSphere Replication
+
+# Adding a remote site as a target
+
+A remote vCenter Server can be added as one of the targets. The pairing is mandatory when both the sites are managed by different vCenter Servers. This is because the VRM Server registered to the protected site vCenter can only see VR Servers that are registered to it. You can deploy multiple VR Servers at either of the sites, but it can only be used if they are registered to its local VRM Server. The pairing will not be possible if the vCenter Server managing the remote site does not have a VRMS registered to it. Refer to the following diagram:
+
+![Adding a remote site as a target](img/6442EN_02_31.jpg)
+
+When adding a target site, you are prompted to specify the address (FQDN/IP) and connection credentials of the vCenter Server managing the target site. Most environments use separate accounts for connections between different vSphere components. The separate account could also be a service account corresponding to that component. In this case, you could use the service account corresponding to the vCenter Server that you are adding as a target site. Here, the vCenter Server acts as a proxy to communicate with the VRM Server registered to the target site. Once the connection is successfully made, the VRM Server will be listed as the target site.
+
+### Note
+
+The default name of the site of the VRM Server is the name of the vCenter Server it is registered to. This can be changed at the VRA's web interface, under the **Configuration** tab.
+
+The following procedure will guide you through the steps required to add a target site:
+
+1.  From the vSphere Web Client's home page, click on **vSphere Replication** to bring up the vSphere Web Client's interface for vSphere Replication, as shown in the following screenshot:![Adding a remote site as a target](img/6442EN_02_01.jpg)
+2.  This page will list the vCenter Server to which the VRMS Server is registered. Click on the toolbar item **Manage**, which should bring up the **Manage** tab for that vCenter Server with the **vSphere Replication** subtab selected.![Adding a remote site as a target](img/6442EN_02_02.jpg)
+3.  Click on **Target Site**, which is on the left pane, to list all the current target sites.
+4.  Navigate to **Actions** | **All vSphere Replication Actions** | **Connect to target site** to bring up the **Connect to target site** window, as shown in the following screenshot:![Adding a remote site as a target](img/6442EN_02_03.jpg)
+5.  Provide the address (FQDN/IP) of the vCenter Server managing the target site and its connection credentials and click on **OK**. Although the following screenshot shows the use of the Administrator account, it is recommended to use a separate account:![Adding a remote site as a target](img/6442EN_02_04.jpg)
+6.  Once done, the VRM Server registered to the added vCenter should be listed as the target site.![Adding a remote site as a target](img/6442EN_02_05.jpg)
+
+# Configuring the replication of a VM to the local site
+
+Replication can be across sites or to the same site. If you choose to replicate the virtual machines that you plan to protect to a datastore at the same site, then you could use vSphere Replication to achieve the same.
+
+Configuring replication requires the availability of a replication server (VRS) at the target site. As you have already deployed a vSphere Replication Appliance that includes both the VRMS and VRS components, there is no need for an additional step to get the replication working at the local site.
+
+The following procedure will guide you through the steps required to configure replication for a VM:
+
+1.  Right-click on the virtual machine from the inventory and navigate to the **Configure Replication** tab in **All vSphere Replication Actions**, as shown in the following screenshot:![Configuring the replication of a VM to the local site](img/6442EN_02_06.jpg)
+2.  Select the local site as the target site and click on **Next**.![Configuring the replication of a VM to the local site](img/6442EN_02_07.jpg)
+3.  You will now have an option to manually select a VR Server to pass the replication traffic through or let VRMS do the selection. Highlight the VR Server that you want to use and click on **Next**.![Configuring the replication of a VM to the local site](img/6442EN_02_08.jpg)
+4.  Select a datastore where you would like to place the replica of the virtual machine. Optionally, select the checkbox of the **Advanced disk configuration** option and then click on **Next**.![Configuring the replication of a VM to the local site](img/6442EN_02_09.jpg)
+5.  Select the virtual disk format and click on **Next** to continue.![Configuring the replication of a VM to the local site](img/6442EN_02_10.jpg)
+
+    ### Note
+
+    You will be prompted to make a choice for every VMDK associated with the VM being configured for replication.
+
+6.  Choose a guest OS-quiescing method. Currently, the only available quiescing method is Microsoft VSS.
+7.  Set a planned **Recovery Point Objective (RPO)** value. The default is **4** hours, the lowest possible being **15** minutes and the highest **24** hours. You can also choose a save point for the snapshots of the replication by selecting the checkbox to enable it. By default, it creates **3** points in time instances, and such instances that are created during the last **5** days are retained. You can only retain a maximum of **24** points in time snapshots of the replication. Point in time snapshots are useful if you want to maintain multiple recoverable points for the virtual machine. Make a selection and click on **Next** to continue. Refer to the following screenshot:![Configuring the replication of a VM to the local site](img/6442EN_02_11.jpg)
+8.  On the **Ready to complete** screen, review the settings and click on **Finish** to configure the replication.
+9.  The **Recent Tasks** pane should show a task **Configure a virtual machine for replication** as completed successfully.
+
+# Configuring the replication of a VM to a remote site
+
+You can configure the replication of a VM to a datastore accessible to a remote site. To achieve this, you will need a vSphere Replication Server component at the remote site. For the remote site to be accessible, you will need to add that server as a target site. Read the *Adding a remote site as a target* section in this chapter for more information.
+
+The following procedure will guide you through the steps required to configure the replication of a VM onto a remote site:
+
+1.  Add a remote site vCenter as the target site. Read the *Adding a remote site as a target* section in this chapter for instructions.
+2.  Right-click on the virtual machine from the inventory and navigate to the **Configure Replication** tab in **All vSphere Replication Actions**.
+3.  Select the remote target site and click on **Next**.![Configuring the replication of a VM to a remote site](img/6442EN_02_12.jpg)
+4.  You will now have an option to manually select a VR Server to pass the replication traffic through or let VRMS do the selection. Make a selection and click on **Next**.
+5.  Select a datastore if you like to place the replica of the virtual machine.
+6.  Select the **Advanced disk configuration** checkbox and click on **Next**.
+7.  Select the virtual disk format and click on **Next** to continue. You will be prompted to make a choice for every VMDK associated with the VM being configured for replication.
+8.  Choose a guest OS-quiescing method. Currently the only available quiescing method is Microsoft VSS.
+9.  Set a planned RPO value. The default is 4 hours, the lowest possible being 15 minutes and the highest 24 hours.
+10.  You can also choose a save point in snapshots of the replication by selecting the checkbox to enable it. By default, it creates three points in time instances, and such instances created during the last five days are retained. You can only retain a maximum of 24 points in time snapshots of the replication. Make an intended section and click on **Next** to continue.
+11.  On the **Ready to complete** screen, review the settings and click on **Finish** to configure the replication.
+12.  The **Recent Tasks** pane should show a task **Configure a virtual machine for replication** as completed successfully.
+
+Regardless of whether a VM is configured to replicate to a local or remote site, the replication works in the same manner. Read the following section for more insight.
+
+# How does replication work?
+
+On successfully configuring the replication on a VM, it first does an initial full sync of the source VMDKs to the target datastore. If you already have the base VMDKs previously copied to the destination datastore, then only the changed blocks are replicated. The replication happens over the network using the **Network File Copy** (**NFC**) protocol. The changed blocks are transferred using ESXi's management VMkernel port group.
+
+Once the initial sync is complete, the VR agent tracks the changed blocks using the vSCSI filter driver. It tracks, writes, and maintains a bitmap of the changed blocks. Every time a replica is created, the data transferred is copied to a redo logfile. This is done to make sure that the VM at the recovery site is not corrupted in the event of a network disruption. The redo log is committed to the base disk only after the changed blocks are fully copied, thereby making each replica crash consistent. When you configure the replication for the VM, you get to choose the RPO and the number of multiple points in time snapshots that you would like to maintain. The RPO ranges from 15 minutes to 24 hours, and you can have up to 24 points in time snapshots. This means you can have up to 24 historical point-time recovery points of the replicated VM.
+
+Both RPO and the number of points in time instances dictate the number of historical snapshots maintained for the VM. For instance, if you set an RPO of 2 hours, then you will retain 12 point-in-time recovery points for the VM each day. While the RPO is set to 2 hours and if the number of point-in-time instances is set to 4, then you have only 4 snapshots for that VM. VR tries to keep the oldest of the recovery points created.
+
+Once a replication has been successfully configured, the destination datastore is populated with the following files:
+
+*   `*.vmdk`: This is the base disk(s) to which the VM data is being replicated to
+*   `hbrdisk.RDID-*`: This is the redo logfile that has the latest replication data
+*   `hbrcfg*.vmx`: This is a shadow VMX file that will be used to register the VM when a recovery is initiated
+
+The following screenshot shows the contents of the replica VM's directory:
+
+![How does replication work?](img/6442EN_02_13.jpg)
+
+### Note
+
+If a VM being replicated is modified by adding a new VMDK to it, then the active replication will stop with an error. The replication should then be manually reconfigured by the administrator to include the new VMDK and resume the replication.
+
+# Using the replication seeds
+
+When you configure a replication on a virtual machine for the very first time, the vSphere Replication will need to make an initial copy of the virtual machine's VMDKs. The initial copy can be bandwidth-intensive and time-consuming, based on the size of the VMDKs. We can overcome this by transporting the VMDKs to the intended location, prior to configuring the replication on the VM. The transport method can be of your choice, ideally couriered to the destination site, if remote.
+
+### Note
+
+The copies of the VMDKs transported and placed at the destination datastore are referred to as seeds.
+
+The following procedure will guide you through the steps required to use an available seed for a VM:
+
+1.  Shut down the virtual machine at the source (protected) site, which you intend to replicate.
+2.  Copy the virtual machine's folder to the target datastore. If it is in a different datacenter, then the files need to be transported to the datacenter first and then uploaded to the target datastore.
+3.  Power on the virtual machine at the source (protected) site.
+4.  Right-click on the virtual machine from the inventory and navigate to the **Configure Replication** tab in **All vSphere Replication Actions**.
+5.  Select the intended target site and click on **Next**.
+6.  You will now have an option to manually select a VR Server to pass the replication traffic through or to let VRMS do the selection. Make an intended selection and click on **Next**.
+7.  Select a datastore where you would like to place the replica of the virtual machine, and set the **Target location** as the folder corresponding to the copy of the source VM at the destination datastore. To do this, hit the **Browse** button to bring up the **Select Target Location** window, as shown in the following screenshot:![Using the replication seeds](img/6442EN_02_14.jpg)
+8.  The **Select Target Location** window will help you browse the selected datastore. Locate and select the seed VM's folder, and then click on **OK** to confirm the selection and return to the replication configuration wizard.![Using the replication seeds](img/6442EN_02_15.jpg)
+9.  Click on **Next** to continue.
+10.  A **Replication Seed Confirmation** message, revealing that duplicates of the VMDKs were found, will be presented seeking your confirmation to use them as seeds. Click on **Yes** to confirm.![Using the replication seeds](img/6442EN_02_16.jpg)
+
+    If the VM being replicated has multiple VMDKs and if the duplicate of each VMDK is found, then there will be a **Replication Seed Confirmation** message for each VMDK, as shown in the following screenshot:
+
+    ![Using the replication seeds](img/6442EN_02_17.jpg)
+11.  Select the virtual disk format and click on **Next** to continue. If the VM being replicated has multiple VMDKs, then there will be a prompt to select the disk format for each VMDK.
+12.  Choose a guest OS-quiescing method.
+13.  Set a planned RPO value.
+14.  You can choose **Enable multiple points in time snapshots** and also specify the number of points you would prefer to be retained. Make the planned selections and click on **Next** to continue.
+15.  On the **Ready to complete** screen, review the settings and click on **Finish** to configure the replication.
+16.  The **Recent Tasks** pane should show a **Configure a virtual machine for replication** task as completed successfully.
+
+Regardless of whether you choose to use a seed or not, vSphere Replication always does initiate an initial full sync. With the case of using a seed, the initial full sync will take considerably less time.
+
+# Monitoring a replication
+
+Replications configured on virtual machines can be monitored for their current status. Replications can be incoming or outgoing.
+
+The following procedure will guide you through the steps required to monitor a replication:
+
+1.  Connect to the vCenter Server and navigate to the inventory home.
+2.  Click on **vSphere Replication** to bring up the vSphere Replication home page.
+3.  Click on **Monitor** to go to the monitor tab with the **vSphere Replication** subtab selected.
+4.  In the left pane, you will find both **Outgoing Replications** and **Incoming Replications** selected.
+
+    ### Note
+
+    The **Outgoing Replications** section will show all the replications leaving the VR Server at the current site, and the **Incoming Replications** section will show all the replications arriving at the VR at the current site.
+
+5.  Selecting either **Incoming Replications** or **Outgoing Replications** will list the names of the VMs being replicated and the current status of the replication.
+6.  At the **Monitor** tab, you will get options to reconfigure, pause, synchronize, stop, and move an ongoing replication. More information on these tasks has been covered in separate sections of this chapter.
+
+# Reconfiguring a replication
+
+An ongoing replication can be reconfigured. This is done when there is a need to change the replication server in use, the target datastore, or the recovery settings.
+
+The following procedure will guide you through the steps required to reconfigure a replication:
+
+1.  Connect to the vCenter Server and navigate to the inventory home.
+2.  Click on **vSphere Replication** to bring up the vSphere Replication home page.
+3.  Click on **Monitor** to go to the monitor tab with the **vSphere Replication** subtab selected.
+4.  In the left pane, you will find both **Outgoing Replications** and **Incoming Replications** selected. Make an appropriate selection depending on whether you are at the local or the remote vCenter Server.
+5.  Select the intended replication and click on the **Reconfigure** option in the **Actions** menu to start the reconfiguration wizard, as shown in the following screenshot:![Reconfiguring a replication](img/6442EN_02_18.jpg)
+6.  Change the replication server to handle the traffic, if intended. Click on **Next** to continue.
+7.  Select the new target datastore, if intended, and click on **Next** to continue.
+8.  Modify **Replication Options**, if intended, and click on **Next** to continue.
+9.  Modify **Recovery Settings**, if intended, and click on **Next** to continue.
+10.  Review the **Ready to complete** screen and click on **Finish** to initiate the reconfiguration.
+
+# Changing the target datastore
+
+You can change the target datastore of an ongoing replication by reconfiguring the replication. Doing so will result in the deletion of the files from the current destination datastore, and an initial full sync will be performed again to the new target datastore location.
+
+The following procedure will guide you through the steps required to change the target datastore of an ongoing replication:
+
+1.  Connect to the vCenter Server and navigate to the inventory home page.
+2.  Click on **vSphere Replication** to bring up the vSphere Replication home page.
+3.  Click on **Monitor** to go to the monitor tab with the **vSphere Replication** subtab selected.
+4.  In the left pane, you will find both **Outgoing Replications** and **Incoming Replications** as selected. Make an appropriate selection depending on whether you are at the local or the remote vCenter Server.
+5.  Select the replication and click on the **Reconfigure** option in the **Actions** menu to start the reconfiguration wizard.
+6.  Select a replication server to handle the traffic. In this case, we have selected the local VRA. Click on **Next** to continue.
+7.  Select the new target datastore. As shown in the following screenshot, the **Target location validation** window will appear and show a warning indicating that the existing replicas will be lost. Click on **Next** to continue.![Changing the target datastore](img/6442EN_02_19.jpg)
+
+    ### Note
+
+    There will be multiple prompts to select the target datastore if the VM has multiple VMDKs.
+
+8.  Do not modify **Replication Options,** and click on **Next** to continue.
+9.  Do not modify **Recovery Settings,** and click on **Next** to continue.
+10.  Review the **Ready to complete** screen and click on **Finish** to initiate the reconfiguration.
+11.  You should see a **Reconfigure virtual machine replication** task as completed successfully in the **Recent Tasks** pane.
+12.  The status should read **Initial Full Sync**. If the initial full sync to the new location completes successfully, the status will then read **OK**.
+
+# Pausing an ongoing replication
+
+An ongoing replication can be paused regardless of the status it is in. Pausing a replication will stop VR from tracking the changes to the VMDK files. The following procedure will guide you through the steps required to pause an ongoing replication:
+
+1.  Connect to the vCenter Server and navigate to the inventory home page.
+2.  Click on **vSphere Replication** to bring up the vSphere Replication home page.
+3.  Click on **Monitor** to go to the monitor tab with the **vSphere Replication** subtab selected.
+4.  In the left pane, you will find both **Outgoing Replications** and **Incoming Replications** as selected. Make an appropriate selection depending on whether you are at the local or the remote vCenter Server.
+5.  Select the replication that you want to pause and click on the **Pause** option in the **Actions** menu, as shown in the following screenshot:![Pausing an ongoing replication](img/6442EN_02_20.jpg)
+6.  Click on **Yes** on the confirmation window.
+7.  Once the replication has been successfully stopped, the status should read **Paused**.
+
+On pausing an ongoing replication, the VR Server will temporarily stop monitoring the source VM. A paused replication can then be resumed by following the same procedure, but select the **Resume** option in the **Actions** menu as a fifth step.
+
+# Synchronizing data immediately
+
+Synchronization is the process of transferring changed blocks from the source to the replica at the destination via the vSphere Replication Server component. vSphere Replication synchronizes the data based on the RPO setting. If the RPO is set to 4 hours, then the synchronization happens every 4 hours.
+
+However, we do have an option to force an immediate synchronization, by using the **Synchronize Data Immediately** option available as a toolbar icon in the **Monitor** tab or the **Sync Now** option available via the action menu. Both options initiate the same task.
+
+The following procedure will guide you through the steps required to initiate the immediate data synchronization:
+
+1.  Connect to the vCenter Server and navigate to the inventory home.
+2.  Click on **vSphere Replication** to bring up the vSphere Replication home page.
+3.  Click on **Monitor** to go to the monitor tab with the **vSphere Replication** subtab selected.
+4.  In the left pane, you will find both **Outgoing Replications** and **Incoming Replications** as selected. Make an appropriate selection depending on whether you are at the local or the remote vCenter Server.
+5.  Select the replication that you want to pause and click on the **Sync Now** tab in the **Actions** menu, as shown in the following screenshot:![Synchronizing data immediately](img/6442EN_02_21.jpg)
+6.  You should see a **Synchronize virtual machine** task complete successfully in the **Recent Tasks** pane.
+
+# Stopping a replication on a VM
+
+You can choose to stop the replication on a VM if there is a need to do so. Stopping a replication will permanently stop it and delete all the replicas. This is normally done to remove the replication for a VM.
+
+The following procedure will guide you through the steps required to stop replication of a virtual machine:
+
+1.  Connect to the vCenter Server and navigate to the inventory home page.
+2.  Click on **vSphere Replication** to bring up the vSphere Replication home page.
+3.  Click on **Monitor** to go to the monitor tab with the **vSphere Replication** subtab selected.
+4.  Select **Outgoing Replications** if the VM is at the protected site, **Incoming Replications** if it is at the recovery site, and either of those if it is replicated to the same site as the source.
+5.  Select the replication, right-click on it, and click on the **Stop** menu item, as shown in the following screenshot:![Stopping a replication on a VM](img/6442EN_02_22.jpg)
+6.  You will be prompted to confirm the selection. Click on **Yes** to confirm. Refer to the following screenshot:![Stopping a replication on a VM](img/6442EN_02_23.jpg)
+7.  The **Recent Tasks** pane should show the two tasks, **Disable Replication of the virtual machine** and **Unconfigure virtual machine replication**, as completed successfully.
+8.  The **Outgoing Replications** or **Incoming Replications** sections will no longer list the stopped replication.
+
+# Moving a replication to another VR Server
+
+You can choose to move an active replication to another vSphere Replication Server if there is a need. This is generally done if you have multiple VR Servers at the recovery site and you intend to distribute the replication load onto those servers. Moving a replication to another VR Server requires a reconfiguring of the replication on the VM.
+
+The following procedure will guide you through the steps required to move the replication to another VR Server:
+
+1.  Connect to the vCenter Server and navigate to the inventory home page.
+2.  Click on **vSphere Replication** to bring up the vSphere Replication home page.
+3.  Click on **Monitor** to go to the monitor tab with the **vSphere Replication** subtab selected.
+4.  Select either **Outgoing Replications** or **Incoming Replications**.
+5.  Select the replication, right-click on it, and click on the **Move to** menu item, as shown in the following screenshot:![Moving a replication to another VR Server](img/6442EN_02_24.jpg)
+6.  You should now be presented with a list of vSphere Replication Servers registered to the site the VM is being replicated to. Make a selection and click on **OK**. Refer to the following screenshot:![Moving a replication to another VR Server](img/6442EN_02_25.jpg)
+7.  The **Recent Tasks** pane should show the **Move replication to other VR Server** task as completed successfully and the status should read **OK**.
+
+# Recovering virtual machines
+
+Now that we have described how to configure replication for the virtual machines, the story will remain half told if we do not cover how to recover virtual machines using their replicas. You perform a recovery only at the target site. In other words, you will be presented with an option to initiate a recovery only at the site that has seen the incoming replication.
+
+The following procedure will guide you through the steps required to perform a recovery:
+
+1.  Connect to the vCenter Server managing the remote site and navigate to the inventory home page.
+
+    ### Tip
+
+    If there is only one vCenter Server managing both the protected and recovery sites, then vSphere Replication's **Monitor** tab will show both the outgoing and incoming replications for the virtual machine.
+
+2.  Click on **vSphere Replication** to bring up the vSphere Replication home page.
+3.  Click on **Monitor** to go to the monitor tab with the **vSphere Replication** subtab selected.
+4.  Select **Incoming Replications** from the left pane and select the virtual machine you would like to recover.
+5.  With the virtual machine selected, right-click on it and click on **Recover**.
+6.  You will be presented with the recovery options: **Recover with recent changes** and **Recover with the latest available data**. Choose an intended option and click on **Next** to continue. More insight on these options will be included at the end of this section. Refer to the following screenshot:![Recovering virtual machines](img/6442EN_02_26.jpg)
+7.  Select the datacenter/folder you intend to place the VM in. Only the datacenter to which the virtual machine was replicated can be selected. Refer to the following screenshot:![Recovering virtual machines](img/6442EN_02_27.jpg)
+
+    ### Tip
+
+    You will not be able to place the recovered VM into the same inventory-hierarchical level as that of the source VM. It is a general practice to create a folder under the datacenter level to house the recovered VMs.
+
+8.  Click on **Next** to continue.
+9.  Select the compute resource (cluster/host/resource pool) and click on **Next**.
+10.  If you still have leftover files at the source datastore, then you will be prompted to overwrite. Click on **Yes** to confirm.![Recovering virtual machines](img/6442EN_02_28.jpg)
+11.  Click on **Next** to continue.
+12.  On the **Ready to complete** screen, you can choose not to power on the recovered virtual machine by deselecting the **Power on the virtual machine after recovery** checkbox. It is selected (checked) by default. Click on **Finish** to start the recovery.![Recovering virtual machines](img/6442EN_02_29.jpg)
+13.  The **Recent Tasks** pane should show a **Recover Virtual Machine** task as completed successfully. The replication status of the VM will show as **Recovered**.![Recovering virtual machines](img/6442EN_02_30.jpg)
+
+After a successful recovery, the inventory should show the recovered VM listed and powered on.
+
+## Recover with recent changes
+
+This option will initiate an immediate synchronization to make sure that the VM after recovery has the latest data in it. This is, however, not possible if the source VM is powered on. You will have to manually power off the VM if it is running.
+
+## Recover with the latest available data
+
+This option will recover using the most recent redo log that was created. In this case, you will lose all the changes that happened at the source VM since the last replication. The amount of data loss will not exceed the RPO set. For instance, if the RPO was set to 15 minutes, then you would only lose 15 minutes worth of data.
+
+# Configuring a Failback for virtual machines
+
+With vSphere Replication, configuring a Failback for a virtual machine is a manual process. The following process will guide you through the steps required to perform a Failback:
+
+1.  Recover the virtual machine to the recovery site. Read the *Recovering virtual machines* section for instructions.
+2.  Remove the virtual machine from the inventory on the protected site.
+3.  Configure an outgoing replication from the recovery site to the protected site. Read the *Configuring a replication of a VM to a remote site* section for instructions.
+
+When configuring the replication from the recovery to the protected site, if the datastore at the protected site has the VM files, then those can be used as seeds; otherwise, an initial full sync is performed.
+
+### Tip
+
+A Failover can be automated using Site Recovery Manager.
+
+# Configuring SRM to leverage vSphere Replication
+
+vSphere Replication as a standalone product has no ability to automate DR tasks, such as a test, a Failover, or a Failback. SRM can be used to leverage vSphere Replication as the replication engine and use its orchestration ability to automate the DR tasks. Refer to the following diagram:
+
+![Configuring SRM to leverage vSphere Replication](img/6442EN_02_32.jpg)
+
+SRM relies on the concept of two sites that replicates data between them with the help of a replication engine. So, you need two sites managed separately by two different vCenter Servers. Both the vCenter Servers should have a VRMS instance registered to it. Meaning, you need to deploy a **vSphere Replication Appliance** (**VRA**) at both the sites. Once the VRA is deployed, use the vSphere Web Client's vSphere Replication interface at the protected site to add the recovery site as the target site. For more information on how to add target sites, read the *Adding a remote site as a target* section. Now, for SRM to detect the registered vSphere Replication Appliances at both the sites, you will need to install the vSphere Replication component bundled with the SRM installer. If you already have SRM installed, you can run the installer to repair the installer and install vSphere Replication components as well. Once you have installed the vSphere Replication component, the SRM interface should list vSphere Replication.
+
+All the DR tasks that can be performed using SRM have been explained in the chapters that cover SRM's array-based replication. Although the DR tasks are notably similar, there are a few changes to the workflow.
+
+We will cover the following tasks in this section:
+
+*   Creating a vSphere Replication Protection Group
+*   Creating a vSphere Replication Recovery Plan
+*   Testing a vSphere Replication Recovery Plan
+*   Performing a Failover (Recovery)
+*   Performing a Failback (reprotect and Failover)
+
+## Creating a vSphere Replication Protection Group
+
+You will need to create a Protection Group for the virtual machines you would like to protect using vSphere Replication. Unlike the array-based replication, you can select any replication-enabled virtual machine to become a part of a Protection Group.
+
+To do this, perform the following steps:
+
+1.  Navigate to the vCenter Server's inventory home page and click on **Site Recovery**.
+2.  Click on **Protection Groups** on the left pane.
+3.  Click on **Create Protection Group** to bring up the **Create Protection Group** wizard.
+4.  In the wizard, select the **Protection Group Type** as **vSphere Replication (VR)** and click on **Next** to continue.
+5.  The next screen will provide you with a list of all the replication-enabled virtual machines. Choose the ones you want to include in the Protection Group and click on **Next** to continue.
+6.  Provide a name and an optional description for the Protection Group and click on **Next** to continue.
+7.  On the **Ready to Complete** screen, click on **Finish** to create the Protection Group.
+
+You should now see the **Create Protection Group** and **Protect VM** task as completed successfully in the **Recent Tasks** pane. At the **Recovery Site**, you should see a **Shadow Virtual Machine** created for the virtual machines we added to the Protection Group.
+
+## Creating a vSphere Replication Recovery Plan
+
+Once the Protection Groups are created, the next step is to create Recovery Plans.
+
+To do this, perform the following steps:
+
+1.  Navigate to the vCenter Server's inventory home page and click on **Site Recovery**.
+2.  Click on **Recovery Plans** in the left pane and click on **Create Recovery Plan** to bring up the **Create Recovery Plan** wizard.
+3.  The remote site is chosen as the recovery site by default. Click on **Next** to continue.
+4.  Select a Protection Group of the type VR. Note that this window will also display Protection Groups of the array-based type, if there are any. So, make sure that you select a Protection Group of the type VR and click on **Next** to continue.
+5.  Choose **Recovery Network** and **Test Network**. You can leave the **Test Network** at **Auto** if you intend to use the temporary vSwitch and the port group that SRM creates for the test; otherwise, you could choose another port group that you have created for the testing. Click on **Nex**t to continue.
+6.  Provide a **Recovery Plan Name** and an optional description and then click on **Next** to continue.
+7.  In the **Ready to Complete** screen, review the options and click on **Finish** to create the Recovery Plan.
+
+You should see a **Create Recovery Plan** task as completed successfully in the **Recent Tasks** pane.
+
+## Testing a vSphere Replication Recovery Plan
+
+Any Recovery Plan that you create should be periodically tested to make sure that it is ready for a DR activity, should the need arise.
+
+This is done by performing the following steps:
+
+1.  Navigate to the vCenter Server's inventory home page and click on **Site Recovery**.
+2.  Click on **Recovery Plans** in the left pane and choose a plan for a vSphere Replication Protection Group.
+3.  Click on the **Test** button to bring up the **Test wizard**.
+4.  By default, the **Replicate recent changes to recovery site** checkbox is selected. Leave it selected and click on **Next** to continue.
+5.  On the next screen, review the options and click on **Start** to begin the test operation.
+
+The progress of the recovery steps can be monitored in the **Recovery Steps** tab.
+
+### Note
+
+Make sure that you run a cleanup after the test is complete.
+
+## Performing a Recovery or a Planned Migration
+
+In the event of a disaster at the protected site or when there is the need for a Planned Migration, we can use SRM's Recovery option to run the Recovery Plan to perform either of the tasks. A Planned Migration and a Recovery are different in terms of whether the replication of the recent changes is necessary. A Planned Migration cannot proceed without being able to replicate the recent changes. A disaster recovery will attempt to replicate the recent changes, but it would continue even if it is unable to do so.
+
+The procedure is the same regardless of the replication engine in use. Refer to the *Performing a Planned Migration* and *Performing a disaster recovery (Failover)* sections from [Chapter 3](ch03.html "Chapter 3. Testing and Performing a Failover and Failback"), *Testing and Performing a Failover and Failback*.
+
+A Recovery is always from the recovery site. Once initiated, a new sync is initiated to replicate the recent changes. Once done, the protected virtual machine is powered off, and the replication status is changed to recovered.
+
+## Performing a Failback (reprotect and Failover)
+
+After a Failover, you can enable protection of the virtual machines in the reverse order, which is achieved by running a reprotect operation. Refer to the following diagram:
+
+![Performing a Failback (reprotect and Failover)](img/6442EN_02_33.jpg)
+
+A reprotect will reverse the direction of the replication. Now, after the original protected site becomes operational, you could choose to Failback to the original site. This is achieved by issuing a Failover after a successful reprotect operation. Once the Failover is complete, the replication status would be set to recovered, and there will not be an active replication. To re-enable a replication in the original direction, you should run a reprotect operation again.
+
+# Summary
+
+In the previous chapter, you learned how to set up a vSphere Replication environment, and then use it to configure a replication on virtual machines. We also learned how to stop or pause an ongoing replication and how to move the replication load onto another vSphere Replication Server. More importantly, we learned how to recover a virtual machine from a replica. Most of the replication-related activities that we have discussed in the chapter are done on a per VM basis, and that is all you can do with vSphere Replication when implemented as a standalone solution. We then learned how to configure vCenter Site Recovery Manager to leverage the vSphere Replication and perform the disaster recovery tasks.

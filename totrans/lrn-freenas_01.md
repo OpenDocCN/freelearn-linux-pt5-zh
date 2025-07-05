@@ -1,0 +1,277 @@
+# Chapter 2. Preparing to Add FreeNAS to Your Network
+
+Like all system deployments, a NAS needs to be correctly planned to maximize success. In this chapter, we will look at the basic planning points including:
+
+*   Capacity planning
+
+*   Hardware requirements
+
+*   Planning for backup
+
+*   Redundancy needs
+
+*   Network infrastructure
+
+This chapter may seem to be less "hands on", but there are important decisions to be made and actions to be taken to successfully plan, and deploy your NAS.
+
+# Planning Your NAS
+
+In my experience, there are two types of people in computing, those which plan meticulously before adding any new hardware or service to their networks and those who just add what they have and hope for the best. You can get busy and proper planning seems like an extra unnecessary step. But it is also equally true that fixing problems after your have deployed the system costs a lot more than resolving them before you "go live".
+
+For example let us imagine that you didn't plan your hard disk requirements correctly and that, in fact, the server you have can't hold any more hard disks? What do you do now? Buy another server? It would have been better to get the right server to start with.
+
+## Capacity Planning
+
+Your plans to deploy FreeNAS are constrained by two major factors, the first is the resources you have available (meaning PC or servers you already have or money to buy new ones) and how much capacity you want in your NAS.
+
+### Note
+
+Never underestimate your need for disk space. Video files, audio files, emails, software downloads; the list of types of data we store is forever growing. I remember when I bought my first 170MB hard drive for a 386 PC that I had. I wondered how I could ever fill 170MB. Today, a short video clip is 170MB!
+
+The more resources you have, the more capacity you can have, it is a simple relationship. FreeNAS, of course, helps this situation in a number of ways, first it is free. There are no licensing costs to pay. If you want 2 users or 20 users, the cost is the same... $0\. Also, FreeNAS is on the lighter side of system requirements, you aren't going to need 4GB of memory to run this server.
+
+So the big first question is how many users are going to use this server? If you are a home user, then the answer is probably less then 5 people. Maybe, you want the FreeNAS to act as a simple repository for multimedia files that can be accessed from any PC in your home. If you work in a small office environment then the answer is probably less than 15, and large offices less than 25\. For any kind of corporate deployment, the number could be 25 and upwards.
+
+Having established this number, you need to consider how many of these users will be writing to the NAS or in other words, will be adding files to the NAS, and how many will be just read as what is already there. We will refer to these as *write* users and *read* users. Again, in the home environment, maybe only 1 person will be actually copying files over to the NAS while 2 or 3 others maybe using them. In the office environment, it is more difficult to say, it all depends on your planned use for the FreeNAS.
+
+Now, there is one final question for this section. How much space will each *write* user need on the server?
+
+Now you just need to multiply:
+
+*number of write users X gigabytes needed*
+
+So, if we have 2 *write* users who need 5GB, each, then you need to start with 10GB of disk space. If you have 25 *write* users who each need 10GB of disk space, then you need 250BG of disk space and so on. For the home user, maybe it is only 1 write user but you want 500GB, so 1 X 500GB is 500GB!!!
+
+### Note
+
+**Now double it**
+
+Whatever figure you have now, double it. Somewhere you have underestimated, you don't know it but you have. Either in the number of users or in the data they need. So the safest thing to do now is double it. That way you won't be caught out with a lack of disk space in 6 months from now.
+
+Now the next calculation is a bit trickier. We need to workout how fast your data grows. How much it will grow depends on what you are storing on your FreeNAS. For example if you are using FreeNAS as a backup server, then as your users create documents, receive emails, download things from the Internet, the amount of disk space needed to backup their PCs will increase. There aren't really any rules of thumb here, you need to work it out. Mid-range and affordable (rather than top of the range, bleeding edge, and expensive) hard disks, on average, grow in capacity about 25% to 50% per year. Their growth isn't driven by need but rather by technology so this doesn't really give us a guide how much your data grows. Having said that, there always seems to be a tendency to use all the disk space that is available. The more disk space available, the more users find ways to fill it.
+
+I remember once working for a mid-sized IT company and the server was running out of disk space. An email was sent around asking people to delete unnecessary files from the server. Once done, over 50% of the disk space was freed.
+
+Once you have decided how much more disk space you need each year, you can calculate your disk requirements for the next three years. For this example, we will use a 25% increase for 25 users who initially need 2GB of disk space each.
+
+Initial space needed: 25 X 2 = 50GB
+
+Double it: = 100GB
+
+25% increase year 1: 100 X 25% = 125GB
+
+25% increase year 2: 125 X 25% = 156GB
+
+25% increase year 3: 156 X 25% = 195GB
+
+From this, we can see that over three years, disk usage could double. Depending on your type of business and how you are using FreeNAS, your growth rates could be even higher. If the data growth rate is 40%, then the storage space needed can double in two years.
+
+To finally tweak the equation, you could factor in any planned growth in staffing levels as every new member will require an extra 4GB of disk space initially, which translates to nearly 8GB over three years.
+
+## Choosing Your Hardware
+
+FreeNAS runs on the PC platform. The stated minimum requirements are an "IBM PC compatible" machine with a Pentium processor, at least 96MB of memory, and a bootable CDROM drive plus hard disks for storage. However, the practical minimum requirements are a Pentium II processor and 128MB of memory, and of course, the CDROM and hard disks.
+
+### CPU
+
+It is impossible to list every manufacturer, motherboard, and CPU that are supported by FreeNAS (or more specifically, by FreeBSD the underlying operating system) but here are some general guidelines:
+
+*   All Intel processors beginning with the Pentium are supported, including the Pentium, Pentium Pro, Pentium II, Pentium III, Pentium 4 (and its variants such as the Xeon and Celeron processors), and the Intel Core (including Core Solo, Core Duo and Core 2 Duo) processors.
+
+*   All i386-compatible AMD processors are also supported, including the Am486, Am5x86, K5, K6 (and variants), Athlon (including Athlon MP, Athlon XP, and Athlon Thunderbird), Duron, and Opteron processors.
+
+*   All of the standard PC buses are supported including ISA, AGP, PCI, and PCI-X. There is NO support for the MicroChannel expansion bus used in the IBM PS/2 line of PCs.
+
+*   PCs with more than one CPU are supported as well as PCs with dual or quad cores. FreeBSD also takes advantage of HyperThreading (HT) on Intel CPUs that support this feature. FreeBSD will detect these additional logical processors as if they were additional physical processors. FreeBSD does not attempt to optimize scheduling decisions given the shared resources between logical processors within the same CPU.
+
+The choice of CPU is important for your NAS. Although FreeNAS will work on a Pentium 1 with less than 128MB of memory, it won't perform well for a real live environment. Although running a NAS isn't CPU intensive in terms of exotic mathematical calculations, it can be CPU intensive because of demand. If 5 people are accessing files simultaneously, the CPU will be used heavily. One of the test machines in my lab is a Pentium III running at 466Mhz. Copying large files to the FreeNAS using a very fast network connection caused the CPU to run at 100%.
+
+Here are some guidelines to help you choose your CPU:
+
+*   If you are just experimenting with FreeNAS and are interested in using it on a small scale, then an old 233MHz or greater Pentium II machine (or AMD equivalent) will be perfect.
+
+*   For home use for backup or storing multimedia files, a minimum of a Pentium III at 1Ghz is required (or AMD equivalent). Such a machine can handle software RAID and up to 10 clients.
+
+*   For a small office environment, the smallest CPU acceptable would be a Pentium 4 running at least 1.3 GHz (or AMD equivalent).
+
+*   For large installations, a Pentium 4 (or AMD equivalent) running at 3Ghz is really the bare minimum and ideally, fast dual core or dual processor machines would be better.
+
+### Note
+
+**Front Side Bus (FSB)**
+
+The FSB connects the CPU to the main memory. The faster the FSB, the faster data is transferred to the CPU. In general, the speed of the FSB (which is measured in MHz) scales with the speed of the CPU. However, there are some motherboard/CPU combinations that use a lower FSB even for a higher speed CPU. This will reduce the overall performance of the system. Make sure you get a machine with a good FSB speed.
+
+Processor speed isn't the only component of the PC or server that affects transfer speeds and concurrent user capacity. The network is a very important factor and we will look at this soon, also, the type of disks in the machine is very important.
+
+### Disks
+
+The processor's job is to co-ordinate the requests coming in on the network with the disks in the machine. If the CPU is slow then that co-ordination role will be slow and the overall performance will be slow. Equally, if the disks are slow, then the performance of the system will suffer. The end goal of a NAS is to read and write data to a hard disk. The speed of the hard disk will determine how fast the data can be read or written.
+
+### Note
+
+**Quality**
+
+In discussing disks and the different parameters that govern their performance, it is important not to forget the quality of the disks. By quality, I mean how likely is it that the disk will fail. In your FreeNAS server, the CPU can fail, the RAM can fail, the network can fail, and so on. But if a disk fails, you are in danger of losing your data.
+
+When looking at disks, we need to look at two things: first the way in which the disks are connected to the PC, and secondly the disks themselves.
+
+#### Buses
+
+Every hard disk is connected to the PC via a thing called an interface. An interface is a conduit or pipeline down which the data for the hard drive travels. The faster the interface, the quicker the data travel, to and from the hard disk. Over the years, PCs have sported different types of hard disk interface and with each new iteration, the top speeds have increased.
+
+**IDE/ATA—** The most common hard drive interface (until around 2004) was the Advanced Technology Attachment (ATA) interface or the Integrated Drive Electronics (IDE) interface. It was developed by Western Digital in the mid 1980's and for over twenty years was the main interface for connecting hard disks and CD ROMs to a PC. There are several synonyms or variations of ATA including Enhanced IDE (EIDE) and AT Attachment Packet Interface (ATAPI) but essentially it is the same technology refined and reused. In 2003, a new interface was introduced called Serial ATA (SATA) and so ATA was retroactively renamed to Parallel ATA (PATA) to distinguish it from the newer interface. Although fading as a means to connect hard drives to a PC, ATA is still popular for connecting CD ROMs and DVD ROMs to PCs and many motherboards come with both PATA and SATA interfaces. ATA interfaces are easy to recognize as they use 40 or 80 wire ribbon cables to connect the hard drive to the PC.
+
+**SATA—** The Serial Advanced Technology Attachment (SATA) interface was released in 2003 and over 2004/2005 started to grow in popularity. SATA is faster than PATA and also adds the ability to remove or add devices while operating (this is called hot swapping). SATA uses thinner cables than PATA (gone are the flat 80 pin cables) and this allows air cooling to work more efficiently in the PC.
+
+**SCSI—** There has always been an alternative to PATA and SATA and that is an interface called the Small Computer System Interface or SCSI for short. Like ATA, SCSI (which is most commonly pronounced "scuzzy") has been around a long time. It has been most popular in PC servers and has also been popular with Apple for their Macintosh computers and with Sun Microsystems. Like Parallel ATA, SCSI is being replaced by a serial version using smaller cabling and running at faster speeds, these new variations are commonly known as Serial SCSI.
+
+Each interface type has various pros and cons. If you are using an existing PC for your FreeNAS server, then the differences are largely academic as you will have to use what is in the machine. But if you are buying a new piece of hardware for your FreeNAS server, then these differences can be important.
+
+The first differences are in transfer speeds. The last version of PATA could transfer data at 133 MB per second (MB/s). This would mean that 700 megabytes of data (the same as a CD) would copy in just over 5 seconds. SATA comes in two speeds at the moment, SATA 150, which can transfer 187.5 MB/s and SATA 300, which peaks at 375MB/s. A CD's worth of data would copy in just under 4 seconds, and just under 2 seconds respectively. SCSI has many different variations and the latest iterations Ultra-320 and Ultra-640 have transfer speeds of 320MB/s and 640MB/s. A 700MB file would transfer in just over 1 second on a Ultra-640 system. All these speeds are theoretical peak transfer rates but they do serve as a good guide to the difference in the transfer speeds.
+
+Cost is also a difference. PATA and SATA have similar costs with SATA being slightly cheaper at the moment as PATA drives have become less popular. SCSI drives, however, have historically been more expensive. SCSI drives are mainly seen as the "professional" storage option and so have higher quality parts, but less of them are sold and so they are more expensive.
+
+Another difference is in the number of disks that can be attached to the PC. Traditionally, ATA is limited to four disks. Most motherboards came with two IDE interfaces know as the primary and secondary interfaces. Each interface can have two drives that were called the master and the slave. In a traditional PC, the secondary master was the CD or DVD ROM drive and the primary master was the hard disk. One could expand the PC by adding another disk as either the primary slave or as the secondary slave.
+
+### Note
+
+A problem with the ATA/IDE system is that when two devices are connected to the same cable, only one device on the cable can perform a read or write operation at a time. Therefore, a hard disk on the same cable as a DVD under heavy use will find that nearly every time it is asked to perform a transfer, it has to wait for the DVD to finish its own transfer first. If the DVD isn't being used, this isn't a issue.
+
+SATA is different in that each physical cable connects to only 1 disk. The number of SATA drives you can have on your PC depends on how many connectors there are on your motherboard. Some motherboards come with only two connectors but there are also motherboards with as many as eight connectors. It is also possible to add extra SATA connectors by installing another SATA controller in a PCI slot.
+
+SCSI is the champion for adding extra drives to your PC or server with a standard SCSI controller allowing you to add 16 drives to it. Many servers often come with 2 or 3 SCSI controllers built-in so as many as 48 drives can be added. SCSI is a mature technology and SCSI drives are often of a higher quality than PATA/SATA disks. They are, however, more expensive.
+
+#### Drives
+
+When buying a hard drive, the first thing we often look for is the capacity of the drive, how many Gigabytes (or even Terabytes) is it. But beside the capacity, there are also issues of quality and speed. Hard disks are physical mechanisms, which means compared to computer memory or a hard disk interface, they are quite slow. When looking to buy a drive for your FreeNAS server, there are several important factors to note besides the capacity of the drive.
+
+Hard drive performance is determined by 3 factors: the seek time, the spindle speed, and the overall transfer speed.
+
+**Seek time—** In order to read or write data in a particular place on the disk, the read/write head of the disk needs to be physically moved to that place. This process is known as seeking, and the time it takes for the head to move to the correct place is the seek time. This seek time varies as it depends on how far the head's destination is, from its origin at the time of the read or write operation. Therefore, seek time is normally expressed as an average. The typical seek time for a desktop hard disk is around 7ms to 8ms (and dropping), while for a server or high end disk it is about 3ms to 4ms. This can mean that the time to find the data on the disk or the time to find the correct spot to write data to the disk can be twice as slow on cheaper hard disks. We are, of course, talking about milliseconds here but multiply that by the number of seek movements that happen on a disk and you could see significant speed improvement on higher quality disks. For big single file transfers, this won't change the performance much as once the disk has found the file (and assuming it is contiguous on the disk), it can just be read without long seek times between reads. However, in a multi-user situation, the disk will be trying to read and write to several files at once.
+
+**Spindle speed—** A hard disk is made up of one or more platters coated with a magnetic material. It is from these platters that we get the word disk or sometime people like to say disc. Each platter spins inside the disk drive unit and the read/write head bobs up and down on the platter surface reading and writing data. The speed at which this platter spins is a factor in the performance of the disk. This is for two reasons: First, when waiting to find a section on the disk, the quicker the disk spins the quicker that section will come around and be under the read/write head. Second, once reading or writing has begun, the quicker the disk spins, the quicker the data can be laid down or read. Today, disks spin at a variety of speeds starting at 4200 revolutions per minute (RPM) then 5400 RPM, 7200 RPM, 10,000 RPM, and 15,000 RPM. The 10,000 and 15,000 type disks are sometimes referred to as 10K RPM or 15K RPM disks. Traditionally, laptops have used the slow disks to space battery power. A common laptop disk speed was 4200 RPM and 5400 RPM. However, there are now some 7200 RPM laptop disks. Interestingly, several high end disks manufacturers now use the 2.5 inch laptop format for servers as they are finding they can make more reliable, faster, and quieter disks in the smaller physical package and the improvements in disk drive technology has meant that these disks aren't necessarily small on capacity. Desktop machines have been the main users of 5400 RPM and 7200 RPM disks with high end servers using the expensive 10K RPM and 15K RPM disks.
+
+**Transfer speed—** Now that the disk is spinning fast and the head is flying back and forth at maximum speed, the real question is how quickly can the data be read from or written to the disk. Unfortunately, this isn't an easy question to answer. There are several different types of transfer speeds that can be measured when looking at a disk. The first is the *internal media transfer rate*, which is the actual speed that the drive can read or write bits to and from the surface of the platter. This figure isn't much use to us (although I am sure there are some people who find it interesting) as it is only an *internal* transfer speed and doesn't include any seeking time. It does not reflect what comes out of the disk to the PC. A better (but not perfect) measure of disk performance is the drive's *sustained transfer rate*. This is the rate at which the drive can transfer data sequentially from multiple parts of the disk including the overheads required for seeking. However, it is worth noting that the speed of the disks external interface (for example SATA 150) does **not** reflect the drive's external transfer rate. The best drives today have a transfer rate of under 100MB/s. Now, the speed of the SATA interface is at its slowest 150MB/s and at its fastest 300MB/s. Many hard disks include a memory cache on the disk, which means that for a small fraction of a second, if the conditions are right, the disk can pump out data at the speed of the bus. But these caches are small, when compared to the size of the disk, and are just a few megabytes. So more often than not, the drive is getting the data directly from the disk platter and as such, it can **never** meet the speed of the external bus.
+
+#### Multiple Disk Drives
+
+So if the disk cannot match the speed of the disk interface, why create these ever faster specifications. Well, the good news is that because you can fit more than one disk to the PC, you can improve overall performance by reading and writing from two disks simultaneously. There are two aspects of this, first, if you install multiple disks in your FreeNAS server and offer them as separate resources, then the load on the disks will be split according to how many people are accessing files on disk one and how many are accessing data on disk two. As the disk interface can cope with both disks simultaneously, you have doubled the performance of your system. The second approach is to use the disks as an array where the disks contain copies of the same data and so the FreeNAS server can find the same data in two places and read that data from the less busy disk. This is called a Redundant Arrays of Inexpensive Disks (RAID) and we shall look at it in more detail later in this chapter.
+
+#### Memory, Network Card, PCI, and USB
+
+There are a few final things to mention when deciding on the hardware for your FreeNAS server.
+
+The first is memory or more specifically how much memory. The minimum requirement for FreeNAS is 96MB, but if you want to use iSCSI, you need a minimum of 256MB. Having extra memory is always a good thing as FreeNAS will use the extra memory for disk caching (meaning the spare memory will be used to speed up access to the disks by storing popular bits of data in memory and so removing the need to get the data from the disk).
+
+The next thing to consider is your network; this will be covered in more depth later in this chapter, but it is worth mentioning here that you will need a network interface to connect your NAS to the network. Many motherboards come with network interfaces on board and they are a good start, but they may not be the best thing. In short, there are 3 types of popular Ethernet network interface: 10Mb/s, 100Mb/s, and 1000Mb/s. Note that these speeds are in megabits per second **not** megabytes per second. Clearly, the faster the network interface, the more data can be transferred to and from the FreeNAS server.
+
+However, it is worth mentioning that the performance of the network is directly related to the speed of the CPU (and the motherboard). Putting a Gigabit Ethernet card in a Pentium II will **not** increase the speed of the network transfers by ten.
+
+To connect the network card or maybe even a hardware RAID controller to your motherboard, you will need to have free PCI slots. 99.9% of all motherboards have a free PCI slot but it is worth mentioning that the speed of PCI is limited to 132MB/s. For the network, that shouldn't be a problem but if you add a high speed hardware RAID controller, then the transfer rate to and from the controller could be more than the PCI bus. There is a new version of PCI called PCI Express. It comes in different speed configurations (1x, 2x, 4x, 8x, 16x, and 32x), but they all have much greater bandwidth than basic PCI.
+
+Finally, your FreeNAS server will need a USB 2.0 port if you are planning on using a USB flash disk to store the configuration data or if you want to install FreeNAS on it. The configuration data can be stored on either a floppy, a USB flash disk or on a hard disk in the PC. The advantage of storing the configuration data on the USB flash disk is that you can leave the disks in the machine 100% for storage. This is also true of installing the FreeNAS on a USB flash disk. This leaves ALL the hard disks free for use as storage, as well as improving boot up time as booting from USB is faster than booting from CDROM. Note that your BIOS needs to be capable of booting from USB if you intend to install FreeNAS on a USB memory stick.
+
+# Planning for Backup
+
+When deciding how you are going to use and deploy your FreeNAS server, you need to consider your backup requirements. Backup is sadly something that is often left as a low priority task and then suddenly something happens and everyone wants to know where are the backups.
+
+FreeNAS doesn't come with many options for automated backup. There is no support for burning DVDs on the FreeNAS machine nor is there any support for attaching a tape drive. This leaves us with just two options:
+
+*   The first is to include enough disks in the machine so that the data can be duplicated internally, and the second is to copy the data to another machine where it can be burnt to DVD or left there as a backup server. This can be achieved in one of two ways. Double the amount of disks can be added to the machine and as a manual task the system administrator can copy the data from the "live" disks to the "backup" disks. This task can also be automated and we will look at this in more detail in chapter 7\. Another way to achieve this is with RAID, which we will study in more detail later in this chapter. Using a technique known as mirroring, the FreeNAS server can be configured to automatically copy all data written to one disk to another disk and so set up a spare copy of the data. This spare copy is also used during read operations meaning that the overall storage performance increases.
+
+### Note
+
+The disadvantage of duplicating the data internally, as the only means of backup, is that if something was to happen to the server itself then the backup data would also be lost. Secondly, this method (especially the RAID variations) doesn't allow for the recovery of mistakenly deleted files or allow for the restoration of files from a few months ago.
+
+*   The second way to implement backup for your FreeNAS server is by copying it to another machine. This second machine would either act as a backup server where the data just remains or it could be a staging point before the data is written to DVD or some other form of backup media. FreeNAS includes several ways in which the data can be copied off the server. In fact, any of the access protocols like CIFS, NFS, and FTP can be used to copy the data to another machine. Also, FreeNAS includes support for the RSYNC protocol whose primary goal is to allow the mirroring (or exact copying) of data from one machine to another. Also, RSYNC is sophisticated in that it will only copy the data that needs to be copied (because it has changed) and hence saves on network bandwidth when possible.
+
+If you just want a backup server then another FreeNAS server would be ideal. Using the RSYNC protocol, the two FreeNAS servers can be configured to make backups at certain times. It is good practice to make sure that this backup server isn't sitting right next to the FreeNAS server. Why? Well if the roof comes down or the air conditioning decides to pour something all over your server, having the two machines side-by-side won't help your backup strategy very much!!!
+
+If you need to get the data onto a DVD or some other type of media, then you need to use a client machine like a Windows, OS X or Linux computer to copy off the data and then put it on to DVD etc. You should investigate the backup solutions, which are available on those platforms.
+
+# What is RAID? And, Do I Need It?
+
+It seems to be a rule of thumb for science fiction writers that once the spaceship is attacked by a hostile force, all appears to be lost until the emergency backup systems kick in, and then everything is restored to full power except for maybe a few flickering lights and the odd spark flying out of a nearby console.
+
+Fortunately, you don't need to worry about your FreeNAS server being zapped with a laser beam, but you **do** need to worry about hard disk failures, electrical spikes, burst water pipes (or cooling systems), fires, and maybe even earthquakes.
+
+The RAID (Redundant Arrays of Inexpensive Disks) concept isn't a magic solution for your entire backup and redundancy problems. For one, it won't save your server from an earthquake! However, as a means to improving your storage access speeds and as a way of coping with a disk failure, RAID is an excellent system.
+
+So what is it? RAID is a system that divides and duplicates your data across several hard disks, and so provides redundancy and removes read bottlenecks. Depending on which scheme, you use your data is copied, in full or in part, across other disks in the RAID set and if one of those disks fails the other disks (with the copy of the data) continue to work and the data as a whole remains intact. RAID provides two main advantages: the duplication of data to guard against disk failure and the increase of storage performance as multiple disks can be used to read the same data and sent quickly back to the client. The minimum number of hard disks for the simplest RAID setup is two.
+
+There are several different RAID configurations that are called RAID levels. Originally, there were 5 RAID levels of which two were most frequently used (RAID 1 and RAID 5). There are also several extensions which improve, combine or nest the original RAID levels. If a disk fails, in an array using a RAID level that has redundancy, then when a new disk is inserted to replace the failed disk, it will be reconstructed (from the other disks in the array) and the array will become fully operational again. It is also possible to designate a disk as a "hot spare", which will automatically take the place of a failed disk without external intervention. The failed disk can then be replaced and it will become the "hot spare". For RAID, all the disks need to be the same size. For the software RAID facilities in FreeNAS, if the disks are of different sizes, the small disk size will be used.
+
+Here is an overview of the most popular RAID levels. Not all of these RAID levels are available using the software RAID functionality of FreeNAS, but they may be available if you are using a dedicated hardware RAID card.
+
+**RAID 0** (Striped set without redundancy)—RAID 0 is a way of joining two disks together to create one big disk. The data is interleaved between the two disks and so it improves performance but there is no fault tolerance. Any disk failure destroys the array and the data will be lost. On its own, this isn't very useful but it can be combined with RAID 1 in a system known as RAID 10\. See below.
+
+**RAID 1** (mirroring)—Here, two disks are used with one disk mirroring the contents of the other disk. Whatever is written to disk 1 is also written simultaneously to disk 2 in a identical fashion. If either of the disks fails, the RAID continues using the remaining disk. When the faulty disk is replaced, the new disk will be synchronized with the good disk and the mirroring will continue as before. Write performance is often slightly worse than on a single device, because identical copies of the data written must be sent to the other disk but read performance is greatly improved as the data is available in two places and the read operation can be split between the two drives. The amount of storage space available is always half of the total of the two drives as one is used to duplicate the other.
+
+**RAID 5** (striped set with distributed parity)—This is one of the most popular and arguably one of the most useful RAID levels. It allows you to combine a larger number of physical disks, and still maintain some redundancy. RAID 5 can be used on three or more disks. If one disk fails, the data remains intact. RAID 5 can survive one disk failure, but not two or more. Both read and write performance usually increase with RAID 5\. The size of a RAID 5 array is equal to the size of the smallest disk multiplied by the number of disks minus 1\. So, if you have three 200GB disks, the total size of the array will be 200 X (3-1) = 400GB.
+
+**RAID 6** (striped set with dual distributed parity)—This is very similar to RAID 5 except that the data is distributed to two other drives, which means the array can recover from the failure of two disks. RAID 6 can be used on four or more disks. The size of a RAID 6 array is equal to the size of the disk multiplied by the number of disks minus 2\. So if you have four 250GB disks, the total size of the array will be 250 X (4-2) = 500GB.
+
+**RAID 10** (mirrored stripes)—This is sometimes called RAID 1+0 and is a RAID 1 array of two RAID 0 arrays. So disk 1 and 2 are in RAID 0 configurations making a big disk A1\. Disks 3 and 4 are also in a RAID 0 set making a combined disk called A2\. Then A1 and A2 are used to mirror each other in a RAID 1 setup. A RAID 10 array can sustain multiple drive failures as long as the two failed drives are part of the **same** RAID 0 set. The read performance is good and the write performance is better than RAID 1 as the writing is interleaved across the two disks in the mirror.
+
+## Hardware or Software RAID
+
+RAID comes in two forms. Arrays that are controlled by a dedicated piece of hardware often called the RAID controller or arrays that are controlled by software, more specifically the operating system, which in this case is FreeBSD.
+
+If you have a hardware RAID controller, then you can use it. FreeBSD supports many hardware RAID controllers and the controller is responsible for managing the RAID array. With a RAID controller, performance is guaranteed as no overhead is added to the local CPU to run the array. The controller simply presents a logical disk to the operating system, which FreeNAS will "see" as one disk regardless of how many disks comprise the array. Some RAID cards also support hot swapping; allowing failed drives to be replaced while the system is running.
+
+### Note
+
+**Beware of "Fake" Hardware RAID Controllers**
+
+There is a type of cheap RAID controller that doesn't have dedicated hardware for managing a RAID array but rather uses a combination of a standard disk controller chip with special firmware and drivers. Although described as RAID controllers, the burden of RAID processing is put on the CPU and not the RAID controller itself. These controllers are often known as "fake" RAID controllers, not because they don't implement RAID correctly but rather because they are not "true" hardware RAID controllers. FreeNAS does not support such kind of RAID controllers.
+
+If you don't have a RAID controller, then you can use FreeNAS (with the help of FreeBSD) to run your RAID array for you. This doesn't require any extra controllers and comes free with FreeNAS. We will look, in detail, in chapter 6 about configuring software RAID on FreeNAS.
+
+# Network Considerations
+
+As FreeNAS is **network** attached storage, an important element in deploying your server is the network infrastructure. If your network is slow, your FreeNAS server will appear slow to your users.
+
+All modern Local Area Networks (LANs) use Ethernet or wireless. By local area, we mean confined to one local area, normally, a building like a house or office building. Ethernet was invented in the 1980s and has become the standard for wired home and office networking. Originally, it used a coax cable that went from machine to machine but today each machine connects directly to a hub or switch using an 8-wire cable called Category 5 cable (commonly known as Cat 5 cable).
+
+The hub or switch acts as the distribution point and sends the network traffic on to the clients. There are 3 main speeds for Ethernet networking today. The first and original Ethernet network worked at 10Mb/s (notice megabits not megabytes) and was called 10BaseT, then came 100Mb/s networking called 100BaseT and more recently 1000Mb/s, which is 1000BaseT. 100BaseT is often known as Fast Ethernet and 1000BaseT as **Gigabit** Ethernet.
+
+In simplest terms, you want to use the fastest networking possible on your FreeNAS server, which at the moment would mean Gigabit Ethernet. This doesn't mean that you need to use Gigabit Ethernet throughout your network. If your network is already established with Fast Ethernet, then you don't need to change all the network cards and switches on your network. However, you do need to ensure that your FreeNAS server is fitted with a Gigabit network card and attached to a **good** Gigabit switch.
+
+This means that if two PCs, each with Fast Ethernet, are copying data from the FreeNAS server then both will use their maximum available network bandwidth (100Mb/s) but the FreeNAS server, being on Gigabit Ethernet, will be able to handle both requests (assuming it has the right hardware in terms of CPU and disks etc).
+
+## Switch or Hub?
+
+To connect your FreeNAS server to your network, it will need to be connected to a piece of network equipment called a hub or switch.
+
+Hubs are quite rare today, but in essence, it is a broadcast device that broadcasts all packets coming into a port from all the other ports. It does not try to manage the traffic in anyway or check if it is appropriate for any particular packet to be forwarded on. As a result, network collisions will occur. This means that the PC is trying to use the network, but other PCs on the hub are using it at the same time. Ethernet has a built-in system for handling this but it slows down the flow of traffic.
+
+Because of this collision problem, only 4 hubs are allowed on a 10Mb/s network and only 2 on a 100Mb/s network. For 100Mb/s and greater networks, it is much better to use a switch.
+
+During the cross over between 10Mb/s networks and 100Mb/s networks, a hybrid hub was produced called a dual speed hub. This hub is, in fact, two smaller hubs (a 10MB/s hub and a 100Mb/s) combined in one unit with a link between them. PCs with 100Mb/s connections would connect to the 100Mb/s hub and those with 10Mb/s to the 10Mb/s hub. There is a two port bridge between them. Like single speed hubs, such devices are rare today due to the popularity and low cost of Fast Ethernet switches.
+
+A switch is different from a hub in that it examines the traffic coming in on a port and calculates where it should be sent. By sending each packet only to the connected device it was intended for, a network switch conserves network bandwidth and offers generally better performance than a hub.
+
+### Note
+
+**Beware of Cheap Gigabit Switches**
+
+One thing to be aware of is that just because a switch calls itself a Gigabit Ethernet switch, that doesn't necessarily mean it can handle 1000Mb/s of traffic. Some of the cheaper switches available understand the language of 1000MB/s networks and in such are Gigabit Ethernet switches, but they don't offer the full bandwidth.
+
+The key feature of a Gigabit switch is the support for Jumbo (meaning large) frames. Without Jumbo frame support, the increases over 100Mb/s networking will be marginal.
+
+## What About Wireless?
+
+Wireless has become a very popular medium today for connecting home PCs to DSL (or ADSL) Internet modems and also for connecting various devices around the home like Internet radio devices, laptops or even multimedia centers which you can connect to your TV and use wireless connections to the Internet and to your desktop for streaming music and films.
+
+FreeNAS does support a number of wireless devices and has support in the web interface for configuring a wireless card.
+
+However, wireless isn't the best method for connecting to the FreeNAS. First of all, wireless has a limited bandwidth (54Mb/s) and is only half that of 100Mb/s. Second, the greater the distance from the wireless access point to the server, the bandwidth drops and this is especially true if the signal needs to go through walls. The practical result is that the server needs to be close to the wireless access point and since it is close, you should be able to connect to your network with a cable.
+
+It is worth repeating that the FreeNAS server is best suited to connection to a Gigabit Ethernet switch.
+
+# Summary
+
+In this chapter, we have looked at the decisions you will need to make to buy or prepare a server for deployment in your organization. We have considered the hardware requirements based on the numbers of users and looked at the different types of disks you can put in your server. We have also looked at some of the implications for your network.
+
+In the next chapter, we will get our hands on the FreeNAS server and install it.

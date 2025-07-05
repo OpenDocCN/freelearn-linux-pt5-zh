@@ -1,0 +1,699 @@
+# Chapter 3. Confining Web Applications
+
+In this chapter, we will cover the default confinement of the web server domain and practice how to enhance this policy to suit our needs. We will also look into `mod_selinux` and how it can be used to confine web applications even further. All this will be handled through the following recipes:
+
+*   Listing conditional policy support
+*   Enabling user directory support
+*   Assigning web content types
+*   Using different web server ports
+*   Using custom content types
+*   Creating a custom CGI domain
+*   Setting up mod_selinux
+*   Starting Apache with limited clearance
+*   Mapping HTTP users to contexts
+*   Using source address mapping to decide on contexts
+*   Separating virtual hosts with mod_selinux
+
+# Introduction
+
+Web applications are a prime example of where SELinux can prove its effectiveness. They are often facing the (untrusted) Internet and are a popular target to exploit. Securing the web server and web applications is just one of the basic mitigating strategies though—by confining the web server, we are reducing the results of a successful exploit even further.
+
+A well-confined web server will only allow operations towards the operating system that are acceptable behavior for the service. But considering the wide area of services that can be provided through a web server, we must be careful not to open up too many privileges.
+
+Policy developers have foreseen the situation that the web server domain might be too broad in its privileges and have made the web server domain (`httpd_t`) not only very versatile, but also very configurable. In this chapter, we will look into the domain in more detail.
+
+# Listing conditional policy support
+
+The first configurable aspect of the SELinux web server domain policy is its wide use of SELinux Booleans. Through these Booleans, additional policy rules can be selectively enabled or disabled. In this recipe, we'll look at the Booleans and see how these can be toggled.
+
+## How to do it…
+
+In order to list the conditional policy support, execute the following steps:
+
+1.  Request the list of all SELinux Booleans and selectively show those starting with `httpd_`:
+
+    ```
+    ~# getsebool –a | grep httpd_
+
+    ```
+
+2.  To get a short description together with the Booleans, we can use `semanage`:
+
+    ```
+    ~# semanage boolean –l | grep httpd_
+
+    ```
+
+3.  If the description of a Boolean isn't sufficient, we can ask the SELinux utilities to display the SELinux rules that will be enabled (or disabled) if the Boolean is set:
+
+    ```
+    ~# sesearch –b httpd_enable_ftp_server –AC
+    Found 3 semantic av rules:
+    DT allow httpd_t httpd_t : capability net_bind_service ; [ httpd_enable_ftp_server ]
+    DT allow httpd_t ftp_port_t : tcp_socket { recv_msg send_msg name_bind } ; [ httpd_enable_ftp_server ]
+    DT allow httpd_t ftp_server_packet_t : packet { send recv } ; [ httpd_enable_ftp_server ]
+
+    ```
+
+## How it works...
+
+Conditional SELinux policy support is provided through SELinux Booleans. These are configurable parameters (with a `true`/`false` value), which an administrator can enable or disable using the `setsebool` or `semanage boolean` command.
+
+With the `getsebool` command, we request an overview of all SELinux Booleans. Recent policies have a few hundred Booleans assigned, but luckily most Booleans follow one of the two following naming conventions that make filtering easier:
+
+*   A Boolean starts with `allow_` or `use_`
+*   A Boolean starts with the SELinux policy module prefix
+
+Booleans that start with `allow_` or `use_` are considered global Booleans and will usually affect multiple SELinux policy modules. A good example for such a Boolean is `allow_execmem`, which enables several domains to execute code stored in writable memory rather than read-only memory (this is a harmful, but sometimes unavoidable memory permission setting).
+
+Most, if not all other Booleans start with the SELinux policy module prefix that they are applied to. For the web server, this is `httpd_` (even though the policy is called apache, the `httpd_` prefix is chosen because the policy can apply directly on various web servers, not only on the Apache HTTPd).
+
+When we use the `semanage boolean` command, a short description is provided for the Booleans. This description is obtained from an XML file called `policy.xml`, which can be found at `/usr/share/selinux/devel/`. The XML file is generated during the build of the base SELinux policy.
+
+The most accurate description of a Boolean, however, is the set of rules that it would trigger when enabled or disabled. This is where the `sesearch` command comes into play.
+
+As can be seen from the example, Booleans will trigger one or more allow rules. The prefix to the `sesearch` output tells us whether a shown rule is active if the Boolean is true (`T`) or false (`F`), and if the rule is currently enabled (`E`) in the policy or disabled (`D`).
+
+A nice trick when querying the SELinux policy using `sesearch` is to ask for Boolean-managed rules as well (regardless of whether they are currently enabled or disabled). This can be accomplished by adding the `–C` option (which is the short option for `--show_cond`). For instance, to find the transitions of the `newrole_t` domain, the following command can be used:
+
+```
+~# sesearch –s newrole_t –c process –p transition –AC
+Found 5 semantic av rules:
+ allow newrole_t newrole_t : process { … };
+ allow newrole_t chkpwd_t : process transition;
+ allow newrole_t updpwd_t : process transition;
+EF allow newrole_t userdomain : process transition ; [ secure_mode ]
+DT allow newrole_t unpriv_userdomain : process transition ; [ secure_mode ]
+
+```
+
+## See also
+
+*   The `httpd_selinux` manual page lists all SELinux Booleans that are applicable to the Apache SELinux module and explains their purpose in more detail:
+
+    ```
+    ~$ man httpd_selinux
+
+    ```
+
+# Enabling user directory support
+
+Let's look at an example of how to use SELinux Booleans applicable to web server installations. In this recipe, we'll enable Apache UserDir support (allowing the web server to serve local user account web pages at `http://sitename/~username`).
+
+## Getting ready
+
+Configure the Apache web server to serve user content. An entire Apache configuration tutorial would be in place here, but this is not in the scope of this book. Basically, this is done by editing the `httpd.conf` file and setting the `UserDir` directive.
+
+## How to do it…
+
+To enable user directory support, follow the next set of steps:
+
+1.  Make sure that the user's home directory is accessible for the Apache runtime account with the following commands. If Linux DAC denies access, SELinux will not even handle the request.
+
+    ```
+    ~$ chmod 755 ${HOME}/
+    ~$ chmod 755 ${HOME}/public_html
+
+    ```
+
+2.  Check that access isn't already allowed by surfing to a user page. If all permissions are okay but SELinux denies access, then the page should be served with a 403 (forbidden) error and a denial should be registered in the audit logs. The Apache error logs would yield a permission denied against the resource.
+3.  The audit logs will probably tell that `httpd_t` isn't allowed to act on `home_root_t` or `user_home_dir_t`. From a look through the SELinux Booleans, we find at least two interesting Booleans (`httpd_enable_homedirs` and `httpd_read_user_content`):
+
+    ```
+    ~# sesearch -s httpd_t -t home_root_t -c dir -p open -AC
+    Found 2 semantic av rules:
+    DT allow httpd_t home_root_t : dir { getattr search open } ; [ httpd_enable_homedirs ]
+    DT allow httpd_t home_root_t : dir { getattr search open } ; [ httpd_read_user_content ]
+
+    ```
+
+4.  Let's first toggle `httpd_read_user_content`. This allows the web server to access all user files, which is functionally okay, but this also immediately grants it access to all files:
+
+    ```
+    ~# setsebool httpd_read_user_content on
+
+    ```
+
+5.  Another approach (but this approach requires user intervention) is to have `~/public_html/` labeled as `httpd_user_content_t`. When this is done, `httpd_read_user_content` can be turned off and `httpd_enable_homedirs` can be enabled:
+
+    ```
+    ~$ chcon –R –t httpd_user_content_t public_html
+    ~# setsebool httpd_read_user_content off
+    ~# setsebool httpd_enable_homedirs on
+
+    ```
+
+6.  When the changes are working nicely, we can persist the changes so that they survive a reboot:
+
+    ```
+    ~# setsebool –P httpd_enable_homedirs on
+
+    ```
+
+## How it works...
+
+The default web server policy in SELinux does not allow the web server to access user home content. If a vulnerability in a web application or the Apache web server itself would allow an attacker to read user content, SELinux will prevent this from happening. But, sometimes, user content access is needed.
+
+By enabling the `httpd_read_user_content` Boolean, the web server domain (and all related domains) will have full read access to all user files. If users are not able (or do not know how) to set the proper context on their files, then this is the only suitable option.
+
+A better approach, however, is to enable the `httpd_enable_homedirs` Boolean. This allows the web server search access through the home directory (`/home/user/`, which is labeled `user_home_dir_t`) but does not provide read access to user content (which is labeled `user_home_t`). Instead, the resources needed for the web server are labeled `httpd_user_content_t`—a type that regular users can relabel resources to (or relabel resources from). Next to `httpd_user_content_t`, one can also define the following content types:
+
+*   `httpd_user_htaccess_t` for the `.htaccess` files
+*   `httpd_user_script_exec_t` for user-provided CGI scripts
+*   `httpd_user_ra_content_t` for appendable resources (for the web server)
+*   `httpd_user_rw_content_t` for read/write resources (for the web server)
+
+These resources can be set by the end user and give a finer control over how each resource within the `~/public_html/` location can be handled by the web server (and the web applications).
+
+## There's more...
+
+Some SELinux supporting distributions have a daemon called `restorecond`, which can be used to automatically set the context of files the moment they are created/detected, without needing file transitions in policy. This can be used to automatically have `~/public_html/` labeled as `httpd_user_content_t`.
+
+## See also
+
+*   More information about per-user web directories can be found at [https://httpd.apache.org/docs/2.4/howto/public_html.html](https://httpd.apache.org/docs/2.4/howto/public_html.html)
+
+# Assigning web content types
+
+For standard web server configurations (without SELinux), access rights on resources for a web server are purely based on the ownership of the files (and the access mask applied to it). With SELinux, the resources can be labeled more specifically towards their functional meaning.
+
+Web applications have content that should be read-only and content that should be read-write, but there are also specific types for resources such as `.htaccess` files. In this recipe, we'll look at the various web server content types and apply them to the right resources.
+
+## How to do it…
+
+Execute the following steps to assign specific web content types to the right resources:
+
+1.  Take a look at the available content types for web servers by asking SELinux to show us all types that have the `httpdcontent` attribute set:
+
+    ```
+    ~$ seinfo –ahttpdcontent –x
+     httpdcontent
+     httpd_sys_content_t
+     httpd_user_ra_content_t
+     httpd_user_rw_content_t
+     httpd_nagios_content_t
+    …
+
+    ```
+
+2.  Query the existing policy for known context assignations (as those can give us pointers to what is still lacking):
+
+    ```
+    ~$ semanage fcontext –l | grep httpd_nagios
+
+    ```
+
+3.  Now, assign the right context to those resources that aren't labeled correctly yet. The paths used here are an example for a Nagios installation:
+
+    ```
+    ~# semanage fcontext –a –t httpd_nagios_content_t /var/www/html/nagios(/.*)?
+    ~# semanage fcontext –a –t httpd_nagios_script_exec_t /usr/local/lib/nagios/cgi-bin/.*
+    ~# restorecon –R /var/www/html/nagios /usr/local/lib/nagios
+
+    ```
+
+## How it works
+
+The web server policy supports functional content types for web applications. These types are used for the following content types:
+
+*   Read-only content of the web application
+*   Writable content of the web application (for which a distinction is made between full writable content and content that can only be appended to, such as logfiles)
+*   Executable scripts (for CGI scripts and similar content)
+
+The advantage is not so much that there is the distinction of read-only versus read-write, but that this is supported on a per-application basis, with types that are specific to one application. In the example, we looked at the content for the Nagios monitoring application.
+
+This allows administrators to provide access to these resources towards specific applications or users. Even though all content in `/var/www/html/` might be owned by the Apache Linux user, we can still grant users (and applications) access to application-specific resources without needing to grant those users or applications full privileges on all Apache resources.
+
+For the read-only content, there is the regular web application content (`httpd_nagios_content_t`) and the special `.htaccess` content (`httpd_nagios_htaccess_t`). The distinction is made primarily because access to the regular content is given more broadly (and depending on some SELinux Booleans, this can also become writable content), whereas the `.htaccess` content remains read-only.
+
+To query the available web server content, we used the `httpdcontent` attribute. This attribute is assigned to all content, allowing administrators to create policies that govern all web content. The `httpdcontent` attribute is given to all these types, but there are also attributes called `httpd_rw_content`, `httpd_ra_content`, `httpd_htaccess_type`, and `httpd_script_exec_type` to allow for manipulation of those specific resources.
+
+## There's more...
+
+We covered Nagios as an example web application, which has a set of web application related resources. Many other web applications or applications with web content have already been identified policy-wise.
+
+On Linux distributions that have all known policies loaded by default, this overview will already be visible through the `seinfo` command as per our preceding example. If that isn't the case, we can always search through the SELinux policies to find out which modules call the `apache_content_template`—the interface that automatically generates the right web application content types:
+
+```
+~$ grep apache_content_template ${POLICY_LOCATION}/policy/modules/*/*.te
+
+```
+
+When different types become more troublesome than helpful, it is possible to ask the SELinux policy to see all those different types as just one common web content type and be done with it. This is supported through the `httpd_unified` Boolean. When this Boolean is enabled, the web server policy will treat all various web server resource types as one, unifying all the types. And, if the Booleans, `httpd_enable_cgi` and `httpd_builtin_scripting`, are enabled as well, then the web server domain has the privilege to execute that content as well.
+
+Needless to say, unifying the web server resource contexts might make management simpler; it also increases the privileges of the web server domain towards various web resources, making it potentially less secure.
+
+# Using different web server ports
+
+By default, web servers listen on the known web server ports (such as ports `80` and `443`). Often, administrators might want to have the web server listen on a nondefault port. The SELinux policy might reject this, as it is not standard behavior for a web server to listen on other unrelated ports.
+
+In this recipe, we will tell SELinux that a nondefault port should still be seen as a web server port.
+
+## How to do it…
+
+In order to assign a label to a different port, execute the following steps:
+
+1.  To see all the ports that match `http_port_t`, use `semanage port -l`:
+
+    ```
+    ~# semanage port -l | grep -w http_port_t
+    http_port_t  tcp  80, 81, 443, 488, 8008, 8009, 8443, 9000
+
+    ```
+
+2.  Query the SELinux policy to see which port type is assigned to a particular port. For instance, for port `8881`, the following command is used:
+
+    ```
+    ~$ seinfo --portcon=8881
+
+    ```
+
+3.  If the port is identified as `unreserved_port_t`, then we can mark it as `http_port_t`:
+
+    ```
+    ~# semanage port -a -t http_port_t -p tcp 8881
+
+    ```
+
+4.  If, however, the port has been already assigned a particular type, then we need to update the SELinux policy for the web server to allow it to listen on ports of this particular type. For instance, for port `9090` (`websm_port_t`), perform the following steps:
+
+    1.  First find the interface that allows binding on `websm_port_t`:
+
+        ```
+        ~$ sefindif websm_port_t.*bind
+
+        ```
+
+    2.  Create a custom SELinux policy (`myhttpd`) with the following content:
+
+        ```
+        corenet_sendrecv_websm_server_packets(httpd_t)
+        corenet_tcp_bind_websm_port(httpd_t)
+        ```
+
+    3.  Load the policy to allow the web server to bind on the identified port type.
+
+5.  Finally, edit the web server configuration file to listen to the right port:
+
+    ```
+    Listen *:8881
+    ```
+
+## How it works...
+
+SELinux works with labels for all resources, including ports. In this example, we are looking at TCP port types to allow the web server to bind to.
+
+With `seinfo`, we can see whether a port matches a known declaration. Ports with a value of `1024` or higher are, by default, labeled as `unreserved_port_t`, whereas, ports `511` or lower are labeled as `reserved_port_t` and those in between are labeled as `hi_reserved_port_t`. These are, however, defaults and more specific port types might be declared for a specific port.
+
+If a port is not assigned a specific type yet, then we can assign one ourselves using `semanage port`. This is sufficient to allow the web server to bind to this port (there is no need for relabeling operations on ports, unlike files or directories, as this is done by the SELinux subsystem immediately).
+
+If a port is already assigned a specific type, then it cannot be overridden by additional policies or the administrator. When this occurs, the SELinux policy will need to be enhanced to allow the web server to bind to this specific type.
+
+In the example, we searched for the interface that would allow the web server to bind to the port, revealing `corenet_tcp_bind_websm_port` as the interface to use. However, we also added another interface—this is due to the way network controls are configured in SELinux, and may or may not be necessary on a system. The additional interface is `corenet_sendrecv_websm_server_packets`. This interface is used to allow the web server to send or receive packets labeled as `websm_server_packet_t`. Packet labeling allows for application-specific communication flow governance and extends the regular firewall capabilities of the Linux operating system (which focus primarily on network flow management) with SELinux domain awareness.
+
+If packet labeling is needed, then packets are labeled through `iptables` on a local system, as shown in the following command:
+
+```
+~# iptables –t mangle –A INPUT –p tcp --dport 9090 -j SECMARK --selctx system_u:object_r:websm_server_packet_t
+
+```
+
+If a system does not have such iptables-based labeling (known as SECMARK labeling), then the interface is not needed.
+
+## There's more...
+
+Recent SELinux user space utilities have another command available to query the SELinux policy, called `sepolicy`. Searching for port declarations with `sepolicy` is done as follows:
+
+```
+~$ sepolicy network --port 8080
+8080: tcp unreserved_port_t 1024-65535
+8080: udp unreserved_port_t 1024-65535
+8080: tcp http_cache_port_t 8080
+
+```
+
+Also, in the SELinux policy rules, we will notice that there is a third interface often enabled for network communication. In our example, the third interface would be called `corenet_tcp_sendrecv_websm_port`. This access vector would enable the domain to send and receive messages on the `websm_port_t` TCP socket. However, the support for this access vector has been disabled in recent policies in favor of SECMARK labeling.
+
+## See also
+
+*   SECMARK labeling is explored in [Chapter 9](ch09.html "Chapter 9. Aligning SELinux with DAC"), *Aligning SELinux with DAC*
+
+# Using custom content types
+
+Next up is to create our own set of content types for a web application that does not have a policy associated with it yet. We will use **DokuWiki** (available at [https://www.dokuwiki.org](https://www.dokuwiki.org)) as an example.
+
+## Getting ready
+
+Install DokuWiki either through the Linux distributions' package manager or manually through a downloaded release from the main site. In this example, we assume that DokuWiki is installed at `/srv/web/dokuwiki/`.
+
+## How to do it…
+
+To use custom web content types, follow the next set of steps:
+
+1.  Create a policy called `mydokuwiki.te` with the following content:
+
+    ```
+    apache_content_template(dokuwiki)
+    ```
+
+2.  Add a file context definition file called `mydokuwiki.fc`, which contains the following code:
+
+    ```
+    /srv/web/dokuwiki/lib/plugins(/.*)?  gen_context(system_u:object_r:httpd_dokuwiki_rw_content_t,s0)
+    /srv/web/dokuwiki/conf(/.*)?  gen_context(system_u:object_r:httpd_dokuwiki_rw_content_t,s0)
+    /srv/web/dokuwiki/data(/.*)?  gen_context(system_u:object_r:httpd_dokuwiki_rw_content_t,s0)
+    /srv/web/dokuwiki/data/\.htaccess  --  gen_context(system_u:object_r:httpd_dokuwiki_htaccess_t,s0)
+    /srv/web/dokuwiki(/.*)?  gen_context(system_u:object_r:httpd_dokuwiki_content_t,s0)
+    ```
+
+3.  Build and load the policy and then relabel all DokuWiki files using the following commands:
+
+    ```
+    ~# semodule -i mydokuwiki.pp
+    ~# restorecon -RvF /srv/web/dokuwiki
+
+    ```
+
+## How it works...
+
+All the magic associated with creating web application content in SELinux is handled by the `apache_content_template` interface. With `seshowif`, one can show all underlying SELinux policy rules as follows:
+
+*   Various SELinux types are created, such as `httpd_dokuwiki_content_t` and the like, and the proper attributes are assigned to it (such as the `httpdcontent` attribute).
+*   An SELinux Boolean is created, which allows the administrator to enable or disable the web application to write to public files (labeled as `public_content_rw_t`). This is an SELinux type used for resources that are shared across multiple services (such as FTP servers, web servers, and many more).
+*   The necessary privileges are granted to the web server domain to access and handle the newly defined types, as well as enabling CGI domains for the web application. For our DokuWiki example, this is not needed as everything is handled by the PHP code parsed and executed by the web server itself (usually).
+
+We then labeled all DokuWiki files accordingly, based on the DokuWiki best practices for file access. Some administrators might want to have the `conf/` subdirectory labeled as a nonwritable resource, and only (temporarily) enable this during the configuration. Although this is a valid approach, it might be sufficient to use Linux DAC file access controls to accomplish the same results.
+
+## There's more...
+
+Using the `apache_content_template` interface is a simple way to create web content types, but it has the downside that it is an all-or-nothing approach, and the module now heavily depends on the web server module (`apache`).
+
+Experienced users might want to selectively create content and assign the right attributes to it, allowing the web server domain to interact with the resources while still keeping granular control over the types and resources.
+
+We'll leave this as an exercise that you can do to see how this can be accomplished.
+
+# Creating a custom CGI domain
+
+Sometimes, it might not be necessary to create a full set of types. Consider a CGI script that is triggered but without the need for a specific set of content types. Sure, one can mark the script as `httpd_sys_script_exec_t` (if it is a system's CGI script) or `httpd_user_script_exec_t` (if it is a user's custom CGI script) so that the resulting script runs in the `httpd_sys_script_t` or `httpd_user_script_t` domain.
+
+But, if those domains do not hold enough privileges (or too many privileges), it might be wise to create a custom CGI domain instead.
+
+## How to do it…
+
+To create a custom CGI domain, the following approach can be used:
+
+1.  Create a custom SELinux policy module (`mycgiscript.te`) with the following content:
+
+    ```
+    policy_module(mycgiscript, 0.1)
+    type cgiscript_t;
+    type cgiscript_exec_t;
+    domain_type(cgiscript_t)
+    domain_entry_file(cgiscript_t, cgiscript_exec_t)
+    apache_cgi_domain(cgiscript_t, cgiscript_exec_t)
+    ```
+
+2.  Create the proper file context file (`mycgiscript.fc`), marking the executable as `cgiscript_exec_t`:
+
+    ```
+    /path/to/script  --gen_context(system_u:object_r:cgiscript_exec_t,s0)
+    ```
+
+3.  Build and load the module.
+4.  Relabel the executable and test it out:
+
+    ```
+    ~# restorecon /path/to/script
+
+    ```
+
+5.  As the `cgiscript_t` domain is primitive in its rights, the script will most likely not work—however, do not turn SELinux in permissive mode. The audit logs will show the access attempts that were denied. Instead of using `audit2allow` to automatically grant everything, use the `sefindif` function to find a proper interface. Add the right interfaces to the module and retry until the script works properly.
+
+## How it works...
+
+The policy module defines a domain type (`cgiscript_t`) and an executable type (`cgiscript_exec_t`). With the `domain_type` interface, `cgiscript_t` is marked as a domain (and the proper SELinux rules to deal with this new domain are created as well). With `domain_entry_type`, the SELinux policy is updated to mark `cgiscript_exec_t` as the type that can be used to transition towards the `cgiscript_t` domain.
+
+Then, we call `apache_cgi_domain`, which allows the web server domain (`httpd_t`) to execute the `cgiscript_exec_t` labeled resources and have the resulting process run in the `cgiscript_t` domain.
+
+The initial policy module, however, is very primitive and will not hold enough privileges. It is a matter of trial and error to update the policy. For instance, consider that the script calls a binary; the audit logs might show the following content:
+
+```
+type=AVC msg=audit(1363205612.277:476924): avc: denied { execute } for pid=6855 comm="cgiscript.pl" name="perl" dev=sda3 ino=4325828 scontext=system_u:system_r:cgiscript_t:s0 tcontext=system_u:object_r:bin_t:s0 tclass=file
+```
+
+To find out which policy interface would allow this, we can use `sefindif` again:
+
+```
+~$ sefindif exec.*bin_t'
+interface(`corecmd_exec_bin',`
+ can_exec($1, bin_t)
+
+```
+
+Developing custom policies remains a trial-and-error approach, but this is the only method available, which ensures that only necessary privileges are granted to a domain. Some policy developers would suggest to turn on the permissive mode and look through all denials in the audit logs. The problem with that approach is that these denials might not lead to the right SELinux policy rules.
+
+For instance, the script might need to call another executable (and transition to a domain). In permissive mode, the transition will not occur, and it would look like the main domain (`cgiscript_t`) needs all privileges that the target command needs—even though all that is needed is a proper domain transition.
+
+By focusing on the enforcing mode, we can gradually increase the policy while keeping the *least privilege* principle in place, only allowing those privileges that are actually needed.
+
+# Setting up mod_selinux
+
+In the next set of recipes, we use an Apache module called `mod_selinux` to make Apache SELinux-aware and to support configurable transitions. In other words, the context in which Apache is running is no longer a statically defined context, but can be changed according to the administrators' needs.
+
+In this recipe, we will install `mod_selinux` from its source as many Linux distributions do not offer it by default, even though it is a very powerful addition to the web server (which is also why support for `mod_selinux` is often called Apache/SELinux Plus).
+
+## How to do it…
+
+You can set up `mod_selinux` through the following steps:
+
+1.  Download the sources from [https://github.com/kaigai/mod_selinux](https://github.com/kaigai/mod_selinux).
+2.  Make sure that the Apache development headers (`httpd-devel` on Red Hat or Fedora systems) are installed.
+3.  Build and install the `mod_selinux` shared library for Apache using `apxs`:
+
+    ```
+    ~# apxs -c -i mod_selinux.c
+
+    ```
+
+    ### Note
+
+    It may be possible that the build fails with an error about `client_ip`. If that is the case, edit `mod_selinux.c` at the line number shown in the error and use `remote_ip` instead of `client_ip`, after which the `apxs` command can be run again.
+
+4.  Build and install the `mod_selinux` SELinux policy module, whose files are also part of the downloaded sources:
+
+    ```
+    ~$ cp mod_selinux.te ${DEVROOT}/local
+    ~$ cp mod_selinux.if ${DEVROOT}/local
+    ~$ cd ${DEVROOT}/local && make mod_selinux.pp
+    ~# semodule -i mod_selinux.pp
+
+    ```
+
+5.  Edit the web server configuration (`httpd.conf`) and add in the proper `LoadModule` line:
+
+    ```
+    LoadModule selinux_module modules/mod_selinux.so
+    ```
+
+6.  Restart the web server. Its logfiles should tell you that the SELinux policy support is loaded:
+
+    ```
+    [Fri Apr 18 13:11:23 2014] [notice] SELinux policy enabled; httpd running as context unconfined_u:system_r:httpd_t:s0-s0:c0.c1023
+    ```
+
+## How it works...
+
+The `mod_selinux.c` file contains the Apache module code and can be built using `apxs`—the Apache eXtenSion tool. This tool will perform the following tasks:
+
+*   Call the compiler with the proper arguments to build a dynamic shared object that can be loaded at runtime by the Apache web server
+*   Install the resulting module in the proper Apache `modules/` directory
+
+The build failure mentioned in the recipe can come up depending on the Apache version in use, where a variable has a different name (`client_ip` instead of `remote_ip`).
+
+Next, we copied and deployed the `mod_selinux` SELinux policy just like we did with other SELinux policy modules.
+
+Finally, the web server is updated to enable the `mod_selinux` Apache module. With the `mod_selinux` shared library in place, Apache is now ready to make SELinux-related decisions.
+
+If the `mod_selinux` support has to be distributed to multiple systems, then only the `mod_selinux.so` (now installed in the web server `modules/` directory, such as `/usr/lib64/httpd/modules/`) and `mod_selinux.pp` files (the SELinux policy module) need to be distributed.
+
+## See also
+
+*   A good write-up on `mod_selinux` can be found at [http://code.google.com/p/sepgsql/wiki/Apache_SELinux_plus](http://code.google.com/p/sepgsql/wiki/Apache_SELinux_plus)
+
+# Starting Apache with limited clearance
+
+In the previous chapter, we manipulated the `/etc/rc.d/init.d/httpd init` script to use `runcon` in order for the web server to run with a limited clearance. But with the help of `mod_selinux`, this can be made configurable.
+
+## How to do it…
+
+In order to start Apache with limited security clearance, follow the given steps:
+
+1.  Edit the Apache web server configuration file (`httpd.conf`) and add in the following code:
+
+    ```
+    <IfModule mod_selinux.c>
+      selinuxServerDomain *:s0-s0:c0.c10
+    </IfModule>
+    ```
+
+2.  Undo the changes made to the service script in the previous chapter.
+3.  Restart the web server and confirm that it is running with the `s0-s0:c0.c10` clearance by issuing the following commands:
+
+    ```
+    ~# /etc/rc.d/init.d/httpd restart
+    ~# ps -efZ | grep httpd
+    system_u:system_r:httpd_t:s0-s0:c0.c10 root 2838 1  0 13:14 ?      00:00:00 /usr/sbin/httpd
+    system_u:system_r:httpd_t:s0-s0:c0.c10 apache 2840 2838  0 13:14 ? 00:00:00 /usr/sbin/httpd
+
+    ```
+
+## How it works...
+
+As mentioned before, with `mod_selinux`, the Apache web server becomes SELinux-aware, meaning it can alter its own behavior and interact with the SELinux subsystem based on configuration settings as well as SELinux policy rules.
+
+With the `selinuxServerDomain` configuration directive, `mod_selinux` performs a dynamic change of the current context to a new context, which is called a dynamic domain transition or dynamic range transition (it is called domain if the type changes, range if the sensitivity level or security clearance changes). This is only possible if an application is SELinux-aware.
+
+Now, such a transition is still governed through SELinux policies. For instance, the range to which the Apache web server can transition must be dominated by the range the Apache web server originally has (which was `s0-s0:c0.c1024` in our example).
+
+### Note
+
+The `mod_selinux` module does not support lookups on the context, making it impossible to use human-readable sensitivities (governed through `mcstransd` as we've seen previously).
+
+## There's more...
+
+It is possible to define different types, allowing the entire web server to run in a custom domain. For this to happen, the `httpd_t` domain must have the rights to dynamically transition to the target type (the `dyntransition` permission in the `process` class). Then, the `selinuxServerDomain` call could look like the following code:
+
+```
+selinuxServerDomain myhttpd_t:s0-s0:c0.c10
+```
+
+Of course, many more privileges are needed as well in order to access resources already accessible by the `httpd_t` domain at startup, but the `dyntransition` permission is specific to the SELinux-aware applications that want to support dynamic domain transitions instead of transitioning upon process execution.
+
+# Mapping HTTP users to contexts
+
+Applications generally run with a static context, which inhibits all privileges that are needed for the application. Even services (daemons) generally stay within their own context during the entire life cycle of the service. But, with `mod_selinux`, it is possible to transition the context of the web server handler (the process or thread responsible for handling a specific request) to another context based on the authenticated user. This allows the administrator to grant certain privileges to the application based on the user. When a lower-privileged user abuses a vulnerability in the web application, then the reduced privileges on the web application itself might prevent a successful exploit.
+
+## How to do it…
+
+Through the following set of steps, we will map a web user to a specific SELinux context:
+
+1.  Create a mapping file in which the users are listed together with their target context. For instance, to have user John's requests handled with the sensitivity `s0:c0,c2`, user Cindy's requests with the sensitivity `s0:c0.c5,c7`, all unauthenticated users as `anon_webapp_t:s0`, and the other authenticated users as `user_webapp_t:s0:c0`:
+
+    ```
+    john    *:s0:c0,c2
+    cindy    *:s0:c0.c5,c7
+    __anonymous__  anon_webapp_t:s0
+    *      user_webapp_t:s0:c0
+    ```
+
+2.  Save this file on a web server-readable location, such as `/etc/httpd/conf/mod_selinux.map`.
+3.  Edit the web server configuration file and add in the following line:
+
+    ```
+    selinuxDomainMap  /etc/httpd/conf/mod_selinux.map
+    ```
+
+4.  Restart the web server.
+
+## How it works...
+
+The `mod_selinux` module is aware of the authenticated user value and, based on the settings in the mappings file, it can transition the request handler to a smaller sensitivity range (as is the case in the first two examples) or to different domains altogether.
+
+There is an important constraint to this though. The target context to which the handler can transition must be bound by the main type (`httpd_t`). This means that the permissions granted to the target context must be a subset of the permissions granted to `httpd_t`. This is performed through the `typebounds` statement, as follows:
+
+```
+typebounds httpd_t anon_webapp_t;
+```
+
+This is because web server handlers are usually threads (or lightweight processes) instead of processes. Threads share a lot of resources, often in ways that SELinux cannot manage. As a result, if one thread gains more rights than the web server, then the secure state of the web server (as a whole) might be in jeopardy. Also, the information flow between different contexts would be difficult, if not impossible to govern.
+
+# Using source address mapping to decide on contexts
+
+The `mod_selinux` Apache module has access to other information than just the username (in case of authenticated users). It can access environment variables (which are used in the Apache web configuration through the `SetEnvIf` directives), allowing a very flexible approach on SELinux context handling within the application.
+
+In this recipe, we will use this to change the context of request handlers based on the remote IP address of the client.
+
+## How to do it…
+
+Alongside web users, we can also use source address information to decide on the context. This is done by completing the following steps:
+
+1.  First, we define the `TARGETDOMAIN` environment variable based on the remote IP address in the web server configuration (`httpd.conf`):
+
+    ```
+    SetEnvIf Remote_Addr "10\.0\.[0-9]+\.[0-9]+$" TARGETDOMAIN=user_webapp_t:s0
+    SetEnvIf Remote_Addr "10\.1\.[0-9]+\.[0-9]+$" TARGETDOMAIN=anon_webapp_t:s0
+    SetEnvIf TARGETDOMAIN ^$ TARGETDOMAIN=*:s0
+    ```
+
+2.  Then, in the same web server configuration, we invoke the `selinuxDomainEnv` directive, which will have the handler context transitioned to the value inside `TARGETDOMAIN`:
+
+    ```
+    selinuxDomainEnv TARGETDOMAIN
+    ```
+
+3.  Restart the web server for the changes to take effect.
+
+## How it works...
+
+In the first step, we used Apache's `SetEnvIf` directive (provided through `mod_setenvif`) to check the remote IP address of the client (`Remote_Addr`). If it matches the expression given, then we set the `TARGETDOMAIN` variable to the given context. In our example, we used a different type for each match, but it is also possible to just change the security clearance. We finished with a check that verified if the `TARGETDOMAIN` variable has been set. If not, then a default value (`*:s0`) is assigned.
+
+Next, we called the `selinuxDomainEnv` directive, which makes a transition to the domain provided in the `TARGETDOMAIN` variable.
+
+## There's more...
+
+The example uses `Remote_Addr`, but many other request-related aspects can be used:
+
+*   With `Remote_Host`, the hostname of the client can be queried and used to make decisions.
+*   With `Server_Addr`, the address of the web server itself (on which the request was received) can be used. This is useful in a multihomed system, where the web server binds to all available IP addresses.
+*   With `Request_Method`, the type of request (such as `GET` or `POST`) can be used.
+*   With `Request_Protocol`, the name and version of the HTTP protocol (such as `HTTP/1.0` or `HTTP/1.1`) can be used.
+*   With `Request_URI`, the request URL can be used to tune the context or clearance.
+
+## See also
+
+*   For more information about Apache's `mod_setenvif` support, consult the module documentation at [http://httpd.apache.org/docs/2.4/mod/mod_setenvif.html](http://httpd.apache.org/docs/2.4/mod/mod_setenvif.html)
+
+# Separating virtual hosts with mod_selinux
+
+One of Apache's strengths is that it can differentiate sites based on the name used to connect to the server, rather than just the IP address, port, and URL. This is called virtual host support and is a very popular approach to multitenant website and web application hosting.
+
+For instance, a web server running on a single IP address can still host the sites of multiple customers, say `www.companyX.com` and `www.companyY.com`. With `mod_selinux`, we can change the context or security clearance of the web server request handlers based on the associated virtual host.
+
+## How to do it…
+
+The following approach distinguishes virtual host confinement through `mod_selinux`:
+
+1.  Decide on the contexts for the individual tenants. In the previous chapter, we used `s0:c100` for company X and `s0:c101` for company Y.
+2.  In each virtual host, set the right clearance. For instance, for company X set the clearance as follows:
+
+    ```
+    <VirtualHost *:443>
+      ServerName www.companyX.com
+     selinuxDomainVal *:s0-s0:c100
+    </VirtualHost>
+    ```
+
+3.  Restart the web server for the changes to take effect.
+
+## How it works...
+
+Unlike the `selinuxServerDomain` directive, which is for the entire web server, the `selinuxDomainVal` directive sets the context of the handlers (virtual hosts) individually. As we covered in the previous chapter, using multiple categories for a multitenant system is a flexible way of dealing with information isolation between tenants.
+
+An important difference with the previous chapter, however, is that the `mod_selinux` module does not use `mcstransd`. The following setting will fail:
+
+```
+selinuxDomainVal *:CompanyXClearance
+
+```
+
+Such a setting would result in the following error message by Apache:
+
+```
+[error] (22)Invalid argument: SELinux: setcon_raw("unconfined_u:system_r:httpd_t:CompanyXClearance") failed
+```
+
+As such, we need to use the standard sensitivity notation.
+
+## See also
+
+*   You can find more information about Apache virtual host support at [http://httpd.apache.org/docs/2.4/vhosts/](http://httpd.apache.org/docs/2.4/vhosts/)

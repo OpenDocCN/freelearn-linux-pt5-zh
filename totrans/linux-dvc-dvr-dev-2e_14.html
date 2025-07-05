@@ -1,6 +1,5 @@
 <html><head></head><body>
-		<div id="_idContainer055">
-			<h1 id="_idParaDest-163"><em class="italic"><a id="_idTextAnchor165"/>Chapter 11</em>: Implementing Direct Memory Access (DMA) Support</h1>
+		<div><h1 id="_idParaDest-163"><em class="italic"><a id="_idTextAnchor165"/>Chapter 11</em>: Implementing Direct Memory Access (DMA) Support</h1>
 			<p><strong class="bold">Direct Memory Access</strong> (<strong class="bold">DMA</strong>) is a <a id="_idIndexMarker860"/>feature of computer systems that allows devices to access the main system memory without CPU intervention, allowing the CPU to focus on other tasks. Examples of its usage include network traffic acceleration, audio data, or video frame grabbing, and its use is not limited to a particular domain. The peripheral responsible for managing the DMA transactions is the DMA controller, which is present in the majority of modern processors and microcontrollers.</p>
 			<p>The feature works in the following manner: When the driver needs to transfer a block of data, the driver sets up the DMA controller with the source address, the destination address, and the total number of bytes to copy. The DMA controller then transfers the data from the source to the destination automatically, without stealing CPU cycles. When the number of bytes remaining reaches zero, the block transfer ends, and the driver is notified.</p>
 			<p class="callout-heading">Note</p>
@@ -33,38 +32,38 @@
 			<p class="callout-heading">Note</p>
 			<p class="callout">It is recommended to use streaming mapping when you can, and coherent mapping when you must. You should consider using coherent mapping if the buffer is accessed unpredictably by the CPU or the DMA controller since memory will always be synced. Otherwise, you should use streaming mapping because you know exactly when you need to access the buffer, in which case you'll first flush the cache (thereby syncing the buffer) before accessing the buffer. </p>
 			<p>The main header to include for <a id="_idIndexMarker872"/>handling DMA mappings is the following:</p>
-			<p class="source-code"> #include &lt;linux/dma-mapping.h&gt;</p>
+			<pre> #include &lt;linux/dma-mapping.h&gt;</pre>
 			<p>However, depending on the mapping, different APIs can be used. Before going further in the API, we need to understand the operations that are performed during DMA mappings:</p>
 			<ol>
-				<li>Assuming the device supports DMA, if the driver sets up a buffer using <strong class="source-inline">kmalloc()</strong>, it will get a virtual address (let's call this <em class="italic">X</em>), which points nowhere yet.</li>
+				<li>Assuming the device supports DMA, if the driver sets up a buffer using <code>kmalloc()</code>, it will get a virtual address (let's call this <em class="italic">X</em>), which points nowhere yet.</li>
 				<li>The virtual memory <a id="_idIndexMarker873"/>system (helped by the <strong class="bold">MMU</strong>, the <strong class="bold">Memory Management Unit</strong>) will map <em class="italic">X</em> to a physical address (let's call this <em class="italic">Y</em>) in the system's RAM, assuming there is still free memory available.</li>
 			</ol>
 			<p>Because DMA does not flow through the CPU virtual memory system, the driver can use virtual address <em class="italic">X</em> to access the buffer at this point, but the device itself cannot.</p>
 			<ol>
 				<li value="3">In some simple systems (those without I/O MMU), the device can do DMA directly to physical the address <em class="italic">Y</em>. But in many others, devices see the main memory through the lenses of the I/O MMU; thus, there is I/O MMU hardware that translates DMA addresses to physical addresses, for example, it translates <em class="italic">Z</em> to <em class="italic">Y</em>. </li>
-				<li>This is where the DMA API intervenes: <ul><li>The driver can pass a virtual address <em class="italic">X</em> to a function such as <strong class="source-inline">dma_map_single()</strong> (which we will look at later in this chapter, in The <em class="italic">Single-buffer mapping</em> section), which sets up any appropriate I/O MMU mapping and returns the DMA address <em class="italic">Z.</em></li><li>The<a id="_idIndexMarker874"/> driver then instructs the device to do DMA into <em class="italic">Z</em>.</li><li>The I/O MMU finally maps it to the buffer at address <em class="italic">Y</em> in the system's RAM.</li></ul></li>
+				<li>This is where the DMA API intervenes: <ul><li>The driver can pass a virtual address <em class="italic">X</em> to a function such as <code>dma_map_single()</code> (which we will look at later in this chapter, in The <em class="italic">Single-buffer mapping</em> section), which sets up any appropriate I/O MMU mapping and returns the DMA address <em class="italic">Z.</em></li><li>The<a id="_idIndexMarker874"/> driver then instructs the device to do DMA into <em class="italic">Z</em>.</li><li>The I/O MMU finally maps it to the buffer at address <em class="italic">Y</em> in the system's RAM.</li></ul></li>
 			</ol>
 			<p>Now that the concept of memory mapping for DMA has been introduced, we can start creating mappings, starting with the easiest ones – the coherent DMA mappings.</p>
 			<h3>Creating coherent DMA mappings</h3>
 			<p>Such <a id="_idIndexMarker875"/>mappings are most often used for long-lasting, bi-directional I/O buffers. The following function sets up a coherent mapping:</p>
-			<p class="source-code">void *dma_alloc_coherent(struct device *dev, size_t size,</p>
-			<p class="source-code">                      dma_addr_t *dma_handle, gfp_t flag) </p>
-			<p>This function is responsible for both the allocation and the mapping of the buffer. It returns a kernel virtual address for that buffer, which is <strong class="source-inline">size</strong> bytes wide and accessible by the CPU. The <strong class="source-inline">size</strong> parameter may be misleading as it is first given to <strong class="source-inline">get_order()</strong> APIs to get the page order that corresponds to this size. Consequently, this mapping is at least page-sized, and the number of pages the power of 2. <strong class="source-inline">dev</strong> is your device structure. The third argument is an output parameter that points to the associated bus address. Memory allocated for the mapping is guaranteed to be physically contiguous, and flags determine how memory should be allocated, which is usually <strong class="source-inline">GFP_KERNEL</strong>, or <strong class="source-inline">GFP_ATOMIC</strong> in an atomic context. </p>
+			<pre>void *dma_alloc_coherent(struct device *dev, size_t size,
+                      dma_addr_t *dma_handle, gfp_t flag) </pre>
+			<p>This function is responsible for both the allocation and the mapping of the buffer. It returns a kernel virtual address for that buffer, which is <code>size</code> bytes wide and accessible by the CPU. The <code>size</code> parameter may be misleading as it is first given to <code>get_order()</code> APIs to get the page order that corresponds to this size. Consequently, this mapping is at least page-sized, and the number of pages the power of 2. <code>dev</code> is your device structure. The third argument is an output parameter that points to the associated bus address. Memory allocated for the mapping is guaranteed to be physically contiguous, and flags determine how memory should be allocated, which is usually <code>GFP_KERNEL</code>, or <code>GFP_ATOMIC</code> in an atomic context. </p>
 			<p>Do note that this mapping is said to be the following: </p>
 			<ul>
 				<li>Consistent (coherent) because the buffer content is always the same across all subsystems (either the device or the CPU)</li>
 				<li>Synchronous, because a write by either the device or the CPU can immediately be read without worrying about cache coherency</li>
 			</ul>
 			<p>To release the mapping, you can use the following API:</p>
-			<p class="source-code">void dma_free_coherent(struct device *dev, size_t size,</p>
-			<p class="source-code">                 void *cpu_addr, dma_addr_t dma_handle);</p>
-			<p>In the preceding prototype, <strong class="source-inline">cpu_addr</strong> and <strong class="source-inline">dma_handle</strong> correspond to the kernel virtual <a id="_idIndexMarker876"/>address and bus address returned by <strong class="source-inline">dma_alloc_coherent()</strong>. Those two parameters are required by the MMU (which returned the virtual address) and the I/O MMU (which returned the bus address) to release their mappings. </p>
+			<pre>void dma_free_coherent(struct device *dev, size_t size,
+                 void *cpu_addr, dma_addr_t dma_handle);</pre>
+			<p>In the preceding prototype, <code>cpu_addr</code> and <code>dma_handle</code> correspond to the kernel virtual <a id="_idIndexMarker876"/>address and bus address returned by <code>dma_alloc_coherent()</code>. Those two parameters are required by the MMU (which returned the virtual address) and the I/O MMU (which returned the bus address) to release their mappings. </p>
 			<h3>Creating streaming DMA mappings</h3>
 			<p>Streaming<a id="_idIndexMarker877"/> DMA mapping memory buffers are typically mapped right before the transmission and unmapped afterward. Such mappings have more constraints and differ from coherent mappings for the following reasons:</p>
 			<ul>
 				<li>Mappings need to function with a buffer that has previously been allocated dynamically.</li>
 				<li>Mappings may accept several non-contiguous and scattered buffers.</li>
-				<li>For read transactions (device to CPU), buffers belong to the device, not to the CPU. Before the CPU can use the buffers, they should be unmapped first (after <strong class="source-inline">dma_unmap_{single,sg}()</strong>), or <strong class="source-inline">dma_sync_{single,sg}_for_cpu()</strong> must be invoked on those buffers. The main reason for this is caching purposes.</li>
+				<li>For read transactions (device to CPU), buffers belong to the device, not to the CPU. Before the CPU can use the buffers, they should be unmapped first (after <code>dma_unmap_{single,sg}()</code>), or <code>dma_sync_{single,sg}_for_cpu()</code> must be invoked on those buffers. The main reason for this is caching purposes.</li>
 				<li>For write transactions (CPU to device), the driver should place data in the buffer before establishing the mapping.</li>
 				<li>The transfer direction has to be specified, and the data should move and should be used only based on this direction.</li>
 			</ul>
@@ -73,139 +72,135 @@
 				<li>Single-buffer mapping, which<a id="_idIndexMarker878"/> allows one physically contiguous buffer mapping</li>
 				<li>Scatter/gather mapping, which<a id="_idIndexMarker879"/> allows several buffers to be passed (scattered over memory)</li>
 			</ul>
-			<p>For both mappings, the transfer direction should be specified by a symbol of the <strong class="source-inline">enum dma_data_direction</strong> type, defined in <strong class="source-inline">include/linux/dma-direction.h</strong>, as follows:</p>
-			<p class="source-code">enum dma_data_direction {</p>
-			<p class="source-code">     DMA_BIDIRECTIONAL = 0,</p>
-			<p class="source-code">     DMA_TO_DEVICE = 1,</p>
-			<p class="source-code">     DMA_FROM_DEVICE = 2,</p>
-			<p class="source-code">     DMA_NONE = 3,</p>
-			<p class="source-code">};</p>
+			<p>For both mappings, the transfer direction should be specified by a symbol of the <code>enum dma_data_direction</code> type, defined in <code>include/linux/dma-direction.h</code>, as follows:</p>
+			<pre>enum dma_data_direction {
+     DMA_BIDIRECTIONAL = 0,
+     DMA_TO_DEVICE = 1,
+     DMA_FROM_DEVICE = 2,
+     DMA_NONE = 3,
+};</pre>
 			<p>In the<a id="_idIndexMarker880"/> preceding excerpt, each element is quite self-explanatory.</p>
 			<p class="callout-heading">Note</p>
-			<p class="callout">Coherent mappings implicitly have a direction attribute setting set with <strong class="source-inline">DMA_BIDIRECTIONAL</strong>.</p>
+			<p class="callout">Coherent mappings implicitly have a direction attribute setting set with <code>DMA_BIDIRECTIONAL</code>.</p>
 			<p>Now that we are aware of the two streaming DMA mapping methods, we can get the details of their implementations, starting with the single-buffer mappings.</p>
 			<h4>Single-buffer mapping</h4>
-			<p>Single-buffer mapping<a id="_idIndexMarker881"/> is a streaming mapping for occasional transfer. You can set up such a mapping using the <strong class="source-inline">dma_map_single()</strong> function, which has the following definition:</p>
-			<p class="source-code">dma_addr_t dma_map_single(struct device *dev, void *ptr,</p>
-			<p class="source-code">        size_t size, enum dma_data_direction direction);</p>
-			<p>The direction should be either <strong class="source-inline">DMA_TO_DEVICE</strong>, <strong class="source-inline">DMA_FROM_DEVICE</strong>, or <strong class="source-inline">DMA_BIDIRECTIONAL</strong>, respectively, when the CPU is the source (it writes to the device), when the CPU is the destination (it reads from the device), or when access is bi-directional for this mapping (implicitly used in coherent mappings). <strong class="source-inline">dev</strong> is the underlying <strong class="source-inline">device</strong> structure for your hardware device, <strong class="source-inline">ptr</strong> is an output parameter, and is the kernel virtual address of the buffer. This function returns an element of the <strong class="source-inline">dma_addr_t</strong> type, which is the bus address returned by the I/O MMU (if present) for the device so that the device can DMA into. You should use <strong class="source-inline">dma_mapping_error()</strong> (which must return <strong class="source-inline">0</strong> if no error occurred) to check whether the mapping returned a valid address <a id="_idIndexMarker882"/>and not go further in case of an error.</p>
+			<p>Single-buffer mapping<a id="_idIndexMarker881"/> is a streaming mapping for occasional transfer. You can set up such a mapping using the <code>dma_map_single()</code> function, which has the following definition:</p>
+			<pre>dma_addr_t dma_map_single(struct device *dev, void *ptr,
+        size_t size, enum dma_data_direction direction);</pre>
+			<p>The direction should be either <code>DMA_TO_DEVICE</code>, <code>DMA_FROM_DEVICE</code>, or <code>DMA_BIDIRECTIONAL</code>, respectively, when the CPU is the source (it writes to the device), when the CPU is the destination (it reads from the device), or when access is bi-directional for this mapping (implicitly used in coherent mappings). <code>dev</code> is the underlying <code>device</code> structure for your hardware device, <code>ptr</code> is an output parameter, and is the kernel virtual address of the buffer. This function returns an element of the <code>dma_addr_t</code> type, which is the bus address returned by the I/O MMU (if present) for the device so that the device can DMA into. You should use <code>dma_mapping_error()</code> (which must return <code>0</code> if no error occurred) to check whether the mapping returned a valid address <a id="_idIndexMarker882"/>and not go further in case of an error.</p>
 			<p>Such mapping can be released by the following function:</p>
-			<p class="source-code">void dma_unmap_single(struct device *dev, </p>
-			<p class="source-code">                      dma_addr_t dma_addr, size_t size, </p>
-			<p class="source-code">                      enum dma_data_direction direction);</p>
-			<p class="source-code">int dma_mapping_error(struct device *dev, </p>
-			<p class="source-code">                      dma_addr_t dma_addr);</p>
+			<pre>void dma_unmap_single(struct device *dev, 
+                      dma_addr_t dma_addr, size_t size, 
+                      enum dma_data_direction direction);
+int dma_mapping_error(struct device *dev, 
+                      dma_addr_t dma_addr);</pre>
 			<p>The other mapping is scatter/gather mappings, since memory buffers are spread (scattered) over the system on allocation and gathered by the driver.</p>
 			<h4>Scatter/gather mappings</h4>
 			<p>Scatter/gather mappings <a id="_idIndexMarker883"/>are a special type of streaming DMA mapping that allow the transfer of several memory buffers in a single shot, instead of mapping each buffer individually and transferring them one by one. Suppose you have several buffers that might not be physically contiguous, all of which need to be transferred at the same time to or from the device. This situation may occur due to the following:</p>
 			<ul>
-				<li>A <strong class="source-inline">readv</strong> or <strong class="source-inline">writev</strong> system call</li>
+				<li>A <code>readv</code> or <code>writev</code> system call</li>
 				<li>A disk I/O request</li>
 				<li>Or simply a list of pages or a vmalloced region</li>
 			</ul>
-			<p>Before you can issue such a mapping, you must set up an array of scatter elements, each of which should describe the mapping of an individual buffer. A scatter element is abstracted in the kernel as an instance of <strong class="source-inline">struct scatterlist</strong>, defined as follows:</p>
-			<p class="source-code">struct scatterlist {</p>
-			<p class="source-code">     unsigned long page_link;</p>
-			<p class="source-code">     unsigned int     offset;</p>
-			<p class="source-code">     unsigned int     length;</p>
-			<p class="source-code">     dma_addr_t       dma_address;</p>
-			<p class="source-code">     unsigned int     dma_length;</p>
-			<p class="source-code">};</p>
+			<p>Before you can issue such a mapping, you must set up an array of scatter elements, each of which should describe the mapping of an individual buffer. A scatter element is abstracted in the kernel as an instance of <code>struct scatterlist</code>, defined as follows:</p>
+			<pre>struct scatterlist {
+     unsigned long page_link;
+     unsigned int     offset;
+     unsigned int     length;
+     dma_addr_t       dma_address;
+     unsigned int     dma_length;
+};</pre>
 			<p>To set up <a id="_idIndexMarker884"/>a scatter list mapping, you <a id="_idIndexMarker885"/>should do the following:</p>
 			<ul>
 				<li>Allocate your scattered buffers.</li>
-				<li>Create an array of scatter elements, initialize this array using <strong class="source-inline">sg_init_table()</strong> on it, and fill this array with allocated memory using <strong class="source-inline">sg_set_buf()</strong>. Note that each scatter element entry must be of page size, except the last one, which may not respect this rule. </li>
-				<li>Call <strong class="source-inline">dma_map_sg()</strong> on the scatter list.</li>
-				<li>Once done with DMA, call <strong class="source-inline">dma_unmap_sg()</strong> to unmap the scatter list.</li>
+				<li>Create an array of scatter elements, initialize this array using <code>sg_init_table()</code> on it, and fill this array with allocated memory using <code>sg_set_buf()</code>. Note that each scatter element entry must be of page size, except the last one, which may not respect this rule. </li>
+				<li>Call <code>dma_map_sg()</code> on the scatter list.</li>
+				<li>Once done with DMA, call <code>dma_unmap_sg()</code> to unmap the scatter list.</li>
 			</ul>
 			<p>The following is a diagram that describes most of the <a id="_idIndexMarker886"/>concepts of the scatter list:</p>
-			<div>
-				<div id="_idContainer052" class="IMG---Figure">
-					<img src="image/B17934_11_001.jpg" alt="Figure 11.1 – Scatter/gather memory organization&#13;&#10;"/>
+			<div><div><img src="img/B17934_11_001.jpg" alt="Figure 11.1 – Scatter/gather memory organization&#13;&#10;"/>
 				</div>
 			</div>
 			<p class="figure-caption">Figure 11.1 – Scatter/gather memory organization</p>
 			<p>While it is <a id="_idIndexMarker887"/>possible to DMA the content of several buffers individually, scatter/gather makes it possible to DMA the whole list at once by sending the pointer to the scatter list array to the device, along with its length, which is the number of entries in the array.</p>
-			<p>The prototypes of <strong class="source-inline">sg_init_table()</strong>, <strong class="source-inline">sg_set_buf()</strong>, and <strong class="source-inline">dma_map_sg()</strong> are as follows:</p>
-			<p class="source-code">void sg_init_table(struct scatterlist *sgl, </p>
-			<p class="source-code">                   unsigned int nents)</p>
-			<p class="source-code">void sg_set_buf(struct scatterlist *sg, const void *buf,</p>
-			<p class="source-code">                unsigned int buflen)</p>
-			<p class="source-code">int dma_map_sg(struct device *dev, </p>
-			<p class="source-code">               struct scatterlist *sglist, int nents,</p>
-			<p class="source-code">               enum dma_data_direction dir);</p>
-			<p>In the preceding APIs, <strong class="source-inline">sgl</strong> is the <strong class="source-inline">scatterlist</strong> array to initialize and <strong class="source-inline">nents</strong> is the number of entries in this array. <strong class="source-inline">sg_set_buf()</strong> sets a <strong class="source-inline">scattlerlist</strong> entry to point at given data. In its parameters, <strong class="source-inline">sg</strong> is the <strong class="source-inline">scatterlist</strong> entry, <strong class="source-inline">data</strong> is the buffer corresponding to the entry, and <strong class="source-inline">buflen</strong> is the size of the buffer. <strong class="source-inline">dma_map_sg()</strong> returns the number of elements in the list that have been successfully mapped, which means it must never be less than zero. In the event of an error, this function returns zero. </p>
+			<p>The prototypes of <code>sg_init_table()</code>, <code>sg_set_buf()</code>, and <code>dma_map_sg()</code> are as follows:</p>
+			<pre>void sg_init_table(struct scatterlist *sgl, 
+                   unsigned int nents)
+void sg_set_buf(struct scatterlist *sg, const void *buf,
+                unsigned int buflen)
+int dma_map_sg(struct device *dev, 
+               struct scatterlist *sglist, int nents,
+               enum dma_data_direction dir);</pre>
+			<p>In the preceding APIs, <code>sgl</code> is the <code>scatterlist</code> array to initialize and <code>nents</code> is the number of entries in this array. <code>sg_set_buf()</code> sets a <code>scattlerlist</code> entry to point at given data. In its parameters, <code>sg</code> is the <code>scatterlist</code> entry, <code>data</code> is the buffer corresponding to the entry, and <code>buflen</code> is the size of the buffer. <code>dma_map_sg()</code> returns the number of elements in the list that have been successfully mapped, which means it must never be less than zero. In the event of an error, this function returns zero. </p>
 			<p>The<a id="_idIndexMarker888"/> following is a code sample that demonstrates the principle of scatter/gather mapping:</p>
-			<p class="source-code">u32 *wbuf, *wbuf2, *wbuf3;</p>
-			<p class="source-code">wbuf = kzalloc(SDMA_BUF_SIZE, GFP_DMA);</p>
-			<p class="source-code">wbuf2 = kzalloc(SDMA_BUF_SIZE, GFP_DMA);</p>
-			<p class="source-code">wbuf3 = kzalloc(SDMA_BUF_SIZE/2, GFP_DMA);</p>
-			<p class="source-code">struct scatterlist sg[3];</p>
-			<p class="source-code">sg_init_table(sg, 3);</p>
-			<p class="source-code">sg_set_buf(&amp;sg[0], wbuf, SDMA_BUF_SIZE);</p>
-			<p class="source-code">sg_set_buf(&amp;sg[1], wbuf2, SDMA_BUF_SIZE);</p>
-			<p class="source-code">sg_set_buf(&amp;sg[2], wbuf3, SDMA_BUF_SIZE/2);</p>
-			<p class="source-code">ret = dma_map_sg(dev, sg, 3, DMA_TO_DEVICE);</p>
-			<p class="source-code">if (ret != 3) {</p>
-			<p class="source-code">     /*handle this error*/</p>
-			<p class="source-code">}</p>
-			<p class="source-code">/* As of now you can use 'ret' or 'sg_dma_len(sgl)' to retrieve the</p>
-			<p class="source-code"> * length of the scatterlist array.</p>
-			<p class="source-code"> */</p>
+			<pre>u32 *wbuf, *wbuf2, *wbuf3;
+wbuf = kzalloc(SDMA_BUF_SIZE, GFP_DMA);
+wbuf2 = kzalloc(SDMA_BUF_SIZE, GFP_DMA);
+wbuf3 = kzalloc(SDMA_BUF_SIZE/2, GFP_DMA);
+struct scatterlist sg[3];
+sg_init_table(sg, 3);
+sg_set_buf(&amp;sg[0], wbuf, SDMA_BUF_SIZE);
+sg_set_buf(&amp;sg[1], wbuf2, SDMA_BUF_SIZE);
+sg_set_buf(&amp;sg[2], wbuf3, SDMA_BUF_SIZE/2);
+ret = dma_map_sg(dev, sg, 3, DMA_TO_DEVICE);
+if (ret != 3) {
+     /*handle this error*/
+}
+/* As of now you can use 'ret' or 'sg_dma_len(sgl)' to retrieve the
+ * length of the scatterlist array.
+ */</pre>
 			<p>The same rules described in the single-buffer mapping section apply to scatter/gather.</p>
-			<p>To unmap the list, you must use <strong class="source-inline">dma_unmap_sg()</strong>, which has the following definition:</p>
-			<p class="source-code">void dma_unmap_sg_attrs(struct device *dev, struct scatterlist *sg,</p>
-			<p class="source-code">                          enum dma_data_direction dir, int nents)</p>
-			<p><strong class="source-inline">dev</strong> is a pointer to the same device that has been used for mapping, <strong class="source-inline">sg</strong> is the scatter list (actually a pointer to the first element in the list) to be unmapped, <strong class="source-inline">dir</strong> is the DMA direction, which should map the mapping direction, and <strong class="source-inline">nents</strong> is the number of elements in the list.</p>
+			<p>To unmap the list, you must use <code>dma_unmap_sg()</code>, which has the following definition:</p>
+			<pre>void dma_unmap_sg_attrs(struct device *dev, struct scatterlist *sg,
+                          enum dma_data_direction dir, int nents)</pre>
+			<p><code>dev</code> is a pointer to the same device that has been used for mapping, <code>sg</code> is the scatter list (actually a pointer to the first element in the list) to be unmapped, <code>dir</code> is the DMA direction, which should map the mapping direction, and <code>nents</code> is the number of elements in the list.</p>
 			<p>The following<a id="_idIndexMarker889"/> is an example that unmaps the previous implementation:</p>
-			<p class="source-code">dma_unmap_sg(dev, sg, 3, DMA_TO_DEVICE);</p>
+			<pre>dma_unmap_sg(dev, sg, 3, DMA_TO_DEVICE);</pre>
 			<p>In the preceding example, we used the same parameters that we used during the mapping.</p>
 			<h4>Implicit and explicit cache coherency for streaming mapping</h4>
-			<p>In either <a id="_idIndexMarker890"/>streaming mapping, <strong class="source-inline">dma_map_single()</strong>/<strong class="source-inline">dma_unmap_single()</strong> and <strong class="source-inline">dma_map_sg()</strong>/<strong class="source-inline">dma_unmap_sg()</strong> pairs take care of cache coherency when they are invoked. In the case of outgoing DMA transfer (CPU to device, <strong class="source-inline">DMA_TO_DEVICE</strong> direction flag set), since data must be in buffers before establishing the mapping, <strong class="source-inline">dma_map_sg()</strong>/<strong class="source-inline">dma_map_single()</strong> will handle cache coherency. In the case of device to CPU (<strong class="source-inline">DMA_FROM_DEVICE</strong> direction flag set), the mappings must be released first before the CPU can access the buffers. This is because <strong class="source-inline">dma_unmap_single()</strong>/<strong class="source-inline">dma_unmap_sg()</strong> implicitly take care of cache coherency as well.</p>
-			<p>However, if you<a id="_idIndexMarker891"/> need to use the same streaming DMA region numerous times and touch the data in between the DMA transfers, the buffer must be synced properly so that the device and CPU see the most up-to-date and correct copy of the DMA buffer. To avoid cache coherency issues, the driver must call <strong class="source-inline">dma_sync_{single,sg}_for_device()</strong> right before starting a DMA transfer from the RAM to the device (after you have put data in the buffer and before actually giving the buffer to the hardware). This function call will flush, if necessary, the cache lines corresponding to the DMA buffer. Similarly, the driver should not access the memory buffer immediately after completing the DMA transfer from the device to the RAM; instead, before reading the buffer, the driver should call <strong class="source-inline">dma_sync_{single,sg}_for_cpu()</strong>, which invalidates the associated hardware cache lines if necessary. In other words, when the source buffer is the device memory, the cache should be invalidated (cache data is not dirty as nothing has been written by the CPU to any buffer), whereas <a id="_idIndexMarker892"/>if the source is RAM (the destination is the device memory), this means the CPU may have written some data to the source buffer and the data may be in the cache line, hence the <a id="_idIndexMarker893"/>cache should be flushed.</p>
+			<p>In either <a id="_idIndexMarker890"/>streaming mapping, <code>dma_map_single()</code>/<code>dma_unmap_single()</code> and <code>dma_map_sg()</code>/<code>dma_unmap_sg()</code> pairs take care of cache coherency when they are invoked. In the case of outgoing DMA transfer (CPU to device, <code>DMA_TO_DEVICE</code> direction flag set), since data must be in buffers before establishing the mapping, <code>dma_map_sg()</code>/<code>dma_map_single()</code> will handle cache coherency. In the case of device to CPU (<code>DMA_FROM_DEVICE</code> direction flag set), the mappings must be released first before the CPU can access the buffers. This is because <code>dma_unmap_single()</code>/<code>dma_unmap_sg()</code> implicitly take care of cache coherency as well.</p>
+			<p>However, if you<a id="_idIndexMarker891"/> need to use the same streaming DMA region numerous times and touch the data in between the DMA transfers, the buffer must be synced properly so that the device and CPU see the most up-to-date and correct copy of the DMA buffer. To avoid cache coherency issues, the driver must call <code>dma_sync_{single,sg}_for_device()</code> right before starting a DMA transfer from the RAM to the device (after you have put data in the buffer and before actually giving the buffer to the hardware). This function call will flush, if necessary, the cache lines corresponding to the DMA buffer. Similarly, the driver should not access the memory buffer immediately after completing the DMA transfer from the device to the RAM; instead, before reading the buffer, the driver should call <code>dma_sync_{single,sg}_for_cpu()</code>, which invalidates the associated hardware cache lines if necessary. In other words, when the source buffer is the device memory, the cache should be invalidated (cache data is not dirty as nothing has been written by the CPU to any buffer), whereas <a id="_idIndexMarker892"/>if the source is RAM (the destination is the device memory), this means the CPU may have written some data to the source buffer and the data may be in the cache line, hence the <a id="_idIndexMarker893"/>cache should be flushed.</p>
 			<p>The following are the prototypes of those syncing APIs:</p>
-			<p class="source-code">void dma_sync_sg_for_cpu(struct device *dev,</p>
-			<p class="source-code">                     struct scatterlist *sg,</p>
-			<p class="source-code">                     int nents,</p>
-			<p class="source-code">                     enum dma_data_direction direction);</p>
-			<p class="source-code">void dma_sync_sg_for_device(struct device *dev,</p>
-			<p class="source-code">                     struct scatterlist *sg, int nents,</p>
-			<p class="source-code">                     enum dma_data_direction direction);</p>
-			<p class="source-code">void dma_sync_single_for_cpu(struct device *dev, </p>
-			<p class="source-code">                     dma_addr_t addr, size_t size,</p>
-			<p class="source-code">                     enum dma_data_direction dir)</p>
-			<p class="source-code">void dma_sync_single_for_device(struct device *dev,</p>
-			<p class="source-code">                     dma_addr_t addr, size_t size,</p>
-			<p class="source-code">                     enum dma_data_direction dir)</p>
+			<pre>void dma_sync_sg_for_cpu(struct device *dev,
+                     struct scatterlist *sg,
+                     int nents,
+                     enum dma_data_direction direction);
+void dma_sync_sg_for_device(struct device *dev,
+                     struct scatterlist *sg, int nents,
+                     enum dma_data_direction direction);
+void dma_sync_single_for_cpu(struct device *dev, 
+                     dma_addr_t addr, size_t size,
+                     enum dma_data_direction dir)
+void dma_sync_single_for_device(struct device *dev,
+                     dma_addr_t addr, size_t size,
+                     enum dma_data_direction dir)</pre>
 			<p>In all of the preceding APIs, the direction parameter must remain the same as the direction specified during the mapping of the corresponding buffer.</p>
 			<p>In this section, we have learned to set up streaming DMA mappings. Now that we are done with mappings, let's introduce the concept of completion, which is used to notify a DMA transfer completion.</p>
 			<h1 id="_idParaDest-167"><a id="_idTextAnchor169"/>Introduction to the concept of completion</h1>
-			<p>This section will <a id="_idIndexMarker894"/>briefly describe completion and the necessary part of its API that the DMA transfer uses. For a complete description, feel free to have a look at the kernel documentation at <strong class="source-inline">Documentation/scheduler/completion.txt</strong>. In kernel programming, a typical practice is to start some activity outside of the current thread and then wait for it to finish. Completions are good alternatives to waitqueues or sleeping APIs while waiting for a very commonly occurring process to complete. Completion variables are implemented using wait queues, with the only difference being that they make the developer's life easier as it does not require the wait queue to be maintained, which makes it very easy to see the intent of the code.</p>
+			<p>This section will <a id="_idIndexMarker894"/>briefly describe completion and the necessary part of its API that the DMA transfer uses. For a complete description, feel free to have a look at the kernel documentation at <code>Documentation/scheduler/completion.txt</code>. In kernel programming, a typical practice is to start some activity outside of the current thread and then wait for it to finish. Completions are good alternatives to waitqueues or sleeping APIs while waiting for a very commonly occurring process to complete. Completion variables are implemented using wait queues, with the only difference being that they make the developer's life easier as it does not require the wait queue to be maintained, which makes it very easy to see the intent of the code.</p>
 			<p>Working<a id="_idIndexMarker895"/> with completion requires this header:</p>
-			<p class="source-code">#include &lt;linux/completion.h&gt; </p>
+			<pre>#include &lt;linux/completion.h&gt; </pre>
 			<p>A completion variable is<a id="_idIndexMarker896"/> represented in the kernel as an instance of struct completion structures that can be initialized statically as follows:</p>
-			<p class="source-code">DECLARE_COMPLETION(my_comp);</p>
+			<pre>DECLARE_COMPLETION(my_comp);</pre>
 			<p>Dynamic allocation of an initialization is done as follows:</p>
-			<p class="source-code">struct completion my_comp;</p>
-			<p class="source-code">init_completion(&amp;my_comp);</p>
-			<p>When the driver initiates work whose completion must be awaited (a DMA transaction in our case), it just has to pass the completion event to the <strong class="source-inline">wait_for_completion()</strong> function, which has the following prototype:</p>
-			<p class="source-code">void wait_for_completion(struct completion *comp);</p>
+			<pre>struct completion my_comp;
+init_completion(&amp;my_comp);</pre>
+			<p>When the driver initiates work whose completion must be awaited (a DMA transaction in our case), it just has to pass the completion event to the <code>wait_for_completion()</code> function, which has the following prototype:</p>
+			<pre>void wait_for_completion(struct completion *comp);</pre>
 			<p>When the completion occurs, the driver can wake the waiters using one of the following APIs:</p>
-			<p class="source-code">void complete(struct completion *comp);</p>
-			<p class="source-code">void complete_all(struct completion *comp);</p>
-			<p><strong class="source-inline">complete()</strong> will wake up only one waiting task, while <strong class="source-inline">complete_all()</strong> will wake up every task waiting for that event. Completions are implemented in such a way that they will <a id="_idIndexMarker897"/>work properly even if <strong class="source-inline">complete()</strong> is called before <strong class="source-inline">wait_for_completion()</strong> is.</p>
+			<pre>void complete(struct completion *comp);
+void complete_all(struct completion *comp);</pre>
+			<p><code>complete()</code> will wake up only one waiting task, while <code>complete_all()</code> will wake up every task waiting for that event. Completions are implemented in such a way that they will <a id="_idIndexMarker897"/>work properly even if <code>complete()</code> is called before <code>wait_for_completion()</code> is.</p>
 			<p>In this section, we have learned to implement a completion callback to notify the completeness status of a DMA transfer. Now that we are comfortable with all the common concepts of the DMA, we can start applying these concepts using the DMA engine APIs, which will also help us better understand how things work once everything is put together.</p>
 			<h1 id="_idParaDest-168"><a id="_idTextAnchor170"/>Working with the DMA engine's API</h1>
 			<p>The DMA engine is a <a id="_idIndexMarker898"/>generic kernel framework used to develop DMA controller drivers and leverage this controller from the consumer side. Through this framework, the DMA controller driver exposes a set of channels that can be used by client devices. This framework then makes it possible for client drivers (also called slaves) to request and use DMA channels from the controller to issue DMA transfers.</p>
 			<p>The following diagram is the layering, showing <a id="_idIndexMarker899"/>how this framework is integrated with the Linux kernel:</p>
-			<div>
-				<div id="_idContainer053" class="IMG---Figure">
-					<img src="image/B17934_11_002.jpg" alt="Figure 11.2 – DMA engine framework&#13;&#10;"/>
+			<div><div><img src="img/B17934_11_002.jpg" alt="Figure 11.2 – DMA engine framework&#13;&#10;"/>
 				</div>
 			</div>
 			<p class="figure-caption">Figure 11.2 – DMA engine framework</p>
 			<p>Here we will simply walk through that (slave) API, which is applicable for slave DMA usage only. The mandatory header here is as follows:</p>
-			<p class="source-code">#include &lt;linux/dmaengine.h&gt;</p>
+			<pre>#include &lt;linux/dmaengine.h&gt;</pre>
 			<p>The slave DMA usage <a id="_idIndexMarker900"/>is straightforward, and consists of the following steps:</p>
 			<ol>
 				<li value="1">Informing the kernel about the device's DMA addressing capabilities.</li>
@@ -220,758 +215,763 @@
 			<p>The<a id="_idIndexMarker901"/> usage of DMA in Linux consists of two parts: the controllers, which perform memory transfer (without the CPU intervening), and the channels, which <a id="_idIndexMarker902"/>are the ways by which client drivers (that is, DMA-capable drivers) submit jobs to controllers. It goes without saying that both the controller and its channels are tightly coupled because the former exposes the latter to clients.</p>
 			<p>Although this chapter targets DMA client drivers, for the sake of understandability, we will be introducing some controller data structures and APIs.</p>
 			<h3>The DMA controller data structure</h3>
-			<p>The DMA controller<a id="_idIndexMarker903"/> is abstracted in the Linux kernel as an instance of <strong class="source-inline">struct dma_device</strong>. On its own, the controller is useless without clients, which would use the channels it exposes. Moreover, the controller driver must expose callbacks for channel configuration, as specified in its data structure, which has the following definition:</p>
-			<p class="source-code">struct dma_device {</p>
-			<p class="source-code">    unsigned int chancnt;</p>
-			<p class="source-code">    unsigned int privatecnt;</p>
-			<p class="source-code">    struct list_head channels;</p>
-			<p class="source-code">    struct list_head global_node;</p>
-			<p class="source-code">    struct dma_filter filter;</p>
-			<p class="source-code">    dma_cap_mask_t  cap_mask;</p>
-			<p class="source-code">    u32 src_addr_widths;</p>
-			<p class="source-code">    u32 dst_addr_widths;</p>
-			<p class="source-code">    u32 directions;</p>
-			<p class="source-code">    int (*device_alloc_chan_resources)(</p>
-			<p class="source-code">                                  struct dma_chan *chan);</p>
-			<p class="source-code">    void (*device_free_chan_resources)(</p>
-			<p class="source-code">                                  struct dma_chan *chan);</p>
-			<p class="source-code">    struct dma_async_tx_descriptor </p>
-			<p class="source-code">     *(*device_prep_dma_memcpy)(</p>
-			<p class="source-code">        struct dma_chan *chan, dma_addr_t dst, </p>
-			<p class="source-code">        dma_addr_t src, size_t len, unsigned long flags);</p>
-			<p class="source-code">    struct dma_async_tx_descriptor </p>
-			<p class="source-code">      *(*device_prep_dma_memset)(</p>
-			<p class="source-code">       struct dma_chan *chan, dma_addr_t dest, int value,</p>
-			<p class="source-code">       size_t len, unsigned long flags);</p>
-			<p class="source-code">    struct dma_async_tx_descriptor</p>
-			<p class="source-code">      *(*device_prep_dma_memset_sg)(</p>
-			<p class="source-code">         struct dma_chan *chan, struct scatterlist *sg,</p>
-			<p class="source-code">         unsigned int nents, int value,</p>
-			<p class="source-code">         unsigned long flags);</p>
-			<p class="source-code">    struct dma_async_tx_descriptor  </p>
-			<p class="source-code">      *(*device_prep_dma_interrupt)(</p>
-			<p class="source-code">         struct dma_chan *chan, unsigned long flags);</p>
-			<p class="source-code">    struct dma_async_tx_descriptor </p>
-			<p class="source-code">      *(*device_prep_slave_sg)(</p>
-			<p class="source-code">         struct dma_chan *chan, struct scatterlist *sgl,</p>
-			<p class="source-code">           unsigned int sg_len,</p>
-			<p class="source-code">           enum dma_transfer_direction direction,</p>
-			<p class="source-code">           unsigned long flags, void *context);</p>
-			<p class="source-code">    struct dma_async_tx_descriptor </p>
-			<p class="source-code">      *(*device_prep_dma_cyclic)(</p>
-			<p class="source-code">           struct dma_chan *chan, dma_addr_t buf_addr,</p>
-			<p class="source-code">           size_t buf_len, size_t period_len,</p>
-			<p class="source-code">           enum dma_transfer_direction direction,</p>
-			<p class="source-code">           unsigned long flags);</p>
-			<p class="source-code">     void (*device_caps)(struct dma_chan *chan,</p>
-			<p class="source-code">                     struct dma_slave_caps *caps);</p>
-			<p class="source-code">     int (*device_config)(struct dma_chan *chan,</p>
-			<p class="source-code">                     struct dma_slave_config *config);</p>
-			<p class="source-code">     void (*device_synchronize)(struct dma_chan *chan);</p>
-			<p class="source-code">     enum dma_status (*device_tx_status)(</p>
-			<p class="source-code">              struct dma_chan *chan, dma_cookie_t cookie,</p>
-			<p class="source-code">              struct dma_tx_state *txstate);</p>
-			<p class="source-code">     void (*device_issue_pending)(struct dma_chan *chan);</p>
-			<p class="source-code">     void (*device_release)(struct dma_device *dev);</p>
-			<p class="source-code">};</p>
-			<p>The complete<a id="_idIndexMarker904"/> definition of this data structure is available in <strong class="source-inline">include/linux/dmaengine.h</strong>. For this chapter, only fields of our interest have been listed. Their meanings are as follows:</p>
+			<p>The DMA controller<a id="_idIndexMarker903"/> is abstracted in the Linux kernel as an instance of <code>struct dma_device</code>. On its own, the controller is useless without clients, which would use the channels it exposes. Moreover, the controller driver must expose callbacks for channel configuration, as specified in its data structure, which has the following definition:</p>
+			<pre>struct dma_device {
+    unsigned int chancnt;
+    unsigned int privatecnt;
+    struct list_head channels;
+    struct list_head global_node;
+    struct dma_filter filter;
+    dma_cap_mask_t  cap_mask;
+    u32 src_addr_widths;
+    u32 dst_addr_widths;
+    u32 directions;
+    int (*device_alloc_chan_resources)(
+                                  struct dma_chan *chan);
+    void (*device_free_chan_resources)(
+                                  struct dma_chan *chan);
+    struct dma_async_tx_descriptor 
+     *(*device_prep_dma_memcpy)(
+        struct dma_chan *chan, dma_addr_t dst, 
+        dma_addr_t src, size_t len, unsigned long flags);
+    struct dma_async_tx_descriptor 
+      *(*device_prep_dma_memset)(
+       struct dma_chan *chan, dma_addr_t dest, int value,
+       size_t len, unsigned long flags);
+    struct dma_async_tx_descriptor
+      *(*device_prep_dma_memset_sg)(
+         struct dma_chan *chan, struct scatterlist *sg,
+         unsigned int nents, int value,
+         unsigned long flags);
+    struct dma_async_tx_descriptor  
+      *(*device_prep_dma_interrupt)(
+         struct dma_chan *chan, unsigned long flags);
+    struct dma_async_tx_descriptor 
+      *(*device_prep_slave_sg)(
+         struct dma_chan *chan, struct scatterlist *sgl,
+           unsigned int sg_len,
+           enum dma_transfer_direction direction,
+           unsigned long flags, void *context);
+    struct dma_async_tx_descriptor 
+      *(*device_prep_dma_cyclic)(
+           struct dma_chan *chan, dma_addr_t buf_addr,
+           size_t buf_len, size_t period_len,
+           enum dma_transfer_direction direction,
+           unsigned long flags);
+     void (*device_caps)(struct dma_chan *chan,
+                     struct dma_slave_caps *caps);
+     int (*device_config)(struct dma_chan *chan,
+                     struct dma_slave_config *config);
+     void (*device_synchronize)(struct dma_chan *chan);
+     enum dma_status (*device_tx_status)(
+              struct dma_chan *chan, dma_cookie_t cookie,
+              struct dma_tx_state *txstate);
+     void (*device_issue_pending)(struct dma_chan *chan);
+     void (*device_release)(struct dma_device *dev);
+};</pre>
+			<p>The complete<a id="_idIndexMarker904"/> definition of this data structure is available in <code>include/linux/dmaengine.h</code>. For this chapter, only fields of our interest have been listed. Their meanings are as follows:</p>
 			<ul>
-				<li><strong class="source-inline">chancnt</strong>: Specifies how many DMA channels are supported by this controller</li>
-				<li><strong class="source-inline">channels</strong>: The list of <strong class="source-inline">struct dma_chan</strong> structures, which corresponds to the DMA channels exposed by this controller</li>
-				<li><strong class="source-inline">privatecnt</strong>: How many DMA channels are requested by <strong class="source-inline">dma_request_channel()</strong>, which is the DMA engine API to request a DMA channel</li>
-				<li><strong class="source-inline">cap_mask</strong>: One or more <strong class="source-inline">dma_capability</strong> flags, representing the capabilities of this controller</li>
+				<li><code>chancnt</code>: Specifies how many DMA channels are supported by this controller</li>
+				<li><code>channels</code>: The list of <code>struct dma_chan</code> structures, which corresponds to the DMA channels exposed by this controller</li>
+				<li><code>privatecnt</code>: How many DMA channels are requested by <code>dma_request_channel()</code>, which is the DMA engine API to request a DMA channel</li>
+				<li><code>cap_mask</code>: One or more <code>dma_capability</code> flags, representing the capabilities of this controller</li>
 			</ul>
 			<p>The following are the possible values:</p>
-			<p class="source-code">enum dma_transaction_type {</p>
-			<p class="source-code">    DMA_MEMCPY,     /* Memory to memory copy */</p>
-			<p class="source-code">    DMA_XOR,  /* Memory to memory XOR*/</p>
-			<p class="source-code">    DMA_PQ,   /* Memory to memory P+Q computation */</p>
-			<p class="source-code">    DMA_XOR_VAL, /* Memory buffer parity check using </p>
-			<p class="source-code">                  * XOR */</p>
-			<p class="source-code">    DMA_PQ_VAL,  /* Memory buffer parity check using </p>
-			<p class="source-code">                  * P+Q */</p>
-			<p class="source-code">    DMA_INTERRUPT,  /* The device can generate dummy</p>
-			<p class="source-code">                     * transfer that will generate </p>
-			<p class="source-code">                     * interrupts */</p>
-			<p class="source-code">    DMA_MEMSET_SG,  /* Prepares a memset operation over a </p>
-			<p class="source-code">                     * scatter list */</p>
-			<p class="source-code">    DMA_SLAVE,      /* Slave DMA operation, either to or</p>
-			<p class="source-code">                     * from a device */</p>
-			<p class="source-code">    DMA_PRIVATE,    /* channels are not to be used </p>
-			<p class="source-code">                     * for global memcpy. Usually</p>
-			<p class="source-code">                     *used with DMA_SLAVE */</p>
-			<p class="source-code">    DMA_SLAVE,      /* Memory to device transfers */</p>
-			<p class="source-code">    DMA_CYCLIC,     /* can handle cyclic tranfers */</p>
-			<p class="source-code">    DMA_INTERLEAVE, /* Memory to memory interleaved</p>
-			<p class="source-code">                     * transfer */</p>
-			<p class="source-code">}</p>
+			<pre>enum dma_transaction_type {
+    DMA_MEMCPY,     /* Memory to memory copy */
+    DMA_XOR,  /* Memory to memory XOR*/
+    DMA_PQ,   /* Memory to memory P+Q computation */
+    DMA_XOR_VAL, /* Memory buffer parity check using 
+                  * XOR */
+    DMA_PQ_VAL,  /* Memory buffer parity check using 
+                  * P+Q */
+    DMA_INTERRUPT,  /* The device can generate dummy
+                     * transfer that will generate 
+                     * interrupts */
+    DMA_MEMSET_SG,  /* Prepares a memset operation over a 
+                     * scatter list */
+    DMA_SLAVE,      /* Slave DMA operation, either to or
+                     * from a device */
+    DMA_PRIVATE,    /* channels are not to be used 
+                     * for global memcpy. Usually
+                     *used with DMA_SLAVE */
+    DMA_SLAVE,      /* Memory to device transfers */
+    DMA_CYCLIC,     /* can handle cyclic tranfers */
+    DMA_INTERLEAVE, /* Memory to memory interleaved
+                     * transfer */
+}</pre>
 			<p>As an<a id="_idIndexMarker905"/> example, this element is set in the i.MX DMA controller driver as follows:</p>
-			<p class="source-code">dma_cap_set(DMA_SLAVE, sdma-&gt;dma_device.cap_mask);</p>
-			<p class="source-code">dma_cap_set(DMA_CYCLIC, sdma-&gt;dma_device.cap_mask);</p>
-			<p class="source-code">dma_cap_set(DMA_MEMCPY, sdma-&gt;dma_device.cap_mask);</p>
+			<pre>dma_cap_set(DMA_SLAVE, sdma-&gt;dma_device.cap_mask);
+dma_cap_set(DMA_CYCLIC, sdma-&gt;dma_device.cap_mask);
+dma_cap_set(DMA_MEMCPY, sdma-&gt;dma_device.cap_mask);</pre>
 			<ul>
-				<li><strong class="source-inline">src_addr_widths</strong>: The bit mask of source address widths that the device supports. This width must be supplied in bytes; for example, if the device supports a width of <strong class="source-inline">4</strong>, the mask should be set to <strong class="source-inline">BIT(4)</strong>.</li>
-				<li><strong class="source-inline">dst_addr_widths</strong>: The bit mask of destination address widths that the device supports.</li>
-				<li><strong class="source-inline">directions</strong>: The bit mask of slave directions supported by the device. Because <strong class="source-inline">enum dma_transfer_direction</strong> does not include a bit flag for each type, the DMA<a id="_idIndexMarker906"/> controller should set <strong class="source-inline">BIT(&lt;TYPE&gt;)</strong> and the same should be checked by the controller as well.</li>
+				<li><code>src_addr_widths</code>: The bit mask of source address widths that the device supports. This width must be supplied in bytes; for example, if the device supports a width of <code>4</code>, the mask should be set to <code>BIT(4)</code>.</li>
+				<li><code>dst_addr_widths</code>: The bit mask of destination address widths that the device supports.</li>
+				<li><code>directions</code>: The bit mask of slave directions supported by the device. Because <code>enum dma_transfer_direction</code> does not include a bit flag for each type, the DMA<a id="_idIndexMarker906"/> controller should set <code>BIT(&lt;TYPE&gt;)</code> and the same should be checked by the controller as well.</li>
 			</ul>
 			<p>It is set in the i.MX SDMA controller driver as follows:</p>
-			<p class="source-code">#define SDMA_DMA_DIRECTIONS (BIT(DMA_DEV_TO_MEM) | \</p>
-			<p class="source-code">                     BIT(DMA_MEM_TO_DEV) | \</p>
-			<p class="source-code">                       BIT(DMA_DEV_TO_DEV))</p>
-			<p class="source-code">[...]</p>
-			<p class="source-code">sdma-&gt;dma_device.directions = SDMA_DMA_DIRECTIONS;</p>
+			<pre>#define SDMA_DMA_DIRECTIONS (BIT(DMA_DEV_TO_MEM) | \
+                     BIT(DMA_MEM_TO_DEV) | \
+                       BIT(DMA_DEV_TO_DEV))
+[...]
+sdma-&gt;dma_device.directions = SDMA_DMA_DIRECTIONS;</pre>
 			<ul>
-				<li><strong class="source-inline">device_alloc_chan_resources</strong>: Allocates resources and returns the number of allocated descriptors. Invoked by the DMA engine core when requesting a channel on this controller.</li>
-				<li><strong class="source-inline">device_free_chan_resources</strong>: A callback allowing the release of the DMA channel's resources.</li>
+				<li><code>device_alloc_chan_resources</code>: Allocates resources and returns the number of allocated descriptors. Invoked by the DMA engine core when requesting a channel on this controller.</li>
+				<li><code>device_free_chan_resources</code>: A callback allowing the release of the DMA channel's resources.</li>
 			</ul>
-			<p>While the preceding was a generic callback, the following is a controller callback that depends on the controller capabilities and that must be provided if the associated capability bit masks are set in <strong class="source-inline">cap_mask</strong>.</p>
+			<p>While the preceding was a generic callback, the following is a controller callback that depends on the controller capabilities and that must be provided if the associated capability bit masks are set in <code>cap_mask</code>.</p>
 			<ul>
-				<li> <strong class="source-inline">device_prep_dma_memcpy</strong> prepares a memcpy operation. If <strong class="source-inline">DMA_MEMCPY</strong> is set in <strong class="source-inline">cap_mask</strong>, then this element must be set. For each flag set, the corresponding callback must be provided, otherwise controller registration will fail. This is the case for all <strong class="source-inline">device_prep_*</strong> callbacks.</li>
-				<li><strong class="source-inline">device_prep_dma_xor</strong>: Prepares an XOR operation.</li>
-				<li><strong class="source-inline">device_prep_dma_xor_val</strong>: Prepares an xor validation operation.</li>
-				<li><strong class="source-inline">device_prep_dma_memset</strong>: Prepares a memset operation.</li>
-				<li><strong class="source-inline">device_prep_dma_memset_sg</strong>: Prepares a memset operation over a scatter list.</li>
-				<li><strong class="source-inline">device_prep_dma_interrupt</strong>: Prepares an end of chain interrupt operation.</li>
-				<li><strong class="source-inline">device_prep_slave_sg</strong>: Prepares a slave DMA operation.</li>
-				<li><strong class="source-inline">device_prep_dma_cyclic</strong>: Prepares a cyclic DMA operation. Such a DMA operation is frequently <a id="_idIndexMarker907"/>used in audio or UART drivers. A buffer of size <strong class="source-inline">buf_len</strong> is required by the function. The callback function will be called after <strong class="source-inline">period_len</strong> bytes have been transferred. We discuss such DMAs in the <em class="italic">A word on cyclic DMA</em> section.</li>
-				<li><strong class="source-inline">device_prep_interleaved_dma</strong>: Transfers expression in a generic way.</li>
-				<li><strong class="source-inline">device_config</strong>: Pushes a new configuration to a channel, with a return value of <strong class="source-inline">0</strong> in the event of success or an error code otherwise.</li>
-				<li><strong class="source-inline">device_pause</strong>: Pauses any current transfer on a channel and returns <strong class="source-inline">0</strong> or if the pausing is effective, or an error code otherwise.</li>
-				<li><strong class="source-inline">device_resume</strong>: Resumes any previously paused transfer on a channel. It returns <strong class="source-inline">0</strong> or an error code otherwise.</li>
-				<li><strong class="source-inline">device_terminate_all</strong>: A callback used to abort all the transfers on a channel, and which returns <strong class="source-inline">0</strong> in the event of success or an error code otherwise. </li>
-				<li><strong class="source-inline">device_synchronize</strong>: A callback allowing synchronization of the termination of a transfer to the current context.</li>
-				<li><strong class="source-inline">device_tx_status</strong>: Polls for transaction completion. The optional <strong class="source-inline">txstate</strong> parameter can be used to obtain a struct containing auxiliary transfer status information; otherwise, the call will just return a simple status code.</li>
-				<li><strong class="source-inline">device_issue_pending</strong>: A mandatory callback that pushes pending transactions to hardware. This is the backend of the <strong class="source-inline">dma_async_issue_pending()</strong> API.</li>
+				<li> <code>device_prep_dma_memcpy</code> prepares a memcpy operation. If <code>DMA_MEMCPY</code> is set in <code>cap_mask</code>, then this element must be set. For each flag set, the corresponding callback must be provided, otherwise controller registration will fail. This is the case for all <code>device_prep_*</code> callbacks.</li>
+				<li><code>device_prep_dma_xor</code>: Prepares an XOR operation.</li>
+				<li><code>device_prep_dma_xor_val</code>: Prepares an xor validation operation.</li>
+				<li><code>device_prep_dma_memset</code>: Prepares a memset operation.</li>
+				<li><code>device_prep_dma_memset_sg</code>: Prepares a memset operation over a scatter list.</li>
+				<li><code>device_prep_dma_interrupt</code>: Prepares an end of chain interrupt operation.</li>
+				<li><code>device_prep_slave_sg</code>: Prepares a slave DMA operation.</li>
+				<li><code>device_prep_dma_cyclic</code>: Prepares a cyclic DMA operation. Such a DMA operation is frequently <a id="_idIndexMarker907"/>used in audio or UART drivers. A buffer of size <code>buf_len</code> is required by the function. The callback function will be called after <code>period_len</code> bytes have been transferred. We discuss such DMAs in the <em class="italic">A word on cyclic DMA</em> section.</li>
+				<li><code>device_prep_interleaved_dma</code>: Transfers expression in a generic way.</li>
+				<li><code>device_config</code>: Pushes a new configuration to a channel, with a return value of <code>0</code> in the event of success or an error code otherwise.</li>
+				<li><code>device_pause</code>: Pauses any current transfer on a channel and returns <code>0</code> or if the pausing is effective, or an error code otherwise.</li>
+				<li><code>device_resume</code>: Resumes any previously paused transfer on a channel. It returns <code>0</code> or an error code otherwise.</li>
+				<li><code>device_terminate_all</code>: A callback used to abort all the transfers on a channel, and which returns <code>0</code> in the event of success or an error code otherwise. </li>
+				<li><code>device_synchronize</code>: A callback allowing synchronization of the termination of a transfer to the current context.</li>
+				<li><code>device_tx_status</code>: Polls for transaction completion. The optional <code>txstate</code> parameter can be used to obtain a struct containing auxiliary transfer status information; otherwise, the call will just return a simple status code.</li>
+				<li><code>device_issue_pending</code>: A mandatory callback that pushes pending transactions to hardware. This is the backend of the <code>dma_async_issue_pending()</code> API.</li>
 			</ul>
-			<p>While most drivers <a id="_idIndexMarker908"/>make a direct invocation of these callbacks (through <strong class="source-inline">dma_chan-&gt;dma_dev-&gt;device_prep_dma_*</strong>), you should be using the <strong class="source-inline">dmaengine_prep_*</strong> DMA engine APIs, which additionally do some sanity checks before invoking the appropriate callback. For example, for memory to memory, the driver should use the <strong class="source-inline">device_prep_dma_memcpy()</strong> wrapper.</p>
+			<p>While most drivers <a id="_idIndexMarker908"/>make a direct invocation of these callbacks (through <code>dma_chan-&gt;dma_dev-&gt;device_prep_dma_*</code>), you should be using the <code>dmaengine_prep_*</code> DMA engine APIs, which additionally do some sanity checks before invoking the appropriate callback. For example, for memory to memory, the driver should use the <code>device_prep_dma_memcpy()</code> wrapper.</p>
 			<h3>The DMA channel data structure</h3>
 			<p>A DMA channel<a id="_idIndexMarker909"/> is how a client driver submits DMA transactions (I/O data transfers) to the DMA controller. The way it works, a DMA-capable driver (client driver) requests one or more channels, reconfigures this channel, and asks the controller to use this channel to perform the submitted DMA transfer. A channel<a id="_idIndexMarker910"/> is defined as follows:</p>
-			<p class="source-code">struct dma_chan {</p>
-			<p class="source-code">     struct dma_device *device;</p>
-			<p class="source-code">     struct device *slave;</p>
-			<p class="source-code">     dma_cookie_t cookie;</p>
-			<p class="source-code">     dma_cookie_t completed_cookie;</p>
-			<p class="source-code">[...]</p>
-			<p class="source-code">};</p>
+			<pre>struct dma_chan {
+     struct dma_device *device;
+     struct device *slave;
+     dma_cookie_t cookie;
+     dma_cookie_t completed_cookie;
+[...]
+};</pre>
 			<p>You can see a DMA channel as a highway for I/O data transfer. The following are the meanings of each element in this data structure:</p>
 			<ul>
-				<li><strong class="source-inline">device</strong>: This is a pointer to the DMA device (the controller) that supplies this channel. This field can never be <strong class="source-inline">NULL</strong> if the channel has been requested successfully because a channel always belongs to a controller.</li>
-				<li><strong class="source-inline">slave</strong>: This is a pointer to the underlying <strong class="source-inline">struct device</strong> structure for the device using this channel (its driver is a client driver).</li>
-				<li><strong class="source-inline">cookie</strong>: This represents the last cookie value returned to the client by this channel.</li>
-				<li><strong class="source-inline">Completed_cookie</strong>: The last completed cookie for this channel.</li>
+				<li><code>device</code>: This is a pointer to the DMA device (the controller) that supplies this channel. This field can never be <code>NULL</code> if the channel has been requested successfully because a channel always belongs to a controller.</li>
+				<li><code>slave</code>: This is a pointer to the underlying <code>struct device</code> structure for the device using this channel (its driver is a client driver).</li>
+				<li><code>cookie</code>: This represents the last cookie value returned to the client by this channel.</li>
+				<li><code>Completed_cookie</code>: The last completed cookie for this channel.</li>
 			</ul>
-			<p>The <a id="_idIndexMarker911"/>complete definition of this data structure can be found in <strong class="source-inline">include/linux/dmaengine.h</strong>.</p>
+			<p>The <a id="_idIndexMarker911"/>complete definition of this data structure can be found in <code>include/linux/dmaengine.h</code>.</p>
 			<p class="callout-heading">Note</p>
 			<p class="callout">In the DMA engine framework, a cookie is nothing but a DMA transaction identifier that allows the status and progression of the transaction it identifies to be checked.</p>
 			<h3>DMA transaction descriptor data structure </h3>
-			<p>A<a id="_idIndexMarker912"/> transaction descriptor<a id="_idIndexMarker913"/> does nothing other than characterize and describe a DMA transaction (or DMA transfer by abuse of language). Such a descriptor is represented in the kernel using a <strong class="source-inline">struct dma_async_tx_descriptor</strong> data structure, which has the following definition:</p>
-			<p class="source-code">struct dma_async_tx_descriptor {</p>
-			<p class="source-code">     dma_cookie_t cookie;</p>
-			<p class="source-code">     struct dma_chan *chan;</p>
-			<p class="source-code">     dma_async_tx_callback callback;</p>
-			<p class="source-code">     void *callback_param;</p>
-			<p class="source-code">[...]</p>
-			<p class="source-code">};</p>
+			<p>A<a id="_idIndexMarker912"/> transaction descriptor<a id="_idIndexMarker913"/> does nothing other than characterize and describe a DMA transaction (or DMA transfer by abuse of language). Such a descriptor is represented in the kernel using a <code>struct dma_async_tx_descriptor</code> data structure, which has the following definition:</p>
+			<pre>struct dma_async_tx_descriptor {
+     dma_cookie_t cookie;
+     struct dma_chan *chan;
+     dma_async_tx_callback callback;
+     void *callback_param;
+[...]
+};</pre>
 			<p>The meanings of each element we have retained in this data structure are set out here: </p>
 			<ul>
-				<li><strong class="source-inline">cookie</strong>: A tracking <a id="_idIndexMarker914"/>cookie for this transaction. It allows the progression of this transaction to be checked.</li>
-				<li><strong class="source-inline">chan</strong>: The target channel for this operation.</li>
-				<li><strong class="source-inline">callback</strong>: A function that should be called once this operation is complete.</li>
-				<li><strong class="source-inline">callback_param</strong>: This is given as a parameter of the callback function.</li>
+				<li><code>cookie</code>: A tracking <a id="_idIndexMarker914"/>cookie for this transaction. It allows the progression of this transaction to be checked.</li>
+				<li><code>chan</code>: The target channel for this operation.</li>
+				<li><code>callback</code>: A function that should be called once this operation is complete.</li>
+				<li><code>callback_param</code>: This is given as a parameter of the callback function.</li>
 			</ul>
-			<p>You can find the complete data structure description in <strong class="source-inline">include/linux/dmaengine.h</strong>.</p>
+			<p>You can find the complete data structure description in <code>include/linux/dmaengine.h</code>.</p>
 			<h2 id="_idParaDest-170"><a id="_idTextAnchor172"/>Handling device DMA addressing capabilities</h2>
 			<p>The <a id="_idIndexMarker915"/>kernel considers that your device can handle 32-bit DMA addressing by default. However, the DMA memory address range your device can access may be limited, and this may be due to manufacturer or historical reasons. Some devices, for example, may only support the low order 24-bits of addressing. This limitation originated from the ISA bus, which was 24-bits wide and where DMA buffers could only live in the bottom 16 MB of the system's memory.</p>
 			<p>Nevertheless, you can use the concept of a DMA mask to inform the kernel of such limitations, which aims to inform the kernel of your device's DMA addressing capabilities.</p>
-			<p>This can be achieved using <strong class="source-inline">dma_set_mask_and_coherent()</strong>, which has the following prototype:</p>
-			<p class="source-code">int dma_set_mask_and_coherent(struct device *dev,</p>
-			<p class="source-code">                              u64 mask);</p>
+			<p>This can be achieved using <code>dma_set_mask_and_coherent()</code>, which has the following prototype:</p>
+			<pre>int dma_set_mask_and_coherent(struct device *dev,
+                              u64 mask);</pre>
 			<p>The preceding function will set the same mask for both streaming mappings and coherent mappings given that the DMA API guarantees that the coherent DMA mask can be set to the same or smaller than the streaming DMA mask.</p>
-			<p>However, for special requirements, you can use either <strong class="source-inline">dma_set_mask()</strong> or <strong class="source-inline">dma_set_coherent_mask()</strong> to set the mask accordingly. These APIs have the following prototypes:</p>
-			<p class="source-code">int dma_set_mask(struct device *dev, u64 mask);</p>
-			<p class="source-code">int dma_set_coherent_mask(struct device *dev, u64 mask);</p>
-			<p>In these<a id="_idIndexMarker916"/> functions, <strong class="source-inline">dev</strong> is the underlying device structure, while <strong class="source-inline">mask</strong> is a bit mask describing which bits of an address your device supports, which you can specify using the <strong class="source-inline">DMA_BIT_MASK</strong> macro along with the actual bit order.</p>
-			<p>Both <strong class="source-inline">dma_set_mask()</strong> and <strong class="source-inline">dma_set_coherent_mask()</strong> return zero to indicate that the device can perform DMA properly on the machine given the address mask specified. Any other return value would be an error, meaning that the given mask is too small to be supportable on the given system. In such a failure case, you can either fall back to non-DMA mode for data transfer in your driver or, if the DMA was mandatory, simply disable the feature in the device that required support for DMA or even not probe the device at all. </p>
-			<p>It is recommended that your driver prints a kernel warning (<strong class="source-inline">dev_warn()</strong> or <strong class="source-inline">pr_warn()</strong>) message when setting the DMA mask fails. The following is an example of pseudo-code for a sound card:</p>
-			<p class="source-code">#define PLAYBACK_ADDRESS_BITS DMA_BIT_MASK(32)</p>
-			<p class="source-code">#define RECORD_ADDRESS_BITS DMA_BIT_MASK(24)</p>
-			<p class="source-code">struct my_sound_card *card;</p>
-			<p class="source-code">struct device *dev;</p>
-			<p class="source-code">...</p>
-			<p class="source-code">if (!dma_set_mask(dev, PLAYBACK_ADDRESS_BITS)) {</p>
-			<p class="source-code">     card-&gt;playback_enabled = 1;</p>
-			<p class="source-code">} else {</p>
-			<p class="source-code">    card-&gt;playback_enabled = 0;</p>
-			<p class="source-code">    dev_warn(dev,</p>
-			<p class="source-code">     "%s: Playback disabled due to DMA limitations\n",</p>
-			<p class="source-code">     card-&gt;name);</p>
-			<p class="source-code">}</p>
-			<p class="source-code">if (!dma_set_mask(dev, RECORD_ADDRESS_BITS)) {</p>
-			<p class="source-code">    card-&gt;record_enabled = 1;</p>
-			<p class="source-code">} else {</p>
-			<p class="source-code">    card-&gt;record_enabled = 0;</p>
-			<p class="source-code">    dev_warn(dev, </p>
-			<p class="source-code">          "%s: Record disabled due to DMA limitations\n",</p>
-			<p class="source-code">          card-&gt;name);</p>
-			<p class="source-code">}</p>
-			<p>In the <a id="_idIndexMarker917"/>preceding example, we have used the <strong class="source-inline">DMA_BIT_MASK</strong> macro to define the DMA mask. Then, we have disabled the features for which DMA support was mandatory when the required DMA mask was not supported. In either case, a warning is printed.</p>
+			<p>However, for special requirements, you can use either <code>dma_set_mask()</code> or <code>dma_set_coherent_mask()</code> to set the mask accordingly. These APIs have the following prototypes:</p>
+			<pre>int dma_set_mask(struct device *dev, u64 mask);
+int dma_set_coherent_mask(struct device *dev, u64 mask);</pre>
+			<p>In these<a id="_idIndexMarker916"/> functions, <code>dev</code> is the underlying device structure, while <code>mask</code> is a bit mask describing which bits of an address your device supports, which you can specify using the <code>DMA_BIT_MASK</code> macro along with the actual bit order.</p>
+			<p>Both <code>dma_set_mask()</code> and <code>dma_set_coherent_mask()</code> return zero to indicate that the device can perform DMA properly on the machine given the address mask specified. Any other return value would be an error, meaning that the given mask is too small to be supportable on the given system. In such a failure case, you can either fall back to non-DMA mode for data transfer in your driver or, if the DMA was mandatory, simply disable the feature in the device that required support for DMA or even not probe the device at all. </p>
+			<p>It is recommended that your driver prints a kernel warning (<code>dev_warn()</code> or <code>pr_warn()</code>) message when setting the DMA mask fails. The following is an example of pseudo-code for a sound card:</p>
+			<pre>#define PLAYBACK_ADDRESS_BITS DMA_BIT_MASK(32)
+#define RECORD_ADDRESS_BITS DMA_BIT_MASK(24)
+struct my_sound_card *card;
+struct device *dev;
+...
+if (!dma_set_mask(dev, PLAYBACK_ADDRESS_BITS)) {
+     card-&gt;playback_enabled = 1;
+} else {
+    card-&gt;playback_enabled = 0;
+    dev_warn(dev,
+     "%s: Playback disabled due to DMA limitations\n",
+     card-&gt;name);
+}
+if (!dma_set_mask(dev, RECORD_ADDRESS_BITS)) {
+    card-&gt;record_enabled = 1;
+} else {
+    card-&gt;record_enabled = 0;
+    dev_warn(dev, 
+          "%s: Record disabled due to DMA limitations\n",
+          card-&gt;name);
+}</pre>
+			<p>In the <a id="_idIndexMarker917"/>preceding example, we have used the <code>DMA_BIT_MASK</code> macro to define the DMA mask. Then, we have disabled the features for which DMA support was mandatory when the required DMA mask was not supported. In either case, a warning is printed.</p>
 			<h2 id="_idParaDest-171"><a id="_idTextAnchor173"/>Requesting a DMA channel</h2>
-			<p>A <a id="_idIndexMarker918"/>channel is requested using <strong class="source-inline">dma_request_channel()</strong>. Its prototype is as follows:</p>
-			<p class="source-code">struct dma_chan *dma_request_channel(</p>
-			<p class="source-code">                      const dma_cap_mask_t *mask,</p>
-			<p class="source-code">                      dma_filter_fn fn, void *fn_param);</p>
-			<p>In the preceding, the mask must be a bit mask that represents the capabilities the channel must satisfy. It is essentially used to specify the type of transfer the driver needs to perform, which must be supported in <strong class="source-inline">dma_device.cap_mask</strong>.</p>
-			<p>The <strong class="source-inline">dma_cap_zero()</strong> and <strong class="source-inline">dma_cap_set()</strong> functions are used to clear the mask and set the capability we need; for example:</p>
-			<p class="source-code">dma_cap_mask my_dma_cap_mask;</p>
-			<p class="source-code">struct dma_chan *chan;</p>
-			<p class="source-code">dma_cap_zero(my_dma_cap_mask);</p>
-			<p class="source-code">/* Memory 2 memory copy */</p>
-			<p class="source-code">dma_cap_set(DMA_MEMCPY, my_dma_cap_mask); </p>
-			<p class="source-code">chan = dma_request_channel(my_dma_cap_mask, NULL, NULL);</p>
-			<p><strong class="source-inline">fn</strong> is a callback pointer whose type has the following definition:</p>
-			<p class="source-code">typedef bool (*dma_filter_fn)(struct dma_chan *chan,</p>
-			<p class="source-code">                void *filter_param);</p>
-			<p>Actually, <strong class="source-inline">dma_requaest_channel()</strong> walks through the available DMA controllers in the <a id="_idIndexMarker919"/>system (<strong class="source-inline">dma_device_list</strong>, defined in <strong class="source-inline">drivers/dma/dmaengine.c</strong>) and for each of them, it looks for a channel that corresponds to the request. If the <strong class="source-inline">filter_fn</strong> parameter (which is optional) is <strong class="source-inline">NULL</strong>, <strong class="source-inline">dma_request_channel()</strong> will simply return the first channel that satisfies the capability mask. Otherwise, when the mask parameter is insufficient for specifying the necessary channel, you can use the <strong class="source-inline">filter_fn</strong> routine as a filter so that each available channel in the system will be given to this callback for acceptance or not. The kernel calls the <strong class="source-inline">filter_fn</strong> routine once for each free channel in the system. Upon seeing a suitable channel, <strong class="source-inline">filter_fn</strong> should return <strong class="source-inline">DMA_ACK</strong>, which will tag the given channel to be the return value from <strong class="source-inline">dma_request_channel()</strong>.</p>
-			<p>A channel allocated through this interface is exclusive to the caller until <strong class="source-inline">dma_release_channel()</strong> is called. It has the following definition:</p>
-			<p class="source-code">void dma_release_channel(struct dma_chan *chan)</p>
+			<p>A <a id="_idIndexMarker918"/>channel is requested using <code>dma_request_channel()</code>. Its prototype is as follows:</p>
+			<pre>struct dma_chan *dma_request_channel(
+                      const dma_cap_mask_t *mask,
+                      dma_filter_fn fn, void *fn_param);</pre>
+			<p>In the preceding, the mask must be a bit mask that represents the capabilities the channel must satisfy. It is essentially used to specify the type of transfer the driver needs to perform, which must be supported in <code>dma_device.cap_mask</code>.</p>
+			<p>The <code>dma_cap_zero()</code> and <code>dma_cap_set()</code> functions are used to clear the mask and set the capability we need; for example:</p>
+			<pre>dma_cap_mask my_dma_cap_mask;
+struct dma_chan *chan;
+dma_cap_zero(my_dma_cap_mask);
+/* Memory 2 memory copy */
+dma_cap_set(DMA_MEMCPY, my_dma_cap_mask); 
+chan = dma_request_channel(my_dma_cap_mask, NULL, NULL);</pre>
+			<p><code>fn</code> is a callback pointer whose type has the following definition:</p>
+			<pre>typedef bool (*dma_filter_fn)(struct dma_chan *chan,
+                void *filter_param);</pre>
+			<p>Actually, <code>dma_requaest_channel()</code> walks through the available DMA controllers in the <a id="_idIndexMarker919"/>system (<code>dma_device_list</code>, defined in <code>drivers/dma/dmaengine.c</code>) and for each of them, it looks for a channel that corresponds to the request. If the <code>filter_fn</code> parameter (which is optional) is <code>NULL</code>, <code>dma_request_channel()</code> will simply return the first channel that satisfies the capability mask. Otherwise, when the mask parameter is insufficient for specifying the necessary channel, you can use the <code>filter_fn</code> routine as a filter so that each available channel in the system will be given to this callback for acceptance or not. The kernel calls the <code>filter_fn</code> routine once for each free channel in the system. Upon seeing a suitable channel, <code>filter_fn</code> should return <code>DMA_ACK</code>, which will tag the given channel to be the return value from <code>dma_request_channel()</code>.</p>
+			<p>A channel allocated through this interface is exclusive to the caller until <code>dma_release_channel()</code> is called. It has the following definition:</p>
+			<pre>void dma_release_channel(struct dma_chan *chan)</pre>
 			<p>This API releases the DMA channel and makes it available for request by other clients.</p>
-			<p>By way of additional information, available DMA channels on a system can be listed in user space using the <strong class="source-inline">ls /sys/class/dma/</strong> command as follows: </p>
-			<p class="source-code">root@raspberrypi4-64:~# ls /sys/class/dma/</p>
-			<p class="source-code">dma0chan0  dma0chan1  dma0chan2  dma0chan3  dma0chan4  dma0chan5  dma0chan6  dma0chan7  dma1chan0  dma1chan1</p>
-			<p>In the preceding snippet, the <strong class="source-inline">chan&lt;chan-index&gt;</strong> channel name is concatenated with the DMA controller, <strong class="source-inline">dma&lt;dma-index&gt;</strong>, to which it belongs. Whether a channel is in use or not can<a id="_idIndexMarker920"/> be seen by printing the <strong class="source-inline">in_use</strong> file value in the corresponding channel directory as follows:</p>
-			<p class="source-code">root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan0/in_use </p>
-			<p class="source-code">1</p>
-			<p class="source-code">root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan1/in_use </p>
-			<p class="source-code">1</p>
-			<p class="source-code">root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan2/in_use </p>
-			<p class="source-code">1</p>
-			<p class="source-code">root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan3/in_use </p>
-			<p class="source-code">0</p>
-			<p class="source-code">root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan4/in_use </p>
-			<p class="source-code">0</p>
-			<p class="source-code">root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan5/in_use </p>
-			<p class="source-code">0</p>
-			<p class="source-code">root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan6/in_use </p>
-			<p class="source-code">0</p>
-			<p class="source-code">root@raspberrypi4-64:~#</p>
-			<p>In the preceding, we can see, for example, that <strong class="source-inline">dma0chan1</strong> is in use, while <strong class="source-inline">dma0chan6</strong> is not.</p>
+			<p>By way of additional information, available DMA channels on a system can be listed in user space using the <code>ls /sys/class/dma/</code> command as follows: </p>
+			<pre>root@raspberrypi4-64:~# ls /sys/class/dma/
+dma0chan0  dma0chan1  dma0chan2  dma0chan3  dma0chan4  dma0chan5  dma0chan6  dma0chan7  dma1chan0  dma1chan1</pre>
+			<p>In the preceding snippet, the <code>chan&lt;chan-index&gt;</code> channel name is concatenated with the DMA controller, <code>dma&lt;dma-index&gt;</code>, to which it belongs. Whether a channel is in use or not can<a id="_idIndexMarker920"/> be seen by printing the <code>in_use</code> file value in the corresponding channel directory as follows:</p>
+			<pre>root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan0/in_use 
+1
+root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan1/in_use 
+1
+root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan2/in_use 
+1
+root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan3/in_use 
+0
+root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan4/in_use 
+0
+root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan5/in_use 
+0
+root@raspberrypi4-64:~# cat /sys/class/dma/dma0chan6/in_use 
+0
+root@raspberrypi4-64:~#</pre>
+			<p>In the preceding, we can see, for example, that <code>dma0chan1</code> is in use, while <code>dma0chan6</code> is not.</p>
 			<h2 id="_idParaDest-172"><a id="_idTextAnchor174"/>Configuring the DMA channel</h2>
-			<p>For the<a id="_idIndexMarker921"/> DMA transfer to operate normally on a channel, a client-specific configuration must be applied to this channel. Thereby, the DMA engine framework allows this configuration by using a <strong class="source-inline">struct dma_slave_config</strong> data structure, which represents the runtime configuration of a DMA channel. This allows clients to specify parameters such as the DMA direction, DMA addresses (source and destination), bus width, and DMA burst lengths, for the peripheral. This<a id="_idIndexMarker922"/> configuration is then applied to the underlying hardware using the <strong class="source-inline">dmaengine_slave_config()</strong> function, which is defined as follows:</p>
-			<p class="source-code">int dmaengine_slave_config(struct dma_chan *chan,</p>
-			<p class="source-code">                         struct dma_slave_config *config)</p>
-			<p>The <strong class="source-inline">chan</strong> parameter represents the DMA channel to configure, and <strong class="source-inline">config</strong> is the configuration to be applied.</p>
-			<p>To better fine-tune this configuration, we must look at the <strong class="source-inline">struct dma_slave_config</strong> structure, which is defined as follows:</p>
-			<p class="source-code">struct dma_slave_config {</p>
-			<p class="source-code">     enum dma_transfer_direction direction;</p>
-			<p class="source-code">     phys_addr_t src_addr;</p>
-			<p class="source-code">     phys_addr_t dst_addr;</p>
-			<p class="source-code">     enum dma_slave_buswidth src_addr_width;</p>
-			<p class="source-code">     enum dma_slave_buswidth dst_addr_width;</p>
-			<p class="source-code">     u32 src_maxburst;</p>
-			<p class="source-code">     u32 dst_maxburst;</p>
-			<p class="source-code">     [...]</p>
-			<p class="source-code">};</p>
+			<p>For the<a id="_idIndexMarker921"/> DMA transfer to operate normally on a channel, a client-specific configuration must be applied to this channel. Thereby, the DMA engine framework allows this configuration by using a <code>struct dma_slave_config</code> data structure, which represents the runtime configuration of a DMA channel. This allows clients to specify parameters such as the DMA direction, DMA addresses (source and destination), bus width, and DMA burst lengths, for the peripheral. This<a id="_idIndexMarker922"/> configuration is then applied to the underlying hardware using the <code>dmaengine_slave_config()</code> function, which is defined as follows:</p>
+			<pre>int dmaengine_slave_config(struct dma_chan *chan,
+                         struct dma_slave_config *config)</pre>
+			<p>The <code>chan</code> parameter represents the DMA channel to configure, and <code>config</code> is the configuration to be applied.</p>
+			<p>To better fine-tune this configuration, we must look at the <code>struct dma_slave_config</code> structure, which is defined as follows:</p>
+			<pre>struct dma_slave_config {
+     enum dma_transfer_direction direction;
+     phys_addr_t src_addr;
+     phys_addr_t dst_addr;
+     enum dma_slave_buswidth src_addr_width;
+     enum dma_slave_buswidth dst_addr_width;
+     u32 src_maxburst;
+     u32 dst_maxburst;
+     [...]
+};</pre>
 			<p>Here is the meaning of each element in the structure:</p>
 			<ul>
-				<li><strong class="source-inline">direction</strong> indicates whether the data should go in or out on this slave channel, right now. The possible values are as follows:<p class="source-code">/* dma transfer mode and direction indicator */</p><p class="source-code">enum dma_transfer_direction {</p><p class="source-code">    DMA_MEM_TO_MEM, /* Async/Memcpy mode */</p><p class="source-code">    DMA_MEM_TO_DEV, /* From Memory to Device */</p><p class="source-code">    DMA_DEV_TO_MEM, /* From Device to Memory */</p><p class="source-code">    DMA_DEV_TO_DEV, /* From Device to Device */</p><p class="source-code">    DMA_TRANS_NONE, </p><p class="source-code">};</p></li>
-				<li><strong class="source-inline">src_addr</strong>: This <a id="_idIndexMarker923"/>is the physical address (the bus address actually) of the buffer where the DMA slave data should be read (RX). This element is ignored if the source is memory. <strong class="source-inline">dst_addr</strong> is the physical address (the bus address) of the buffer where the DMA slave data should be written (TX), which is ignored if the source is memory. <strong class="source-inline">src_addr_width</strong> is the width in bytes of the source (RX) register where the DMA data should be read. If the source is memory, this may be ignored depending on the architecture. In the same manner, <strong class="source-inline">dst_addr_width</strong> is the same as <strong class="source-inline">src_addr_width</strong>, but for the destination target (TX).</li>
+				<li><code>direction</code> indicates whether the data should go in or out on this slave channel, right now. The possible values are as follows:<pre>/* dma transfer mode and direction indicator */
+enum dma_transfer_direction {
+    DMA_MEM_TO_MEM, /* Async/Memcpy mode */
+    DMA_MEM_TO_DEV, /* From Memory to Device */
+    DMA_DEV_TO_MEM, /* From Device to Memory */
+    DMA_DEV_TO_DEV, /* From Device to Device */
+    DMA_TRANS_NONE, 
+};</pre></li>
+				<li><code>src_addr</code>: This <a id="_idIndexMarker923"/>is the physical address (the bus address actually) of the buffer where the DMA slave data should be read (RX). This element is ignored if the source is memory. <code>dst_addr</code> is the physical address (the bus address) of the buffer where the DMA slave data should be written (TX), which is ignored if the source is memory. <code>src_addr_width</code> is the width in bytes of the source (RX) register where the DMA data should be read. If the source is memory, this may be ignored depending on the architecture. In the same manner, <code>dst_addr_width</code> is the same as <code>src_addr_width</code>, but for the destination target (TX).</li>
 			</ul>
 			<p>Any bus width must be one of the following enumerations:</p>
-			<p class="source-code">enum dma_slave_buswidth {</p>
-			<p class="source-code">    DMA_SLAVE_BUSWIDTH_UNDEFINED = 0,</p>
-			<p class="source-code">    DMA_SLAVE_BUSWIDTH_1_BYTE = 1,</p>
-			<p class="source-code">    DMA_SLAVE_BUSWIDTH_2_BYTES = 2,</p>
-			<p class="source-code">    DMA_SLAVE_BUSWIDTH_3_BYTES = 3,</p>
-			<p class="source-code">    DMA_SLAVE_BUSWIDTH_4_BYTES = 4,</p>
-			<p class="source-code">    DMA_SLAVE_BUSWIDTH_8_BYTES = 8,</p>
-			<p class="source-code">    DMA_SLAVE_BUSWIDTH_16_BYTES = 16,</p>
-			<p class="source-code">    DMA_SLAVE_BUSWIDTH_32_BYTES = 32,</p>
-			<p class="source-code">    DMA_SLAVE_BUSWIDTH_64_BYTES = 64,</p>
-			<p class="source-code">};</p>
+			<pre>enum dma_slave_buswidth {
+    DMA_SLAVE_BUSWIDTH_UNDEFINED = 0,
+    DMA_SLAVE_BUSWIDTH_1_BYTE = 1,
+    DMA_SLAVE_BUSWIDTH_2_BYTES = 2,
+    DMA_SLAVE_BUSWIDTH_3_BYTES = 3,
+    DMA_SLAVE_BUSWIDTH_4_BYTES = 4,
+    DMA_SLAVE_BUSWIDTH_8_BYTES = 8,
+    DMA_SLAVE_BUSWIDTH_16_BYTES = 16,
+    DMA_SLAVE_BUSWIDTH_32_BYTES = 32,
+    DMA_SLAVE_BUSWIDTH_64_BYTES = 64,
+};</pre>
 			<ul>
-				<li><strong class="source-inline">src_maxburs</strong>: This is the maximum number of words that can be sent to the device in a single burst (consider words as units of the <strong class="source-inline">src_addr_width</strong> member, not bytes). On I/O peripherals, typically half the FIFO depth is used so that it does not overflow. On memory sources, this may or may not be applicable. <strong class="source-inline">dst_maxburst</strong> is similar to <strong class="source-inline">src_maxburst</strong>, but it is used for the destination target.</li>
+				<li><code>src_maxburs</code>: This is the maximum number of words that can be sent to the device in a single burst (consider words as units of the <code>src_addr_width</code> member, not bytes). On I/O peripherals, typically half the FIFO depth is used so that it does not overflow. On memory sources, this may or may not be applicable. <code>dst_maxburst</code> is similar to <code>src_maxburst</code>, but it is used for the destination target.</li>
 			</ul>
 			<p>The following is <a id="_idIndexMarker924"/>an example of DMA channel configuration:</p>
-			<p class="source-code">struct dma_chan *my_dma_chan;</p>
-			<p class="source-code">dma_addr_t dma_src_addr, dma_dst_addr;</p>
-			<p class="source-code">struct dma_slave_config channel_cfg = {0};</p>
-			<p class="source-code">/* No filter callback, neither filter param */</p>
-			<p class="source-code">my_dma_chan = dma_request_channel(my_dma_cap_mask,</p>
-			<p class="source-code">                                   NULL, NULL);</p>
-			<p class="source-code">/* scr_addr and dst_addr are ignored for mem to mem copy */</p>
-			<p class="source-code">channel_cfg.direction = DMA_MEM_TO_MEM;</p>
-			<p class="source-code">channel_cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_32_BYTES;</p>
-			<p class="source-code">dmaengine_slave_config(my_dma_chan, &amp;channel_cfg);</p>
-			<p>In the preceding excerpt, <strong class="source-inline">dma_request_channel()</strong> is used to request a DMA channel, which is then configured using <strong class="source-inline">dmaengine_slave_config()</strong>. </p>
+			<pre>struct dma_chan *my_dma_chan;
+dma_addr_t dma_src_addr, dma_dst_addr;
+struct dma_slave_config channel_cfg = {0};
+/* No filter callback, neither filter param */
+my_dma_chan = dma_request_channel(my_dma_cap_mask,
+                                   NULL, NULL);
+/* scr_addr and dst_addr are ignored for mem to mem copy */
+channel_cfg.direction = DMA_MEM_TO_MEM;
+channel_cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_32_BYTES;
+dmaengine_slave_config(my_dma_chan, &amp;channel_cfg);</pre>
+			<p>In the preceding excerpt, <code>dma_request_channel()</code> is used to request a DMA channel, which is then configured using <code>dmaengine_slave_config()</code>. </p>
 			<h2 id="_idParaDest-173"><a id="_idTextAnchor175"/>Configuring the DMA transfer</h2>
-			<p>This step <a id="_idIndexMarker925"/>allows the type of transfer to be defined. A DMA transfer is configured (or should we say prepared) thanks to one of the <strong class="source-inline">device_prep_dma_*</strong> callbacks of the controller associated with the DMA channel to which the transfer will be submitted. Each of these APIs returns a transfer descriptor, represented by the <strong class="source-inline">struct dma_async_tx_descriptor</strong> data structure, which can be used later for customization before submitting the transfer.</p>
-			<p>For a <a id="_idIndexMarker926"/>memory-to-memory transfer, for example, you should be using the <strong class="source-inline">device_prep_dma_memcpy</strong> callback, as in the following code:</p>
-			<p class="source-code">struct dma_device *dma_dev = my_dma_chan-&gt;device;</p>
-			<p class="source-code">struct dma_async_tx_descriptor *tx_desc = NULL;</p>
-			<p class="source-code">tx_desc = dma_dev-&gt;device_prep_dma_memcpy(</p>
-			<p class="source-code">                          my_dma_chan, dma_dst_addr,</p>
-			<p class="source-code">                          dma_src_addr, BUFFER_SIZE, 0);</p>
-			<p class="source-code">if (!tx_desc) {</p>
-			<p class="source-code">    /* dma_unmap_* the buffer */</p>
-			<p class="source-code">    handle_error();</p>
-			<p class="source-code">}</p>
-			<p>In the preceding code sample, we dereference the controller callback for invocation while we could have checked for its existence first. However, for sanity and portability reasons, it is recommended to use the <strong class="source-inline">dmaengine_prep_*</strong> DMA engine APIs instead of invoking the controller callback directly. Our <strong class="source-inline">tx_desc</strong> assignation will then have the following form:</p>
-			<p class="source-code">tx_desc = dmaengine_prep_dma_memcpy(my_dma_chan,</p>
-			<p class="source-code">             dma_dst_addr, dma_src_addr, BUFFER_SIZE, 0);</p>
+			<p>This step <a id="_idIndexMarker925"/>allows the type of transfer to be defined. A DMA transfer is configured (or should we say prepared) thanks to one of the <code>device_prep_dma_*</code> callbacks of the controller associated with the DMA channel to which the transfer will be submitted. Each of these APIs returns a transfer descriptor, represented by the <code>struct dma_async_tx_descriptor</code> data structure, which can be used later for customization before submitting the transfer.</p>
+			<p>For a <a id="_idIndexMarker926"/>memory-to-memory transfer, for example, you should be using the <code>device_prep_dma_memcpy</code> callback, as in the following code:</p>
+			<pre>struct dma_device *dma_dev = my_dma_chan-&gt;device;
+struct dma_async_tx_descriptor *tx_desc = NULL;
+tx_desc = dma_dev-&gt;device_prep_dma_memcpy(
+                          my_dma_chan, dma_dst_addr,
+                          dma_src_addr, BUFFER_SIZE, 0);
+if (!tx_desc) {
+    /* dma_unmap_* the buffer */
+    handle_error();
+}</pre>
+			<p>In the preceding code sample, we dereference the controller callback for invocation while we could have checked for its existence first. However, for sanity and portability reasons, it is recommended to use the <code>dmaengine_prep_*</code> DMA engine APIs instead of invoking the controller callback directly. Our <code>tx_desc</code> assignation will then have the following form:</p>
+			<pre>tx_desc = dmaengine_prep_dma_memcpy(my_dma_chan,
+             dma_dst_addr, dma_src_addr, BUFFER_SIZE, 0);</pre>
 			<p>This last approach is safer and portable regarding the controller data structure that may be subject to changes.</p>
-			<p>Additionally, the client driver can use the <strong class="source-inline">callback</strong> element of the <strong class="source-inline">dma_async_tx_descriptor</strong> structure (returned by the <strong class="source-inline">dmaengine_prep_*</strong> function) to supply a completion callback.</p>
+			<p>Additionally, the client driver can use the <code>callback</code> element of the <code>dma_async_tx_descriptor</code> structure (returned by the <code>dmaengine_prep_*</code> function) to supply a completion callback.</p>
 			<h2 id="_idParaDest-174"><a id="_idTextAnchor176"/>Submitting the DMA transfer</h2>
-			<p>To put<a id="_idIndexMarker927"/> the transaction in the driver pending queue, <strong class="source-inline">dmaengine_submit()</strong> is used, which has the following prototype:</p>
-			<p class="source-code">dma_cookie_t dmaengine_submit(</p>
-			<p class="source-code">                  struct dma_async_tx_descriptor *desc)</p>
-			<p>This API is the frontend of the controller's <strong class="source-inline">device_issue_pending</strong> callback. This function returns a cookie that you can use to check the progression of DMA activity through other DMA engines. To check whether the returned cookie is valid, you can use the <strong class="source-inline">dma_submit_error()</strong> helper, as we will see in the example. Assuming the completion callback has not yet been provided, it can be set up before submitting the transfer, as in the following excerpt:</p>
-			<p class="source-code">struct completion transfer_ok;</p>
-			<p class="source-code">init_completion(&amp;transfer_ok);</p>
-			<p class="source-code">/*</p>
-			<p class="source-code"> * you can also set the parameter to be given to this </p>
-			<p class="source-code"> * callback in tx-&gt;callback_param</p>
-			<p class="source-code"> */</p>
-			<p class="source-code">Tx_desc-&gt;callback = my_dma_callback;</p>
-			<p class="source-code">/* Submitting our DMA transfer */</p>
-			<p class="source-code">dma_cookie_t cookie = dmaengine_submit(tx);</p>
-			<p class="source-code">if (dma_submit_error(cookie)) {</p>
-			<p class="source-code">    /* handle error */</p>
-			<p class="source-code">    [...]</p>
-			<p class="source-code">}</p>
-			<p>The preceding excerpt is quite short and self-explanatory. For a parameter to be passed to the callback, it <a id="_idIndexMarker928"/>must be set in the descriptor's <strong class="source-inline">callback_param</strong> field. It can be a device state structure, for example.</p>
+			<p>To put<a id="_idIndexMarker927"/> the transaction in the driver pending queue, <code>dmaengine_submit()</code> is used, which has the following prototype:</p>
+			<pre>dma_cookie_t dmaengine_submit(
+                  struct dma_async_tx_descriptor *desc)</pre>
+			<p>This API is the frontend of the controller's <code>device_issue_pending</code> callback. This function returns a cookie that you can use to check the progression of DMA activity through other DMA engines. To check whether the returned cookie is valid, you can use the <code>dma_submit_error()</code> helper, as we will see in the example. Assuming the completion callback has not yet been provided, it can be set up before submitting the transfer, as in the following excerpt:</p>
+			<pre>struct completion transfer_ok;
+init_completion(&amp;transfer_ok);
+/*
+ * you can also set the parameter to be given to this 
+ * callback in tx-&gt;callback_param
+ */
+Tx_desc-&gt;callback = my_dma_callback;
+/* Submitting our DMA transfer */
+dma_cookie_t cookie = dmaengine_submit(tx);
+if (dma_submit_error(cookie)) {
+    /* handle error */
+    [...]
+}</pre>
+			<p>The preceding excerpt is quite short and self-explanatory. For a parameter to be passed to the callback, it <a id="_idIndexMarker928"/>must be set in the descriptor's <code>callback_param</code> field. It can be a device state structure, for example.</p>
 			<p class="callout-heading">Note</p>
 			<p class="callout">An interrupt (from the DMA controller) is raised after each DMA transfer has been completed, after which the next transfer in the queue is initiated and a tasklet is activated. If the client driver has provided a completion callback, the tasklet will call it when it is scheduled. Thus, the completion callback runs in an interrupt context.</p>
 			<h2 id="_idParaDest-175"><a id="_idTextAnchor177"/>Issuing pending DMA requests and waiting for callback notification</h2>
-			<p>Starting the <a id="_idIndexMarker929"/>transaction is the last step of the DMA transfer setup. Transactions in the pending queue of a channel are activated by calling <strong class="source-inline">dma_async_issue_pending()</strong> on that channel. If the channel is idle, then the first transaction in the queue is started and subsequent ones are queued up. Upon completion of a DMA operation, the next one in the queue is started and a tasklet triggered. This tasklet is in charge of calling the client driver completion callback routine for notification, if set:</p>
-			<p class="source-code">void dma_async_issue_pending(struct dma_chan *chan);</p>
-			<p>This function is a wrapper around the controller's <strong class="source-inline">device_issue_pending</strong> callback. An example of its usage would look like the following:</p>
-			<p class="source-code">dma_async_issue_pending(my_dma_chan);</p>
-			<p class="source-code">wait_for_completion(&amp;transfer_ok);</p>
-			<p class="source-code">/* may be unmap buffer if necessary and if it is not</p>
-			<p class="source-code"> * done in the completion callback yet</p>
-			<p class="source-code"> */</p>
-			<p class="source-code">[...]</p>
-			<p class="source-code">/* Process buffer through rx_data and tx_data virtual addresses. */</p>
-			<p class="source-code">[...]</p>
-			<p>The <strong class="source-inline">wait_for_completion()</strong> function will block, putting the current task to sleep until our DMA callback <a id="_idIndexMarker930"/>gets called to update (complete) our completion variable in order to resume the blocked code. It is a good alternative to <strong class="source-inline">while (!done) msleep(SOME_TIME);</strong>. The following is an example:</p>
-			<p class="source-code">static void my_dma_complete_callback (void *param)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    complete(transfer_ok);</p>
-			<p class="source-code">[...]</p>
-			<p class="source-code">}</p>
+			<p>Starting the <a id="_idIndexMarker929"/>transaction is the last step of the DMA transfer setup. Transactions in the pending queue of a channel are activated by calling <code>dma_async_issue_pending()</code> on that channel. If the channel is idle, then the first transaction in the queue is started and subsequent ones are queued up. Upon completion of a DMA operation, the next one in the queue is started and a tasklet triggered. This tasklet is in charge of calling the client driver completion callback routine for notification, if set:</p>
+			<pre>void dma_async_issue_pending(struct dma_chan *chan);</pre>
+			<p>This function is a wrapper around the controller's <code>device_issue_pending</code> callback. An example of its usage would look like the following:</p>
+			<pre>dma_async_issue_pending(my_dma_chan);
+wait_for_completion(&amp;transfer_ok);
+/* may be unmap buffer if necessary and if it is not
+ * done in the completion callback yet
+ */
+[...]
+/* Process buffer through rx_data and tx_data virtual addresses. */
+[...]</pre>
+			<p>The <code>wait_for_completion()</code> function will block, putting the current task to sleep until our DMA callback <a id="_idIndexMarker930"/>gets called to update (complete) our completion variable in order to resume the blocked code. It is a good alternative to <code>while (!done) msleep(SOME_TIME);</code>. The following is an example:</p>
+			<pre>static void my_dma_complete_callback (void *param)
+{
+    complete(transfer_ok);
+[...]
+}</pre>
 			<p>This is all in our DMA transfer implementation. When the completion callback returns, the main code will resume and continue its normal workflow.</p>
 			<p>Now that we have gone through the DMA engine APIs, we can summarize the knowledge in a complete example, as we see in the next section.</p>
 			<h1 id="_idParaDest-176"><a id="_idTextAnchor178"/>Putting it all together – Single-buffer DMA mapping</h1>
-			<p>Let's consider <a id="_idIndexMarker931"/>the following case where we would like to map a single buffer (streaming mapping) and DMA data from the source, <strong class="source-inline">src</strong>, to the destination, <strong class="source-inline">dst</strong>. We will use a character device so that any write operation in this device will trig the DMA and any read operation will compare both the source and destination to check whether they match. </p>
+			<p>Let's consider <a id="_idIndexMarker931"/>the following case where we would like to map a single buffer (streaming mapping) and DMA data from the source, <code>src</code>, to the destination, <code>dst</code>. We will use a character device so that any write operation in this device will trig the DMA and any read operation will compare both the source and destination to check whether they match. </p>
 			<p>First, let's enumerate the header files required to pull the necessary APIs:</p>
-			<p class="source-code">#define pr_fmt(fmt) "DMA-TEST: " fmt</p>
-			<p class="source-code">#include &lt;linux/module.h&gt;</p>
-			<p class="source-code">#include &lt;linux/slab.h&gt;</p>
-			<p class="source-code">#include &lt;linux/init.h&gt;</p>
-			<p class="source-code">#include &lt;linux/dma-mapping.h&gt;</p>
-			<p class="source-code">#include &lt;linux/fs.h&gt;</p>
-			<p class="source-code">#include &lt;linux/dmaengine.h&gt;</p>
-			<p class="source-code">#include &lt;linux/device.h&gt;</p>
-			<p class="source-code">#include &lt;linux/io.h&gt;</p>
-			<p class="source-code">#include &lt;linux/delay.h&gt;</p>
+			<pre>#define pr_fmt(fmt) "DMA-TEST: " fmt
+#include &lt;linux/module.h&gt;
+#include &lt;linux/slab.h&gt;
+#include &lt;linux/init.h&gt;
+#include &lt;linux/dma-mapping.h&gt;
+#include &lt;linux/fs.h&gt;
+#include &lt;linux/dmaengine.h&gt;
+#include &lt;linux/device.h&gt;
+#include &lt;linux/io.h&gt;
+#include &lt;linux/delay.h&gt;</pre>
 			<p>Let's <a id="_idIndexMarker932"/>now define some global variables for the driver:</p>
-			<p class="source-code">/* we need page aligned buffers */</p>
-			<p class="source-code">#define DMA_BUF_SIZE  2 * PAGE_SIZE</p>
-			<p class="source-code">static u32 *wbuf;</p>
-			<p class="source-code">static u32 *rbuf;</p>
-			<p class="source-code">static int dma_result;</p>
-			<p class="source-code">static int gMajor; /* major number of device */</p>
-			<p class="source-code">static struct class *dma_test_class;</p>
-			<p class="source-code">static struct completion dma_m2m_ok;</p>
-			<p class="source-code">static struct dma_chan *dma_m2m_chan;</p>
-			<p>In the preceding, <strong class="source-inline">wbuf</strong> represents the source buffer, and <strong class="source-inline">rbuf</strong> represents the destination buffer. Since our implementation is based on a character device, <strong class="source-inline">gMajor</strong> and <strong class="source-inline">dma_test_class</strong> are used to represent the major number and the class of the character device.</p>
+			<pre>/* we need page aligned buffers */
+#define DMA_BUF_SIZE  2 * PAGE_SIZE
+static u32 *wbuf;
+static u32 *rbuf;
+static int dma_result;
+static int gMajor; /* major number of device */
+static struct class *dma_test_class;
+static struct completion dma_m2m_ok;
+static struct dma_chan *dma_m2m_chan;</pre>
+			<p>In the preceding, <code>wbuf</code> represents the source buffer, and <code>rbuf</code> represents the destination buffer. Since our implementation is based on a character device, <code>gMajor</code> and <code>dma_test_class</code> are used to represent the major number and the class of the character device.</p>
 			<p>Because DMA mappings need to be given a device structure as the first parameter, let's create a dummy one:</p>
-			<p class="source-code">static void dev_release(struct device *dev)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    pr_info( "releasing dma capable device\n");</p>
-			<p class="source-code">}</p>
-			<p class="source-code">static struct device dev = {</p>
-			<p class="source-code">    .release = dev_release,</p>
-			<p class="source-code">    .coherent_dma_mask = ~0, // allow any address</p>
-			<p class="source-code">    .dma_mask = &amp;dev.coherent_dma_mask,// use the same mask</p>
-			<p class="source-code">};</p>
-			<p>Because <a id="_idIndexMarker933"/>we have used a static device, we set the device's DMA mask in the device structure. In a platform driver, we would have used <strong class="source-inline">dma_set_mask_and_coherent()</strong> to achieve that.</p>
-			<p>The time has come to implement our first file operation, the <strong class="source-inline">open</strong> method, which in our case, simply allocates buffers:</p>
-			<p class="source-code">int dma_open(struct inode * inode, struct file * filp)</p>
-			<p class="source-code">{     </p>
-			<p class="source-code">     init_completion(&amp;dma_m2m_ok);</p>
-			<p class="source-code">     wbuf = kzalloc(DMA_BUF_SIZE, GFP_KERNEL | GFP_DMA);</p>
-			<p class="source-code">     if(!wbuf) {</p>
-			<p class="source-code">           pr_err("Failed to allocate wbuf!\n");</p>
-			<p class="source-code">           return -ENOMEM;</p>
-			<p class="source-code">     }</p>
-			<p class="source-code">     rbuf = kzalloc(DMA_BUF_SIZE, GFP_KERNEL | GFP_DMA);</p>
-			<p class="source-code">     if(!rbuf) {</p>
-			<p class="source-code">           kfree(wbuf);</p>
-			<p class="source-code">           pr_err("Failed to allocate rbuf!\n");</p>
-			<p class="source-code">           return -ENOMEM;</p>
-			<p class="source-code">     }</p>
-			<p class="source-code">     return 0;</p>
-			<p class="source-code">}</p>
+			<pre>static void dev_release(struct device *dev)
+{
+    pr_info( "releasing dma capable device\n");
+}
+static struct device dev = {
+    .release = dev_release,
+    .coherent_dma_mask = ~0, // allow any address
+    .dma_mask = &amp;dev.coherent_dma_mask,// use the same mask
+};</pre>
+			<p>Because <a id="_idIndexMarker933"/>we have used a static device, we set the device's DMA mask in the device structure. In a platform driver, we would have used <code>dma_set_mask_and_coherent()</code> to achieve that.</p>
+			<p>The time has come to implement our first file operation, the <code>open</code> method, which in our case, simply allocates buffers:</p>
+			<pre>int dma_open(struct inode * inode, struct file * filp)
+{     
+     init_completion(&amp;dma_m2m_ok);
+     wbuf = kzalloc(DMA_BUF_SIZE, GFP_KERNEL | GFP_DMA);
+     if(!wbuf) {
+           pr_err("Failed to allocate wbuf!\n");
+           return -ENOMEM;
+     }
+     rbuf = kzalloc(DMA_BUF_SIZE, GFP_KERNEL | GFP_DMA);
+     if(!rbuf) {
+           kfree(wbuf);
+           pr_err("Failed to allocate rbuf!\n");
+           return -ENOMEM;
+     }
+     return 0;
+}</pre>
 			<p>The <a id="_idIndexMarker934"/>preceding character device's open operation does nothing other than allocate the buffer that will be used for our transfer. These buffers will be freed when the device file is closed, which will result in invoking our device's release function, implemented as follows:</p>
-			<p class="source-code">int dma_release(struct inode * inode, struct file * filp)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">     kfree(wbuf);</p>
-			<p class="source-code">     kfree(rbuf);</p>
-			<p class="source-code">     return 0;</p>
-			<p class="source-code">}</p>
-			<p>We arrive at the implementation of the <strong class="source-inline">read</strong> method. This method will simply add an entry to the kernel message buffer, reporting the result of the DMA operation. It is implemented as follows:</p>
-			<p class="source-code">ssize_t dma_read (struct file *filp, char __user * buf,</p>
-			<p class="source-code">                   size_t count, loff_t * offset)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">     pr_info("DMA result: %d!\n", dma_result);</p>
-			<p class="source-code">     return 0;</p>
-			<p class="source-code">}</p>
-			<p>Now comes the DMA-related part. We first implement the completion callback, which does nothing other than invoke <strong class="source-inline">complete()</strong> on our completion structure and add a trace in the kernel log buffer. It is implemented as follows:</p>
-			<p class="source-code">static void dma_m2m_callback(void *data)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    pr_info("in %s\n",__func__);</p>
-			<p class="source-code">    complete(&amp;dma_m2m_ok);</p>
-			<p class="source-code">}</p>
+			<pre>int dma_release(struct inode * inode, struct file * filp)
+{
+     kfree(wbuf);
+     kfree(rbuf);
+     return 0;
+}</pre>
+			<p>We arrive at the implementation of the <code>read</code> method. This method will simply add an entry to the kernel message buffer, reporting the result of the DMA operation. It is implemented as follows:</p>
+			<pre>ssize_t dma_read (struct file *filp, char __user * buf,
+                   size_t count, loff_t * offset)
+{
+     pr_info("DMA result: %d!\n", dma_result);
+     return 0;
+}</pre>
+			<p>Now comes the DMA-related part. We first implement the completion callback, which does nothing other than invoke <code>complete()</code> on our completion structure and add a trace in the kernel log buffer. It is implemented as follows:</p>
+			<pre>static void dma_m2m_callback(void *data)
+{
+    pr_info("in %s\n",__func__);
+    complete(&amp;dma_m2m_ok);
+}</pre>
 			<p>The<a id="_idIndexMarker935"/> choice has been made to implement all the DMA logic in the write method. There is no technical reason behind this choice. A user is free to adapt the code architecture, based on the following implementation:</p>
-			<p class="source-code">ssize_t dma_write(struct file * filp,</p>
-			<p class="source-code">                  const char __user * buf,</p>
-			<p class="source-code">                  size_t count, loff_t * offset)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    u32 *index, i;</p>
-			<p class="source-code">    size_t err = count;</p>
-			<p class="source-code">    dma_cookie_t cookie;</p>
-			<p class="source-code">    dma_cap_mask_t dma_m2m_mask;</p>
-			<p class="source-code">    dma_addr_t dma_src, dma_dst;</p>
-			<p class="source-code">    struct dma_slave_config dma_m2m_config = {0};</p>
-			<p class="source-code">    struct dma_async_tx_descriptor *dma_m2m_desc;</p>
+			<pre>ssize_t dma_write(struct file * filp,
+                  const char __user * buf,
+                  size_t count, loff_t * offset)
+{
+    u32 *index, i;
+    size_t err = count;
+    dma_cookie_t cookie;
+    dma_cap_mask_t dma_m2m_mask;
+    dma_addr_t dma_src, dma_dst;
+    struct dma_slave_config dma_m2m_config = {0};
+    struct dma_async_tx_descriptor *dma_m2m_desc;</pre>
 			<p>In the preceding, there are variables we will require in order to perform our memory-to-memory DMA transfer.</p>
 			<p>Now that our variables are defined, we initialize the source buffer with some content that will later be copied to the destination with the DMA operation:</p>
-			<p class="source-code">    pr_info("Initializing buffer\n");</p>
-			<p class="source-code">    index = wbuf;</p>
-			<p class="source-code">    for (i = 0; i &lt; DMA_BUF_SIZE/4; i++) {</p>
-			<p class="source-code">        *(index + i) = 0x56565656;</p>
-			<p class="source-code">    }</p>
-			<p class="source-code">    data_dump("WBUF initialized buffer", (u8*)wbuf,</p>
-			<p class="source-code">               DMA_BUF_SIZE);</p>
-			<p class="source-code">    pr_info("Buffer initialized\n");</p>
+			<pre>    pr_info("Initializing buffer\n");
+    index = wbuf;
+    for (i = 0; i &lt; DMA_BUF_SIZE/4; i++) {
+        *(index + i) = 0x56565656;
+    }
+    data_dump("WBUF initialized buffer", (u8*)wbuf,
+               DMA_BUF_SIZE);
+    pr_info("Buffer initialized\n");</pre>
 			<p>The <a id="_idIndexMarker936"/>source buffer is ready, and we can now start the DMA-related code. At this first step, we initialize capabilities and request a DMA channel:</p>
-			<p class="source-code">     dma_cap_zero(dma_m2m_mask);</p>
-			<p class="source-code">     dma_cap_set(DMA_MEMCPY, dma_m2m_mask);</p>
-			<p class="source-code">     dma_m2m_chan = dma_request_channel(dma_m2m_mask,</p>
-			<p class="source-code">                                         NULL, NULL);</p>
-			<p class="source-code">     if (!dma_m2m_chan) {</p>
-			<p class="source-code">           pr_err("Error requesting the DMA channel\n");</p>
-			<p class="source-code">           return -EINVAL;</p>
-			<p class="source-code">     } else {</p>
-			<p class="source-code">           pr_info("Got DMA channel %d\n",</p>
-			<p class="source-code">                    dma_m2m_chan-&gt;chan_id);</p>
-			<p class="source-code">     }</p>
-			<p>In the preceding, the channel could have also registered with <strong class="source-inline">dma_m2m_chan = dma_request_chan_by_mask(&amp;dma_m2m_mask);</strong>. The advantage of using this method is that only the mask has to be specified in a parameter, and the driver need not bother with other arguments.</p>
+			<pre>     dma_cap_zero(dma_m2m_mask);
+     dma_cap_set(DMA_MEMCPY, dma_m2m_mask);
+     dma_m2m_chan = dma_request_channel(dma_m2m_mask,
+                                         NULL, NULL);
+     if (!dma_m2m_chan) {
+           pr_err("Error requesting the DMA channel\n");
+           return -EINVAL;
+     } else {
+           pr_info("Got DMA channel %d\n",
+                    dma_m2m_chan-&gt;chan_id);
+     }</pre>
+			<p>In the preceding, the channel could have also registered with <code>dma_m2m_chan = dma_request_chan_by_mask(&amp;dma_m2m_mask);</code>. The advantage of using this method is that only the mask has to be specified in a parameter, and the driver need not bother with other arguments.</p>
 			<p>In the second step, we set slave- and controller-specific parameters, and then we create the mappings for both source and destination buffers:</p>
-			<p class="source-code">     dma_m2m_config.direction = DMA_MEM_TO_MEM;</p>
-			<p class="source-code">     dma_m2m_config.dst_addr_width =</p>
-			<p class="source-code">                     DMA_SLAVE_BUSWIDTH_4_BYTES;</p>
-			<p class="source-code">     dmaengine_slave_config(dma_m2m_chan,</p>
-			<p class="source-code">                            &amp;dma_m2m_config);</p>
-			<p class="source-code">     pr_info("DMA channel configured\n");</p>
-			<p class="source-code">     /* Grab bus addresses to prepare the DMA transfer */</p>
-			<p class="source-code">     dma_src = dma_map_single(&amp;dev, wbuf, DMA_BUF_SIZE,    </p>
-			<p class="source-code">                               DMA_TO_DEVICE);</p>
-			<p class="source-code">     if (dma_mapping_error(&amp;dev, dma_src)) {</p>
-			<p class="source-code">           pr_err("Could not map src buffer\n");</p>
-			<p class="source-code">           err = -ENOMEM;</p>
-			<p class="source-code">           goto channel_release;</p>
-			<p class="source-code">     }</p>
-			<p class="source-code">     dma_dst = dma_map_single(&amp;dev, rbuf, DMA_BUF_SIZE,</p>
-			<p class="source-code">                               DMA_FROM_DEVICE);</p>
-			<p class="source-code">     if (dma_mapping_error(&amp;dev, dma_dst)) {</p>
-			<p class="source-code">           dma_unmap_single(&amp;dev, dma_src,</p>
-			<p class="source-code">                            DMA_BUF_SIZE, DMA_TO_DEVICE);</p>
-			<p class="source-code">           err = -ENOMEM;</p>
-			<p class="source-code">           goto channel_release;</p>
-			<p class="source-code">     }</p>
-			<p class="source-code">     pr_info("DMA mappings created\n");</p>
+			<pre>     dma_m2m_config.direction = DMA_MEM_TO_MEM;
+     dma_m2m_config.dst_addr_width =
+                     DMA_SLAVE_BUSWIDTH_4_BYTES;
+     dmaengine_slave_config(dma_m2m_chan,
+                            &amp;dma_m2m_config);
+     pr_info("DMA channel configured\n");
+     /* Grab bus addresses to prepare the DMA transfer */
+     dma_src = dma_map_single(&amp;dev, wbuf, DMA_BUF_SIZE,    
+                               DMA_TO_DEVICE);
+     if (dma_mapping_error(&amp;dev, dma_src)) {
+           pr_err("Could not map src buffer\n");
+           err = -ENOMEM;
+           goto channel_release;
+     }
+     dma_dst = dma_map_single(&amp;dev, rbuf, DMA_BUF_SIZE,
+                               DMA_FROM_DEVICE);
+     if (dma_mapping_error(&amp;dev, dma_dst)) {
+           dma_unmap_single(&amp;dev, dma_src,
+                            DMA_BUF_SIZE, DMA_TO_DEVICE);
+           err = -ENOMEM;
+           goto channel_release;
+     }
+     pr_info("DMA mappings created\n");</pre>
 			<p>In the <a id="_idIndexMarker937"/>third step, we grab a descriptor for the transaction:</p>
-			<p class="source-code">    dma_m2m_desc = </p>
-			<p class="source-code">        dmaengine_prep_dma_memcpy(dma_m2m_chan,</p>
-			<p class="source-code">                      dma_dst, dma_src, DMA_BUF_SIZE,0);</p>
-			<p class="source-code">     if (!dma_m2m_desc) {</p>
-			<p class="source-code">           pr_err("error in prep_dma_sg\n");</p>
-			<p class="source-code">           err = -EINVAL;</p>
-			<p class="source-code">           goto dma_unmap;</p>
-			<p class="source-code">     }</p>
-			<p class="source-code">     dma_m2m_desc-&gt;callback = dma_m2m_callback;</p>
-			<p>Calling <strong class="source-inline">dmaengine_prep_dma_memcpy()</strong> results in invoking <strong class="source-inline">dma_m2m_chan-&gt;device-&gt;device_prep_dma_memcpy()</strong>. It is, however, recommended to use the DMA <a id="_idIndexMarker938"/>engine method since it is more portable.</p>
+			<pre>    dma_m2m_desc = 
+        dmaengine_prep_dma_memcpy(dma_m2m_chan,
+                      dma_dst, dma_src, DMA_BUF_SIZE,0);
+     if (!dma_m2m_desc) {
+           pr_err("error in prep_dma_sg\n");
+           err = -EINVAL;
+           goto dma_unmap;
+     }
+     dma_m2m_desc-&gt;callback = dma_m2m_callback;</pre>
+			<p>Calling <code>dmaengine_prep_dma_memcpy()</code> results in invoking <code>dma_m2m_chan-&gt;device-&gt;device_prep_dma_memcpy()</code>. It is, however, recommended to use the DMA <a id="_idIndexMarker938"/>engine method since it is more portable.</p>
 			<p>In the fourth step, we submit the DMA transaction:</p>
-			<p class="source-code">     cookie = dmaengine_submit(dma_m2m_desc);</p>
-			<p class="source-code">     if (dma_submit_error(cookie)) {</p>
-			<p class="source-code">           pr_err("Unable to submit the DMA coockie\n");</p>
-			<p class="source-code">           err = -EINVAL;</p>
-			<p class="source-code">           goto dma_unmap;</p>
-			<p class="source-code">     }</p>
-			<p class="source-code">     pr_info("Got this cookie: %d\n", cookie);</p>
+			<pre>     cookie = dmaengine_submit(dma_m2m_desc);
+     if (dma_submit_error(cookie)) {
+           pr_err("Unable to submit the DMA coockie\n");
+           err = -EINVAL;
+           goto dma_unmap;
+     }
+     pr_info("Got this cookie: %d\n", cookie);</pre>
 			<p>Now that the transaction has been submitted, we can move to the fifth and final step, where we issue pending DMA requests and wait for callback notification:</p>
-			<p class="source-code">     dma_async_issue_pending(dma_m2m_chan);</p>
-			<p class="source-code">     pr_info("waiting for DMA transaction...\n");</p>
-			<p class="source-code">     /* you also can use wait_for_completion_timeout() */</p>
-			<p class="source-code">     wait_for_completion(&amp;dma_m2m_ok);</p>
+			<pre>     dma_async_issue_pending(dma_m2m_chan);
+     pr_info("waiting for DMA transaction...\n");
+     /* you also can use wait_for_completion_timeout() */
+     wait_for_completion(&amp;dma_m2m_ok);</pre>
 			<p>At this point in the code, the DMA transaction has run until completion, and we can check whether source and destination buffers have the same content. However, before accessing the buffers, they must be synced; luckily, the unmapping methods perform an implicit <a id="_idIndexMarker939"/>buffer sync:</p>
-			<p class="source-code">dma_unmap:</p>
-			<p class="source-code">    /* we do not care about the source anymore */</p>
-			<p class="source-code">    dma_unmap_single(&amp;dev, dma_src, DMA_BUF_SIZE,</p>
-			<p class="source-code">                       DMA_TO_DEVICE);</p>
-			<p class="source-code">    /* unmap the DMA memory destination for CPU access.</p>
-			<p class="source-code">     * This will sync the buffer */</p>
-			<p class="source-code">    dma_unmap_single(&amp;dev, dma_dst, DMA_BUF_SIZE,</p>
-			<p class="source-code">                       DMA_FROM_DEVICE);</p>
-			<p class="source-code">    /* </p>
-			<p class="source-code">     * if no error occured, then we are safe to access </p>
-			<p class="source-code">     * the buffer. The buffer must be synced first, and </p>
-			<p class="source-code">     * thanks to dma_unmap_single(), it is.</p>
-			<p class="source-code">     */</p>
-			<p class="source-code">    if (err &gt;= 0) {</p>
-			<p class="source-code">        pr_info("Checking if DMA succeed ...\n");</p>
-			<p class="source-code">        for (i = 0; i &lt; DMA_BUF_SIZE/4; i++) {</p>
-			<p class="source-code">            if (*(rbuf+i) != *(wbuf+i)) {</p>
-			<p class="source-code">                pr_err("Single DMA buffer copy falled!, </p>
-			<p class="source-code">                        r=%x,w=%x,%d\n",</p>
-			<p class="source-code">                        *(rbuf+i), *(wbuf+i), i);</p>
-			<p class="source-code">                return err;</p>
-			<p class="source-code">            }</p>
-			<p class="source-code">        }</p>
-			<p class="source-code">        pr_info("buffer copy passed!\n");</p>
-			<p class="source-code">        dma_result = 1;</p>
-			<p class="source-code">        data_dump("RBUF DMA buffer", (u8*)rbuf, </p>
-			<p class="source-code">                  DMA_BUF_SIZE);</p>
-			<p class="source-code">    }</p>
-			<p class="source-code">channel_release:</p>
-			<p class="source-code">     dma_release_channel(dma_m2m_chan);</p>
-			<p class="source-code">     dma_m2m_chan = NULL;</p>
-			<p class="source-code">     return err;</p>
-			<p class="source-code">}</p>
+			<pre>dma_unmap:
+    /* we do not care about the source anymore */
+    dma_unmap_single(&amp;dev, dma_src, DMA_BUF_SIZE,
+                       DMA_TO_DEVICE);
+    /* unmap the DMA memory destination for CPU access.
+     * This will sync the buffer */
+    dma_unmap_single(&amp;dev, dma_dst, DMA_BUF_SIZE,
+                       DMA_FROM_DEVICE);
+    /* 
+     * if no error occured, then we are safe to access 
+     * the buffer. The buffer must be synced first, and 
+     * thanks to dma_unmap_single(), it is.
+     */
+    if (err &gt;= 0) {
+        pr_info("Checking if DMA succeed ...\n");
+        for (i = 0; i &lt; DMA_BUF_SIZE/4; i++) {
+            if (*(rbuf+i) != *(wbuf+i)) {
+                pr_err("Single DMA buffer copy falled!, 
+                        r=%x,w=%x,%d\n",
+                        *(rbuf+i), *(wbuf+i), i);
+                return err;
+            }
+        }
+        pr_info("buffer copy passed!\n");
+        dma_result = 1;
+        data_dump("RBUF DMA buffer", (u8*)rbuf, 
+                  DMA_BUF_SIZE);
+    }
+channel_release:
+     dma_release_channel(dma_m2m_chan);
+     dma_m2m_chan = NULL;
+     return err;
+}</pre>
 			<p>In the <a id="_idIndexMarker940"/>preceding write operation, we have gone through the five steps required to perform our DMA transfer: requesting a DMA channel; configuring this channel; preparing a DMA transfer; submitting this transfer; and then triggering the transfer providing a completion callback in the meantime.</p>
 			<p>After we are done with operation definitions, we can set up a file operation data structure as follows:</p>
-			<p class="source-code">struct file_operations dma_fops = {</p>
-			<p class="source-code">     .open = dma_open,</p>
-			<p class="source-code">     .read = dma_read,</p>
-			<p class="source-code">     .write = dma_write,</p>
-			<p class="source-code">     .release = dma_release,</p>
-			<p class="source-code">};</p>
-			<p>Now that the file operation has been set up, we can implement the module's <strong class="source-inline">init</strong> function, where we create and register the character device as follows:</p>
-			<p class="source-code">int __init dma_init_module(void)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    int error;</p>
-			<p class="source-code">    struct device *dma_test_dev;</p>
-			<p class="source-code">    /* register a character device */</p>
-			<p class="source-code">    error = register_chrdev(0, "dma_test", &amp;dma_fops);</p>
-			<p class="source-code">    if (error &lt; 0) {</p>
-			<p class="source-code">      pr_err("DMA test driver can't get major number\n");</p>
-			<p class="source-code">        return error;</p>
-			<p class="source-code">    }</p>
-			<p class="source-code">    gMajor = error;</p>
-			<p class="source-code">    pr_info("DMA test major number = %d\n",gMajor);</p>
-			<p class="source-code">    dma_test_class = class_create(THIS_MODULE, </p>
-			<p class="source-code">                                  "dma_test");</p>
-			<p class="source-code">    if (IS_ERR(dma_test_class)) {</p>
-			<p class="source-code">       pr_err("Error creating dma test module class.\n");</p>
-			<p class="source-code">       unregister_chrdev(gMajor, "dma_test");</p>
-			<p class="source-code">       return PTR_ERR(dma_test_class);</p>
-			<p class="source-code">    }</p>
-			<p class="source-code">    dma_test_dev = device_create(dma_test_class, NULL,</p>
-			<p class="source-code">                     MKDEV(gMajor, 0), NULL, "dma_test");</p>
-			<p class="source-code">    if (IS_ERR(dma_test_dev)) {</p>
-			<p class="source-code">       pr_err("Error creating dma test class device.\n");</p>
-			<p class="source-code">       class_destroy(dma_test_class);</p>
-			<p class="source-code">       unregister_chrdev(gMajor, "dma_test");</p>
-			<p class="source-code">       return PTR_ERR(dma_test_dev);</p>
-			<p class="source-code">    }</p>
-			<p class="source-code">     dev_set_name(&amp;dev, "dmda-test-dev");</p>
-			<p class="source-code">     device_register(&amp;dev);</p>
-			<p class="source-code">     pr_info("DMA test Driver Module loaded\n");</p>
-			<p class="source-code">     return 0;</p>
-			<p class="source-code">}</p>
-			<p>The <a id="_idIndexMarker941"/>module initialization will create and register a character device. This operation must be reverted when the module is unloaded, that is, in the module's <strong class="source-inline">exit</strong> method, implemented as follows:</p>
-			<p class="source-code">static void dma_cleanup_module(void)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    unregister_chrdev(gMajor, "dma_test");</p>
-			<p class="source-code">    device_destroy(dma_test_class, MKDEV(gMajor, 0));</p>
-			<p class="source-code">    class_destroy(dma_test_class);</p>
-			<p class="source-code">    device_unregister(&amp;dev);</p>
-			<p class="source-code">    pr_info("DMA test Driver Module Unloaded\n");</p>
-			<p class="source-code">}</p>
+			<pre>struct file_operations dma_fops = {
+     .open = dma_open,
+     .read = dma_read,
+     .write = dma_write,
+     .release = dma_release,
+};</pre>
+			<p>Now that the file operation has been set up, we can implement the module's <code>init</code> function, where we create and register the character device as follows:</p>
+			<pre>int __init dma_init_module(void)
+{
+    int error;
+    struct device *dma_test_dev;
+    /* register a character device */
+    error = register_chrdev(0, "dma_test", &amp;dma_fops);
+    if (error &lt; 0) {
+      pr_err("DMA test driver can't get major number\n");
+        return error;
+    }
+    gMajor = error;
+    pr_info("DMA test major number = %d\n",gMajor);
+    dma_test_class = class_create(THIS_MODULE, 
+                                  "dma_test");
+    if (IS_ERR(dma_test_class)) {
+       pr_err("Error creating dma test module class.\n");
+       unregister_chrdev(gMajor, "dma_test");
+       return PTR_ERR(dma_test_class);
+    }
+    dma_test_dev = device_create(dma_test_class, NULL,
+                     MKDEV(gMajor, 0), NULL, "dma_test");
+    if (IS_ERR(dma_test_dev)) {
+       pr_err("Error creating dma test class device.\n");
+       class_destroy(dma_test_class);
+       unregister_chrdev(gMajor, "dma_test");
+       return PTR_ERR(dma_test_dev);
+    }
+     dev_set_name(&amp;dev, "dmda-test-dev");
+     device_register(&amp;dev);
+     pr_info("DMA test Driver Module loaded\n");
+     return 0;
+}</pre>
+			<p>The <a id="_idIndexMarker941"/>module initialization will create and register a character device. This operation must be reverted when the module is unloaded, that is, in the module's <code>exit</code> method, implemented as follows:</p>
+			<pre>static void dma_cleanup_module(void)
+{
+    unregister_chrdev(gMajor, "dma_test");
+    device_destroy(dma_test_class, MKDEV(gMajor, 0));
+    class_destroy(dma_test_class);
+    device_unregister(&amp;dev);
+    pr_info("DMA test Driver Module Unloaded\n");
+}</pre>
 			<p>At this point, we can register our module's init and exit methods with the driver core and provide metadata for our module. This is done as follows:</p>
-			<p class="source-code">module_init(dma_init_module);</p>
-			<p class="source-code">module_exit(dma_cleanup_module);</p>
-			<p class="source-code">MODULE_AUTHOR("John Madieu, &lt;john.madieu@laabcsmart.com&gt;");</p>
-			<p class="source-code">MODULE_DESCRIPTION("DMA test driver");</p>
-			<p class="source-code">MODULE_LICENSE("GPL");</p>
-			<p>The full code <a id="_idIndexMarker942"/>is available in the repository of the book in the <strong class="source-inline">chapter-12/</strong> directory.</p>
+			<pre>module_init(dma_init_module);
+module_exit(dma_cleanup_module);
+MODULE_AUTHOR("John Madieu, &lt;john.madieu@laabcsmart.com&gt;");
+MODULE_DESCRIPTION("DMA test driver");
+MODULE_LICENSE("GPL");</pre>
+			<p>The full code <a id="_idIndexMarker942"/>is available in the repository of the book in the <code>chapter-12/</code> directory.</p>
 			<p>Now that we are familiar with the DMA engine APIs and have summarized our skills in a concrete example, we can discuss a particular DMA transfer, the Cyclic DMA, mostly used in UART drivers.</p>
 			<h1 id="_idParaDest-177"><a id="_idTextAnchor179"/>A word on cyclic DMA</h1>
-			<p>Cyclic mode is <a id="_idIndexMarker943"/>a particular DMA transfer <a id="_idIndexMarker944"/>mode where an I/O peripheral drives the data transaction, triggering transfers repeatedly on a periodic basis. While dealing with callbacks that the DMA controller can expose, we have seen <strong class="source-inline">dma_device.device_prep_dma_cyclic</strong>, which is the backend for <strong class="source-inline">dmaengine_prep_dma_cyclic()</strong>, which has the following prototype:</p>
-			<p class="source-code">struct dma_async_tx_descriptor </p>
-			<p class="source-code">     *dmaengine_prep_dma_cyclic(</p>
-			<p class="source-code">             struct dma_chan *chan, dma_addr_t buf_addr,</p>
-			<p class="source-code">             size_t buf_len, size_t period_len,</p>
-			<p class="source-code">             enum dma_transfer_direction dir,</p>
-			<p class="source-code">             unsigned long flags)</p>
-			<p>The preceding API takes in five parameters: <strong class="source-inline">chan</strong>, which is the allocated DMA channel structure; <strong class="source-inline">buf_addr</strong>, the handle to the mapped DMA buffer; <strong class="source-inline">buf_len</strong>, which is the size of the DMA buffer; <strong class="source-inline">period_len</strong>, the size of one cyclic period; <strong class="source-inline">dir</strong>, the direction of the DMA transfer; and <strong class="source-inline">flags</strong>, the control flags for this transfer. In the event of success, this function returns a DMA channel descriptor structure, which can be used to assign a completion function to the DMA transfer. Most of the time, <strong class="source-inline">flags</strong> correspond to <strong class="source-inline">DMA_PREP_INTERRUPT</strong>, which means that the DMA transfer callback should be invoked upon each cycle completion.</p>
+			<p>Cyclic mode is <a id="_idIndexMarker943"/>a particular DMA transfer <a id="_idIndexMarker944"/>mode where an I/O peripheral drives the data transaction, triggering transfers repeatedly on a periodic basis. While dealing with callbacks that the DMA controller can expose, we have seen <code>dma_device.device_prep_dma_cyclic</code>, which is the backend for <code>dmaengine_prep_dma_cyclic()</code>, which has the following prototype:</p>
+			<pre>struct dma_async_tx_descriptor 
+     *dmaengine_prep_dma_cyclic(
+             struct dma_chan *chan, dma_addr_t buf_addr,
+             size_t buf_len, size_t period_len,
+             enum dma_transfer_direction dir,
+             unsigned long flags)</pre>
+			<p>The preceding API takes in five parameters: <code>chan</code>, which is the allocated DMA channel structure; <code>buf_addr</code>, the handle to the mapped DMA buffer; <code>buf_len</code>, which is the size of the DMA buffer; <code>period_len</code>, the size of one cyclic period; <code>dir</code>, the direction of the DMA transfer; and <code>flags</code>, the control flags for this transfer. In the event of success, this function returns a DMA channel descriptor structure, which can be used to assign a completion function to the DMA transfer. Most of the time, <code>flags</code> correspond to <code>DMA_PREP_INTERRUPT</code>, which means that the DMA transfer callback should be invoked upon each cycle completion.</p>
 			<p>Cyclic mode is mostly used in TTY drivers, where the data is fed<a id="_idIndexMarker945"/> into a <strong class="bold">First In First Out</strong> (<strong class="bold">FIFO</strong>) ring buffer. In this mode, the allocated DMA buffer is divided into periods equal in size (often referenced as cyclic periods) so that every time one such transfer is finished, the callback function is invoked.</p>
-			<p>The callback <a id="_idIndexMarker946"/>function that has been implemented is used to keep track of the state of the ring buffer and buffer management is implemented using the kernel ring buffer API (so you need to include <strong class="source-inline">&lt;linux/circ_buf.h&gt;</strong>):</p>
-			<div>
-				<div id="_idContainer054" class="IMG---Figure">
-					<img src="image/B17934_11_003.jpg" alt="Figure 11.3 – Cyclic DMA ring buffer&#13;&#10;"/>
+			<p>The callback <a id="_idIndexMarker946"/>function that has been implemented is used to keep track of the state of the ring buffer and buffer management is implemented using the kernel ring buffer API (so you need to include <code>&lt;linux/circ_buf.h&gt;</code>):</p>
+			<div><div><img src="img/B17934_11_003.jpg" alt="Figure 11.3 – Cyclic DMA ring buffer&#13;&#10;"/>
 				</div>
 			</div>
 			<p class="figure-caption">Figure 11.3 – Cyclic DMA ring buffer</p>
-			<p>The following<a id="_idIndexMarker947"/> is an example from the Atmel serial driver in <strong class="source-inline">drivers/tty/serial/atmel_serial.c</strong>, which demonstrates this principle of cyclic DMA quite well.</p>
+			<p>The following<a id="_idIndexMarker947"/> is an example from the Atmel serial driver in <code>drivers/tty/serial/atmel_serial.c</code>, which demonstrates this principle of cyclic DMA quite well.</p>
 			<p>The driver first prepares the DMA resources as in the following:</p>
-			<p class="source-code">static int atmel_prepare_rx_dma(struct uart_port *port)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    struct atmel_uart_port *atmel_port = </p>
-			<p class="source-code">                       to_atmel_uart_port(port);</p>
-			<p class="source-code">     struct device *mfd_dev = port-&gt;dev-&gt;parent;</p>
-			<p class="source-code">     struct dma_async_tx_descriptor *desc;</p>
-			<p class="source-code">     dma_cap_mask_t        mask;</p>
-			<p class="source-code">     struct dma_slave_config config;</p>
-			<p class="source-code">     struct circ_buf       *ring;</p>
-			<p class="source-code">     int ret, nent;</p>
-			<p class="source-code">     ring = &amp;atmel_port-&gt;rx_ring;</p>
-			<p class="source-code">     dma_cap_zero(mask);</p>
-			<p class="source-code">     dma_cap_set(DMA_CYCLIC, mask);</p>
-			<p class="source-code">    atmel_port-&gt;chan_rx = </p>
-			<p class="source-code">              dma_request_slave_channel(mfd_dev, "rx");</p>
-			<p class="source-code">    sg_init_one(&amp;atmel_port-&gt;sg_rx, ring-&gt;buf,</p>
-			<p class="source-code">                  sizeof(struct atmel_uart_char) *</p>
-			<p class="source-code">                    ATMEL_SERIAL_RINGSIZE);</p>
-			<p class="source-code">    nent = dma_map_sg(port-&gt;dev, &amp;atmel_port-&gt;sg_rx, 1,</p>
-			<p class="source-code">                       DMA_FROM_DEVICE);</p>
-			<p class="source-code">    /* Configure the slave DMA */</p>
-			<p class="source-code">    [...]</p>
-			<p class="source-code">    ret = dmaengine_slave_config(atmel_port-&gt;chan_rx,</p>
-			<p class="source-code">                           &amp;config);</p>
-			<p class="source-code">    /* Prepare a cyclic dma transfer, assign 2</p>
-			<p class="source-code">     * descriptors, each one is half ring buffer size */</p>
-			<p class="source-code">     desc =</p>
-			<p class="source-code">       dmaengine_prep_dma_cyclic(atmel_port-&gt;chan_rx,</p>
-			<p class="source-code">           sg_dma_address(&amp;atmel_port-&gt;sg_rx),</p>
-			<p class="source-code">           sg_dma_len(&amp;atmel_port-&gt;sg_rx),</p>
-			<p class="source-code">           sg_dma_len(&amp;atmel_port-&gt;sg_rx)/2,</p>
-			<p class="source-code">           DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);</p>
-			<p class="source-code">    desc-&gt;callback = atmel_complete_rx_dma;</p>
-			<p class="source-code">    desc-&gt;callback_param = port;</p>
-			<p class="source-code">    atmel_port-&gt;desc_rx = desc;</p>
-			<p class="source-code">    atmel_port-&gt;cookie_rx = dmaengine_submit(desc);</p>
-			<p class="source-code">    dma_async_issue_pending(chan);</p>
-			<p class="source-code">    return 0;</p>
-			<p class="source-code">chan_err:</p>
-			<p class="source-code">[...]</p>
-			<p class="source-code">}</p>
-			<p>For the<a id="_idIndexMarker948"/> sake of readability, error checking has been omitted. The function starts by setting the appropriate DMA capability<a id="_idIndexMarker949"/> mask (using <strong class="source-inline">dma_set_cap()</strong>) before requesting the DMA channel. After the channel has been requested, the mapping (a streaming one) is created and the channel is configured using <strong class="source-inline">dmaengine_slave_config()</strong>. Thereafter, a cyclic DMA transfer descriptor is obtained thanks to <strong class="source-inline">dmaengine_prep_dma_cyclic()</strong> and <strong class="source-inline">DMA_PREP_INTERRUPT</strong> is there to instruct the DMA engine core to invoke the callback at the end of each cycle transfer. The descriptor obtained is then configured with the callback along with its parameter before being submitted to the DMA controller using <strong class="source-inline">dmaengine_submit()</strong> and fired with <strong class="source-inline">dma_async_issue_pending()</strong>. </p>
-			<p>The <strong class="source-inline">atmel_complete_rx_dma()</strong> callback will schedule a tasklet whose handler is  <strong class="source-inline">atmel_tasklet_rx_func()</strong> and which will invoke the real DMA completion callback, <strong class="source-inline">atmel_rx_from_dma()</strong>, implemented as follows:</p>
-			<p class="source-code">static void atmel_rx_from_dma(struct uart_port *port)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    struct atmel_uart_port *atmel_port =</p>
-			<p class="source-code">                               to_atmel_uart_port(port);</p>
-			<p class="source-code">    struct tty_port *tport = &amp;port-&gt;state-&gt;port;</p>
-			<p class="source-code">    struct circ_buf *ring = &amp;atmel_port-&gt;rx_ring;</p>
-			<p class="source-code">    struct dma_chan *chan = atmel_port-&gt;chan_rx;</p>
-			<p class="source-code">    struct dma_tx_state state;</p>
-			<p class="source-code">    enum dma_status dmastat;</p>
-			<p class="source-code">    size_t count;</p>
-			<p class="source-code">    dmastat = dmaengine_tx_status(chan,</p>
-			<p class="source-code">                  atmel_port-&gt;cookie_rx, &amp;state);</p>
-			<p class="source-code">    /* CPU claims ownership of RX DMA buffer */</p>
-			<p class="source-code">    dma_sync_sg_for_cpu(port-&gt;dev, &amp;atmel_port-&gt;sg_rx, 1,</p>
-			<p class="source-code">                        DMA_FROM_DEVICE);</p>
-			<p class="source-code">    /* The current transfer size should not be larger </p>
-			<p class="source-code">     * than the dma buffer length.</p>
-			<p class="source-code">     */</p>
-			<p class="source-code">    ring-&gt;head =</p>
-			<p class="source-code">         sg_dma_len(&amp;atmel_port-&gt;sg_rx) - state.residue;</p>
-			<p class="source-code"> </p>
-			<p class="source-code">    /* we first read from tail to the end of the buffer</p>
-			<p class="source-code">     * then reset tail */</p>
-			<p class="source-code">    if (ring-&gt;head &lt; ring-&gt;tail) {</p>
-			<p class="source-code">        count =</p>
-			<p class="source-code">            sg_dma_len(&amp;atmel_port-&gt;sg_rx) - ring-&gt;tail;</p>
-			<p class="source-code">        tty_insert_flip_string(tport,</p>
-			<p class="source-code">                          ring-&gt;buf + ring-&gt;tail, count);</p>
-			<p class="source-code">           ring-&gt;tail = 0;</p>
-			<p class="source-code">           port-&gt;icount.rx += count;</p>
-			<p class="source-code">     }</p>
-			<p class="source-code">     /* Finally we read data from tail to head */</p>
-			<p class="source-code">     if (ring-&gt;tail &lt; ring-&gt;head) {</p>
-			<p class="source-code">           count = ring-&gt;head - ring-&gt;tail;</p>
-			<p class="source-code">        tty_insert_flip_string(tport,</p>
-			<p class="source-code">                         ring-&gt;buf + ring-&gt;tail, count);</p>
-			<p class="source-code">        /* Wrap ring-&gt;head if needed */</p>
-			<p class="source-code">        if (ring-&gt;head &gt;= sg_dma_len(&amp;atmel_port-&gt;sg_rx))</p>
-			<p class="source-code">            ring-&gt;head = 0;</p>
-			<p class="source-code">        ring-&gt;tail = ring-&gt;head;</p>
-			<p class="source-code">        port-&gt;icount.rx += count;</p>
-			<p class="source-code">     }</p>
-			<p class="source-code">    /* USART retrieves ownership of RX DMA buffer */</p>
-			<p class="source-code">    dma_sync_sg_for_device(port-&gt;dev, &amp;atmel_port-&gt;sg_rx,</p>
-			<p class="source-code">                            1, DMA_FROM_DEVICE);</p>
-			<p class="source-code">     [...]</p>
-			<p class="source-code">     tty_flip_buffer_push(tport);</p>
-			<p class="source-code">[...]</p>
-			<p class="source-code">}</p>
-			<p>In the DMA completion callback, we can see that before the buffer is being accessed by the CPU, <strong class="source-inline">dma_sync_sg_for_cpu()</strong> is invoked to invalidate the corresponding hardware cache<a id="_idIndexMarker950"/> lines. Then, some ring buffers and TTY-related <a id="_idIndexMarker951"/>operations are performed (respectively, reading the received data and forwarding it to the TTY layer). And finally, the buffer is given back to the device after <strong class="source-inline">dma_sync_sg_for_device()</strong> is invoked.</p>
+			<pre>static int atmel_prepare_rx_dma(struct uart_port *port)
+{
+    struct atmel_uart_port *atmel_port = 
+                       to_atmel_uart_port(port);
+     struct device *mfd_dev = port-&gt;dev-&gt;parent;
+     struct dma_async_tx_descriptor *desc;
+     dma_cap_mask_t        mask;
+     struct dma_slave_config config;
+     struct circ_buf       *ring;
+     int ret, nent;
+     ring = &amp;atmel_port-&gt;rx_ring;
+     dma_cap_zero(mask);
+     dma_cap_set(DMA_CYCLIC, mask);
+    atmel_port-&gt;chan_rx = 
+              dma_request_slave_channel(mfd_dev, "rx");
+    sg_init_one(&amp;atmel_port-&gt;sg_rx, ring-&gt;buf,
+                  sizeof(struct atmel_uart_char) *
+                    ATMEL_SERIAL_RINGSIZE);
+    nent = dma_map_sg(port-&gt;dev, &amp;atmel_port-&gt;sg_rx, 1,
+                       DMA_FROM_DEVICE);
+    /* Configure the slave DMA */
+    [...]
+    ret = dmaengine_slave_config(atmel_port-&gt;chan_rx,
+                           &amp;config);
+    /* Prepare a cyclic dma transfer, assign 2
+     * descriptors, each one is half ring buffer size */
+     desc =
+       dmaengine_prep_dma_cyclic(atmel_port-&gt;chan_rx,
+           sg_dma_address(&amp;atmel_port-&gt;sg_rx),
+           sg_dma_len(&amp;atmel_port-&gt;sg_rx),
+           sg_dma_len(&amp;atmel_port-&gt;sg_rx)/2,
+           DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
+    desc-&gt;callback = atmel_complete_rx_dma;
+    desc-&gt;callback_param = port;
+    atmel_port-&gt;desc_rx = desc;
+    atmel_port-&gt;cookie_rx = dmaengine_submit(desc);
+    dma_async_issue_pending(chan);
+    return 0;
+chan_err:
+[...]
+}</pre>
+			<p>For the<a id="_idIndexMarker948"/> sake of readability, error checking has been omitted. The function starts by setting the appropriate DMA capability<a id="_idIndexMarker949"/> mask (using <code>dma_set_cap()</code>) before requesting the DMA channel. After the channel has been requested, the mapping (a streaming one) is created and the channel is configured using <code>dmaengine_slave_config()</code>. Thereafter, a cyclic DMA transfer descriptor is obtained thanks to <code>dmaengine_prep_dma_cyclic()</code> and <code>DMA_PREP_INTERRUPT</code> is there to instruct the DMA engine core to invoke the callback at the end of each cycle transfer. The descriptor obtained is then configured with the callback along with its parameter before being submitted to the DMA controller using <code>dmaengine_submit()</code> and fired with <code>dma_async_issue_pending()</code>. </p>
+			<p>The <code>atmel_complete_rx_dma()</code> callback will schedule a tasklet whose handler is  <code>atmel_tasklet_rx_func()</code> and which will invoke the real DMA completion callback, <code>atmel_rx_from_dma()</code>, implemented as follows:</p>
+			<pre>static void atmel_rx_from_dma(struct uart_port *port)
+{
+    struct atmel_uart_port *atmel_port =
+                               to_atmel_uart_port(port);
+    struct tty_port *tport = &amp;port-&gt;state-&gt;port;
+    struct circ_buf *ring = &amp;atmel_port-&gt;rx_ring;
+    struct dma_chan *chan = atmel_port-&gt;chan_rx;
+    struct dma_tx_state state;
+    enum dma_status dmastat;
+    size_t count;
+    dmastat = dmaengine_tx_status(chan,
+                  atmel_port-&gt;cookie_rx, &amp;state);
+    /* CPU claims ownership of RX DMA buffer */
+    dma_sync_sg_for_cpu(port-&gt;dev, &amp;atmel_port-&gt;sg_rx, 1,
+                        DMA_FROM_DEVICE);
+    /* The current transfer size should not be larger 
+     * than the dma buffer length.
+     */
+    ring-&gt;head =
+         sg_dma_len(&amp;atmel_port-&gt;sg_rx) - state.residue;
+ 
+    /* we first read from tail to the end of the buffer
+     * then reset tail */
+    if (ring-&gt;head &lt; ring-&gt;tail) {
+        count =
+            sg_dma_len(&amp;atmel_port-&gt;sg_rx) - ring-&gt;tail;
+        tty_insert_flip_string(tport,
+                          ring-&gt;buf + ring-&gt;tail, count);
+           ring-&gt;tail = 0;
+           port-&gt;icount.rx += count;
+     }
+     /* Finally we read data from tail to head */
+     if (ring-&gt;tail &lt; ring-&gt;head) {
+           count = ring-&gt;head - ring-&gt;tail;
+        tty_insert_flip_string(tport,
+                         ring-&gt;buf + ring-&gt;tail, count);
+        /* Wrap ring-&gt;head if needed */
+        if (ring-&gt;head &gt;= sg_dma_len(&amp;atmel_port-&gt;sg_rx))
+            ring-&gt;head = 0;
+        ring-&gt;tail = ring-&gt;head;
+        port-&gt;icount.rx += count;
+     }
+    /* USART retrieves ownership of RX DMA buffer */
+    dma_sync_sg_for_device(port-&gt;dev, &amp;atmel_port-&gt;sg_rx,
+                            1, DMA_FROM_DEVICE);
+     [...]
+     tty_flip_buffer_push(tport);
+[...]
+}</pre>
+			<p>In the DMA completion callback, we can see that before the buffer is being accessed by the CPU, <code>dma_sync_sg_for_cpu()</code> is invoked to invalidate the corresponding hardware cache<a id="_idIndexMarker950"/> lines. Then, some ring buffers and TTY-related <a id="_idIndexMarker951"/>operations are performed (respectively, reading the received data and forwarding it to the TTY layer). And finally, the buffer is given back to the device after <code>dma_sync_sg_for_device()</code> is invoked.</p>
 			<p>To summarize, the preceding example did not only show how cyclic DMA works but also showed how to address coherency issues when the buffer is used and reused between transfers, either by the CPU or the device. </p>
 			<p>Now that we are familiar with the cyclic DMA, we have concluded our series on DMA transfer and DMA engine APIs. We have learned how to set up transfers, initiate them, and await their completion.</p>
 			<p>In the next section, we will learn how to specify and grab DMA channels from the device tree and the code.</p>
 			<h1 id="_idParaDest-178"><a id="_idTextAnchor180"/>Understanding DMA and DT bindings</h1>
-			<p>DT binding<a id="_idIndexMarker952"/> for the DMA channel depends on the DMA controller node, which is SoC-dependent, and some parameters (such as DMA cells) may vary from one SoC to another. This example only focuses on the i.MX SDMA controller, which can be found in the kernel source, at <strong class="source-inline">Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt</strong>.</p>
+			<p>DT binding<a id="_idIndexMarker952"/> for the DMA channel depends on the DMA controller node, which is SoC-dependent, and some parameters (such as DMA cells) may vary from one SoC to another. This example only focuses on the i.MX SDMA controller, which can be found in the kernel source, at <code>Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt</code>.</p>
 			<h2 id="_idParaDest-179"><a id="_idTextAnchor181"/>Consumer binding</h2>
 			<p>According <a id="_idIndexMarker953"/>to the SDMA event-mapping table, the following code shows the DMA request signals for peripherals in i.MX 6Dual/6Quad:</p>
-			<p class="source-code">uart1: serial@02020000 {</p>
-			<p class="source-code">    compatible = "fsl,imx6sx-uart", "fsl,imx21-uart";</p>
-			<p class="source-code">    reg = &lt;0x02020000 0x4000&gt;;</p>
-			<p class="source-code">    interrupts = &lt;GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH&gt;;</p>
-			<p class="source-code">    clocks = &lt;&amp;clks IMX6SX_CLK_UART_IPG&gt;,</p>
-			<p class="source-code">                &lt;&amp;clks IMX6SX_CLK_UART_SERIAL&gt;;</p>
-			<p class="source-code">    clock-names = "ipg", "per";</p>
-			<p class="source-code">    dmas = &lt;&amp;sdma 25 4 0&gt;, &lt;&amp;sdma 26 4 0&gt;;</p>
-			<p class="source-code">    dma-names = "rx", "tx";</p>
-			<p class="source-code">    status = "disabled";</p>
-			<p class="source-code">};</p>
-			<p>The<a id="_idIndexMarker954"/> second cells (25 and 26) in the <strong class="source-inline">dma</strong> property correspond to the DMA request/event ID. Those values come from the SoC manuals (i.MX53 in our case). You can have a look at <a href="https://community.nxp.com/servlet/JiveServlet/download/614186-1-373516/iMX6_Firmware_Guide.pdf">https://community.nxp.com/servlet/JiveServlet/download/614186-1-373516/iMX6_Firmware_Guide.pdf</a> and the Linux reference manual at <a href="https://community.nxp.com/servlet/JiveServlet/download/614186-1-373515/i.MX_Linux_Reference_Manual.pdf">https://community.nxp.com/servlet/JiveServlet/download/614186-1-373515/i.MX_Linux_Reference_Manual.pdf</a>.</p>
-			<p>The third cell indicates the priority of use. The driver code to request a specified parameter is defined next. You can find the complete code in <strong class="source-inline">drivers/tty/serial/imx.c</strong> in the kernel source tree. The following is the excerpt of the code grabbing elements from the device tree:</p>
-			<p class="source-code">static int imx_uart_dma_init(struct imx_port *sport)</p>
-			<p class="source-code">{</p>
-			<p class="source-code">    struct dma_slave_config slave_config = {};</p>
-			<p class="source-code">    struct device *dev = sport-&gt;port.dev;</p>
-			<p class="source-code">    int ret;</p>
-			<p class="source-code">    /* Prepare for RX : */</p>
-			<p class="source-code">    sport-&gt;dma_chan_rx =</p>
-			<p class="source-code">               dma_request_slave_channel(dev, "rx");</p>
-			<p class="source-code">    if (!sport-&gt;dma_chan_rx)</p>
-			<p class="source-code">        /* cannot get the DMA channel. handle error */</p>
-			<p class="source-code">        [...]</p>
-			<p class="source-code">    [...] /* configure the slave channel */</p>
-			<p class="source-code">    ret = dmaengine_slave_config(sport-&gt;dma_chan_rx,</p>
-			<p class="source-code">                                 &amp;slave_config);</p>
-			<p class="source-code">[...]</p>
-			<p class="source-code">    /* Prepare for TX */</p>
-			<p class="source-code">    sport-&gt;dma_chan_tx =</p>
-			<p class="source-code">                 dma_request_slave_channel(dev, "tx");</p>
-			<p class="source-code">    if (!sport-&gt;dma_chan_tx) {</p>
-			<p class="source-code">        /* cannot get the DMA channel. handle error */</p>
-			<p class="source-code">        [...]</p>
-			<p class="source-code">    [...] /* configure the slave channel */</p>
-			<p class="source-code">    ret = dmaengine_slave_config(sport-&gt;dma_chan_tx,</p>
-			<p class="source-code">                                 &amp;slave_config);</p>
-			<p class="source-code">    if (ret) {</p>
-			<p class="source-code">        [...] /* handle error */</p>
-			<p class="source-code">    }</p>
-			<p class="source-code">    [...]</p>
-			<p class="source-code">}</p>
-			<p>The <a id="_idIndexMarker955"/>magic call here is <strong class="source-inline">dma_request_slave_channel()</strong>, which will parse the device node (in the DT) using <strong class="source-inline">of_dma_request_slave_channel()</strong> to gather channel settings, according to the DMA channel name (refer to the named resource in <a href="B17934_06_Epub.xhtml#_idTextAnchor095"><em class="italic">Chapter 6</em></a>, <em class="italic">Understanding and Leveraging the Device Tree</em>).</p>
+			<pre>uart1: serial@02020000 {
+    compatible = "fsl,imx6sx-uart", "fsl,imx21-uart";
+    reg = &lt;0x02020000 0x4000&gt;;
+    interrupts = &lt;GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH&gt;;
+    clocks = &lt;&amp;clks IMX6SX_CLK_UART_IPG&gt;,
+                &lt;&amp;clks IMX6SX_CLK_UART_SERIAL&gt;;
+    clock-names = "ipg", "per";
+    dmas = &lt;&amp;sdma 25 4 0&gt;, &lt;&amp;sdma 26 4 0&gt;;
+    dma-names = "rx", "tx";
+    status = "disabled";
+};</pre>
+			<p>The<a id="_idIndexMarker954"/> second cells (25 and 26) in the <code>dma</code> property correspond to the DMA request/event ID. Those values come from the SoC manuals (i.MX53 in our case). You can have a look at <a href="https://community.nxp.com/servlet/JiveServlet/download/614186-1-373516/iMX6_Firmware_Guide.pdf">https://community.nxp.com/servlet/JiveServlet/download/614186-1-373516/iMX6_Firmware_Guide.pdf</a> and the Linux reference manual at <a href="https://community.nxp.com/servlet/JiveServlet/download/614186-1-373515/i.MX_Linux_Reference_Manual.pdf">https://community.nxp.com/servlet/JiveServlet/download/614186-1-373515/i.MX_Linux_Reference_Manual.pdf</a>.</p>
+			<p>The third cell indicates the priority of use. The driver code to request a specified parameter is defined next. You can find the complete code in <code>drivers/tty/serial/imx.c</code> in the kernel source tree. The following is the excerpt of the code grabbing elements from the device tree:</p>
+			<pre>static int imx_uart_dma_init(struct imx_port *sport)
+{
+    struct dma_slave_config slave_config = {};
+    struct device *dev = sport-&gt;port.dev;
+    int ret;
+    /* Prepare for RX : */
+    sport-&gt;dma_chan_rx =
+               dma_request_slave_channel(dev, "rx");
+    if (!sport-&gt;dma_chan_rx)
+        /* cannot get the DMA channel. handle error */
+        [...]
+    [...] /* configure the slave channel */
+    ret = dmaengine_slave_config(sport-&gt;dma_chan_rx,
+                                 &amp;slave_config);
+[...]
+    /* Prepare for TX */
+    sport-&gt;dma_chan_tx =
+                 dma_request_slave_channel(dev, "tx");
+    if (!sport-&gt;dma_chan_tx) {
+        /* cannot get the DMA channel. handle error */
+        [...]
+    [...] /* configure the slave channel */
+    ret = dmaengine_slave_config(sport-&gt;dma_chan_tx,
+                                 &amp;slave_config);
+    if (ret) {
+        [...] /* handle error */
+    }
+    [...]
+}</pre>
+			<p>The <a id="_idIndexMarker955"/>magic call here is <code>dma_request_slave_channel()</code>, which will parse the device node (in the DT) using <code>of_dma_request_slave_channel()</code> to gather channel settings, according to the DMA channel name (refer to the named resource in <a href="B17934_06_Epub.xhtml#_idTextAnchor095"><em class="italic">Chapter 6</em></a>, <em class="italic">Understanding and Leveraging the Device Tree</em>).</p>
 			<h1 id="_idParaDest-180"><a id="_idTextAnchor182"/>Summary</h1>
-			<p>DMA is a feature that is found in many modern CPUs. This chapter gives you the necessary steps to get the most out of this device, using the kernel DMA mapping and DMA engine APIs. After this chapter, I have no doubt you will be able to set up at least a memory-to-memory DMA transfer. Further information can be found at <strong class="source-inline">Documentation/dmaengine/</strong>, in the kernel source tree. </p>
+			<p>DMA is a feature that is found in many modern CPUs. This chapter gives you the necessary steps to get the most out of this device, using the kernel DMA mapping and DMA engine APIs. After this chapter, I have no doubt you will be able to set up at least a memory-to-memory DMA transfer. Further information can be found at <code>Documentation/dmaengine/</code>, in the kernel source tree. </p>
 			<p>However, the next chapter deals with the regmap, which introduces memory-oriented abstractions, and which unify access to memory-oriented devices (I2C, SPI, or memory-mapped).</p>
 		</div>
 	</body></html>

@@ -1,0 +1,166 @@
+# Chapter 6. Tips and Tricks
+
+So, this is where we part ways. We have come a long way since defining our first alias, so there's really not much left for us to discover, at least not with the number of pages left for us. Like a nosy neighbor though, I can't help but give you a few more tips before our journey ends.
+
+# Main resources
+
+Hold your horses there buddy. Before you start typing down tips and tweaking your configuration, it's important that I point you towards zsh's official site once again. Zsh's page is located at [http://www.zsh.org](http://www.zsh.org), and you can take your browser there to take a look at the *Frequently Asked Questions* section as well as other interesting entries such as **Scripts & contributions**. Turns out this is our main source of information for our new favorite shell, so I recommend you refer it to keep up with changes between releases and the awesome user guides and manuals located there.
+
+Perhaps the most feature-packed item on the list of recommendations is the zsh wiki ([http://zshwiki.org](http://zshwiki.org)). There you will find a lot of useful information about zsh together with tips and user-suggested configurations. Overall an excellent starting point for stuffing your startup files to the gills. It's worth noting that this is a user-maintained site, which means you can contribute to it by submitting your own configurations and scripts as well as editing existing content.
+
+No project with the magnitude of zsh is without its mailing list. You can find zsh's located at [http://www.zsh.org/mla](http://www.zsh.org/mla) and have a look at the thousands of interesting discussions going on for more tips, tricks, and announcements that happen around the project. Remember, you can also use this for any impending questions you have regarding the shell and the project in general. Also an excellent starting point if you are looking forward to contributing to the project.
+
+Finally, for those inclined to "group chat", there's an IRC channel hosted on **freenode** ([http://freenode.net](http://freenode.net)) as `#zsh`. This is your go-to source to get help and discuss zsh with lots of other users.
+
+# Helping tips
+
+What follows is a list of "nice things to have" on your configuration files, aliases, and functions. Think of these as a helping hand with some of the more boring tasks that involve the command line.
+
+## Directory substitution
+
+This is one of the cooler tricks you can pull with zsh, albeit a bit hidden from plain sight. Did you know you can use `cd` for switching between parallel directories without even typing the whole path? Let's work with an example.
+
+Say you were located in the directory `/zsh/completion/unix/`; now, see the following command:
+
+```
+% cd completion doc
+
+```
+
+This command would effectively move your current working directory to `/zsh/doc/unix/`, provided both the directories have the same tree structure and are located on the same branch level. I know, I too can't imagine myself living without it.
+
+Remember, you can set the `AUTOCD` option to enable `cd` just by typing the name of a directory, provided that the directory exists and is not an ambiguous match, of course.
+
+## Magic space
+
+It's safe to assume that you have been using the *Tab* key for completion so far, but the shell also provides a `magic-space` functionality that is really worth being bound to your space bar. Simply add the following code to your `.zshrc` file:
+
+```
+bindkey ' ' magic-space
+```
+
+And try typing something followed immediately by the space bar as follows:
+
+```
+% echo !!<Space>
+
+```
+
+You'll notice what that "magic" means right away, as pressing the space bar now triggers history expansion on the current line.
+
+## Random numbers
+
+I've lost track of how many times I needed an actual random number in order to fill in a form or make a completely arbitrary decision, just like those times you can't decide between cappuccino or latte.
+
+Let's borrow a helping hand from our friend `$RANDOM` and sprinkle some arithmetic expansion on top. Putting everything together, we end up with the following alias:
+
+```
+alias rand='echo $(( ( RANDOM % 10 ) + 1 ))'
+```
+
+What this does is uses the `$RANDOM` internal function to get a *pseudorandom* number for us. We then use the *modulo* operator (`%`) to get the remainder of the division by 10; this way, we can get only numbers between `1` and `10`. The `1` being added that you see is there because the `1` to `10` range is actually interpreted by your computer as "0-9", which includes the first 10 digits, but is a bit less human friendly.
+
+The whole expression is wrapped with the arithmetic expansion construction `$(())` that we learned about in [Chapter 2](ch02.html "Chapter 2. Alias and History"), *Alias and History*, and allows us to operate with numbers such as `$RANDOM`.
+
+You can now go ahead and type `rand` every time you need an actual random number output on your terminal window.
+
+As a side note, keep in mind that, as with all things computer-generated, there's no such thing as a purely "random" event—unless you are talking to my boss about one of my bugs. Those are completely random phenomena—so don't rely on this for security or sensitive operations.
+
+## zcalc
+
+Most times, math just catches us with an unfairly low caffeine level. Attempting algebra at those times usually calls for a quick calculator. Turns out zsh comes packed with just one of those.
+
+The way it works is similar to the `tetris` and `zle` modules; just add `autoload -Uz zcalc` to your `.zshrc` and type `zcalc` on your terminal emulator whenever the need arises. To exit `zcalc` just press *Ctrl* + *D*.
+
+## Change and list directory contents
+
+Like many, many other users of shells out there, most of of the time with shell you will be switching between directories and listing their contents. It's reasonable to assume that during your normal workflow, you'll be calling `cd` and `ls` quite a lot.
+
+Look at the following example:
+
+```
+% cd some_dir
+> ~/gfestari/somedir/
+% ls
+> file1.txt  file2.txt
+
+```
+
+Fret not, dear reader, you are not alone. Most fellow shell users feel your pain. Luckily, there's something we can do about it, which involves a simple function to change our current working directory with `cd` and then calling ls to list the contents of the new directory as shown in the following code snippet:
+
+```
+# calls cd, and immediately list its contents
+function cs {
+    cd "$@" && ls -A
+}
+```
+
+Our new `cs` function will perform just like `cd`, but will list the contents of any directory we move to. The `$@` string you see there is the current command arguments we use when calling `cs`. These get passed in its entirety to `cd`, so we don't need to worry about handling them with the same finesse as the actual program. We then use the double ampersand logic operator `&&` (read that as "and") to chain the `ls` command with the `-A` option. This works as "execute `cd` and if it succeeds, call `ls -A`".
+
+Put this on your startup files, and start changing directories by typing `cs`.
+
+## Finding your path through commands
+
+We have used `which` many times already throughout this book, but it's time for you to learn about yet another cool zsh feature, courtesy of the command substitution mechanism: the `=command` shortcut.
+
+Try the following command line, which should point you towards zsh's binary location:
+
+```
+% echo $(which zsh)
+> /usr/local/bin/zsh
+
+```
+
+And now, let's try using the equivalent shortcut:
+
+```
+% echo =zsh
+> /usr/local/bin/zsh
+
+```
+
+This will work the same as `which` with a lot less typing as long as you remember to follow that equals sign immediately with the name of any program on your system.
+
+# Other projects
+
+This section aims to point you towards some of the most interesting projects and resources out there. The whole point of these is to have something of an "extra spice" to add your zsh.
+
+## zsh-lovers
+
+The `zsh-lovers` project ([http://grml.org/zsh/zsh-lovers.html](http://grml.org/zsh/zsh-lovers.html)) is a collection of useful tips, tricks, and examples that can be installed as a manual page and accessed from the terminal. One of the more interesting features of the project is the collection of examples for many of the "hidden"—or not so evident—features of zsh. Worth every byte, if only for the hundreds of hours of online searching it'll save you.
+
+## zsh-users
+
+The zsh users' repository on GitHub ([https://github.com/zsh-users](https://github.com/zsh-users)) packs a lot of incredibly useful code. Of particular interest to any zsh user are the projects `zsh-syntax-highlighting` ([https://github.com/zsh-users/zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting)) and `zsh-history-substring-search` ([https://github.com/zsh-users/zsh-history-substring-search](https://github.com/zsh-users/zsh-history-substring-search)).
+
+As the name implies, `zsh-syntax-highlighting` offers syntax highlighting similar to that available in the fish shell, whereas `zsh-history-substring-search` again borrows a page from the fish's functionality and does a history search by allowing you to type any part of a history entry and press the up or down arrow keys to cycle through the matching commands.
+
+Also available on the zsh users' repository is the `zsh-completions` project ([https://github.com/zsh-users/zsh-completions](https://github.com/zsh-users/zsh-completions)), a collection of community-submitted completion functions for a lot of popular programs and tools such as Node.js, Redis, and Vagrant.
+
+## oh-my-zsh
+
+Unless you have been offline for the past couple of years, chances are you have already heard about oh-my-zsh ([https://github.com/robbyrussell/oh-my-zsh](https://github.com/robbyrussell/oh-my-zsh)). The community-driven project has helped zsh become incredibly popular by simplifying the initial configuration and learning curve for zsh. The framework packs more than a hundred plugins for tools like Ruby on Rails, Git, and Ant, and another chock-full of prompt themes; so the command line never gets boring.
+
+## Prezto
+
+Prezto ([https://github.com/sorin-ionescu/prezto](https://github.com/sorin-ionescu/prezto)) is another popular project with some great configuration options. Like oh-my-zsh, Prezto packs what it calls "sane defaults", a handful of interesting aliases and functions together with autocompletion and—you guessed it—prompt themes.
+
+Okay, I heard that. Does my shell *really need a framework?* Truth is you probably don't need *the whole package* but just a particular functionality, be it a completion function or prompt style. So why reinvent the wheel when someone has already thought about the problem and come up with a—hopefully elegant—solution? What I'm trying to say here is: look at the source code, see what you can bring into your configuration, and if you feel like it, give it back to the community. The next guy will surely appreciate it a lot.
+
+## Explain Shell
+
+Although not purely zsh-related, the Explain Shell project ([http://explainshell.com](http://explainshell.com)) aims to lend a helping hand on those incredibly awkward commands by providing a really neat interface in which to parse and explain them term-by-term. This can prove really useful when experimenting with unfamiliar commands or things found in the strangest depths of the web.
+
+## Your dotfiles
+
+Noticed how your program's configuration files all are hidden by default? Even your startup files and zsh-related configuration lay on your home directory tucked away from plain sight by a leading dot on their filename. Commonly referred to as *dotfiles*, there are a lot of really cool settings and configurations out there that started as someone's clever attempt at fixing an annoyance. So go ahead and publish your dotfiles for the world to see. Turns out sharing your configuration is a really nice way of helping other users on their zsh adventures and getting feedback on what you have been so passionately working on. Just be careful not to share any passwords or credentials while you're at it!
+
+If there's a book that should be on your radar after reading this, that should be *From Bash to Z Shell Conquering the Command Line* by *Oliver Kiddle*, *Peter Stephenson*, and *Jerry Peek*. An almost-instant classic for both beginners and power-users that will definitely help you expand your knowledge of the command line.
+
+# Summary
+
+And that brings us to the end of this book. Notice how I wrote "book" and not journey, as hopefully this first dip into zsh has gotten you excited enough about the possibilities of the shell and how versatile a tool it really is.
+
+What now, then? Well, fortunately, that's up to you, dear reader. There's plenty more left on zsh for you to unravel and many more of those annoying and boring tasks that are required of your scripts, so you can go back to those other, important things on the backlog.
+
+With a bit of spit and polish, particularly on the configuration side of things, zsh can really shine and make your life easier—and why not, fun—on the command line. So go ahead and get back to it. You'll be glad you did.

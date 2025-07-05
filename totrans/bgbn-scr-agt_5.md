@@ -1,0 +1,849 @@
+# Chapter 5. Chatting Off-the-Record
+
+In this final chapter, we will use the **BeagleBone Black** (**BBB**) to protect the last bastion of your online life: real-time chats. With your e-mail protected by GPG and your browsing protected by Tor, we'll use the software called **Off-the-Record** (**OTR**) to protect instant messaging chats. OTR addresses a weakness in the PGP threat model and we will give an overview of the OTR design objectives before building the project. We'll also consolidate all of your chat networks to be managed over an Internet Relay Chat interface, which will run on your BBB. While this project doesn't require any additional hardware other than the BBB, the cryptographic concepts and networking interactions are slightly more challenging than the previous chapters. At the end of this chapter and the book, you will have had exposure to and become familiar with the three most effective tools to protect your privacy online.
+
+In this chapter, you will do the following:
+
+*   Learn the difference between the cryptographic design between PGP and OTR
+*   Run an IRC to chat gateway with BitlBee
+*   Incorporate your IRC networks with the IRC bouncer ZNC
+*   Set up and use OTR chat on BitlBee and ZNC
+
+# Communicating Off-the-Record – a background
+
+Before we investigate OTR, let's consider how we could encrypt our chat sessions. We could use GPG for chat. We'd have to know the public key of our correspondent, and each time we'd enter a message, it would encrypt and/or sign the message and send it along. Some chat networks don't have an equivalent e-mail address, so it could be awkward finding and verifying public keys. However, you can certainly imagine a chat system that worked this way; it's a slightly more synchronous version of GPG with e-mail.
+
+Even if those technical problems are addressed there is a bigger issue lurking in PGP's design. Let's return to our friends Alice and Bob. Alice and Bob have been communicating with GPG for quite some time now. They use GPG flawlessly and religiously practice the best security hygiene. Until one day, when somebody gets a hold of Bob's private key. Now, there are several ways this could happen. Despite Bob's willpower, perhaps he just couldn't resist clicking on the *Watch cuTe kittys [sic]* link and malware infected his computer. Perhaps somebody stole his custom made GPG key hardware token and guessed his GPG passphrase. Regardless of how his private key was leaked, what matters is that now somebody else has it.
+
+Bob, vigilant GPG user that he is, immediately revokes his key, which informs the world that the key is compromised. This warns others not to use that particular key and for future conversations, they should use a new key. But let's not forget about Alice and the many communiqués she exchanged with Bob. What's to make of Alice? This attacker, who has Bob's private key, can decrypt the entire past communication between Alice and Bob. All of it. All of a sudden, their conversation doesn't seem so private as Ian Goldberg, the designer of OTR, remarks about privacy in GPG communications.
+
+## Introducing Off-the-Record communication
+
+While GPG has its place, if you are concerned about losing control of your private key, then maybe you should consider other tools. One tool, which was designed with this threat in mind, is called **Off-the-Record** (**OTR**) which was originally published in the paper *Off-the-Record Communication, or, Why Not To Use PGP* (Borisov 2004). OTR includes some cryptographic features and design goals that differ from PGP. For example, OTR was designed to incorporate *perfect forward secrecy*, which ensures that **session keys**, the keys that are encrypting the communication traffic, can't be re-derived if the longer term identity key is compromised. Also OTR only uses digital signatures for the initial authentication step; individual messages are not signed.
+
+The session keys are derived independently by both parties through a **Diffie-Hellman Key-Exchange** protocol. The Diffie-Hellman protocol helps to solve a key distribution problem. Alice and Bob want to secure their communications with a symmetric cipher, but they both need the same key. Using Diffie-Hellman, they can both derive the shared key value over an insecure channel, without exposing the value of the key to a third party. OTR uses asymmetric cryptography in a Diffie-Hellman key-exchange, so that both parties can derive a shared AES key in counter-mode. **AES in counter-mode** (**AES-CTR**) uses AES as a stream cipher, the significance of which is discussed later in this section.
+
+### Note
+
+A simplified, two-minute description of the Diffie-Hellman Key Exchange is available at Khan Academy website [https://www.khanacademy.org/computing/computer-science/cryptography/modern-crypt/v/diffie-hellman-key-exchange--part-2](https://www.khanacademy.org/computing/computer-science/cryptography/modern-crypt/v/diffie-hellman-key-exchange--part-2).
+
+Another feature of OTR that is different than PGP is that OTR was designed with repudiability for messages, which is the ability to deny authorship or validity. PGP was designed for non-repudiability, which provides a proof, via your digital signature, that you indeed created that message. However, with OTR, neither Alice nor Bob can prove the other, or themselves, created a particular message. The details of this feature are a bit technical, but we'll provide a high-level summary since it is a clever use of **Message Authentication Codes** (**MACs**).
+
+A MAC is a small tag that accompanies a block of data. The tag is computed by the sender and is sent to the receiver, who recomputes the value to check that the data was not corrupted in transit, which attests the integrity of the data. Furthermore, MACs involve a shared-key between parties. So, Alice has the same MAC key as Bob. Therefore, when Bob verifies the MAC on a message, he is assured that the sender has the same MAC key as himself. In OTR, because Alice and Bob have the same MAC key that is applied to individual messages, either one of them can create messages to imitate the other. Therefore, neither of them can prove that they, nor their communicating partner, definitively produced a message. This provides the repudiation feature in OTR.
+
+The OTR designers incorporate one additional unorthodox feature for a cryptographic system: forgeability. OTR is designed so that it is easy to change the ciphertext en route to produce a meaningful output when the message is decrypted. This can be performed because the designers chose a malleable encryption scheme using a stream cipher; in OTR's case, it uses AES-CTR with a 128-bit key length. In stream ciphers, the *meat* of the cipher is generating a key stream, but the actual encryption is typically performed by applying the exclusive-OR operation to the plaintext. Decryption is performed with the same exclusive-OR function applied to the same keystream. An attacker, who can guess the plaintext of the message, can modify the ciphertext to produce a different plaintext message of the same length. Therefore, the messages can be forged.
+
+### Note
+
+Exclusive-OR, or XOR, can be used for both encryption and decryption due to its logical definition: the XOR of A and B is true if and only if either A or B is true. Digital messages are represented as binary streams. The plaintext of a message is XORed with a key stream to produce a ciphertext, and when that ciphertext is XORed with the same key stream, the plaintext is returned. For example, if the plaintext bit is 1 and the key stream bit is 1, the ciphertext will return 0\. When the ciphertext bit, 0, is applied to the keystream 1, the plaintext bit 1 is recovered. The Khan Academy has an interactive and visual series on XOR in cryptography: [https://www.khanacademy.org/computing/computer-science/cryptography/ciphers/a/xor-bitwise-operation](https://www.khanacademy.org/computing/computer-science/cryptography/ciphers/a/xor-bitwise-operation).
+
+Alice and Bob are still protected from a third party, who doesn't know the MAC key, being able to tamper with their immediate conversation. However, OTR includes yet another twist. It publishes the MAC keys of the previous conversation once it has re-keyed to new MAC keys. Publishing the MAC keys means that anyone who has passively monitored the conversation can change the ciphertext, and thus, manipulate the plaintext of past messages. This adds another layer of deniability to the conversation, as any recorded conversation could be easily manipulated and might seem legitimate. Alice and Bob only publish *old* MAC keys, the key currently in use is kept secret until the protocol requires them to re-key.
+
+## On the usability of OTR
+
+Designing cryptosystems is not enough to ensure their adoption; they also need to be robust and usable. OTR was not only published as an academic paper, but a library was provided as well. OTR was designed to work over any existing **Instant Message** (**IM**) protocol with any client that could incorporate the library, or plugin. Your favorite IRC client probably has a plugin or library that can easily incorporate OTR. In this chapter, we will be using OTR plugins that are built in the two IRC applications we will examine.
+
+The design of OTR, specifically the perfect forward secrecy and deniability features, have inspired derivates for other protocols besides real-time chatting. For example, Open WhisperSystems' TextSecure app for mobile devices uses an OTR-like protocol over SMS and other asynchronous IM channels.
+
+Also, OTR, like Tor and GPG, is recommended by the Freedom of the Press Foundation, a U.S. Non-profit organization that *supports and defends public interest journalism*. This organization provides education and tutorials on how to use these tools. While presented in the contexts of journalists protecting their sources, as Glenn Greenwald and Laura Poitras used (Greenwald 2014), the information is applicable to any user of privacy enhancing technology.
+
+## Using the BeagleBone to protect your online chats
+
+In this chapter, we'll be using the BBB to run OTR on various IRC gateways. The BBB is well suited to act as your personal IRC gateway. It can easily handle the IRC connections and act as an always-on server without dramatically increasing your electric bill. While IRC may seem archaic, it provides an interface that is client independent and modular. We'll eventually build a complete IRC solution, one that manages all of your IRC networks. First we will look at the software BitlBee, which merges your chat networks like Google Talk and Jabber into IRC.
+
+# Installing BitlBee on the BeagleBone
+
+BitlBee is an *IRC to-other-chat-networks gateway*. This means that if you use an existing chat program, such as Google Talk, Jabber, Twitter, AIM, or Facebook, you can use BitlBee to chat over those protocols via IRC. The first question when a non-IRC user hears about BitlBee is, *why would you want to do this?* while IRC users respond with excitement. The major benefit is that by using IRC, you can effectively chat with buddies over Google Talk using the same client software as you use to chat on IRC. This reduces the number of programs you have to learn. While this may not seem impressive at first, consider that each program typically has its own keyboard shortcuts and distinct interface. Also, each vendor frequently changes the appearance of their application, requiring you to re-learn how to use the tool. On the other hand, IRC clients are fairly simple in their user interface and IRC interactions are fairly standardized.
+
+The other reason BitlBee is useful is that it acts as a proxy server for your chat networks. Your chat network presence is persistent but you can attach and detach your client at will. When you re-attach, you can catch-up on missed instant messages. This will prevent receiving a message on one client, like your phone, but missing it because you then logged into the chat network with your computer. Additionally, BitlBee supports OTR so we can use BitlBee to manage our OTR protected conversations.
+
+BitlBee and the OTR plugin are available through the Debian repositories, so installing is as easy as:
+
+```
+sudo apt-get install bitlbee bitlbee-plugin-otr
+
+```
+
+The installation procedure will automatically start the BitlBee daemon running on port 6667, which is the default IRC port. At this point, you can connect with your favorite IRC client to your BitlBee server. This is one of the advantages of running BitlBee on your local network from a BBB, it's always on and available from any other internal computer or smartphone. Since BitlBee is marshalling your accounts, it won't appear as if you are coming online and offline.
+
+In this chapter, the IRC client we will use will be ERC, which is the Emacs IRC client. ERC is a client that runs inside an Emacs instance and has several advantages over traditional IRC clients. First and most important, if you are already using Emacs, you can be more efficient if you can use Emacs for other tasks. Not only do you save the cognitive friction from task switching, but the layout and keyboard commands are already known to you. Also, ERC, like Emacs, is extremely modular and flexible. It is, of course, a free software program, but there are also many existing modules from nick highlighting to autoaway that you can use. Lastly, it's naturally cross-platform; any platform that can run Emacs can run ERC.
+
+### Tip
+
+For Emacs users, running an IRC client in Emacs makes sense. After all, dedicated Emacs users consider Emacs to be the most portable operating system. If you insist on not using Emacs, irssi is a well-respected IRC client alternative: [http://www.irssi.org/](http://www.irssi.org/).
+
+To connect to your BBB BitlBee server with ERC, inside Emacs, type `M-x erc`. You'll be prompted for the IP address. Then hit enter for the default port number and enter again for the password. You should join the `&bitlbee` channel and there will be one other user in that channel with you, root. The following screenshot shows how root interacts with you in the `&bitlbee` channel but also illustrates the IRC client interface inside Emacs:
+
+![Installing BitlBee on the BeagleBone](img/00020.jpeg)
+
+## Creating a BitlBee account
+
+The first task is to create an account on your BitlBee server. This is a new account that will manage your BitlBee connections. Later, we can log back in with this account to load our configuration. Otherwise, we would have to repeat the following steps each time we connect. Since BitlBee is an IRC gateway, all the commands to BitlBee have an IRC feel to them. Registration is performed by typing the following command in the `&bitlbee` channel:
+
+```
+register <password>
+
+```
+
+Your password will be echoed back to you and the root user should reply with:
+
+```
+Account successfully created
+
+```
+
+With BitlBee, it's important to get into the habit of saving often. Otherwise, changes are not persistent. Saving is simply done by typing `save` into the `&bitlbee` channel. Go ahead and save now.
+
+## Adding a Google Talk account to BitlBee
+
+A BitlBee account alone is not that useful. We need to add your other social media accounts to BitlBee in order to make it useful. The first account we will add is a Google Talk account. BitlBee supports other chat services such as Yahoo, AIM, XMPP, MSN, Facebook, and Twitter, so you don't have to use a Google account. For the full list, refer to [http://wiki.bitlbee.org/FrontPage](http://wiki.bitlbee.org/FrontPage).
+
+Unfortunately, in May 2013, Google announced its new communications product *Hangouts*, which does not support XMPP, which is an IETF standard, but instead uses a proprietary protocol. Specifically, Google Hangout does not support server-to-server federation support with XMPP. If you have an independent XMPP server, or have an account on Jabber.org or the Free Software Foundation's server, it will no longer be possible to communicate with Google Hangout users. You can still use Google Talk, which fully supports XMPP, but it is not clear when Google will retire Google Talk.
+
+### Note
+
+If you don't have a Google account, because of valid privacy concerns, you should read *Google has most of my e-mail because it has all of yours* by Benjamin Mako Hill [http://mako.cc/copyrighteous/google-has-most-of-my-email-because-it-has-all-of-yours](http://mako.cc/copyrighteous/google-has-most-of-my-email-because-it-has-all-of-yours). The author didn't use Gmail, but over 50 percent of his e-mails correspondence went to Google servers. Unless you are encrypting your e-mail, Google servers have your correspondence.
+
+To add your Gmail account in BitlBee, type the following into the `&bitlbee` channel:
+
+```
+account add jabber you@gmail.com
+
+```
+
+The BitlBee root account will respond with:
+
+```
+<root> Account successfully added with tag gtalk
+<root> You can now use the /OPER command to enter the password
+<root> Alternatively, enable OAuth if the account supports it: account gtalk set oauth on
+
+```
+
+We'll go ahead and enable `OAuth`:
+
+```
+acc gtalk set oauth on
+
+```
+
+### Note
+
+OAuth is an *authorization framework* that allows third-party access to other web services without the need for the third-party application to know your credential, for example, password. Limited use access tokens are provided to the third-party application to restrict the access on the hosting service. More information is available on the OAuth website [http://oauth.net](http://oauth.net).
+
+As most people have Google+ accounts now, we have to set the format of the nicks to full names. Otherwise, we will see random strings as nicknames:
+
+```
+account gtalk set nick_format %full_name
+
+```
+
+Finally, enable the account with:
+
+```
+acc gtalk on
+
+```
+
+BitlBee will send a private message to a URL for your OAuth login:
+
+```
+<jabber_oauth> Open this URL in your browser to authenticate:
+https://...
+<jabber_oauth> Respond to this message with the returned authorization token.
+
+```
+
+Clicking on the link will prompt you to accept BitlBee's permissions, which should look like the following screenshot. After clicking on **Accept**, you'll receive a code, which you can then paste back into the private message window.
+
+![Adding a Google Talk account to BitlBee](img/00021.jpeg)
+
+Once complete, back in the `&bitlbee` window, you should see the following messages indicating you are logging in to GTalk:
+
+```
+<root> jabber - Logging in: Starting OAuth authentication
+<root> jabber - Logging in: Requesting OAuth access token
+<root> jabber - Logging in: Connecting
+<root> jabber - Logging in: Connected to server, logging in
+<root> jabber - Logging in: Converting stream to TLS
+<root> jabber - Logging in: Connected to server, logging in
+<root> jabber - Logging in: Authentication finished
+<root> jabber - Logging in: Server changed session resource string to `BitlBee301D65C5'
+<root> jabber - Logging in: Authenticated, requesting buddy list
+<root> jabber - Logging in: Logged in
+
+```
+
+Don't forget to save!
+
+## Adding a Jabber account to BitlBee
+
+If you have a Jabber (XMPP) account, you can go ahead and add that to Bitlbee. The syntax is similar to the prior example:
+
+```
+account add jabber username@jabber.org password
+
+```
+
+The root user should return with something like:
+
+```
+Account successfully added with tag jabber
+
+```
+
+Turn the account on with:
+
+```
+acc jabber on
+
+```
+
+You should now see two accounts when you type `account list`. Lastly, save your data!
+
+### Note
+
+You can add your Twitter account as well and tweet from IRC. However, you'll need BitlBee version 3.2.1 or greater; otherwise, you will receive SSL errors when trying to connect to twitter.
+
+One of the many benefits of joining the Free Software Foundation as a member is the use of the FSF's XMPP server. Through federation, users can reach you at your FSF username at the member.fsf.org server. Similarly, fellows of the Free Software Foundation Europe also have XMPP privileges. For more information, visit the respective FSF sites at [https://www.fsf.org/associate/benefits](https://www.fsf.org/associate/benefits) and [https://fsfe.org/fellowship/index.en.html](https://fsfe.org/fellowship/index.en.html), respectively.
+
+# Adding OTR to your BitlBee server
+
+We installed the OTR plugin for BitlBee already, so it's ready to support OTR. Prior to an encrypted conversation, we must first generate a key pair. For each account you have registered with BitlBee, you can have unique key pairs. View your account list and then generate an OTR key with:
+
+```
+otr keygen 0
+
+```
+
+After a few seconds, root will inform you that OTR key generation is complete. At any point, you can view information on your OTR keys with:
+
+```
+otr info
+
+```
+
+This will provide the key fingerprints for each account. You are now ready to have an encrypted chat.
+
+## Managing contacts in BitlBee
+
+Your contacts, or buddy list, should have been available when BitlBee authenticated your account. You can view your buddy list in the `&bitlbee` window with the `blist` command. This table will show the nick, the handle at the specific account, and the status of each contact. BitlBee converts the handle into IRC-friendly names, which are the "nicks" in the first column. It can become confusing when people use the same handle on separate accounts. BitlBee allows you to rename nicks to help manage this problem. For example, BitlBee will append duplicate nicks with an underscore, but you can rename them with the following command:
+
+```
+rename gabriel_ice_ gabriel_ice_jabber
+
+```
+
+Adding contacts is also straightforward with the familiar command syntax:
+
+```
+add 0 gabriel.ice@gmail.com
+
+```
+
+Just remember to check your account list to know which account number to use.
+
+## Chatting with BitlBee
+
+Chatting can be performed directly in the `&bitlbee` channel. Use IRC syntax to specify the nick and BitlBee will direct it to the appropriate service. A basic chat session, between `maxine` and `gabriel_ice_japper`, would look like this:
+
+```
+<maxine> gabriel_ice_jabber: when can we meet to talk about DeepArcher?
+<gabriel_ice_jabber> maxine: Tuesday at 10.
+
+```
+
+Alternatively, you can use the `/query` command to open a new window and chat directly with the user. With this method, you don't have to specify the user's nick each time because you and your buddy are in a private chat.
+
+### Tip
+
+For those new to IRC, the following tutorial is a good introduction: [http://www.irchelp.org/irchelp/irctutorial.html](http://www.irchelp.org/irchelp/irctutorial.html). For those looking for ERC-specific help, the Emacs Wiki has some resources: [http://www.emacswiki.org/emacs/ErcBasics](http://www.emacswiki.org/emacs/ErcBasics).
+
+## Chatting with OTR in BitlBee
+
+To initiate an OTR protected chat, type:
+
+```
+otr connect gabriel_ice_jabber
+
+```
+
+While we are connected at this point and the chat session will be encrypted, we are left with the problem of how do we really know who we are chatting with? This question may seem existential, but it is an important one. A common attack on a communication protocol is a **Man-In-The-Middle** (**MITM**) attack. The canonical setup of the MITM attack involves two parties who wish to communicate, Alice and Bob, and the malicious meddler Mallory. Alice initiates a connection with Bob, but it is usurped by Mallory and likewise with the connection from Bob to Alice. Alice thinks she is talking to Bob, but really she is talking to Mallory, who is forwarding messages to Bob and vice versa. At this point, Mallory can direct and manipulate the conversation at will.
+
+To defeat this, we need to authenticate the receiving party. In OTR, you could verify the key fingerprint of your partner. This requires you to have swapped OTR fingerprints *a priori* and it might not be very convenient to carry your OTR fingerprint with you at all times. The other mechanism is to use the **Socialist Millionaire Problem** to authenticate your buddy. The Socialist Millionaire Problem is discussed in more detail in the following subsection, for now, think of it as a question and answer game where the answer would only be known by the person with whom you are communicating.
+
+To initiate the protocol in BitlBee, type something like the following:
+
+```
+otr smpq gabriel_ice_jabber "What beer did I order last night, one word, lowercase?" ipa
+
+```
+
+Presumably, you and Gabriel Ice were out at dinner last night and he would know the type of beer you ordered. When phrasing the question, it's good to include instructions of how to type it. Else, it would result in an incorrect response and probably confuse your partner, who despite the drinks, distinctly remembers you drinking an IPA. If your partner responds correctly, you should see:
+
+```
+<root> smp: initiating with gabriel_ice_jabber_...
+<root> smp gabriel_ice_jabber_: secrets proved equal, fingerprint trusted
+
+```
+
+This mechanism is one-way; Gabriel must initiate the protocol in order to fully trust you as well. This portion of the exchange looks like this:
+
+```
+<root> smp: initiated by gabriel_ice_jabber with question: "What did I have for lunch yesterday, one word, lowercase?"
+<root> smp: respond with otr smp gabriel_ice_jabber <answer>
+<jbd> otr smp gabriel_ice_jabber pizza
+<root> smp: responding to gabriel_ice_jabber...
+<root> smp gabriel_ice_jabber: correct answer, you are trusted
+
+```
+
+Congratulations! You have connected and authenticated and may chat away with OTR and BitlBee! If you are using GTalk and are also logged in to Google with your browser, you may notice the encrypted messages going back and forth. You can probably log out of GTalk from your browser, but just for fun, if you are logged in, you will see the OTR messages, which look like this:
+
+```
+?OTR:AAIDAAAAAAQAAAAFAAAAwBPAdyxNJT7MYxOFBPfmPRCbW3yE6gADfimB7wikaf/r9/DVQ3hZfJXj+c7HSddySk77fJi3csbRIIxKCSXGLO/9cOw7SJ+u10d8D6Wp2scCAi7TzO/YGkZmeGlef3lYUbwaVkH5VoYfLSo+i90McmLrgEfM9kgZuXLtDA1H2f4jWdtBJh1XxdK/GyZBZvTcncMs/e3rRrKpSNZiJq0kijMhIK6N4NRdaNK1URipDJai1d2bnGJ2Pk0rihXc5yzCrgAAAAAAAAACAAAAEUw6xZ+tJrdEG/+yqaiwoDi0Fc9eloiWtIc1UWQ8JTIT3eaKvuMAAAAA.
+
+```
+
+### Understanding the Socialist Millionaire Problem
+
+Even a well-designed protocol such as OTR can have subtle design flaws. For those looking to add cryptography to your project, there is a well-known saying, *don't roll your own crypto*, which means don't invent your own cryptography because the odds are against you and one mistake can undermine your security. Plus even seasoned cryptographers don't get everything right on the first try. Fortunately, releasing the research, design, and code helps with the peer review process.
+
+In response to some critiques on OTR's authentication phase, the authors improved their protocol (Alexander 2007). Prior to this paper, OTR users had to verify the fingerprint of OTR keys out-of-band. While this works, it has a human factor drawback as it is inconvenient and not very scalable to hand out OTR keys to peoplewith whom you may want to securely communicate. However, two parties may share more intimate knowledge about each other that would prove their authenticity.The problem then becomes how do Alice and Bob share some secret information without revealing it to each other. The researchers discovered that this problem is a re-statement of the Socialist Millionaire Problem where two millionaires want to know whether they are equally wealthy without revealing to each other the quantity of their wealth.
+
+The mathematics behind this problem rely on a technique called a **zero-knowledge proof**. A zero knowledge proof allows someone to attest to the correctness of a statement without providing any additional information about the said statement. The details and proof of OTR's zero-knowledge proofs are beyond the scope of this book and described in detail in (Alexander 2007).
+
+The implication of using the Socialist Millionaire Problem in OTR is that Alice can ask Bob a specific question that only Bob would know. If Mallory is masquerading as Bob and if Alice chose a good question to which Mallory doesn't know the answer, Mallory won't gain any additional information about the answer if she guesses wrong. For example, Alice asks Mallory, pretending to be Bob, who her favorite guitarist is. Bob knows that Alice is a *Who* fan and the answer is none other then Pete Townshend. Mallory does not know this detail so she provides an admirable, but incorrect, answer of Jimmy Page. Alice will see the protocol fail and know that Bob is not who he appears to be. But Mallory will not know any other information about the answer other than that Jimmy Page is not correct. However, it is too late for Mallory because Alice no longer trusts her and terminates the connection.
+
+# Marshalling your IRC connections with a Bouncer
+
+Now that BitlBee is running on the BeagleBone, you can enjoy OTR-protected instant messaging, but we can improve the setup. Currently, we are connecting to BitlBee directly from your IRC client. This is fine if you have one client. But, if you are chatting with your laptop and then get up and go, you may want to continue a conversation on your phone. For this, we will need a more persistent proxy connection. The problem can be stated in a more general way: how can we maintain a persistent connection to all of our IRC networks, including BitlBee. For this, we'll need an IRC bouncer.
+
+IRC bouncers act as a proxy server and maintain your connection to an IRC server. This may be useful on servers that don't support nick registration and you want to maintain your nick. As mentioned in the previous use case, bouncers generally support multiple clients which will allow you to have a near seamless IRC conversation as you switch devices. Since we are using BitlBee as an IRC gateway to our XMPP and instant message networks, we can combine IRC connections as well and have all of this managed by the bouncer.
+
+## The modern uses of IRC
+
+IRC was invented in 1988 and it was one of the first global, real-time, chat networks. While social networks may have replaced much of the casual conversation on the Internet, IRC still has its place. While those conversations still continue on IRC, there is a group that routinely hangs out on IRC that should be of interest to the readers of this book: open source developers. Most well-maintained open source projects have a corresponding IRC channel where at all hours, you can generally find help.
+
+For open source projects, the two biggest IRC networks are **freenode** and **oftc**. In fact, every major software and hardware package in this book has a corresponding IRC channel where you can ask for help. There are a few benefits to using IRC over other mediums. For active channels, it is beneficial and encouraged to **lurk** prior to adding to the conversation. Lurking is just passively watching the conversation. You may, and probably will, learn something just by reading the existing conversation. Also, if you do have a problem or a question, IRC is a real-time chat, so you potentially can quickly resolve your issue. It's also a more informal medium than a public mailing list. If you have some trepidation about asking your question on a mailing list, IRC is the place to ask.
+
+### Note
+
+On freenode, the relevant channels are: `#sparkfun`, for general electronics questions and to chat with some SparkFun employees and customers, `#beagle`, home to BeagleBone enthusiasts, `#gnupg`, for GPG-related questions, and `#cryptotronix`, which is the author's channel about open source crypto hardware. On oftc ([irc.oftc.net](http://irc.oftc.net)), you can check out the `#bitlbee` channel for help on BitlBee or `#tor` to talk about Tor.
+
+IRC, like any shared communication medium, has certain **netiquette** that users expect everyone to follow. Surprisingly, there is an RFC that defines netiquette guidelines (RFC 1855). It's certainly worth a read, but you should be ok if you follow these tips. First of all, *don't ask to ask*. This means, don't ask in an IRC channel if you can ask a question. You can just ask your question directly. While there are operators in channels, IRC typically doesn't follow the raise-your-hand-and-wait-to-be-called-on approach. Secondly, don't *flood* the channel. This means not to paste a large amount of text into the channel as it will cause all connected clients to rapidly scroll the text off of the screen. Instead, use a paste service like that provided by Debian ([http://paste.debian.net/](http://paste.debian.net/)) and then paste the link in the IRC channel, while explaining what is contained in the linked information. Lastly, be patient. As previously stated, many people lurk on IRC in the background and may not immediately see your question. Depending on the time at which you asked your question, it's reasonable to wait 30 minutes or so. On an active channel, you'll probably get a response quicker than that, just don't keep asking the question repeatedly.
+
+## Downloading and installing the IRC bouncer ZNC
+
+We'll be using the IRC bouncer package called ZNC. ZNC is a well-maintained and up-to-date package and like all good open source software, has an IRC channel: `#znc` on freenode. The packages in the Debian repository are a bit old, so we'll install ZNC from source. Download the source tarball by issuing the following command:
+
+```
+wget http://znc.in/releases/znc-1.4.tar.gz
+
+```
+
+We want to develop the good habit of checking signatures on downloaded software. The 1.4 release is signed by Alexey Sokolov, whose GPG fingerprint is: `D582 3CAC B477 191C AC00 7555 5AE4 20CC 0209 989E`. You can download his public key with the following command:
+
+```
+gpg –recv-key  D5823CACB477191CAC0075555AE420CC0209989E
+
+```
+
+Next, download the signature file for the release:
+
+```
+wget http://znc.in/releases/znc-1.4.tar.gz.sig
+
+```
+
+Lastly, verify the signature over the downloaded software:
+
+```
+gpg --verify znc-1.4.tar.gz.sig znc-1.4.tar.gz
+You should see something like the following:
+gpg: Signature made Thu 08 May 2014 08:21:40 PM UTC using RSA key ID 0209989E
+gpg: Good signature from "Alexey Sokolov <alexey@alexeysokolov.co.cc>"
+gpg:                 aka "Alexey Sokolov <ktonibud@gmail.com>"
+gpg:                 aka "Alexey Sokolov <alexey@asokolov.org>"
+gpg: WARNING: This key is not certified with a trusted signature!
+gpg:          There is no indication that the signature belongs to the owner.
+Primary key fingerprint: D582 3CAC B477 191C AC00  7555 5AE4 20CC 0209 989E
+
+```
+
+While this procedure adds a few steps, it should soon become second nature. If you don't perform these steps, when there is a signature file available, you are assuming that the software you downloaded is the software that was posted. Even though there are checksums built into the TCP, which you are using when you use `wget`, it does not guarantee that the file is the correct file since there is an opportunity for a MITM attack. Regardless of your paranoia level, it's good practice to verify the software each time. In fact, a quick bash script will help here since it's standard practice to append `.sig` to the end of the file:
+
+```
+wgetsig(){
+    wget $1
+    wget $1.sig
+    fn=$(basename $1)
+    gpg --verify $fn.sig $fn
+}
+```
+
+If you add that function to your `.bashrc` or equivalent, you can just type `wgetsig <url>` to grab the file, the signature, and run them through GPG. Now that you can trust that the software you downloaded is the software that was posted, you can finally extract the package:
+
+```
+tar -zxvf znc-1.4.tar.gz
+
+```
+
+To build ZNC from source, you'll want to install the following dependencies:
+
+```
+sudo apt-get install libssl-dev libperl-dev
+
+```
+
+Most software tarballs support the `confgure-make-make install` dance and this one is no different. You can build and install with the following:
+
+```
+cd znc-*
+./configure
+make
+sudo make install
+
+```
+
+Building ZNC on the BBB will take a while because it will build each of the ZNC modules as well, so go enjoy some coffee.
+
+## Configure ZNC to manage your IRC connections
+
+Before we configure ZNC, let's step back and examine our system architecture. We have at least three distinct pieces of hardware involved: the machine on which your IRC client is running, the BBB, and the machines running IRC servers. One of those machines is the BBB since it's running the BitlBee IRC server. Examine the following deployment diagram:
+
+![Configure ZNC to manage your IRC connections](img/00022.jpeg)
+
+Let's start with the BBB, depicted by the center cube. The BBB is running two modules: ZNC and BitlBee. ZNC is the module to which multiple IRC clients can connect. ZNC is connected to the BitlBee module, which is a process also running on the same hardware. ZNC is also connected to one or more different IRC servers. BitlBee maintains connections to various XMPP or chat servers but since BitlBee itself is an IRC server, you connect to it through ZNC. Once everything is set up, you will only have to worry about connecting to ZNC.
+
+ZNC needs a configuration file and the easiest way to generate the configuration file is to run the following command:
+
+```
+znc --makeconf
+
+```
+
+This will launch an interactive command-line interface. You'll need to create a new ZNC username that is not associated with any BitlBee or IRC systems. You will also have to decide what port to run the service. If you pick a port number in the private range, `49152` to `65535`, you'll have less of a chance of colliding with another service. For this example, port `50000` was chosen. There are quite a few ZNC modules, but you'll want to enable the `webadmin` module to easily configure ZNC. Lastly, be sure to enable SSL. It will generate a self-signed certificate, at which most browsers will grumble when connecting. Alternatively, you can create a full **Public Key Infrastructure** (**PKI**), complete with your own certificate authority, and supply the server certificate to ZNC.
+
+### Note
+
+PKIs are a bookworthy subtopic. An introduction to the complexities to PKI is well documented by Peter Gutmann in *Everything you Never Wanted to Know about PKI but were Forced to Find Out* at [http://www.cs.auckland.ac.nz/~pgut001/pubs/pkitutorial.pdf](http://www.cs.auckland.ac.nz/~pgut001/pubs/pkitutorial.pdf).
+
+The example configuration session is listed as follows:
+
+```
+[ .. ] Checking for list of available modules...
+[ >> ] ok
+[ ** ] Building new config
+[ ** ]
+[ ** ] First let's start with some global settings...
+[ ** ]
+[ ?? ] What port would you like ZNC to listen on? (1025 to 65535): 50000
+[ ?? ] Would you like ZNC to listen using SSL? (yes/no) [no]: yes
+[ ?? ] Would you like ZNC to listen using both IPv4 and IPv6? (yes/no) [yes]: yes
+[ .. ] Verifying the listener...
+[ >> ] ok
+[ ** ] Unable to locate pem file: [/home/debian/.znc/znc.pem], creating it
+[ .. ] Writing Pem file [/home/debian/.znc/znc.pem]...
+[ >> ] ok
+[ ** ]
+[ ** ] -- Global Modules --
+[ ** ]
+[ ** ] +-----------+----------------------------------------------------------+
+[ ** ] | Name      | Description 
+[ ** ] +-----------+---------------------------------------+ 
+[ ** ] | partyline | Internal channels and queries for users 
+ connected to znc |
+[ ** ] | webadmin  | Web based administration module       |
+[ ** ] +-----------+---------------------------------------+
+[ ** ] And 10 other (uncommon) modules. You can enable those
+ later.
+[ ** ]
+[ ?? ] Load global module <partyline>? (yes/no) [no]: yes
+[ ?? ] Load global module <webadmin>? (yes/no) [no]: yes
+[ ** ]
+[ ** ] Now we need to set up a user...
+[ ** ]
+[ ?? ] Username (AlphaNumeric): zncbeagle
+[ ?? ] Enter Password:
+[ ?? ] Confirm Password:
+[ ?? ] Would you like this user to be an admin? (yes/no) [yes]:
+ yes
+[ ?? ] Nick [zncbeagle]:
+[ ?? ] Alt Nick [zncbeagle_]:
+[ ?? ] Ident [zncbeagle]:
+[ ?? ] Real Name [Got ZNC?]: ZNC Admin
+[ ?? ] Bind Host (optional):
+[ ?? ] Number of lines to buffer per channel [50]:
+[ ?? ] Would you like to clear channel buffers after replay?
+ (yes/no) [yes]:
+[ ?? ] Default channel modes [+stn]:
+[ ** ]
+[ ** ] -- User Modules --
+[ ** ]
+[ ** ] +--------------+------------------------------------------+
+[ ** ] | Name         | Description                              |
+[ ** ] +--------------+------------------------------------------+
+[ ** ] | chansaver    | Keep config up-to-date when user         |
+ |              | joins/parts                              |
+[ ** ] | controlpanel | Dynamic configuration through IRC. Allows editing only yourself if you're not ZNC admin. |
+[ ** ] | perform      | Keeps a list of commands to be executed when ZNC connects to IRC.                        |
+[ ** ] | webadmin     | Web based administration module                                                          |
+[ ** ] +--------------+------------------------------------------------------------------------------------------+
+[ ** ] And 21 other (uncommon) modules. You can enable those later.
+[ ** ]
+[ ?? ] Load module <chansaver>? (yes/no) [no]:
+[ ?? ] Load module <controlpanel>? (yes/no) [no]:
+[ ?? ] Load module <perform>? (yes/no) [no]:
+[ ?? ] Load module <webadmin>? (yes/no) [no]: yes
+[ ** ]
+[ ?? ] Would you like to set up a network? (yes/no) [no]:
+[ ** ]
+[ ?? ] Would you like to set up another user? (yes/no) [no]:
+[ .. ] Writing config [/home/debian/.znc/configs/znc.conf]...
+[ >> ] ok
+[ ** ]
+[ ** ]To connect to this ZNC you need to connect to it as your IRC server
+[ ** ]using the port that you supplied.  You have to supply your login info
+[ ** ]as the IRC server password like this: user/network:pass.
+[ ** ]
+[ ** ]Try something like this in your IRC client...
+[ ** ]/server <znc_server_ip> +50000 zncbeagle:<pass>
+[ ** ]And this in your browser...
+[ ** ]https://<znc_server_ip>:50000/
+[ ** ]
+[ ?? ] Launch ZNC now? (yes/no) [yes]: yes
+[ .. ] Opening config [/home/debian/.znc/configs/znc.conf]...
+[ >> ] ok
+[ .. ] Loading global module [partyline]...
+[ >> ] [/usr/local/lib/znc/partyline.so]
+[ .. ] Loading global module [webadmin]...
+[ >> ] [/usr/local/lib/znc/webadmin.so]
+[ .. ] Binding to port [+50000]...
+[ >> ] ok
+[ ** ] Loading user [zncbeagle]
+[ .. ] Loading user module [webadmin]...
+[ >> ] [/usr/local/lib/znc/webadmin.so]
+[ .. ] Forking into the background...
+[ >> ] [pid: 7019]
+[ ** ] ZNC 1.4 - http://znc.in
+
+```
+
+## Adding OTR to your ZNC server
+
+While BitlBee has our XMPP and chat networks covered with OTR, our IRC networks are OTR-less at the moment. If you don't plan on using OTR, then you can still use the BBB as your IRC gateway and enjoy a consolidated IRC platform. Since OTR has to be initiated by one of the communicating parties, this chat configuration will interoperate with any IRC system. But, if you want OTR over your other IRC channels, then there are two methods to resolve this. First of all, you can use OTR from your IRC client. This will provide an end-to-end OTR session from your client to your communicating party, assuming they are using OTR from their client. However, most, but not all clients have an OTR-plugin. The other approach, the one that will be presented here, is to use OTR inside ZNC.
+
+There are pros and cons to this approach. The benefit is that for all of your chat networks, regardless of your client, you will have the same OTR key. Therefore, once your buddies authenticate you and trust your key, they can keep that trust even when you switch to a different IRC network. Also, you will no longer need to run an OTR plugin on your client. However, the OTR session is terminated at ZNC. Therefore, it is extremely important to have a secure connection from your client to ZNC. At minimum, you should turn on the SSL option as previously mentioned. With that self-signed certificate, you are susceptible to a MITM attack, though, so it may be worth your time to generate a certificate authority and issue a certificate to your ZNC server. The reason you are at risk is that it's fairly easy to generate a self-signed certificate as ZNC does. At minimum, you should take note of the public key generated in the self-signed certificate and only trust the SSL connection if your ZNC server presents that known key. This technique is known as **certificate pinning**. As previously mentioned, generating PKIs is a nuanced task, so I'll leave this as a (moderately difficult) exercise for the reader.
+
+Another option, if you don't want to deal with SSL, is that you can `ssh` into your BBB and run an IRC client on localhost. This will still provide confidentiality for your messages between your computer and the server (the BBB) but it will restrict the IRC clients available to you since the IRC client would be running on the BBB. For the rest of this chapter, we will continue with the SSL approach.
+
+The ZNC OTR module is fairly new, so it must be built from source. It also depends on a version of OTR that is not available in Debian wheezy, but it is available as a backport. Edit your apt-sources file to add the backport repository:
+
+```
+sudo nano /etc/apt/sources.list
+
+```
+
+Add the following line to the end:
+
+```
+deb http://http.debian.net/debian wheezy-backports main
+
+```
+
+Then perform:
+
+```
+sudo apt-get update
+
+```
+
+To install the newer version of OTR, enter the following command:
+
+```
+sudo apt-get -t wheezy-backports install "libotr5" "libotr5-dev"
+
+```
+
+Clone the `znc-otr` module repository:
+
+```
+git clone https://github.com/mmilata/znc-otr.git
+
+```
+
+Enter the directory and type `make`. You should see:
+
+```
+LIBS="-lotr" znc-buildmod otr.cpp
+Building "otr.so" for ZNC 1.4... [ ok ]
+
+```
+
+Copy `otr.so` to `~/.znc/modules` and note, you may have to create the modules directory. The `znc-otr` module is now installed, but not loaded.
+
+## Adding your networks to ZNC
+
+With all of the components installed, we can now configure ZNC. Since we've enabled the ZNC `webadmin` module, we can use our browser to configure our bouncer and add accounts. You can access the `webadmin` module by typing the URL of your BBB followed by the port number of ZNC as follows:
+
+```
+https://192.168.1.42:50000
+
+```
+
+Log in with your username and password. On the right-hand side of the page, there will be a navigation menu as shown in the following screenshot:
+
+![Adding your networks to ZNC](img/00023.jpeg)
+
+Click on **Your Settings**. Then scroll down to the **Networks** section and click on **Add**. Here you can add your BitlBee settings we previously created. The **Network Name** is BitlBee and the **Nickname** is the BitlBee user you created. Under **Servers of this IRC Network**, enter the following and replace the password with your BitlBee password:
+
+`localhost 6667 password`
+
+Scroll to the bottom of the page and click on **Add Network** to save. Now you can go back to the **Your Settings** page and add other IRC networks in a similar manner. For this chapter, let's add a freenode account as we'll be using it to demonstrate how to use OTR over IRC. If you don't have one, you can make up a nick and enter the following in the **Servers of this IRC network** section:
+
+`chat.freenode.net +6697`
+
+The +6697 indicates to ZNC that you want to connect to freenode using SSL on port 6697, which is the semi-official IRC TLS port. You can add channels by clicking on Add under **Channels** and ZNC will not only keep you in the channel when your client detaches, but will playback the channel's conversation. You can specify how many lines to playback by changing the **Buffer Count** setting in the **Channel Info** screen.
+
+### Connecting to ZNC from your IRC client
+
+You can now connect to ZNC from your IRC client. Depending on the client, you should be able to set your username and password in the `server password` field. If you receive an *incorrect password* warning and you are sure that you typed in the password correctly, set your password to `username:password`. You need to do this if using ERC. More specifically, you should connect with `M-x erc-tls` and supply the IP of your BBB, the port number of ZNC, username, and the password in the previous format.
+
+If you've added multiple networks, the first messages you should see are the following when you make your connection to your BBB:
+
+```
+-*status- You have several networks configured, but no network was specified for the connection.
+-*status- Selecting network [bitlbee]. To see list of all configured networks, use /znc ListNetworks
+-*status- If you want to choose another network, use /znc JumpNetwork <network>, or connect to ZNC with username zncbeagle/<network> (instead of just zncbeagle)
+
+```
+
+These messages are from a **virtual user**. The prefix for virtual users is an `*` and this user is `status`. While ZNC is connected to multiple networks, you are only seeing the BitlBee network at the moment. Here you can interact with BitlBee like we did in a previous section. As long as ZNC and BitlBee are running, ZNC will remain connected to BitlBee and you can attach and detach at will. To use OTR on an actual IRC network, like freenode, we need to attach ZNC to the other network. There are two ways to do this. We can, as `status` reminded us, jump to that network with the following command, assuming you named your freenode network *freenode*:
+
+```
+/msg *status JumpNetwork freenode
+
+```
+
+This will take your existing session and *jump* it over to freenode. While you may be in the same client window, you are now talking on a different IRC network since we switched from BitlBee to freenode. If you use GNU screen or tmux, we just performed a similar action as we would have had we switched to a new screen. The session is still running; we are just looking at a different instance. This method has the benefit of only using one connection from your client to ZNC, but it can be a bit confusing.
+
+Alternatively, you can open another ZNC connection. To indicate to ZNC that you want the new session to attach to a different network, you must use a different syntax. Your username must be in the form `username/network` and if you were sending the username in the password field, as you must with ERC, the format is `username/network:password`. So, in this example the username is:
+
+```
+zncbeagle/freenode
+
+```
+
+Using either method, connect to freenode via IRC.
+
+## Establishing OTR connections through ZNC
+
+Now that we are using ZNC to manage our IRC traffic, let's establish an OTR session. The process is similar to what we did with BitlBee and by the end of this, you should be well-versed in establishing identity with OTR. For this experiment, you will either need a crypto-savy friend, a begrudging significant other, or a separate IRC account. Basically, you need somebody with whom you can chat via OTR.
+
+Now that you are logged onto freenode or your favorite IRC network, initiate a chat with another user. On most clients, this will open the conversation in a new window when you type the following command:
+
+```
+/query username
+
+```
+
+At this point, you can enjoy an old-fashioned, unencrypted chat with your buddy. To chat with OTR, we first need to generate a key, like we did with BitlBee. In ZNC, there is a virtual user, `*otr`, similar to the `*status` user, to whom you direct OTR commands. First, you should generate a keypair by typing in the following command:
+
+```
+/msg *otr genkey
+
+```
+
+Remember, all virtual users in ZNC have the `*` prefix. This will probably open a new window with the `*otr` user and you should see something like this:
+
+```
+<*otr> Starting key generation in a background thread.
+<*otr> Key generation finished.
+
+```
+
+Now you can initiate an OTR conversation. If you want to initiate the OTR conversation, type the following:
+
+```
+?OTR?
+
+```
+
+Otherwise, your buddy can initiate the OTR conversation and ZNC-OTR will automatically proceed with the protocol. Unlike BitlBee, the question is not part of the authenticate command, so you must type that first on your own. If Alice and Bob are talking, the conversation prior to the authenticate step would look like:
+
+```
+<alice> When prompted, answer the question: What was printed on my t-shirt which I wore yesterday? One word, lowercase.
+<bob> got it.
+
+```
+
+The command to initiate authentication is of the format: `/msg *otr auth username answer`. Continuing our example, the command would look like the following, where the answer to the question is *tworkeffx*:
+
+```
+/msg *otr auth bob tworkeffx
+
+```
+
+This will prompt your buddy to participate in the OTR authentication phase and what he sees on his screen depends on the IRC client he is using. The `*otr` user should respond with something like the following messages:
+
+```
+<*otr> [bob] Gone SECURE. Please make sure logging is turned off on your IRC
+<*otr> [bob] Peer is not authenticated. There are two ways of verifying their identity:
+<*otr> [bob] 1\. Agree on a common secret (do not type it into the chat), then type auth bob <secret>.
+<*otr> [bob] 2\. Compare their fingerprint over a secure channel, then type trust bob.
+<*otr> [bob] Your fingerprint:  E8949490 D0326A85 1049EE79 DF111C0A BCC68D42
+<*otr> [bob] Their fingerprint: 00694775 3945FA05 B2E0DA61 5416DFFC 4F9C5936
+<*otr> [bob] Initiated authentication.
+<*otr> [bob] Peer replied to authentication request.
+<*otr> [bob] Successfully authenticated.
+
+```
+
+As `*otr` reminds us, there are two methods to authenticate the user. We are using method number 1, which is the Socialist Millionaire Protocol. Your buddy, Bob, responded with your answer and you have authenticated him. Bob should conduct a similar exchange and the format for the answer is:
+
+```
+/msg *otr auth bob <answer>
+
+```
+
+And now, you can enjoy an encrypted chat session.
+
+# Extending the project
+
+Currently, your BeagleBone is only serving your local network. You can enable port forwarding, like you did with your Tor server to open it up to the Internet to allow access to ZNC while you are on-the-go. If you do this, be sure that you are using SSL and consider using a Dynamic DNS service so you don't have to remember your IP address.
+
+The ZNC and BitlBee packages are quite extensible. Moreover, since they are IRC servers, you can run an IRC **bot** in your ZNC server. There are several popular IRC bot packages and perhaps the most well known is Eggdrop ([http://www.eggheads.org/](http://www.eggheads.org/)). A custom bot on your BBB IRC server can interact with you from IRC to hardware. For example, if you add a temperature sensor on your BBB, you can query the bot to find out the temperature in the room. If you add a ZigBee radio to your BBB and attach the same temperature sensor to a corresponding ZigBee radio outside, powered by a battery, the bot can tell you the temperature outside. If you become an avid IRC user, you will enjoy combining the hardware electronics project with your BBB bot.
+
+If you want to involve the CryptoCape to add some hardware protection, you could store ZNC's SSL certificate in the TPM. The TPM can store RSA keys and the keys can be generated such that the private key remains in the TPM. While there would be significant programming to connect the various components, this would certainly be a fun and challenging project!
+
+# Summary
+
+In this chapter, you learned how to use another privacy tool, OTR. We used OTR with two different applications and examined how OTR authentication works. We also have our BBB set up to act as an IRC gateway to our chat networks and to manage all of our IRC communication.
+
+In this book, we've taken three of the most popular and well-respected privacy and security applications and used them on the BeagleBone Black. The small form factor, low power consumption, and extendibility of the BBB makes it an ideal privacy aid. The software and hardware used in this book makes heavy use of cryptography, which is inherently a social and often controversial technology. We've also learned some of modern cryptography's social-political struggles along the way. Finally, you don't need to be a secret agent to communicate privately and securely; the best tools are freely available. You can improve these tools by using them and providing your feedback to the developers.
+
+Happy hacking!
+
+# Appendix A. Selected Bibliography
+
+# Chapter 1
+
+*   Gibb, Alicia. "The death of patents and what comes after." Accessed September 3, 2014\. [https://www.youtube.com/watch?v=z__Sbw1Ax4o](https://www.youtube.com/watch?v=z__Sbw1Ax4o). TEDx Stockholm, 2012.
+*   BeagleBone Black Wiki. "WIFI Adapters." Accessed September 3, 2014\. [http://elinux.org/Beagleboard:BeagleBoneBlack#WIFI_Adapters](http://elinux.org/Beagleboard:BeagleBoneBlack#WIFI_Adapters).
+*   Batsov, Bozhidar. "Package Management in Emacs: The Good, the Bad and the Ugly." Accessed September 3, 2014\. [http://batsov.com/articles/2012/02/19/package-management-in-emacs-the-good-the-bad-and-the-ugly/](http://batsov.com/articles/2012/02/19/package-management-in-emacs-the-good-the-bad-and-the-ugly/). 2012.
+*   Batsov, Bozhidar. "Prelude." Accessed September 3, 2014\. [https://github.com/bbatsov/prelude](https://github.com/bbatsov/prelude). 2014.
+*   Cygwin. Accessed September 3, 2014\. [https://www.cygwin.com](https://www.cygwin.com).
+*   Boneh, Dan. "Cryptography I." Accessed September 3, 2014\. [https://www.coursera.org/course/crypto](https://www.coursera.org/course/crypto).
+*   Boneh, Dan. "Cryptography II." Accessed September 3, 2014\. [https://www.coursera.org/course/crypto2](https://www.coursera.org/course/crypto2).
+*   Molloy, Derek. "Setting up a C++ Cross-Development Platform." Accessed September 3, 2014\. [http://derekmolloy.ie/beaglebone/ setting-up-eclipse-on-the-beaglebone-for-c-development/](http://derekmolloy.ie/beaglebone/%20setting-up-eclipse-on-the-beaglebone-for-c-development/). 2013.
+*   edX. "Introduction to Linux." Accessed September 3, 2014\. [https://www.edx.org/course/linuxfoundationx/linuxfoundationx-lfs101x-introduction-1621](https://www.edx.org/course/linuxfoundationx/linuxfoundationx-lfs101x-introduction-1621).
+*   eLinux Wiki. "BeagleBone Black Serial." Accessed September 3, 2014\. [http://elinux.org/Beagleboard:BeagleBone_Black_Serial](http://elinux.org/Beagleboard:BeagleBone_Black_Serial).
+*   EmacsWiki. "Emacs Newbie." Accessed September 3, 2014\. [http://www.emacswiki.org/emacs/EmacsNewbie](http://www.emacswiki.org/emacs/EmacsNewbie).
+*   EmacsWiki. "Viper Mode." Accessed September 3, 2014\. [http://www.emacswiki.org/emacs/ViperMode](http://www.emacswiki.org/emacs/ViperMode). 2014.
+*   Corey, Gerald. "BeagleBone Black System Reference Manual. Beagleboard.org." Accessed September 3, 2014\. [https://github.com/CircuitCo/BeagleBone-Black/ blob/master/BBB_SRM.pdf?raw=true](https://github.com/CircuitCo/BeagleBone-Black/%20blob/master/BBB_SRM.pdf?raw=true). 2014.
+*   Hertzog, Raphael, and Roland Mas. *The Debian Administrator's Handbook*. Freexian SARL. 2013.
+*   Homebrew. Accessed September 3, 2014\. [http://brew.sh/](http://brew.sh/).
+*   Axelson, Jan. "Using Eclipse to Cross-compile Applications for Embedded Systems." Accessed September 3, 2014\. [http://janaxelson.com/eclipse1.htm](http://janaxelson.com/eclipse1.htm). 2014.
+*   Katz, Jonathan. "Cryptography." Accessed September 3, 2014\. [https://www.coursera.org/course/cryptography](https://www.coursera.org/course/cryptography).
+*   Katz, Jonathan, and Yehuda Lindell. *Introduction to Modern Cryptography (Chapman & Hall/Crc Cryptography and Network Security Series)*. Chapman & Hall/CRC. 2007.
+*   Khan Academy. "Electricity and magnetism." Accessed September 3, 2014\. [https://www.khanacademy.org/science/physics/electricity-and-magnetism](https://www.khanacademy.org/science/physics/electricity-and-magnetism).
+*   Khan Academy. "Journey into cryptography." Accessed September 3, 2014\. [https://www.khanacademy.org/computing/computer-science/cryptography](https://www.khanacademy.org/computing/computer-science/cryptography).
+*   Murphy, Sean, and Fred Piper. *Cryptography: A Very Short Introduction.* Oxford University Press. 2002.
+*   nixCraft. "Ubuntu / Debian Linux Regenerate OpenSSH Host Keys." Accessed September 3, 2014\. [http://www.cyberciti.biz/faq/howto-regenerate-openssh-host-keys/](http://www.cyberciti.biz/faq/howto-regenerate-openssh-host-keys/).
+*   Nmap.org. "Microsoft Windows binaries." Accessed September 3, 2014\. [http://nmap.org/download.html#windows](http://nmap.org/download.html#windows).
+*   OSHWA. [http://www.oshwa.org/definition/](http://www.oshwa.org/definition/). 2013.
+*   Paar, Christof, and Jan Pelzl. *Understanding Cryptography: A Textbook for Students and Practitioners*. Springer Publishing Company, Incorporated. 2009.
+*   Munroe, Randall. "Permanence." Accessed September 3, 2014\. [https://xkcd.com/910/](https://xkcd.com/910/). 2008.
+*   Munroe, Randall. "Real Programmers." Accessed September 3, 2014\. [https://xkcd.com/378/](https://xkcd.com/378/). 2008.
+*   Chua, Sacha. "How to Learn Emacs." Accessed September 3, 2014\. [http://sachachua.com/blog/wp-content/uploads/2013/05/How-to-Learn-Emacs-v2-Large.png](http://sachachua.com/blog/wp-content/uploads/2013/05/How-to-Learn-Emacs-v2-Large.png). 2013.
+*   Scherz, Paul. *Practical Electronics for Inventors*. McGraw-Hill. 3rd edition. 2013\.
+*   Stallman, Richard M. "Emacs the extensible, customizable self-documenting display editor." *In Proceedings of the ACM SIGPLAN SIGOA Symposium on Text Manipulation*: 147–56\. ACM, New York, NY, USA. 1981\. Also available at [http://doi.acm.Org/10.1145/800209.806466](http://doi.acm.Org/10.1145/800209.806466).
+*   Stallman, Richard M. *Gnu Emacs Manual: For Version 24.3*. Free Software Foundation, 17th edition. 2013.
+*   VirtualBox.org. Accessed September 3, 2014\. [https://www.virtualbox.org/](https://www.virtualbox.org/).
+
+# Chapter 2
+
+*   Adafruit Industries. "Adafruit's BeagleBone IO Python Library". Accessed September 3, 2014\. [https://github.com/adafruit/adafruit-beaglebone-io-python](https://github.com/adafruit/adafruit-beaglebone-io-python).
+*   Appelbaum, Jacob and Nick Mathewson. *Pluggable transports for circumvention*. 2010\. Accessed September 3, 2014\. [https://gitweb.torproject.org/torspec.git/blob/refs/heads/master:/proposals/180-pluggable-transport.txt](https://gitweb.torproject.org/torspec.git/blob/refs/heads/master:/proposals/180-pluggable-transport.txt).
+*   Dingledine, Roger. "Yes, we know about the Guardian article.". Accessed September 3, 2014\. [https://blog.torproject.org/blog/yes-we-know-about-guardian-article](https://blog.torproject.org/blog/yes-we-know-about-guardian-article). 2013.
+*   Dingledine, Roger and Nick Mathewson. *Design of a blocking-resistant anonymity system*. Technical Report 2006-11-001, The Tor Project, [https://research.torproject.org/techreports/blocking-2006-11.pdf](https://research.torproject.org/techreports/blocking-2006-11.pdf). November 2006.
+*   Dingledine, Roger, Nick Mathewson, and Paul Syverson. "In Proceedings of the 13th Conference on USENIX Security Symposium - Volume 13, SSYM'04." *Tor: The second-generation onion router*: 21\. USENIX Association. Berkeley, CA, USA. 2004\. [http://dl.acm.org/citation.cfm?id=1251375.1251396](http://dl.acm.org/citation.cfm?id=1251375.1251396).
+*   Electronic Frontier Foundation. "The Legal FAQ for Tor Relay Operators." Accessed September 3, 2014\. [https://www.torproject.org/eff/tor-legal-faq.html.en](https://www.torproject.org/eff/tor-legal-faq.html.en). 2014
+*   Fuss, Juergen, Tobias Pulls, and Philipp Winter. "Scramblesuit: a polymorphic network protocol to circumvent censorship." *Proceedings of the 12th ACM workshop on Workshop on Privacy in the electronic society, WPES'13*: 213-24\. New York, NY, USA: ACM. 2013\. Also available at [http://doi.acm.org/10.1145/2517840.2517856](http://doi.acm.org/10.1145/2517840.2517856).
+*   Grusin, Mike. "Serial LCD quickstart." Accessed September 3, 2014\. [https://www.sparkfun.com/tutorials/246](https://www.sparkfun.com/tutorials/246). 2011.
+*   Kadianakis, George. "New obfsproxy transport: scramblesuit." Accessed September 3, 2014\. [https://lists.torproject.org/pipermail/tor-relays/2014-February/003886.html](https://lists.torproject.org/pipermail/tor-relays/2014-February/003886.html). 2014
+*   speedtest-cli. Accessed September 3, 2014\. [https://github.com/sivel/speedtest-cli](https://github.com/sivel/speedtest-cli).
+*   Tails. Accessed September 3, 2014\. [https://tails.boum.org/](https://tails.boum.org/).
+*   Tor Atlas. Accessed September 3, 2014\. [https://atlas.torproject.org/](https://atlas.torproject.org/).
+*   Tor Globe. Accessed September 3, 2014\. [https://globe.torproject.org/](https://globe.torproject.org/).
+*   Tor Metrics. "Directly connecting users from Turkey." Accessed September 3, 2014\. [https://metrics.torproject.org/users.html?graph=userstats-relay-country&start=2014-01-04&end=2014-04-04&country=tr&events=off#userstats-relay-country](https://metrics.torproject.org/users.html?graph=userstats-relay-country&start=2014-01-04&end=2014-04-04&country=tr&events=off#userstats-relay-country).
+*   Tor Project. "Installing Tor on Debian/Ubuntu." Accessed September 3, 2014\. [https://www.torproject.org/docs/debian](https://www.torproject.org/docs/debian).
+*   Tor Project. *Tc: A Tor control protocol (Version 1)*. Accessed September 3, 2014\. [https://gitweb.torproject.org/torspec.git?a=blob_plain;hb=HEAD;f=control-spec.txt](https://gitweb.torproject.org/torspec.git?a=blob_plain;hb=HEAD;f=control-spec.txt).
+*   Tor Stem. Accessed September 3, 2014\. [https://stem.torproject.org/](https://stem.torproject.org/).
+*   Tor Stem. "Tutorials." Accessed September 3, 2014\. [https://stem.torproject.org/tutorials.html](https://stem.torproject.org/tutorials.html).
+
+# Chapter 3
+
+*   Atmel. "ATAES 132." Accessed September 3, 2014\. [http://www.atmel.com/devices/ataes132.aspx](http://www.atmel.com/devices/ataes132.aspx).
+*   Beagleboard forum. Accessed September 3, 2014\. [https://groups.google.com/forum/#!forum/beagleboard](https://groups.google.com/forum/#!forum/beagleboard).
+*   eLinux Wiki. "BeagleBone Black." Accessed September 3, 2014\. [http://elinux.org/Beagleboard:BeagleBoneBlack](http://elinux.org/Beagleboard:BeagleBoneBlack).
+*   Chaos Computer Club. "Chaos Computer Club Breaks Apple TouchID." Accessed September 3, 2014\. [http://www.ccc.de/en/updates/2013/ccc-breaks-apple-touchid](http://www.ccc.de/en/updates/2013/ccc-breaks-apple-touchid). 2013.
+*   Datko, Josh. "BeagleBone Black ATmega Flasher." Accessed September 3, 2014\. [https://github.com/jbdatko/BBB_ATmega328P_flasher](https://github.com/jbdatko/BBB_ATmega328P_flasher). 2014.
+*   Datko, Josh. "Cryptotronix:CryptoCape." Accessed September 3, 2014\. [http://elinux.org/Cryptotronix:CryptoCape](http://elinux.org/Cryptotronix:CryptoCape). 2014.
+*   Datko, Josh. "CryptoCape Device Tree Source." Accessed September 3, 2014\. [https://github.com/beagleboard/linux/blob/3.8/firmware/capes/BB-BONE-CRYPTO-00A0.dts](https://github.com/beagleboard/linux/blob/3.8/firmware/capes/BB-BONE-CRYPTO-00A0.dts). 2014.
+*   Datko, Josh. "EClet" Accessed September 3, 2014\. [https://github.com/cryptotronix/eclet](https://github.com/cryptotronix/eclet). 2014
+*   Datko, Josh. "Hashlet." Accessed September 3, 2014\. [https://github.com/cryptotronix/hashlet](https://github.com/cryptotronix/hashlet). 2014.
+*   Electronic Frontier Foundation. "Https Everywhere." Accessed September 3, 2014\. [https://www.eff.org/https-everywhere](https://www.eff.org/https-everywhere). 2014.
+*   Gellesaug, David and Nicole Perlroth. "Russian hackers amass over a billion internet passwords. New York Times." [http://www.nytimes.com/2014/08/06/technology/russian-gang-said-to-amass-more-than-a-billion-stolen-internet-credentials.html](http://www.nytimes.com/2014/08/06/technology/russian-gang-said-to-amass-more-than-a-billion-stolen-internet-credentials.html). 2014.
+*   Texas Instrument. "AM335x Crypto Performance." Accessed September 3, 2014\. [http://processors.wiki.ti.com/index.php/AM335x_Crypto_Performance](http://processors.wiki.ti.com/index.php/AM335x_Crypto_Performance).
+*   Munroe, Randall. "Heartbleed explanation." Accessed September 3, 2014\. [https://xkcd.com/1354/](https://xkcd.com/1354/). 2014.
+*   MythBusters. "Crimes and Myth-Demeanors 2." Episode 59\. Accessed September 3, 2014\. [https://www.youtube.com/watch?v=3Hji3kp_i9k](https://www.youtube.com/watch?v=3Hji3kp_i9k). 2006
+*   NXP Semiconductor. *I2C-Bus Specification and User Manual*. [http://www.nxp.com/documents/user_manual/UM10204.pdf](http://www.nxp.com/documents/user_manual/UM10204.pdf). 2014.
+*   O'Flynn, Colin. "Clock Glitch Attack Examples - Bypassing Password Check." Accessed September 3, 2014\. [https://www.youtube.com/watch?v=Ruphw98JWE&list=UUqc9MJwX_R1pQC6A353JmJg](https://www.youtube.com/watch?v=Ruphw98JWE&list=UUqc9MJwX_R1pQC6A353JmJg). 2014.
+*   Oliveira, David. "BeagleBone Cape EEPROM Generator." Accessed September 3, 2014\. [https://github.com/picoflamingo/BBCape_EEPROM](https://github.com/picoflamingo/BBCape_EEPROM). 2013.
+*   Petazzoni, Thomas. "Device Tree for Dummies." Embedded Linux Conference Europe. [https://www.youtube.com/watch?v=m_NyYEBxfn8](https://www.youtube.com/watch?v=m_NyYEBxfn8). 2013.
+*   Skorobogatov, Dr Sergei. *Physical Attacks on Tamper Resistance: Progress and Lessons*. 2nd ARO Special Workshop on Hardware Assurance. [http://www.cl.cam.ac.uk/~sps32/ARO_2011.pdf](http://www.cl.cam.ac.uk/~sps32/ARO_2011.pdf). 2011.
+
+# Chapter 4
+
+*   Appelbaum, Jacob. "GPG Configuration." Accessed September 3, 2014\. [https://github.com/ioerror/duraconf/raw/master/configs/gnupg/gpg.conf](https://github.com/ioerror/duraconf/raw/master/configs/gnupg/gpg.conf).
+*   Appelbaum, Jacob, Joseph A. Calandrino, William Clarkson, Edward W. Felten, Ariel J. Feldman, J. Alex Halderman, Nadia Heninger, Seth D. Schoen, and William Paul. *Lest We Remember: Cold-boot Attacks on Encryption Keys*. 52(5): 91-98\. Commun. ACM. 2009\. Also available at [http://doi.acm.org/10.1145/1506409.1506429](http://doi.acm.org/10.1145/1506409.1506429).
+*   Borisov, Nikita, George Danezis, and Ian Goldberg. DP5: *A Private Presence Service*. Technical Report 2014-10\. The Tor Project. [http://cacr.uwaterloo.ca/techreports/2014/cacr2014-10.pdf](http://cacr.uwaterloo.ca/techreports/2014/cacr2014-10.pdf). 2014.
+*   Datko, Josh. "CryptoCape Trusted Platform Module." Accessed September 3, 2014\. [http://cryptotronix.com/cryptocape-tpm/](http://cryptotronix.com/cryptocape-tpm/). 2014.
+*   Free Software Foundation. "Email Self-Defense." Accessed September 3, 2014\. [https://emailselfdefense.fsf.org/en/index.html](https://emailselfdefense.fsf.org/en/index.html). 2014.
+*   Free Software Foundation. *The GNU Privacy Handbook*. [https://www.gnupg.org/gph/en/manual.html](https://www.gnupg.org/gph/en/manual.html). 1999.
+*   Greenwald, Glenn. *No Place to Hide: Edward Snowden, the NSA, and the U.S. Surveillance State*. 2014\. Metropolitan Books. USA.
+*   Gutmann, Peter. "An Open-Source Cryptographic Coprocessor." *Proceedings of the 9th Conference on USENIX Security Symposium - Volume 9, SSYM'00*: 8-8\. USENIX Association, Berkeley, CA, USA. 2000\. Also available at [http://dl.acm.org/citation.cfm?id=1251306.1251314](http://dl.acm.org/citation.cfm?id=1251306.1251314).
+*   HAVEGE. Accessed September 3, 2014\. [http://www.irisa.fr/caps/projects/hipsor/](http://www.irisa.fr/caps/projects/hipsor/).
+*   Huang, Bunnie. "On Hacking MicroSD Cards." Accessed September 3, 2014\. [http://www.bunniestudios.com/blog/?p=3554](http://www.bunniestudios.com/blog/?p=3554). 2013.
+*   Langner, Ralph. *Stuxnet: Dissecting a Cyberwarfare Weapon*. 9(3): 49-51\. IEEE Security and Privacy. 2011\. Also available at [http://dx.doi.org/10.1109/MSP.2011.67](http://dx.doi.org/10.1109/MSP.2011.67).
+*   Levy, Steven. *Crypto: How the Code Rebels Beat the Government: Saving Privacy in the Digital Age*. Penguin USA, New York, NY, USA. 2001.
+*   Marlinspike, Moxie. "A Critique of Lavabit." Accessed September 3, 2014\. [http://www.thoughtcrime.org/blog/lavabit-critique/](http://www.thoughtcrime.org/blog/lavabit-critique/). 2013.
+*   Microsoft. "United States' Malware Infection Rate More than Doubles in the First Half of 2013." Accessed September 3, 2014\. [http://blogs.technet.com/b/security/archive/2014/03/31/united-states-malware-infection-rate-more-than-doubles-in-the-first-half-of-2013.aspx](http://blogs.technet.com/b/security/archive/2014/03/31/united-states-malware-infection-rate-more-than-doubles-in-the-first-half-of-2013.aspx). 2014.
+*   National Archives. "Frequently Asked Questions About Optical Storage Media." Accessed September 3, 2014\. [http://www.archives.gov/records-mgmt/initiatives/temp-opmedia-faq.html](http://www.archives.gov/records-mgmt/initiatives/temp-opmedia-faq.html).
+*   Opsahl, Kurt. "Why Metadata Matters." Accessed September 3, 2014\. [https://www.eff.org/deeplinks/2013/06/why-metadata-matters](https://www.eff.org/deeplinks/2013/06/why-metadata-matters).
+*   riseup.net. "OpenPGP Best Practices." Accessed September 3, 2014\. [https://help.riseup.net/en/security/message-security/openpgp/best-practices](https://help.riseup.net/en/security/message-security/openpgp/best-practices).
+*   Shirey, R. "Internet Security Glossary. RFC 4949 (Informational)." Accessed September 3, 2014\. [http://www.ietf.org/rfc/rfc4949.txt](http://www.ietf.org/rfc/rfc4949.txt). 2007.
+*   Trusted Computing Group. "TPM 1.2 Specification." Accessed September 3, 2014\. [http://www.trustedcomputinggroup.org/resources/tpm_main_specification](http://www.trustedcomputinggroup.org/resources/tpm_main_specification). 2011.
+*   Tygar, J. D. and Alma Whitten. "Why Johnny can't encrypt: A Usability Evaluation of PGP 5.0." *Proceedings of the 8th Conference on USENIX Security Symposium - Volume 8, SSYM'99*: 14-14\. USENIX Association Berkeley, CA, USA. 1999\. Also available at [http://dl.acm.org/citation.cfm?id=1251421.1251435](http://dl.acm.org/citation.cfm?id=1251421.1251435).
+*   Zimmermann, Philip R. *PGP Source Code and Internals*. MIT Press, Cambridge, MA, USA. 1995.
+*   Zimmermann, Philip R. *The Official PGP User's Guide*. MIT Press, Cambridge, MA, USA. 1995.
+
+# Chapter 5
+
+*   Alexander, Chris and Ian Goldberg. "Improved User authentication in Off-the-Record Messaging." *Proceedings of the 2007 ACM Workshop on Privacy in Electronic Society, WPES '07*: 41-47, New York, NY, USA. ACM. 2007\. Also available at [http://doi.acm.org/10.1145/1314333.1314340](http://doi.acm.org/10.1145/1314333.1314340).
+*   Borisov, Nikita, Eric Brewer, and Ian Goldberg. "Off-the-Record Communication, or, Why not to use PGP." *Proceedings of the 2004 ACM Workshop on Privacy in the Electronic Society, WPES '04*: 77-84, New York, NY, USA. ACM 2004\. Also available at [http://doi.acm.org/10.1145/1029179.1029200](http://doi.acm.org/10.1145/1029179.1029200).
+*   Cruise, Brit. "Walkthrough of Diffie-Gellman Key Exchange." Accessed September 3, 2014\. [https://www.khanacademy.org/computing/computer-science/cryptography/modern-crypt/v/diffie-hellman-key-exchange—part-2](https://www.khanacademy.org/computing/computer-science/cryptography/modern-crypt/v/diffie-hellman-key-exchange%E2%80%94part-2).
+*   EggHEADS.ORG. "Eggdrop." Accessed September 3, 2014\. [http://www.eggheads.org/](http://www.eggheads.org/).
+*   EmacsWiki. "ERC Basics." Accessed September 3, 2014\. [http://www.emacswiki.org/emacs/ErcBasics](http://www.emacswiki.org/emacs/ErcBasics).
+*   fellowship. "Join FSFE's Community." Accessed September 3, 2014\. [https://fsfe.org/fellowship/index.en.html](https://fsfe.org/fellowship/index.en.html).
+*   Google. "What is Google Talk?." Accessed September 3, 2014\. [https://developers.google.com/talk/](https://developers.google.com/talk/). 2013.
+*   Gutmann, Peter. *Everything you Never Wanted to Know about PKI but were Forced to Find Out*. Accessed September 3, 2014\. [https://www.cs.auckland.ac.nz/~pgut001/pubs/pkitutorial.pdf](https://www.cs.auckland.ac.nz/~pgut001/pubs/pkitutorial.pdf).
+*   Hill, Benjamin. "Google has Most of my Email Because it Has All of Yours." Accessed September 3, 2014\. [http://mako.cc/copyrighteous/google-has-most-of-my-email-because-it-has-all-of-yours](http://mako.cc/copyrighteous/google-has-most-of-my-email-because-it-has-all-of-yours). 2014.
+*   IRC Help. "An IRC Tutorial." Accessed September 3, 2014\. [http://www.irchelp.org/irchelp/irctutorial.html](http://www.irchelp.org/irchelp/irctutorial.html).
+*   irssi. "Irssi IRC Client." Accessed September 3, 2014\. [http://www.irssi.org/](http://www.irssi.org/).
+*   Khan Academy. "XOR Bitwise Operation." Accessed September 3, 2014 [https://www.khanacademy.org/computing/computer-science/cryptography/ciphers/a/xor-bitwise-operation](https://www.khanacademy.org/computing/computer-science/cryptography/ciphers/a/xor-bitwise-operation).
+*   OAuth. Accessed September 3, 2014\. [http://oauth.net/](http://oauth.net/).
+*   Rasata, Jeanne. Free Software Foundation. "Associate Member Benefits." Accessed September 3, 2014\. [https://www.fsf.org/associate/benefits](https://www.fsf.org/associate/benefits). 2012.
+*   ZNC Wiki. "ZNC." Accessed September 3, 2014\. [http://wiki.znc.in/ZNC](http://wiki.znc.in/ZNC).

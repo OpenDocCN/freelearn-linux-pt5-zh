@@ -1,0 +1,561 @@
+# Chapter 4. Protecting GPG Keys with a Trusted Platform Module
+
+After our investigation into BBB hardware security, we'll now use that technology to protect your personal encryption keys for the popular GPG software. GPG is a free implementation of the OpenPGP standard. This standard was developed based on the work of Philip Zimmerman and his **Pretty Good Privacy** (**PGP**) software. PGP has a complex socio-political backstory, which we'll briefly cover before getting into the project. For the project, we'll treat the BBB as a separate cryptographic co-processor and use the CryptoCape, with a keypad code entry device, to protect our GPG keys when they are not in use.
+
+Specifically, we will do the following:
+
+*   Tell you a little about the history and importance of the PGP software
+*   Perform basic threat modeling to analyze your project
+*   Create a strong PGP key using the free GPG software
+*   Teach you to use the TPM to protect encryption keys
+
+# History of PGP
+
+The software used in this chapter would have once been considered a munition by the U.S. Government. Exporting it without a license from the government, would have violated the **International Traffic in Arms Regulations** (**ITAR**). As late as the early 1990s, cryptography was heavily controlled and restricted. While the early 90s are filled with numerous accounts by crypto-activists, all of which are well documented in Steven Levy's *Crypto*, there is one man in particular who was the driving force behind the software in this project: Philip Zimmerman.
+
+Philip Zimmerman had a small pet project around the year 1990, which he called **Pretty Good Privacy**. Motivated by a strong childhood passion for codes and ciphers, combined with a sense of political activism against a government capable of strong electronic surveillance, he set out to create a strong encryption program for the people (Levy 2001).
+
+One incident in particular helped to motivate Zimmerman to finish PGP and publish his work. This was the language that the then U.S. Senator Joseph Biden added to Senate Bill #266, which would mandate that:
+
+> *"Providers of electronic communication services and manufacturers of electronic communications service equipment shall ensure that communication systems permit the government to obtain the plaintext contents of voice, data, and other communications when appropriately authorized by law."*
+
+In 1991, in a rush to release PGP 1.0 before it was illegal, Zimmerman released his software as a freeware to the Internet. Subsequently, after PGP spread, the U.S. Government opened a criminal investigation on Zimmerman for the violation of the U.S. export laws. Zimmerman, in what is best described as a *legal hack*, published the entire source code of PGP, including instructions on how to scan it back into digital form, as a book. As Zimmerman describes:
+
+|   | *"It would be politically difficult for the Government to prohibit the export of a book that anyone may find in a public library or a bookstore."* |   |
+|   | --*(Zimmerman, 1995)* |
+
+A book published in the public domain would no longer fall under ITAR export controls. The genie was out of the bottle; the government dropped its case against Zimmerman in 1996.
+
+## Reflecting on the Crypto Wars
+
+Zimmerman's battle is considered a resilient victory. Many other outspoken supporters of strong cryptography, known as **cypherpunks**, also won battles popularizing and spreading encryption technology. But if the Crypto Wars were won in the early nineties, why hasn't cryptography become ubiquitous? Well, to a degree, it has. When you make purchases online, it should be protected by strong cryptography. Almost nobody would insist that their bank or online store *not* use cryptography and most probably feel more secure that they do. But what about personal privacy protecting software? For these tools, habits must change as the normal e-mail, chat, and web browsing tools are insecure by default. This change causes tension and resistance towards adoption.
+
+Also, security tools are notoriously hard to use. In the seminal paper on security usability, researchers conclude that the then PGP version 5.0, complete with a **Graphical User Interface** (**GUI**), was not able to prevent users, who were inexperienced with cryptography but all of whom had at least some college education, from making catastrophic security errors (Whitten 1999). Glenn Greenwald delayed his initial contact with Edward Snowden for roughly two months because he thought GPG was *too complicated* to use (Greenwald, 2014). Snowden absolutely refused to share anything with Greenwald until he installed GPG.
+
+GPG and PGP enable an individual to protect their own communications. Implicitly, you must also trust the receiving party not to forward your plaintext communication. GPG expects you to protect your private key and does not rely on a third party. While this adds some complexity and maintenance processes, trusting a third party with your private key can be disastrous. In August of 2013, Ladar Levison decided to shut down his own company, Lavabit, an e-mail provider, rather than turn over his users' data to the authorities. Levison courageously pulled the plug on his company rather then turn over the data.
+
+The Lavabit service generated and stored your private key. While this key was encrypted to the user's password, it still enabled the server to have access to the raw key. Even though the Lavabit service alleviated users from managing their private key themselves, it enabled the awkward position for Levison. To use GPG properly, you should never turn over your private key. For a complete analysis of Lavabit, see Moxie Marlinspike's blog post at [http://www.thoughtcrime.org/blog/lavabit-critique/](http://www.thoughtcrime.org/blog/lavabit-critique/).
+
+Given the breadth and depth of state surveillance capabilities, there is a re-kindled interest in protecting one's privacy. Researchers are now designing secure protocols, with these threats in mind (Borisov, 2014). Philip Zimmerman ended the chapter on *Why Do You Need PGP?* in the *Official PGP User's Guide* with the following statement, which is as true today as it was when first inked:
+
+> *"PGP empowers people to take their privacy into their own hands. There's a growing social need for it."*
+
+# Developing a threat model
+
+At the end of the previous chapter, we introduced the concept of a threat model. A **threat model** is an analysis of the security of the system that identifies assets, threats, vulnerabilities, and risks. Like any model, the depth of the analysis can vary. In the upcoming section, we'll present a cursory analysis so that you can start thinking about this process. This analysis will also help us understand the capabilities and limitations of our project.
+
+## Outlining the key protection system
+
+The first step of our analysis is to clearly provide a description of the system we are trying to protect. In this project, we'll build a logical GPG co-processor using the BBB and the CryptoCape. We'll store the GPG keys on the BBB and then connect to the BBB over **Secure Shell** (**SSH**) to use the keys and to run GPG. The CryptoCape will be used to encrypt your GPG key when not in use, known as **at rest**. We'll add a keypad to collect a numeric code, which will be provided to the TPM. This will allow the TPM to unwrap your GPG key.
+
+### Note
+
+The idea for this project was inspired by Peter Gutmann's work on open source cryptographic co-processors (Gutmann, 2000). The BBB, when acting as a co-processor to a host, is extremely flexible, and considering the power usage, relatively high in performance. By running sensitive code that will have access to cleartext encryption keys on a separate hardware, we gain an extra layer of protection (or at the minimum, a layer of indirection).
+
+## Identifying the assets we need to protect
+
+Before we can protect anything, we must know what to protect. The most important assets are the GPG private keys. With these keys, an attacker can decrypt past encrypted messages, recover future messages, and use the keys to impersonate you. By protecting your private key, we are also protecting your reputation, which is another asset. Our decrypted messages are also an asset. An attacker may not care about your key if he/she can easily access your decrypted messages. The BBB itself is an asset that needs protecting. If the BBB is rendered inoperable, then an attacker has successfully prevented you from accessing your private keys, which is known as a **Denial-Of-Service** (**DOS**).
+
+## Threat identification
+
+To identify the threats against our system, we need to classify the capabilities of our adversaries. This is a highly personal analysis, but we can generalize our adversaries into three archetypes: a well funded state actor, a skilled cracker, and a jealous ex-lover. The state actor has nearly limitless resources both from a financial and personnel point of view. The cracker is a skilled operator, but lacks the funding and resources of the state actor. The jealous ex-lover is not a sophisticated computer attacker, but is very motivated to do you harm.
+
+Unfortunately, if you are the target of directed surveillance from a state actor, you probably have much bigger problems than your GPG keys. This actor can put your entire life under monitoring and why go through the trouble of stealing your GPG keys when the hidden video camera in the wall records everything on your screen.
+
+Also, it's reasonable to assume that everyone you are communicating with is also under surveillance and it only takes one mistake from one person to reveal your plans for world domination.
+
+### Tip
+
+The adage by Benjamin Franklin is apropos here: *Three may keep a secret if two of them are dead*.
+
+However, properly using GPG will protect you from global passive surveillance. When used correctly, neither your Internet Service Provider, nor your e-mail provider, or any passive attacker would learn the contents of your messages. The passive adversary is not going to engage your system, but they could monitor a significant amount of Internet traffic in an attempt to *collect it all*. Therefore, the confidentiality of your message should remain protected.
+
+We'll assume the cracker trying to harm you is remote and does not have physical access to your BBB. We'll also assume the worst case that the cracker has compromised your host machine. In this scenario there is, unfortunately, a lot that the cracker can perform. He can install a key logger and capture everything, including the password that is typed on your computer. He will not be able to get the code that we'll enter on the BBB; however, he would be able to log in to the BBB when the key is available.
+
+The jealous ex-lover doesn't understand computers very well, but he doesn't need to, because he knows how to use a golf club. He knows that this BBB connected to your computer is somehow important to you because you've talked his ear off about this really cool project that you read in a book. He physically can destroy the BBB and with it, your private key (and probably the relationship as well!).
+
+## Identifying the risks
+
+How likely are the previous risks? The risk of active government surveillance in most countries is fortunately low. However, the consequences of this attack are very damaging. The risk of being caught up in passive surveillance by a state actor, as we have learned from Edward Snowden, is very likely. However, by using GPG, we add protection against this threat. An active cracker seeking you harm is probably unlikely. Contracting keystroke-capturing malware, however, is probably not an unreasonable event. A 2013 study by Microsoft concluded that 8 out of every 1,000 computers were infected with malware. You may be tempted to play these odds but let's rephrase this statement: in a group of 125 computers, one is infected with malware. A school or university easily has more computers than this. Lastly, only you can assess the risk of a jealous ex-lover.
+
+### Note
+
+For the full Microsoft report, refer to [http://blogs.technet.com/b/security/archive/2014/03/31/united-states-malware-infection-rate-more-than-doubles-in-the-first-half-of-2013.aspx](http://blogs.technet.com/b/security/archive/2014/03/31/united-states-malware-infection-rate-more-than-doubles-in-the-first-half-of-2013.aspx).
+
+## Mitigating the identified risks
+
+If you find yourself the target of a state, this project alone is not going to help much. We can protect ourselves somewhat from the cracker with two strategies. The first is instead of connecting the BBB to your laptop or computer, you can use the BBB as a standalone machine and transfer files via a microSD card. This is known as an **air-gap**. With a dedicated monitor and keyboard, it is much less likely for software vulnerabilities to break the gap and infect the BBB. However, this comes as a high level of personal inconvenience, depending on how often you encrypt files. If you consider the risk of running the BBB attached to your computer too high, create an air-gapped BBB for maximum protection. If you deem the risk low, because you've hardened your computer and have other protection mechanism, then keep the BBB attached to the computer.
+
+### Note
+
+An air-gapped computer can still be compromised. In 2010, a highly specialized worm known as Stuxnet was able to spread to networked isolated machines through USB flash drives.
+
+The second strategy is to somehow enter the GPG passphrase directly into the BBB without using the host's keyboard. After we complete the project, we'll suggest a mechanism to do this, but it is slightly more complicated. This would eliminate the threat of the key logger since the pin is directly entered.
+
+The mitigation against the ex-lover is to treat your BBB as you would your own wallet, and don't leave it out of your sight. It's slightly larger than you would want, but it's certainly small enough to fit in a small backpack or briefcase.
+
+## Summarizing our threat model
+
+Our threat model, while cursory, illustrates the thought process one should go through before using or developing security technologies. The term threat model is specific to the security industry, but it's really just proper planning. The purpose of this analysis is to find *logic bugs* and prevent you from spending thousands of dollars on high-tech locks for your front door when you keep your backdoor unlocked. Now that we understand what we are trying to protect and why it is important to use GPG, let's build the project.
+
+# Generating GPG keys
+
+First, we need to install GPG on the BBB. It is mostly likely already installed, but you can check and install it with the following command:
+
+```
+sudo apt-get install gnupg gnupg-curl
+
+```
+
+Next, we need to add a secret key. For those that already have a secret key, you can import your secret key ring, `secring.gpg`, to your `~/.gnupg` folder. For those that want to create a new key, on the BBB, proceed to the upcoming section.
+
+### Note
+
+This project assumes some familiarity with GPG. If GPG is new to you, the Free Software Foundation maintains the **Email Self-Defense** guide which is a very approachable introduction to the software and can be found at [https://emailselfdefense.fsf.org/en/index.html](https://emailselfdefense.fsf.org/en/index.html).
+
+## Generating entropy
+
+If you decided to create a new key on the BBB, there are a few technicalities we must consider. First of all, GPG will need a lot of random data to generate the keys. The amount of random data available in the kernel is proportional to the amount of entropy that is available. You can check the available entropy with the following command:
+
+```
+cat /proc/sys/kernel/random/entropy_avail
+
+```
+
+If this command returns a relatively low number, under 200, then GPG will not have enough entropy to generate a key. On a PC, one can increase the amount of entropy by interacting with the computer such as typing on the keyboard or moving the mouse. However, such sources of entropy are difficult for embedded systems, and in our current setup, we don't have the luxury of moving a mouse.
+
+Fortunately, there are a few tools to help us. If your BBB is running kernel version 3.13 or later, we can use the hardware random number generator on the AM3358 to help us out. You'll need to install the `rng-tools` package. Once installed, you can edit `/etc/default/rng-tools` and add the following line to register the hardware random number generated for `rng-tools`:
+
+```
+HRNGDEVICE=/dev/hwrng
+
+```
+
+After this, you should start the `rng-tools` daemon with:
+
+```
+/etc/init.d/rng-tools start
+
+```
+
+If you don't have `/dev/hwrng`—and currently, the chips on the CryptoCape do not yet have character device support and aren't available to `/dev/hwrng`—then you can install `haveged`. This daemon implements the **Hardware Volatile Entropy Gathering and Expansion** (**HAVEGE**) algorithm, the details of which are available at [http://www.irisa.fr/caps/projects/hipsor/](http://www.irisa.fr/caps/projects/hipsor/). This daemon will ensure that the BBB maintains a pool of entropy, which will be sufficient for generating a GPG key on the BBB.
+
+## Creating a good gpg.conf file
+
+Before you generate your key, we need to establish some more secure defaults for GPG. As we discussed earlier, it is still not as easy as it should be to use e-mail encryption. [Riseup.net](http://Riseup.net), an e-mail provider with a strong social cause, maintains an OpenPGP best practices guide at [https://help.riseup.net/en/security/message-security/openpgp/best-practices](https://help.riseup.net/en/security/message-security/openpgp/best-practices). This guide details how to harden your GPG configuration and provides the motivation behind each option. It is well worth a read to understand the intricacies of GPG key management.
+
+Jacob Applebaum maintains an implementation of these best practices, which you should download from [https://github.com/ioerror/duraconf/raw/master/configs/gnupg/gpg.conf](https://github.com/ioerror/duraconf/raw/master/configs/gnupg/gpg.conf) and save as your `~/.gnupg/gpg.conf` file. The configuration is well commented and you can refer to the best practices guide available at [Riseup.net](http://Riseup.net) for more information. There are three entries, however, that you should modify. The first is `default-key`, which is the fingerprint of your primary GPG key. Later in this chapter, we'll show you how to retrieve that fingerprint. We can't perform this action now because we don't have a key yet. The second is `keyserver-options ca-cert-file`, which is the certificate authority for the **keyserver pool**. Keyservers host your public keys and a keyserver pool is a redundant collection of keyservers. The instructions on [Riseup.net](http://Riseup.net) gives the details on how to download and install that certificate. Lastly, you can use Tor to fetch updates on your keys.
+
+The act of you requesting a public key from a keyserver signals that you have a potential interest in communicating with the owner of that key. This metadata might be more interesting to a passive adversary than the contents of your message, since it reveals your social network. As we learned in [Chapter 2](part0019_split_000.html#page "Chapter 2. Circumventing Censorship with a Tor Bridge"), *Circumventing Censorship with a Tor Bridge*, Tor is apt at protecting traffic analysis. You probably don't want to store your GPG keys on the same BBB as your bridge, so a second BBB would help here. On your GPG BBB, you need to only run Tor as a client, which is its default configuration. Then you can update `keyserver-options http-proxy` to point to your Tor SOCKS proxy running on `localhost`.
+
+### Note
+
+The **Electronic Frontier Foundation** (**EFF**) provides some hypothetical examples on the telling nature of metadata, for example, *They (the government) know you called the suicide prevention hotline from the Golden Gate Bridge. But the topic of the call remains a secret*. Refer to the EFF blog post at [https://www.eff.org/deeplinks/2013/06/why-metadata-matters](https://www.eff.org/deeplinks/2013/06/why-metadata-matters) for more details.
+
+## Generating the key
+
+Now you can generate your GPG key. Follow the on screen instructions and don't include a comment. Depending on your entropy source, this could take a while. This example took 10 minutes using `haveged` as the entropy collector. There are various opinions on what to set as the expiration date. If this is your first GPG, try one year at first. You can always make a new key or extend the same one. If you set the key to never expire and you lose the key, by forgetting the passphrase, people will still think it's valid unless you revoke it. Also, be sure to set the user ID to a name that matches some sort of identification, which will make it easier for people to verify that the holder of the private key is the same person as a certified piece of paper. The command to create a new key is `gpg –-gen-key`:
+
+```
+Please select what kind of key you want:
+ (1) RSA and RSA (default)
+ (2) DSA and Elgamal
+ (3) DSA (sign only)
+ (4) RSA (sign only)
+Your selection? 1
+RSA keys may be between 1024 and 4096 bits long.
+What keysize do you want? (2048) 4096
+Requested keysize is 4096 bits
+Please specify how long the key should be valid.
+ 0 = key does not expire
+ <n>  = key expires in n days
+ <n>w = key expires in n weeks
+ <n>m = key expires in n months
+ <n>y = key expires in n years
+Key is valid for? (0) 1y
+Key expires at Sat 06 Jun 2015 10:07:07 PM UTC
+Is this correct? (y/N) y
+
+You need a user ID to identify your key; the software constructs the user ID
+from the Real Name, Comment and Email Address in this form:
+ "Heinrich Heine (Der Dichter) <heinrichh@duesseldorf.de>"
+
+Real name: Tyrone Slothrop
+Email address: tyrone.slothrop@yoyodyne.com
+Comment:
+You selected this USER-ID:
+ "Tyrone Slothrop <tyrone.slothrop@yoyodyne.com>"
+
+Change (N)ame, (C)omment, (E)mail or (O)kay/(Q)uit? O
+You need a Passphrase to protect your secret key.
+
+We need to generate a lot of random bytes. It is a good idea to perform some other action (type on the keyboard, move the mouse, utilize the disks) during the prime generation; this gives the random number generator a better chance to gain enough entropy.
+......+++++
+..+++++
+
+gpg: key 0xABD9088171345468 marked as ultimately trusted
+public and secret key created and signed.
+
+gpg: checking the trustdb
+gpg: 3 marginal(s) needed, 1 complete(s) needed, PGP trust model
+gpg: depth: 0  valid:   1  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 1u
+gpg: next trustdb check due at 2015-06-06
+pub   4096R/0xABD9088171345468 2014-06-06 [expires: 2015-06-06]
+ Key fingerprint = CBF9 1404 7214 55C5 C477  B688 ABD9 0881 7134 5468
+uid                 [ultimate] Tyrone Slothrop <tyrone.slothrop@yoyodyne.com>
+sub   4096R/0x9DB8B6ACC7949DD1 2014-06-06 [expires: 2015-06-06]
+
+gpg --gen-key  320.62s user 0.32s system 51% cpu 10:23.26 total
+
+```
+
+From this example, we know that our secret key is `0xABD9088171345468`. If you end up creating multiple keys, but use just one of them more regularly, you can edit your `gpg.conf` file and add the following line:
+
+```
+default-key 0xABD9088171345468
+
+```
+
+## Postgeneration maintenance
+
+In order for people to send you encrypted messages, they need to know your public key. Having your public key server can help distribute your public key. You can post your key as follows, and replace the fingerprint with your primary key ID:
+
+```
+gpg --send-keys 0xABD9088171345468
+
+```
+
+### Note
+
+GPG does not rely on third parties and expects you to perform key management. To ease this burden, the OpenPGP standards define the Web-of-Trust as a mechanism to verify other users' keys. Details on how to participate in the Web-of-Trust can be found in the GPG Privacy Handbook at [https://www.gnupg.org/gph/en/manual/x334.html](https://www.gnupg.org/gph/en/manual/x334.html).
+
+You are also going to want to create a revocation certificate. A revocation certificate is needed when you want to revoke your key. You would do this when the key has been compromised, say if it was stolen. Or more likely, if the BBB fails and you can no longer access your key. Generate the certificate and follow the ensuing prompts replacing the ID with your key ID:
+
+```
+gpg --output revocation-certificate.asc --gen-revoke 0xABD9088171345468
+
+sec  4096R/0xABD9088171345468 2014-06-06 Tyrone Slothrop <tyrone.slothrop@yoyodyne.com>
+
+Create a revocation certificate for this key? (y/N) y
+Please select the reason for the revocation:
+ 0 = No reason specified
+ 1 = Key has been compromised
+ 2 = Key is superseded
+ 3 = Key is no longer used
+ Q = Cancel
+(Probably you want to select 1 here)
+Your decision? 0
+Enter an optional description; end it with an empty line:
+>
+Reason for revocation: No reason specified
+(No description given)
+Is this okay? (y/N) y
+
+You need a passphrase to unlock the secret key for
+user: "Tyrone Slothrop <tyrone.slothrop@yoyodyne.com>"
+4096-bit RSA key, ID 0xABD9088171345468, created 2014-06-06
+
+ASCII armored output forced.
+Revocation certificate created.
+
+Please move it to a medium which you can hide away; if Mallory gets access to this certificate he can use it to make your key unusable.
+It is smart to print this certificate and store it away, just in case your media become unreadable.  But have some caution:  The print system of your machine might store the data and make it available to others!
+
+```
+
+Do take the advice and move this file off the BeagleBone. Printing it out and storing it somewhere safe is a good option, or burn it to a CD.
+
+### Note
+
+The lifespan of a CD or DVD may not be as long as you think. The United States National Archives Frequently Asked Questions (FAQ) page on optical storage media states that:
+
+*"CD/DVD experiential life expectancy is 2 to 5 years even though published life expectancies are often cited as 10 years, 25 years, or longer."*
+
+Refer to their website [http://www.archives.gov/records-mgmt/initiatives/temp-opmedia-faq.html](http://www.archives.gov/records-mgmt/initiatives/temp-opmedia-faq.html) for more details.
+
+Lastly, create an encrypted backup of your encryption key and consider storing that in a safe location on durable media.
+
+## Using GPG
+
+With your GPG private key created or imported, you can now use GPG on the BBB as you would on any other computer. In [Chapter 1](part0015_split_000.html#page "Chapter 1. Creating Your BeagleBone Black Development Environment"), *Creating Your BeagleBone Black Development Environment*, you installed Emacs on your host computer. If you follow the GNU/Linux instructions, you can also install Emacs on the BBB. If you do, you'll enjoy automatic GPG encryption and decryption for files that end in the `.gpg` extension. For example, suppose you want to send a message to your good friend, Pirate Prentice, whose GPG key you already have. Compose your message in Emacs, and then save it with a `.gpg` extension. Emacs will prompt you to select the public keys for encryption and will automatically encrypt the buffer. If a GPG-encrypted message is encrypted to a public key, with which you have the corresponding private key, Emacs will automatically decrypt the message if it ends with `.gpg`. When using Emacs from the terminal, the prompt for encryption should look like the following screenshot:
+
+![Using GPG](img/00017.jpeg)
+
+# Protecting your GPG key with a TPM
+
+If you want, you could stop the project now and happily use GPG on your BBB. But if you do, you would miss out on adding some extra protection with the CryptoCape, specifically, the **Trusted Platform Module** (**TPM**). In the upcoming sections, we will use the TPM to protect our GPG private key.
+
+## Introducing trusted computing
+
+The TPM is a cryptographic co-processor. The TPM on the CryptoCape is Atmel's embedded I2C version, which conforms to version 1.2 of the TPM spec published by the **Trusted Computing Grou**p (**TCG**). The TCG is an industry consortium that maintains and develops open specifications for trusted computing. *Trusted* in this sense is the definition from RFC 4949: *a system that operates as expected, according to design and policy*.
+
+Cryptographically, TPM 1.2 is limited. It implements the RSA algorithm, SHA-1, has an internal random number generator, and some limited storage. It does not provide any symmetric ciphers. These limitations were a result of the design goal for a low cost embeddable module. Symmetric ciphers were eliminated, because with the TPM, one can protect the symmetric keys at rest and allow the much more powerful host computer to operate on them.
+
+The TPM 1.2 specification is, in total, over 700 pages. We will focus on a unique feature of the TPM that enables many of its security features: **Platform Control Registers** (**PCRs**). PCRs are TPM registers that can always be read but may only be written to with the **extend operation**. The extend operation takes the current value of the 20 byte PCR, combines it with a 20 byte input value, and sets the new PCR value to the SHA-1 result of the combination. The key point is that once a PCR is set, it can't be reversed. It can only be continued to be combined in future extend operations.
+
+At first, it may not be obvious how this feature helps. Let's consider an example. On boot, your computer's BIOS, prior to loading the bootloader, first sends a SHA-1 hash of the bootloader to the TPM to extend one of the PCRs. It then loads the bootloader. The bootloader performs the same operation on your kernel. The kernel then performs the same operation on various startup systems before finally allowing normal user operation. At the end of this process, the PCRs will be populated with a series of hash values.
+
+The values of these registers represent a trusted measurement of your system. Now, say malware has infected your computer and has modified the boot process. On next boot, at least one of the PCRs will have a drastically different value than previously recorded. PCRs enable measurements of the boot process which provide assertions of the boot process.
+
+There are several terms relating to the TPM-protected boot process. Secure boot will halt the boot processes if the PCR values do not match a known configuration. Authenticated boot simply measures the boot process and allows remote parties to make assertions on the pedigree of the boot process. Trusted boot refers to a system that uses both authenticated and secure boots.
+
+## Encrypting data to a PCR state
+
+The TPM supports another feature that builds on the state of the PCRs. As previously mentioned, the TPM can perform RSA encryption. However, the TPM can also combine the state of the PCRs to the encryption in a process known as **sealing**. Once data is sealed to a PCR value, it can only be decrypted when the PCR matches the same value as when the encryption was performed.
+
+How is this going to help us protect our GPG key? We will encrypt the GPG key to a known PCR state. We'll use the numeric code entered from the keypad connected to the CryptoCape as input into this PCR state. When the TPM decrypts the GPG private key, it will be available for use by GPG as usual. While GPG private keys are already protected with a passphrase, the TPM provides extra protection for the key at rest. The passphrase could still be captured with a keylogger, but our key won't be available until the BBB boots with the CryptoCape attached and the code entered directly into the BBB.
+
+This system also helps in preventing offline attacks on the numeric code. The PCR value, once extended with the correct code, will allow unsealing of the data. But, if the wrong code is entered, the PCR value will be incorrect and the only way to reset the PCR, if that PCR is one of the *non-resettable* PCRs, is to reboot.
+
+# Adding the keypad
+
+We're going to need a way to enter this code into the BBB. This code is used to populate one of the TPM's PCRs that will be used to seal the GPG key. This keypad will be connected to the ATmega328p on the CryptoCape. While the BBB is more than capable of handling the I/O for the keypad, by using the ATmega328p, we take advantage of code reuse. For most hardware products in the SparkFun catalog, there exists at least an unofficial Arduino library. If the components aren't available at SparkFun, then you should be able to find similar parts from the product descriptions. In the case of the keypad, there is an official library. The hardware for this project is listed in the following table:
+
+| Device | SparkFun number |
+| --- | --- |
+| CryptoCape | DEV-12773 |
+| Keypad | COM-08653 |
+| F/F jumper wires | PRT-08430 |
+| Male breakaway headers | PRT-00116 |
+
+To build this Arduino library, you'll first need to install the `Keypad` library from the Arduino playground site: [http://playground.arduino.cc/code/Keypad](http://playground.arduino.cc/code/Keypad). Then clone the following repository from GitHub:
+
+```
+git clone https://github.com/jbdatko/beagle-bone-for-secret-agents.git
+
+```
+
+In the `ch4` code folder, you'll find both the `keypad.ino` source and the compiled hex that is ready to be loaded onto the 328p. From [Chapter 3](part0031_split_000.html#page "Chapter 3. Adding Hardware Security with the CryptoCape"), *Adding Hardware Security with the CryptoCape*, remember that compiled sketches can be uploaded to the ATmega328p with the following command, just be sure to install the program jumpers:
+
+```
+sudo ./upload.sh keypad_cryptocape.cpp.hex
+
+```
+
+This program has the 328p joining the I2C bus at hex address 0x42\. It then waits to receive data from an I2C master device, the BBB, and then will collect your five-digit code from the keypad. You have ten seconds to enter a five-digit code and the timer starts once the CryptoCape LED is lit. Each time you press a key, the LED will momentarily flash. Once all five characters are collected, the LED will turn off.
+
+To connect the keypad to the CryptoCape, you first need to solder 0.1" male pins to the keypad. Also, you'll need to solder the 0.1" male header pins to the CryptoCape ATmega328p pads. Once the pins are installed, now you need to connect a jumper wire from the keypad to the CryptoCape. Note that the keypad has nine pins but only seven are used. Consider the first pin, closest to the `*` character as *pin 0*. Connect the jumpers per the following table:
+
+| Keypad pin | Arduino digital pin |
+| --- | --- |
+| 3 | D2 |
+| 1 | D3 |
+| 5 | D4 |
+| 2 | D5 |
+| 7 | D6 |
+| 6 | D7 |
+| 4 | D8 |
+
+The keypad, when attached to the CryptoCape, should look like the following image:
+
+![Adding the keypad](img/00018.jpeg)
+
+### Note
+
+The case shown in the image is logic supply's plated steel chassis. It is available on their website: [http://www.logicsupply.com/components/beaglebone/boards-cases-kits/bb100-orange/](http://www.logicsupply.com/components/beaglebone/boards-cases-kits/bb100-orange/).
+
+Now, we need some software that will initiate the code collection process on the ATmega328p. Remember that the software needs to collect the code and then extend the PCR. In the previously listed repository is a file, `keypad.c`, which does exactly this. To build this program, you'll need the development package of the open source TCG software stack:
+
+```
+sudo apt-get install libtspi-dev
+
+```
+
+Then you should be able to compile the program with:
+
+```
+gcc keypad.c -o getgpgpin -ltspi
+
+```
+
+# Taking ownership of the TPM
+
+Before we use the TPM, we must first take ownership of it. Taking ownership establishes an owner password for maintenance operations and a password for one of the root keys inside the TPM, the **Storage Root Key** (**SRK**) (pronounced *shark*). You can set the administrator password to any password you want, but to work with legacy software, you'll want to set the SRK to the *well-known password* of twenty zeros. You can set a unique SRK password if you want, but the TrouSerS software, the software used to control the TPM, includes a command-line parameter to set the password to its well-known value for a reason. First install `tpm-tools`:
+
+```
+sudo apt-get install tpm-tools
+
+```
+
+Then you should restart your BBB with the CryptoCape attached. This will ensure that the TPM kernel driver and associate software load correctly. To check if everything is working properly issue the following command:
+
+```
+dmesg | grep TPM
+
+```
+
+This should return:
+
+```
+[    5.370109] tpm_i2c_atmel 1-0029: Issuing TPM_STARTUP
+
+```
+
+Then check for the daemon by issuing:
+
+```
+ps aux | grep tcsd
+
+```
+
+This command should return something like this:
+
+```
+tss  799  0.0  0.1  11492   980 ?  Ss Jun08 0:00 /usr/sbin/tcsd
+
+```
+
+Then you can take ownership of the TPM as follows:
+
+```
+tpm_takeownership -z -l debug
+
+```
+
+You'll be prompted to enter an owner password. The `-z` option sets the SRK to the well-known passphrase. The response should be:
+
+```
+Tspi_Context_Create success
+Enter owner password:
+Confirm password:
+Tspi_Context_Connect success
+Tspi_Context_GetTpmObject success
+Tspi_GetPolicyObject success
+Tspi_Policy_SetSecret success
+Tspi_Context_CreateObject success
+Tspi_GetPolicyObject success
+Tspi_Policy_SetSecret success
+Tspi_TPM_TakeOwnership success
+tpm_takeownership succeeded
+Tspi_Context_CloseObject success
+Tspi_Context_FreeMemory success
+Tspi_Context_Close success
+
+```
+
+Now you are ready to use the TPM.
+
+### Note
+
+If you have the CryptoCape v02, then you will need to perform some additional steps. The version number is found on the bottom layer of the board, above the P8 header, near the open source hardware logo, which looks like a gear. The TPMs on this revision are shipped in compliance mode, which means the keys loaded on them are test keys. This helps test the TPM during manufacture, but the keys need to be changed by the end user. Refer to the page [http://cryptotronix.com/cryptocape-tpm/](http://cryptotronix.com/cryptocape-tpm/) for more details.
+
+# Extending a PCR
+
+We'll need to extend a PCR so that we can encrypt our GPG key. We'll arbitrarily choose PCR number 9\. First let's view the PCR status to be sure that it is blank:
+
+```
+cat /sys/class/misc/tpm0/device/pcrs | grep PCR-09
+
+```
+
+This should return the current state of the PCR, which without using secure boot is:
+
+```
+PCR-09:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+```
+
+Now, run the `getgpgpin` program from the following section. You should see the LED turn green on the CryptoCape and you have 10 seconds to enter a five-digit pin. Each time you press a key, the LED should briefly flash and when five digits have been entered, the LED will turn off. After 10 seconds, the `getgpgpin` program will silently exit. If you compiled the program with `#define DEBUG` set to `1`, you should see something like this:
+
+```
+54321
+(Line 53, extend_pcr)  Create a Context
+ returned 0x00000000\. Success.
+(Line 55, extend_pcr)  Connect to TPM
+ returned 0x00000000\. Success.
+(Line 59, extend_pcr)  GetTPM Handle
+ returned 0x00000000\. Success.
+(Line 62, extend_pcr)  Owner Policy
+ returned 0x00000000\. Success.
+36987(Line 73, extend_pcr)  extend
+ returned 0x00000000\. Success.
+
+```
+
+Now, check your PCR status again:
+
+```
+cat /sys/class/misc/tpm0/device/pcrs | grep PCR-09
+
+```
+
+You should now have a populated PCR9:
+
+```
+PCR-09:2B 1E 41 10 EB A0 91 9E B4 89 0E 04 83 0B 70 C5 C2 AA 23 44
+
+```
+
+You can only enter the code once. If you try it again, the program will extend PCR9 again using the now incorrect PCR state as input into the next. Now, let's seal our GPG secret key ring:
+
+```
+tpm_sealdata -p 9 -i secring.gpg -o secring.gpg.tpm -z -l debug
+
+```
+
+You can remove `-l debug` if you wish and the command will silently complete. Let's test decryption:
+
+```
+tpm_unsealdata -i secring.gpg.tpm -o deleteme -z
+
+```
+
+It should silently complete on success. You can now delete the temporary file `deleteme` and the original `secring.gpg`. You did make an encrypted backup, right? You'll probably want to delete the file in a more secure fashion. The secure remove tool `srm` does just that and overwrites the file numerous times before deleting. To install use the following command:
+
+```
+sudo apt-get install secure-delete
+
+```
+
+Then use just as you would `rm`.
+
+### Note
+
+Bunnie Huang and Sean Cross (also known as *xobs*) presented a talk at the **30th Chaos Communication Congress** (**30C3**) on hacking SD cards. Your SD or eMMC includes a small microcontroller that manages the attached flash memory. This microcontroller is perfectly situated to act as a Man-in-the-Middle attacker and manipulate the data you store on the device. For example, the microcontroller could keep a backup copy of your data since it would report to your computer a storage capacity of 8GB, but actually it contains a 16 GB flash chip. More information can be found on Bunnie's blog at [http://www.bunniestudios.com/blog/?p=3554](http://www.bunniestudios.com/blog/?p=3554).
+
+# Unlocking your key at startup
+
+Finally, we need to automate this process. When the BBB boots, we want it to collect the code, extend the PCR, and unwrap the GPG keys so that they are ready to use. We'll make an `init.d` script that will handle this, but we still need to deal with the GPG key. We don't want an unwrapped GPG key lying around the disk, even if it is protected with a password. Instead, we'll keep the GPG keys on a `ramfs`, which will never touch persistent storage.
+
+To create the `ramfs`, add the following to `/etc/fstab`:
+
+```
+ramfs    /mnt/ramdisk ramfs nodev,nosuid,noexec,nodiratime,size=1M,uid=1000,gid=1002   0 0
+
+```
+
+Be sure to replace your uid and gid with the appropriate values for your user. This can be obtained by running the `id` command. Either reboot or run `mount -a` to reload the `fstab`. Since GPG expects the `secring.gpg` to live in `~/.gnupg/secring.gpg`, we'll create a link from there to the ramdisk. Create the following symlink:
+
+```
+ln -s /mnt/ramdisk/secring.gpg ~/.gnupg/secring.gpg
+
+```
+
+Now, we want a script to run on boot. In the `beagle-bone-for-secret-agents/ch4` repository, there is a script, `tpm_gpg`, which you can copy to `/etc/init.d/`. This script expects `getgpgpin` to live in `/usr/local/bin` and that your `secring.gpg` is in the normal place. Edit as desired. To register this script, run as root:
+
+```
+update-rc.d tpm_gpg defaults
+
+```
+
+With the script in place, the ramdisk set to mount at boot, the ATmega programmed to collect the code, and the hardware attached, reboot one more time. Watch for the CryptoCape LED to turn on, enter your pin, and then log back in to the BBB. If your GPG key is in `/mnt/ramdisk`, congratulations, you have just used your TPM to protect your GPG key! Because of the symlink, all GPG-related programs will use the keys just as usual. If not, recompile `keypad.c` with debug set to `1` to make sure everything is working.
+
+### Note
+
+While the ramfs is meant to ensure that the GPG key, which is still protected by a password, is destroyed without power, researchers have recovered keys from RAM in the past. Refer to the URL [https://citp.princeton.edu/research/memory/](https://citp.princeton.edu/research/memory/) on cold boot attacks.
+
+# Iterating on the threat model
+
+Threat modeling and system design is an iterative process. The system we built in this chapter is a good start, but it can be improved. We identified a problem at the beginning of the chapter in that we still had to enter the GPG passphrase from a potentially compromised computer. The code entry on the keypad is currently only protecting the GPG key when the BBB is powered off. It also protects the key if an attacker who doesn't know the code boots the BBB, since the PCR will not have the correct value after the 10-second window has passed. To mitigate against the key logger attack, we would want to enter a passphrase directly into the BBB.
+
+There is a piece of software called **gpg-agent**, which manages your passphrase per login session. It can support different types of *pin entry* programs. For example, one pin entry program is X-Windows-based and another supports a command-line interface. You could certainly create your own pin entry program that supported your custom hardware. However, when you create this custom pin entry, you'd want to consider the effect of a potentially weaker passphrase, one composed of only numbers, for your GPG key. This demonstrates the importance of re-evaluating your threat model as new features are added to the design to ensure the correctness of the original assumptions.
+
+Also, you might want to consider adding an enclosure for your project. Your local hackerspace will be able to help you make a professionally looking enclosure. If you want something on the cheap, find a small translucent container and cut out room for the keypad and the connectors as shown in the following image:
+
+![Iterating on the threat model](img/00019.jpeg)
+
+# Summary
+
+In this chapter, you learned how GPG can protect e-mail confidentiality. We created a threat model for our system and showed how this analysis can help us understand the capabilities and limitations of our design. At the end, we successfully built a BBB GPG co-processor that uses a TPM to help protect the GPG keys at rest and got more practice combining a microcontroller with an embedded Linux platform.
+
+In the next chapter, we will investigate another major privacy enhancing technology that is used to protect real-time chat. You'll learn about the unique cryptographic properties of **Off-the-Record** (**OTR**) and how to use OTR over an Internet Relay Chat gateway that is hosted by your BBB.

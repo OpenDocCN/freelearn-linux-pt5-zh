@@ -1,0 +1,603 @@
+# 11
+
+# Working with Virtual Machines
+
+In this chapter, you will learn about **virtual machines** (**VMs**) on Linux. For starters, you will learn how virtualization works and how to create and use VMs. You will learn about one of the most widely used virtualization and hypervisor technologies on Linux, called **Kernel-based Virtual Machine** (**KVM**). The topics in this chapter will prepare you for the future of Linux, as it is the foundation of every modern cloud technology. If you wish to remain up to date in a constantly changing landscape, this chapter will be an essential starting point for your journey.
+
+In this chapter, we’re going to cover the following main topics:
+
+*   Introduction to virtualization on Linux
+*   Understanding Linux KVM
+*   Working with basic KVM commands
+*   Advanced KVM management
+*   Provisioning VMs using cloud-init
+*   Public key authentication with SSH
+
+# Technical requirements
+
+No special technical requirements are needed, just a working installation of Linux on your system. We will mainly use Debian GNU/Linux 12 for our examples, but we will also show you how to install KVM in Fedora and openSUSE.
+
+# Introduction to virtualization on Linux
+
+**Virtualization** is a way to make more efficient use of computer hardware. It is basically an abstraction layer that takes advantage of the computer’s resources. In this section, you will learn about the types of VMs, how they work on Linux, and how to deploy and manage them.
+
+## Efficiency in resource usage
+
+The abstraction layer that virtualization uses is a software layer that allows more efficient use of all the computer’s components. This in turn allows better use of all the physical machine’s capabilities and resources.
+
+Before going any further into virtualization, let’s give you an example. In our testing laboratory, we have several physical machines, in the form of laptops and small form factor desktop computers (Intel NUCs) that we use as servers. Each of the systems has significant resources available, more than enough to run the services we need. For instance, our least performant systems are a 5th-generation Intel NUC with an Intel i3 CPU with four processing cores and 16 GB of RAM and a 7th-generation Intel NUC with a four-core Intel Pentium and 12 GB of RAM. Those two systems have plenty of resources that could be more efficiently used by using VMs.
+
+For running a local web service or any kind of server on our local network, those resources can be split between various VMs with ease. For example, each physical system could host four different VMs, each using a single CPU core, and at least 2 GB of memory and all the necessary storage capacities. This way, one single machine will work as if there were four different ones. This is way more efficient than using individual machines for separate tasks.
+
+In the following diagram, we are comparing the load on a single computer versus the same load divided between several VMs. This way of using the same hardware resources is more efficient:
+
+![Figure 11.1 – Comparison between single computer use and using multiple VMs](img/B19682_11_1.jpg)
+
+Figure 11.1 – Comparison between single computer use and using multiple VMs
+
+Nonetheless, as we will use the hypervisor on top of a host OS, we will have to keep some resources for the OS’s use, so the number of VMs will be smaller. Here is a diagram of how the VMs work on a host OS:
+
+![Figure 11.2 – How virtualization works on a host OS](img/B19682_11_2.jpg)
+
+Figure 11.2 – How virtualization works on a host OS
+
+The preceding diagram shows the scheme of how virtualization works when used on a host OS. As we will see in the following sections, it is not the only type of virtualization.
+
+It is important to note that efficiency is not related solely to the hardware resources used. A significant aspect of the efficient use of hardware in data centers is related to increased energy efficiency and a reduction of the carbon footprint. In this respect, virtualization has played a major role for many decades in changing the usage patterns of servers inside data centers. Overall, virtualization and containerization are significant players in the fight against climate change.
+
+In the following sections, we will give you a short introduction to hypervisors and VMs.
+
+## Introduction to hypervisors
+
+The software layer that virtualization is based on is called a **hypervisor**. The physical resources are divided and used as virtual computers, better known as VMs. By using VMs, the limits of physical hardware are overcome by the process of **emulation**. This has a lot of advantages, enabling the hardware to be used more effectively.
+
+Important note
+
+The process of emulation is basically an imitation process through which a piece of software replicates (or imitates) the functions of another system. In our case, the hypervisor (the virtualization software layer) is simulating the use of hardware as if it were a different system altogether. This allows the hardware resources a computer has to be used more effectively.
+
+Hypervisors can be used either on top of an existing OS (*type 2*) or directly on bare metal (hardware) (*type 1*). For each of these types, there are various solutions that can be used, particularly on Linux. For a Linux OS, examples of each type are as follows:
+
+*   Examples of hypervisors that run on top of a host OS (type 2) are Oracle VirtualBox and VMware Workstation/Fusion
+*   Examples of hypervisors that run directly on bare metal (type 1) are Citrix Xen Server and VMware ESXi
+*   KVM is mostly classified as a bare-metal hypervisor (type 1), while its underlying system is a full OS, thus it is classified as a host hypervisor at the same time (type 2)
+
+In this chapter, we will exclusively use KVM as the hypervisor of choice.
+
+# Understanding Linux KVMs
+
+A VM is similar to a standalone computer. It is a software-based emulator that has access to the host computer’s resources. It uses the host’s CPU, RAM, storage, networking interface(s), and ports. Not only that, but it is a virtual environment that has the same functions as a physical computer; it is also seen as a virtual computer.
+
+The resources for each VM are managed by the hypervisor. It can relocate resources between existing VMs or create new VMs. The VMs are isolated from each other and from the host computer. As multiple VMs can exist on a single computer, each VM can use different guest OSes. For example, if you use a Windows machine and want to try out Linux, a popular solution would be to create a VM with the Linux distribution that you want to try. The same goes for Mac users, too. An OS installed inside a VM runs similarly to an OS installed on bare metal. The user experience could vary from one hypervisor to the other, and so could the resource efficiency and response times. From our experience, we prefer running VMs from KVM rather than running from any other hypervisor, mainly because of the comprehensive **command-line interface** (**CLI**). However, use cases could be different from one user to another.
+
+## Choosing the hypervisor
+
+In this chapter, we chose the KVM hypervisor. As an optional solution, if you use the GNOME desktop environment, you will have access to GNOME Boxes. As both KVM and GNOME Boxes are directly available from Linux repositories, we consider them to be the better solutions for newcomers to Linux. Both KVM and GNOME Boxes share parts of `libvirt` and `qemu` code (to be detailed in the next section), and in this respect, we consider them to both be the same hypervisor, which is KVM.
+
+In [*Chapter 1*](B19682_01.xhtml#_idTextAnchor030), *Installing Linux*, you first encountered the use of a hypervisor to set up a Linux VM. We showed you how to use VMware solutions and VirtualBox to set up a Linux VM. The details used then should be sufficient for any user, whether they are experienced or a newbie. VirtualBox has several features that make it a fair candidate for your hypervisor solution, but in our opinion, it still lacks the finesse of KVM. In the next section, we will walk you through KVM.
+
+## Using the KVM hypervisor
+
+The KVM hypervisor is an open source virtualization project available on all major Linux distributions. It is a modern hypervisor that uses specific kernel modules to take advantage of all the benefits that the Linux kernel has to offer, including memory support, scheduler, nested virtualization, GPU pass-through, and so on.
+
+### KVM in detail – QEMU and libvirt
+
+KVM uses `libvirt`. The KVM’s interface with `libvirt`, specifically in GNOME, is `virt-manager`. The CLI for `libvirt` is called `virsh`.
+
+The `libvirt` API provides a common library for managing VMs. It is the management layer for VM creation, modification, and provision. It is running in the background as a daemon called `libvirtd` that manages the connections with the hypervisor at the client’s request.
+
+QEMU is both an emulator and a virtualizer. When used as an emulator, QEMU uses **dynamic binary translation** methods to operate. This means that it can use different types of OS on the host machine, even if they are designed for different architectures. Dynamic binary translations are used in **software-based virtualization**, where hardware is emulated to execute instructions in virtualized environments. This way, QEMU emulates the machine’s CPU, using a specific binary translator method called **Tiny Code Generator** (**TCG**), which transforms the binary code for different types of architectures.
+
+When used as a virtualizer, QEMU uses what is known as a **hardware-based virtualization**, where the binary translation is not used, because the instructions are executed directly on the host CPU. The differences between software- and hardware-assisted virtualization are shown in the following diagram:
+
+![Figure 11.3 – Comparison between software- and hardware-assisted virtualization](img/B19682_11_3.jpg)
+
+Figure 11.3 – Comparison between software- and hardware-assisted virtualization
+
+As you can see in the diagram, instructions have different paths when using software- and hardware-assisted virtualization. In software-assisted virtualization, when dynamic binary translations are used, the user’s unprivileged instructions are sent directly to the hardware, while the guest OS privileged instructions are first sent to the hypervisor before getting to the hardware. In hardware-assisted virtualization, the user’s unprivileged instructions are sent to the hypervisor first, and then sent to the hardware, while the privileged instructions from the guest OS have the same path as in software-assisted virtualization. This ensures a certain level of isolation for the guest OS, thereby achieving better performance and less complexity.
+
+In the following section, we will show you how to install and configure QEMU on a Debian 12 machine. We consider Debian to be a sufficiently lightweight distribution, offering the necessary stability for a virtualization host OS. Some commands can be replicated on Ubuntu as well.
+
+### Installing the hypervisor on major Linux distributions
+
+Installing QEMU is a straightforward task. All you need to do is to run the package installer utility of your distribution, with some specified package names. In our case, we will show you how to install it on major Linux distributions such as Debian/Ubuntu, Fedora, and openSUSE:
+
+*   **Installing on** **Debian/Ubuntu Linux**
+
+    Run the following command:
+
+    ```
+    sudo apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virtinst libvirt-daemon virt-manager
+    ```
+
+*   **Installing on** **Fedora Linux**
+
+    Run the following command:
+
+    ```
+    sudo dnf group install --with-optional virtualization
+    ```
+
+*   **Installing on** **openSUSE Linux**
+
+    Run the following commands:
+
+    ```
+    sudo zypper install -t pattern kvm_server kvm_tools
+    sudo zypper install libvirt-daemon
+    ```
+
+Once all the necessary packages are installed, you can enable and start the `libvirtd` daemon with the following commands (valid for all Linux distributions showcased in this section):
+
+```
+sudo systemctl start libvirtd
+sudo systemctl enable libvirtd
+```
+
+Once the packages are installed and the daemon is started and enabled, a safe action to take is to check whether your machine is compatible with KVM requirements. To do this, use the `virt-host-validate` command as a root user or by using `sudo`. We are running the command on a Debian GNU/Linux 12 host, but it can be used on other Linux distributions as well:
+
+```
+sudo virt-host-validate
+```
+
+Once the command is running, you may receive a couple of errors or warnings regarding QEMU or **Linux Containers** (**LXC**) – which is a technology used to run isolated systems, similar to how KVM works – depending on your system (there’s more on LXC in [*Chapter 12*](B19682_12.xhtml#_idTextAnchor257)). In our case, the output shows one error regarding LXC compatibility, as shown in the following screenshot:
+
+![Figure 11.4 – Running the host validation program](img/B19682_11_4.jpg)
+
+Figure 11.4 – Running the host validation program
+
+However, this error will not limit our use of `libvirt` and QEMU, so we do not intend to resolve it here.
+
+After seeing that there are no compatibility issues regarding QEMU, we can proceed to creating our first VM using the CLI. Thus, we will start using KVM-specific commands.
+
+# Working with basic KVM commands
+
+One of the first commands that you will use when working with KVM is the one used for creating a VM. Other commands, as shown in the following sections, are the ones used to start, stop, delete, or pause an already existing VM.
+
+## Creating a VM using the command line
+
+Before creating our first VM using `libvirt`, we must check and see whether our default bridge network configuration was created. We can verify this by using the following command:
+
+```
+sudo virsh net-list
+```
+
+This command shows if the default bridge configuration was created and if it is running. In our case, the bridge connection is not running, thus we will need to set it up ourselves. The command used to start the default bridge network is as follows:
+
+```
+sudo virsh net-start default
+```
+
+Once it has been started, the network bridge is not set up for automatic start, thus we will use the following command to set it for automatic start:
+
+```
+sudo virsh net-autostart default
+```
+
+Now, the output is as follows:
+
+![Figure 11.5 – Enabling the default bridge connection](img/B19682_11_5.jpg)
+
+Figure 11.5 – Enabling the default bridge connection
+
+Now that the default bridge connection has been enabled and set for `autostart`, we can create our first VM. In order to create a VM, follow these steps:
+
+1.  First, we will need to download the image file of the OS to use inside the VM. For our example, we will create a new VM with Ubuntu 22.04.2 LTS server edition. We can download the ISO image with the following command:
+
+    ```
+    /var/lib/libvirt/images.
+    ```
+
+2.  Once the Ubuntu image is downloaded, we will use the `virt-install` command to create the first VM on our host system. We will create one VM that will use a single `virt-install` command used is the following (run as root):
+
+    ```
+    --virt-type: Type of the new VM
+    ```
+
+3.  `--name`: The name of the new VM
+4.  `--memory`: The amount of RAM used by the VM
+5.  `--vcpus`: The number of virtual CPUs used by the new VM
+6.  `--disk size`: The amount of storage used
+7.  `--os-variant`: The type of guest OS
+8.  `--network`: The bridge network used
+9.  `--cdrom`: The location of the guest OS ISO file
+
+The command will start a new `virt-viewer` window, which will start the OS installation process. Similarly, by using the command with the `–graphics=vnc` argument, `virt-install` will start `virt-viewer`, which is the default tool for displaying the graphical console using the VNC protocol.
+
+Simply knowing how to create a VM is not sufficient for a system administrator. This is why, in the next section, we will show you some basic VM management tools to use.
+
+## Basic VM management
+
+The basic VM tasks can be done using the `virsh` command when using the CLI, or Virtual Machine Manager when using a graphical user interface. In the following, we will show you the basic commands to use while inside a CLI.
+
+To list the existing VM guests, use the `virsh` `list` command:
+
+```
+sudo virsh list
+```
+
+Be aware that listing the VMs cannot be done by just anyone. This is why the following note needs to be considered.
+
+Important note
+
+When trying to list the existing guest VMs, you will not get a valid output when using a regular user. You will need to be logged in as `root` or use `sudo` to see the list of VMs.
+
+The following screenshot shows some basic commands used to manage VMs, together with their output:
+
+![Figure 11.6 – Commands for VM management](img/B19682_11_6.jpg)
+
+Figure 11.6 – Commands for VM management
+
+Here is a short explanation of the commands you see in the preceding figure. To change the state of a VM, such as starting, stopping, and pausing, use the following commands:
+
+*   `sudo virsh` `destroy ubuntu-vm1`
+*   `sudo virsh` `reboot ubuntu-vm1`
+*   `sudo virsh` `suspend ubuntu-vm1`
+*   `sudo virsh` `start ubuntu-vm1`
+*   `sudo virsh` `resume ubuntu-vm1`
+*   `sudo virsh` `undefine ubuntu-vm1`
+
+For all the options available for `virsh`, please refer to the manual pages using the following command:
+
+```
+man virsh
+```
+
+The command-line tools for managing VMs are powerful and offer various options. If we consider the fact that, most of the time, a system administrator will be using the CLI rather than the GUI, the ability to use command-line tools is of the utmost importance.
+
+In the following section, we will show you some advanced KVM management practices.
+
+# Advanced KVM management
+
+Using KVM is so much more than just creating VMs and starting or stopping them. VM management can be much more complex, starting with VM automated installation, storage and resources management, and up to VM orchestration. Some of these topics are out of the scope of this book, but we will still show you how to master your VMs on your Linux-powered systems.
+
+By now, we only have one VM. For the purpose of the exercises in this section, we will create two more VMs, all running the same Ubuntu OS that we used for the first VM. We will create `ubuntu-vm2` and `ubuntu-vm3` VMs using the following commands:
+
+*   For `ubuntu-vm2`:
+
+    ```
+    ubuntu-vm3:
+
+    ```
+    sudo virt-install --virt-type=kvm --name ubuntu-vm3 --vcpus=2 --memory=2048 --os-variant=ubuntufocal --cdrom=/var/lib/libvirt/images/ubuntu-22.04.2-live-server-amd64.iso --network=default --disk size=20 --noautoconsole
+    ```
+
+    ```
+
+Now, we have three VMs running on our system and we can begin managing them. In the next section, we will show you how to find out the IP of a VM and how to connect to it.
+
+## Connecting to a VM
+
+Most of the time, we would like to connect to a running VM from a terminal and not use the integrated console provided by the VM manager. In order to be able to do this, we will need to know the VM’s IP address. A simple run of the `ip neighbor` command will show us all the IP addresses on our local network, but this will not provide the relevant information we need, such as the VM’s name.
+
+On our system, when running the `ip neighbor` command, the output is as follows:
+
+![Figure 11.7 – Viewing the IP addresses on the local network](img/B19682_11_7.jpg)
+
+Figure 11.7 – Viewing the IP addresses on the local network
+
+From the output, we can see that three of the IP addresses are from the default virtual network that is set up by KVM (`virbr0`). This is the first information that tells us the IP addresses used by our VMs. But which IP is which VM? To find out more information, we will use the following commands:
+
+```
+sudo virsh list --all
+```
+
+The preceding command is used to list all the existing VMs. The output (as seen in *Figure 11**.8*) shows the names of the VMs. In order to see the IP addresses associated with each one, we will use the following command:
+
+```
+sudo virsh domifaddr [vm name]
+```
+
+The `[vm name]` represents one of the VM names from the `virsh list` command’s output. In the following screenshot, you can see the output of the previous commands:
+
+![Figure 11.8 – Showing the IP addresses for VMs](img/B19682_11_8.jpg)
+
+Figure 11.8 – Showing the IP addresses for VMs
+
+Now that we know the IP addresses of every VM we created, we can connect to any of the VMs using SSH (more on installing and configuring SSH in [*Chapter 13*](B19682_13.xhtml#_idTextAnchor276)). Considering that we already have openSSH installed on both our host system and the target VM, the simplest way to connect using SSH is as follows:
+
+```
+ssh packt@192.168.122.129
+```
+
+In the previous command, we used the `ssh` command, we specified the user (in our case `packt`) and the IP address of the VM (in our case, `192.168.122.129`, which is `ubuntu-vm1` that we created earlier). The prompt (as shown in the following figure) asks you for confirmation, saves the key to the list of known hosts, and then connects you to the machine:
+
+![Figure 11.9 – Connect to a VM through SSH](img/B19682_11_9.png)
+
+Figure 11.9 – Connect to a VM through SSH
+
+Another way to connect to a VM is by using the `virt-viewer` command:
+
+```
+virt-viewer --connect qemu:///system ubuntu-vm1
+```
+
+This command will open a new console window using the `virt-viewer` utility and connect to the VM you specify (in our case, `ubuntu-vm1` again) without using the SSH protocol:
+
+![Figure 11.10 – Connecting to VM using virt-viewer](img/B19682_11_10.jpg)
+
+Figure 11.10 – Connecting to VM using virt-viewer
+
+Important note
+
+The connection remains active inside the terminal where you initiated the command. Thus, if you press *Ctrl* + *C*, the connection will be terminated and the new console window will close. Take into consideration that only the connection will be terminated and the VM will still be running.
+
+We have shown you how to use the command line to create VMs, for basic management, and to connect to a virtual machine. However, you can also use GUI tools. All modern Linux distributions that use GNOME as the desktop environment will offer at least two useful tools: the Virtual Machine Manager and GNOME Boxes. The former is simply the GUI for `libvirt`, and the latter is a new and simple way to provision VMs for immediate use inside GNOME based on QEMU/KVM technology. We will let you discover these GUI tools as they are pretty straightforward and not difficult to use. You could start creating new VMs using the Virtual Machine Manager. In the next section, we will show you how to clone VMs.
+
+## Cloning VMs
+
+We have already created three different VMs on our host system. However, there are times when you might want to clone an existing VM instead of creating a new one.
+
+Before starting to clone a VM, we need to stop or suspend it. We will do this using the `suspend` or the `shutdown` commands. We will stop one of our VMs, as shown:
+
+```
+sudo virsh shutdown ubuntu-vm1
+```
+
+This command will shut down the `ubuntu-vm1` VM. In order to clone it, we will use the `virt-clone` command. Let’s say that we want to name the clone `ubuntu-vm1-clone1`. We will use the following command:
+
+```
+sudo virt-clone --original ubuntu-vm1 --name ubuntu-vm1-clone1 --auto-clone
+```
+
+The output of the command is shown in the following screenshot:
+
+![Figure 11.11 – Cloning virtual machines using virt-clone](img/B19682_11_11.jpg)
+
+Figure 11.11 – Cloning virtual machines using virt-clone
+
+Now that the clone has been created, we can start it using the `virsh start` command. Cloning a VM will also *transfer* all the original VM’s configuration regarding the number of vCPUs, RAM, bridge networking configuration, the same MAC address, and even the same IP address. This can become a real headache and needs to be solved.
+
+One way to solve this is to directly connect to the VM’s console (not through SSH) and run the `ip addr show` command. This will enable the DHCP client to automatically assign an IP address to the host. In the next section, we will show you another useful way to manage cloning with VM templates.
+
+## Creating VM templates
+
+Another useful way to overcome the issue described in the previous section is to first create a VM template before cloning. By creating a template, you make sure that all the configuration files will not persist, including MAC and IP configuration, user settings, or SSH host keys.
+
+To create a template, follow these steps:
+
+1.  We will use the `virt-sysprep` utility. In Debian 12, we will install the `libguestfs-tools` utility, which contains the `virt-sysprep`, using the following command:
+
+    ```
+    sudo apt install libguestfs-tools
+    ```
+
+2.  Now that the utility is installed, we will use it to create a template. But first, we will create a new VM running Ubuntu and use it as a template. We will use the following command to create the new VM:
+
+    ```
+    sudo virt-install --virt-type=kvm --name ubuntu-template --vcpus=2 --memory=2048 --os-variant=ubuntufocal --cdrom=/var/lib/libvirt/images/ubuntu-22.04.2-live-server-amd64.iso --network=default --disk size=20 –noautoconsole
+    ```
+
+3.  After finishing the OS installation, make sure that it is up to date with all the available packages.
+4.  Proceed only after ensuring that the VM is turned off. As a precautionary method, you could first copy the file with a different name:
+
+    ```
+    virt-sysprep utility:
+
+    ```
+    virt-sysprep command is preparing the VM by resetting all the configuration files that might have been created. The following is an excerpt from the output:
+    ```
+
+    ```
+
+![Figure 11.12 – Creating a template with virt-sysprep](img/B19682_11_12.jpg)
+
+Figure 11.12 – Creating a template with virt-sysprep
+
+1.  Now that the template is prepared, you can do either of the following:
+    *   Undefine the domain by using the `virsh undefine` command. This command removes the configuration of the VM but leaves the `qcow2` file that it created so that you could use it when creating a new VM.
+    *   Keep the VM (in our case, the one named `ubuntu-template`) and use it as a clone template, as intended.
+
+    The choice is yours, but we are inclined towards the second option, as it is already configured and thus is much easier to use. When using only the `qcow2` file, you still have to configure (setting CPUs, RAM, networking, etc.) the VM prior to using it.
+
+Now that you know how to clone a VM and how to create templates, let’s see other ways to manage VMs. In the next section, we will show you how to obtain information about the VMs you work with, from the command line.
+
+## Obtaining VM and host resource information
+
+When you’re working at the command line, some information is not as visible as when working with the GUI tools. To see if we still have the necessary sources for creating new VMs, we will need to use the `virsh nodeinfo` command to obtain information about the host machine:
+
+![Figure 11.13 – Finding host information with the nodeinfo command](img/B19682_11_13.jpg)
+
+Figure 11.13 – Finding host information with the nodeinfo command
+
+In our case, as seen in the preceding image, the host has 16 vCPUs available and 48 GB of RAM, meaning that we still have resources available for some new VMs. We know that when we created the VMs we allocated 2 vCPUs and 2 GB of RAM for each one. As we now have five VMs (as shown in the following image), it means that we use 10 out of 16 vCPUs and 10 GB out of 48 GB RAM:
+
+![Figure 11.14 – Listing the existing VMs](img/B19682_11_14.jpg)
+
+Figure 11.14 – Listing the existing VMs
+
+But what if we do not know how many resources the existing VMs use? There is a command that can help us with that. It is called `virsh dominfo`. Let’s see the resources that one of our VMs is using, for example, `ubuntu-vm1`:
+
+![Figure 11.15 – Showing the VMs’ resource usage](img/B19682_11_15.jpg)
+
+Figure 11.15 – Showing the VMs’ resource usage
+
+In the preceding image, you can see that our VM is using 2 vCPUs and 2 GB of RAM. You can check the resource usage for every VM that you manage. Besides vCPUs and RAM, you can also manage virtual disks for existing VMs. To see the disk usage for a VM you can use the `virt-df` command:
+
+![Figure 11.16 – Showing disk usage for a VM](img/B19682_11_16.jpg)
+
+Figure 11.16 – Showing disk usage for a VM
+
+We have used the `-d` option for showing `libvirt` domain guests and the `-h` option to show the results in a human-readable format. The `virt-df` command is similar to the `df` command (see [*Chapter 6*](B19682_06.xhtml#_idTextAnchor124)).
+
+Knowing the resource usage is the first step in managing the resources that you have. In the following section, we will show you how to change the amount of resources a VM is using.
+
+## Managing VM resource usage
+
+As shown earlier, knowing how many resources a VM is using can prove of great value. You would need to be able to modify the resources already in use if you run out of resources. You have tools available to modify the amount of vCPUs and RAM an existing VM is using. For example, let’s change the resources for our `ubuntu-vm1-clone1` VM from 2 vCPUs to 1 vCPU and from 2 GB of RAM to 1 GB of RAM. The command we will use is `virsh setvcpus`, and we will use it as follows:
+
+![Figure 11.17 – Changing the vCPU count for a VM](img/B19682_11_17.jpg)
+
+Figure 11.17 – Changing the vCPU count for a VM
+
+We can also change the amount of RAM used with the `virsh setmem` and `virsh` `setmaxmem` commands:
+
+![Figure 11.18 – Changing the memory used by a VM](img/B19682_11_18.jpg)
+
+Figure 11.18 – Changing the memory used by a VM
+
+We can now check the resources used by the `ubuntu-vm1-clone1` VM using the `virsh dominfo` command, as shown in the following screenshot:
+
+![Figure 11.19 – Checking the resources for a VM](img/B19682_11_19.jpg)
+
+Figure 11.19 – Checking the resources for a VM
+
+As you can see, the resources used by the VM have been changed according to your new settings. Now that you know how to manage KVMs, which is a required asset for a Linux system administrator. In the next section, we will show you how to automate KVM VM provisioning using **cloud-init**.
+
+# Provisioning VMs using cloud-init
+
+When you’re dealing with only one VM, things can be relatively simple. But when we have to create hundreds of VMs, manual creation can be daunting. One useful tool you can use for such a task is **cloud-init**. Another tool that is suitable for this kind of task is **Ansible** (there’s more on Ansible in [*Chapter 17*](B19682_17.xhtml#_idTextAnchor359)). In this section, we will cover only cloud-init. It was developed by Canonical to be used as a tool for configuring VM instances on cloud platforms, and it is written in Python. Currently, it is considered an industry standard for provisioning cloud images. In the next subsection, we will briefly explain to you how cloud-init works.
+
+## Understanding how cloud-init works
+
+According to the official cloud-init documentation, it is based on several configuration sources, specific boot stages, user data formats, vendor data, and instance metadata. The concept of boot stages is specific to cloud-init architecture, as it configures the entire instance during specific stages of the boot process. It provides a way for managing completely working instances that have networking, boot sequence, and local configuration files configured.
+
+Cloud-init is available on most widely used Linux distributions, such as Ubuntu, Debian, Red Hat Enterprise Linux, Fedora, SUSE, and openSUSE. We will use one of our Debian 12 systems as a host and install and configure cloud-init on it. We will show you how in the following subsection.
+
+## Installing and configuring cloud-init
+
+Even if its main purpose is to be used for cloud deployments, cloud-init can also be used locally. We will use it to deploy VMs on our local system. As a prerequisite for using cloud-init, a hypervisor should already be installed on your system, such as KVM. For the guest image, cloud-init uses specific cloud images that are already available from almost every Linux distribution provider. For example, we are planning on deploying Ubuntu VMs, thus we will need Ubuntu-optimized cloud images, which are available at [https://cloud-images.ubuntu.com/](https://cloud-images.ubuntu.com/). Let’s look at the steps required to prepare the image for deployment:
+
+1.  First, we will install the `cloud-image-utils` additional package and then the `cloud-init` package:
+
+    ```
+    sudo apt install cloud-image-utils cloud-init
+    ```
+
+2.  The next step is to create a new directory for the new cloud images:
+
+    ```
+    mkdir local-cloud-images && cd local-cloud-images
+    ```
+
+3.  The next step is to download the cloud image:
+
+    ```
+    wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+    ```
+
+4.  Then we get details for the cloud image file:
+
+    ```
+    qemu-img info jammy-server-cloudimg-amd64.img
+    ```
+
+5.  Then we resize the image:
+
+    ```
+    .qcow2 base image:
+
+    ```
+    libvirt directory:
+
+    ```
+    meta-data) and another file for user data (called user-data). They are /var/lib/libvirt/image/) to store the new configuration files. We will use the following commands as root:
+
+    ```
+    meta-data file will not be populated just yet. We will edit the user-data file first.
+    ```
+
+    ```
+
+    ```
+
+    ```
+
+Important note
+
+At this point, we will need a pair of SSH keys to use to connect with the new VM we plan to create. As we have not shown you yet how to work with SSH keys, we will provide you with the needed information in the next subsection. Go ahead and read the *Public key authentication with SSH* section, then get back to this point, where we will continue configuring our cloud-init files.
+
+Let’s create the `user-data` file and add the following information:
+
+![Figure 11.20 – The user-data file contents](img/B19682_11_20.jpg)
+
+Figure 11.20 – The user-data file contents
+
+1.  After the `user-data` file editing is finished, we can continue and create a disk image that will contain the configuration files. We will use the `cloud-localds` command from the `cloud-image-utils` package we installed earlier:
+
+    ```
+    user-data file we created. The preparations are finished and we can start deploying. We will deploy our VM using the following command:
+
+    ```
+    sudo virt-install --name vm01 --virt-type kvm --vcpus 1 --memory 2048 --disk path=/var/lib/libvirt/images/ubuntu.qcow2,device=disk --disk path=/var/lib/libvirt/images/cloud-init/ubuntu-provisioning.qcow2,device=cdrom --os-type linux --os-variant generic --import --network network=default --noautoconsole
+    ```
+
+    ```
+
+2.  If you get any errors regarding the network activation, you might have to use the following commands to activate the default network:
+
+    ```
+    virt-install command, the output will be as shown as follows:
+    ```
+
+![Figure 11.21 – Creating a new VM](img/B19682_11_21.jpg)
+
+Figure 11.21 – Creating a new VM
+
+1.  We now have deployed a new VM using cloud-init. We can verify that it is running by using the `sudo virsh list` command or by using the Virtual Manager GUI. We will verify if the VM is running, we will find out the IP address and connect to it using SSH. We will use the following commands: `sudo virsh list` to check the state of the VM, `sudo virsh domifaddr vm01` to find its IP, and `ssh packt@192.168.122.32` to connect to it. The output is shown in the following screenshot:
+
+![Figure 11.22 – Connecting to the new VM using SSH](img/B19682_11_22.jpg)
+
+Figure 11.22 – Connecting to the new VM using SSH
+
+We have successfully created and connected to a new VM using cloud-init. After finishing this section, you now possess the ability to deploy VMs using cloud-init. However, we have only scratched the surface of what cloud-init can do, so if you feel like you would like to learn more about it, please use the official documentation or any of the titles provided in the *Further reading* section at the end of the chapter.
+
+In the next section, we will show you how to use public key authentication with SSH.
+
+# Public key authentication with SSH
+
+`.ssh` directory in your user’s home directory. To generate a new pair of keys, you will have to use the `ssh-keygen` command.
+
+It can be used with options, the most relevant ones being: `-t` to specify the type of encryption algorithm used, `-b` to specify the number of bits. Used with no option, the `ssh-keygen` command will use the RSA encryption algorithm and a 3,072-bit key. The following is the output for using the command as is:
+
+![Figure 11.23 – Using the ssh-keygen to create a pair of SSH keys](img/B19682_11_23.jpg)
+
+Figure 11.23 – Using the ssh-keygen to create a pair of SSH keys
+
+As mentioned earlier, the two keys are stored inside the `.ssh` directory. One will be called `id_rsa` and the other `id_rsa.pub`. For our use case, configuring cloud-init, we will need to use the public key. Thus, we will need to concatenate the contents of the `id_rsa.pub` file and copy the key. In our case, the contents are as follows:
+
+![Figure 11.24 – The SSH public key](img/B19682_11_24.jpg)
+
+Figure 11.24 – The SSH public key
+
+However, if we need to use those keys to connect to a cloud instance of a virtual private server or a VM, the public key needs to be safely copied to that machine or instance. For this, we will use the `ssh-copy-id` command. When using the command, we will need to provide a username and an IP address or hostname for the destination machine. For example, if we were to copy the SSH public key to a VM that has the IP `192.168.122.48` and a user `packt`, we would use the following command:
+
+```
+ssh-copy-id packt@192.168.122.48
+```
+
+More details on how to install and configure an SSH server will be provided in [*Chapter 13*](B19682_13.xhtml#_idTextAnchor276). The information shown here is sufficient for our cloud-init task.
+
+Virtualization is an important part of computing, providing the technology needed to take advantage of the tremendous computing power that modern systems provide. It gives you the ability to get the most out of your investment in hardware technology.
+
+# Summary
+
+In this chapter, we emphasized the importance of virtualization on a Linux system. We showed you how to create and manage VMs using KVM. You know how to clone, template, and manage resources for VMs; and you know how virtualization works and how to install the QEMU/KVM hypervisor on Linux. With those assets, you are prepared to start your path into virtualization with no fears.
+
+In the next chapter, we will introduce you to Docker container technologies.
+
+# Exercises
+
+Here’s a brief quiz about some of the essential concepts that were covered in this chapter:
+
+1.  Enumerate and describe the types of hypervisors.
+2.  Practice by installing a hypervisor on many Linux hosts.
+3.  Verify whether your hypervisor is working correctly.
+
+    `virt-host-validate`.
+
+4.  Can you think of significant differences between major hypervisors?
+
+    **Hint**: Test KVM and VirtualBox for example, and make a comparison.
+
+5.  How can you find the IP addresses of VMs?
+
+    `virsh` `domifaddr` command.
+
+# Further reading
+
+For more information on the topics covered in this chapter, you can refer to the following Packt books:
+
+*   *Mastering KVM Virtualization – Second Edition*, Vedran Dakic, Humble Devassy Chirammal, Prasad Mukhedkar, Anil Vettathu
+*   *KVM Virtualization Cookbook*, Konstantin Ivanov
+
+For detailed information about the inner workings of cloud-init, visit the official documentation website at [https://cloudinit.readthedocs.io/en/latest/explanation/index.html](https://cloudinit.readthedocs.io/en/latest/explanation/index.html).
