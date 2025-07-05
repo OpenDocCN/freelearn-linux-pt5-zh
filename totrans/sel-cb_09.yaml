@@ -1,521 +1,769 @@
 - en: Chapter 9. Aligning SELinux with DAC
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第9章. 对齐 SELinux 和 DAC
 - en: 'In this chapter, our focus will be on the following set of recipes:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们的重点将放在以下一组方案上：
 - en: Assigning a different root location to regular services
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 为常规服务分配不同的根目录位置
 - en: Using a different root location for SELinux-aware applications
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 为 SELinux 感知的应用程序使用不同的根目录位置
 - en: Sharing user content with file ACLs
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用文件 ACL 分享用户内容
 - en: Enabling polyinstantiated directories
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 启用多实例化目录
 - en: Configuring capabilities instead of setuid binaries
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 配置能力而不是 setuid 二进制文件
 - en: Using group membership for role-based access
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用组成员身份进行基于角色的访问控制
 - en: Backing up and restoring files
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 文件备份与恢复
 - en: Governing application network access
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 管理应用程序网络访问
 - en: Introduction
+  id: totrans-10
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 引言
 - en: SELinux is an access control mechanism that works alongside the regular access
     controls that Linux provides. Making sure that these various access control systems
     play nicely together is important as both have their merits and uses.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 是一种访问控制机制，它与 Linux 提供的常规访问控制一起工作。确保这些不同的访问控制系统能够良好协同是非常重要的，因为它们各自都有优点和用途。
 - en: Regular DAC security services on Linux are already quite powerful and are being
     extended with almost every Linux release. Namespaces, extended access controls,
     additional **chroot** restrictions, and other services are added to the Linux
     ecosystem to support the hardening of Linux systems further.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 上的常规 DAC 安全服务已经相当强大，并且几乎每个 Linux 版本发布时都会进一步扩展。命名空间、扩展的访问控制、额外的 **chroot**
+    限制以及其他服务都被加入到 Linux 生态系统中，进一步支持 Linux 系统的加固。
 - en: In this process of hardening systems, SELinux is just another layer of defense.
     Putting all efforts only on SELinux would be a major mistake to make, as SELinux
     has its downsides as well. By properly enabling the Linux DAC controls and tweaking
     SELinux so that it plays nicely together with these controls, a Linux system can
     be made much more resilient against vulnerabilities and attacks.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 在加固系统的过程中，SELinux 只是另一个防御层。仅仅将所有精力集中在 SELinux 上是一个重大的错误，因为 SELinux 也有其缺点。通过正确启用
+    Linux DAC 控制并调整 SELinux，使其与这些控制系统良好配合，可以使 Linux 系统在应对漏洞和攻击时更加韧性。
 - en: Assigning a different root location to regular services
+  id: totrans-14
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 为常规服务分配不同的根目录位置
 - en: A different root location, also known as achroot, is an important feature of
     Linux systems meant to disallow direct access to file resources outside a specified
     directory location. The environment that is accessible from a chroot is called
     a **jail** or **chroot jail**. Applications in a chroot jail are launched with
     a different root, wherein only those files that are needed for the application
     to work are hosted.
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 不同的根目录位置，也称为 chroot，是 Linux 系统的一项重要功能，旨在禁止直接访问指定目录位置之外的文件资源。从 chroot 中可以访问的环境称为
+    **jail** 或 **chroot jail**。在 chroot jail 中运行的应用程序会在不同的根目录下启动，其中仅托管应用程序正常运行所需的文件。
 - en: Although it is commonly seen as a security feature, this was not the intention
     of a chroot. However, with the proper approach, chroots can enhance the secure
     setup of an application.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管通常被视为一种安全功能，但 chroot 本身并非出于这个目的。然而，通过正确的方法，chroot 可以增强应用程序的安全配置。
 - en: For instance, in case of a vulnerability, a successful exploit might only be
     able to access the files available in the chroot. Other sensitive files, such
     as authentication-related files or other service configurations, are not reachable
     from within the chroot (assuming the exploited application does not have the privileges
     to break out of a chroot jail).
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，在出现漏洞的情况下，成功的利用可能只能访问 chroot 中可用的文件。其他敏感文件，例如与身份验证相关的文件或其他服务配置文件，在 chroot
+    内是无法访问的（假设被利用的应用程序没有越狱 chroot 限制的权限）。
 - en: 'The steps to set up a chroot environment for any service are similar, but the
     end result of a chroot is never the same: different files need to be available
     in a chroot depending on the application that is being restricted.'
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 设置任何服务的 chroot 环境的步骤是类似的，但 chroot 的最终结果永远不会相同：根据被限制的应用程序，不同的文件需要在 chroot 中可用。
 - en: Getting ready
+  id: totrans-19
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: Find the application that needs to be restricted. Such applications have to
     be end services, in the sense that there is little to no interaction between the
     application and other applications or services. Otherwise, all those other applications
     and services would need to be available in the same chroot as well.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 查找需要被限制的应用程序。这些应用程序必须是最终服务，因为这些应用程序与其他应用程序或服务几乎没有交互。否则，所有这些其他应用程序和服务也需要在相同的
+    chroot 中可用。
 - en: Usually, the primary targets are those services that are very popular in use
     on the Internet. Exploits for these services are usually more actively searched
     and developed for, and when a vulnerability is found and an exploit has been developed,
     malicious users or groups quickly scan the Internet for vulnerable versions to
     attack.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，主要的目标是那些在互联网上使用非常广泛的服务。这些服务的漏洞通常会更积极地被搜索和开发，当发现漏洞并开发出利用代码时，恶意用户或团体会迅速扫描互联网寻找易受攻击的版本进行攻击。
 - en: How to do it…
+  id: totrans-22
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'The next set of steps shows how to set up a chroot environment and inform SELinux
     about the chroot. We use the BIND DNS server as our example service and `/var/chroot/`
     as the chroot location:'
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一组步骤展示了如何设置 chroot 环境并通知 SELinux 关于 chroot 的信息。我们以 BIND DNS 服务器作为示例服务，并将 `/var/chroot/`
+    作为 chroot 位置：
 - en: 'Create the chroot location and add in the necessary subdirectories:'
+  id: totrans-24
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建 chroot 位置并添加必要的子目录：
 - en: '[PRE0]'
+  id: totrans-25
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Copy all the files that the application needs:'
+  id: totrans-26
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 复制应用程序所需的所有文件：
 - en: '[PRE1]'
+  id: totrans-27
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Create the device files that the application needs:'
+  id: totrans-28
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建应用程序需要的设备文件：
 - en: '[PRE2]'
+  id: totrans-29
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: As the BIND service knows about chroots, we do not need to copy its binaries
     and libraries to the chroot location. However, not all services support chroots
     out of the box. When this is the case, we need to copy the binaries and libraries
     as well.
+  id: totrans-30
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 由于 BIND 服务支持 chroot，我们不需要将其二进制文件和库复制到 chroot 位置。但是，并非所有服务都原生支持 chroot。当遇到这种情况时，我们还需要复制二进制文件和库。
 - en: 'Now, relabel the files in the chroot so that they get the proper SELinux labels:'
+  id: totrans-31
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，重新标记 chroot 中的文件，以便它们获得正确的 SELinux 标签：
 - en: '[PRE3]'
+  id: totrans-32
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'Launch the application with the proper options to enable the chroot support.
     Some Linux distributions already support chroot information for the BIND service.
     In general, it requires the `named` application to be launched with the `-t /var/chroot/`
     option. If the application does not support chroots out of the box, use the `chroot`
     command itself:'
+  id: totrans-33
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用适当的选项启动应用程序以启用 chroot 支持。一些 Linux 发行版已经为 BIND 服务支持 chroot 信息。通常，它要求通过 `-t
+    /var/chroot/` 选项启动 `named` 应用程序。如果应用程序不原生支持 chroot，请使用 `chroot` 命令本身：
 - en: '[PRE4]'
+  id: totrans-34
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'If the application supports chroots out of the box, it might require the `chroot`
     capability. This is supported through the `sys_chroot` permission, granted through
     the following SELinux policy interface:'
+  id: totrans-35
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果应用程序原生支持 chroot，它可能需要 `chroot` 功能。这可以通过以下 SELinux 策略接口中的 `sys_chroot` 权限来支持：
 - en: '[PRE5]'
+  id: totrans-36
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: How it works…
+  id: totrans-37
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: Setting up a chroot environment is usually a trial-and-error approach; although,
     for more popular services, many tutorials exist on the Internet that make setting
     up chroots a lot easier.
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 设置 chroot 环境通常是一个反复试验的过程；不过，对于更受欢迎的服务，互联网上有许多教程可以让设置 chroot 更加简单。
 - en: 'The basic approach to use is four-fold:'
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用的基本方法是四个步骤：
 - en: Create the chroot location and directory structure.
+  id: totrans-40
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建 chroot 位置和目录结构。
 - en: Install the necessary files and, if necessary, application binaries and libraries.
+  id: totrans-41
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 安装必要的文件，并在必要时安装应用程序的二进制文件和库。
 - en: Update the SELinux labels of the resources.
+  id: totrans-42
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 更新资源的 SELinux 标签。
 - en: Call the chroot binary or use the built-in `chroot` capabilities of the application.
+  id: totrans-43
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 调用 chroot 二进制文件或使用应用程序内置的 `chroot` 功能。
 - en: When creating a chroot location, we need to make sure that the structure is
     similar to a real root location (that is, the `/` location); as for the application,
     it will see the filesystem as if this chroot location is the entire filesystem.
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 创建 chroot 位置时，我们需要确保其结构类似于真实的根目录位置（即`/`位置）；至于应用程序，它会将该 chroot 位置视为整个文件系统。
 - en: Which files to install is a different matter though, and having online resources
     to inform us what to do is a great help. But if these online resources are missing,
     then we can still find out which files are needed.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 安装哪些文件是另一个问题，拥有在线资源来告知我们该怎么做是很大的帮助。但是，如果这些在线资源缺失，我们仍然可以找到哪些文件是必需的。
 - en: 'For instance, we can use the `ldd` or `scanelf` application:'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，我们可以使用 `ldd` 或 `scanelf` 应用程序：
 - en: '[PRE6]'
+  id: totrans-47
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: But in general, it is the trial-and-error approach that works the easiest. Just
     launch the application in the chroot, register its errors, and resolve them.
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 但通常，反复试验的方法最有效。只需在 chroot 中启动应用程序，记录其错误并解决它们。
 - en: For SELinux, the important bit here is that the chroot should be labeled correctly.
     Consider `/var/chroot/etc/named.conf`, for instance. The SELinux policy will assume
     that this file is labeled `named_conf_t`. However, the location itself (`/var/chroot/etc/named.conf`)
     implies `var_t`, as `/var/` is `var_t` and there are no definitions for any of
     our defined location's subdirectories or files within.
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于 SELinux，这里需要注意的是 chroot 应该正确标记。例如，考虑 `/var/chroot/etc/named.conf`。SELinux
+    策略将假定该文件标记为 `named_conf_t`。然而，文件本身的路径（`/var/chroot/etc/named.conf`）暗示着它的标签为 `var_t`，因为
+    `/var/` 的标签是 `var_t`，并且没有针对我们所定义的任何子目录或文件的标签定义。
 - en: The `setfiles` command allows us to relabel a location with a different root
     location, resulting in `/var/chroot/etc/named.conf` being labeled as if it was
     `/etc/named.conf`. However, take care that a system relabeling operation is followed
     by the `setfiles` command again as the SELinux configuration is not aware of this
     change in labeling.
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: '`setfiles` 命令允许我们通过不同的根位置重新标记位置，这样 `/var/chroot/etc/named.conf` 就会被标记为与 `/etc/named.conf`
+    相同的标签。然而，注意系统的重新标记操作之后，需要再次使用 `setfiles` 命令，因为 SELinux 配置并未意识到标签的改变。'
 - en: Finally, the application itself needs to be launched inside the chroot or through
     its built-in chroot support. Applications that support chroots themselves can
     be tuned through their configuration files and start up options to make sure that
     they run in a chroot environment. If that isn't possible, then the application
     should be started using an `init` script that calls the `chroot` command, most
     likely together with the `su` application to allow switching to a different user.
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，应用程序本身需要在 chroot 内部启动或通过其内建的 chroot 支持启动。支持 chroot 的应用程序可以通过其配置文件和启动选项进行调整，以确保它们在
+    chroot 环境中运行。如果这不可行，则应该通过一个 `init` 脚本启动该应用程序，该脚本调用 `chroot` 命令，并很可能与 `su` 应用程序一起使用，以允许切换到其他用户。
 - en: There's more...
+  id: totrans-52
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: A chroot is a relatively primitive yet powerful method for reducing the impact
     of an exploit. However, methods exist to escape a chroot. Luckily, there are some
     kernel patches that improve the security of chroots tremendously. A popular update
     is the one maintained by the **grsecurity** team ([http://www.grsecurity.net](http://www.grsecurity.net)).
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: chroot 是一种相对原始但强大的减少漏洞影响的方法。然而，确实存在逃逸 chroot 的方法。幸运的是，存在一些内核补丁，能显著提高 chroot
+    的安全性。一个流行的更新是由 **grsecurity** 团队维护的 ([http://www.grsecurity.net](http://www.grsecurity.net))。
 - en: 'With grsecurity''s chroot restrictions, the kernel can be configured with the
     following options:'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 grsecurity 的 chroot 限制，内核可以通过以下选项进行配置：
 - en: Disallow mounts and remounts of filesystems initiated from within the chroot
+  id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 禁止在 chroot 内部发起文件系统的挂载和重新挂载操作
 - en: Disallow chrooting from within the chroot
+  id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 禁止在 chroot 内部执行 chroot 操作
 - en: Disallow the `pivot_root` call from within the chroot
+  id: totrans-57
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 禁止在 chroot 内部执行 `pivot_root` 调用
 - en: Force the current working directory of chrooted applications to be the root
     directory of the chroot
+  id: totrans-58
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 强制 chroot 应用程序的当前工作目录为 chroot 根目录
 - en: Disallow the `setuid` and `setgid chmod` operations from within the chroot
+  id: totrans-59
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 禁止在 chroot 内部执行 `setuid` 和 `setgid chmod` 操作
 - en: Disallow changing directories through open file descriptors pointing outside
     the chroot
+  id: totrans-60
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 禁止通过指向 chroot 外部的打开文件描述符来更改目录
 - en: Disallow attaching to shared memory created outside the chroot
+  id: totrans-61
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 禁止连接到 chroot 外部创建的共享内存
 - en: Disallow access to Unix domain sockets created outside the chroot
+  id: totrans-62
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 禁止访问 chroot 外部创建的 Unix 域套接字
 - en: Disallow sending signals to processes outside the chroot
+  id: totrans-63
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 禁止向 chroot 外部的进程发送信号
 - en: Besides these options, there are many, many more options. Such options make
     chroot jails much more security-oriented than originally intended and make for
     a very powerful mitigation against exploits.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了这些选项，还有许多其他选项。这些选项使得 chroot 监狱比最初预期的更加注重安全性，并且为防范漏洞提供了非常强大的缓解措施。
 - en: See also
+  id: totrans-65
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: 'There are many resources available about chroot jails and BIND chroots in particular:'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于 chroot 监狱和特别是 BIND chroot 的资源有很多：
 - en: Building and configuring BIND 9 in a chroot jail available at [http://www.unixwiz.net/techtips/bind9-chroot.html](http://www.unixwiz.net/techtips/bind9-chroot.html)
     goes in great detail and has pointers to various other BIND-related resources
+  id: totrans-67
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在 [http://www.unixwiz.net/techtips/bind9-chroot.html](http://www.unixwiz.net/techtips/bind9-chroot.html)
+    上，关于在 chroot 监狱中构建和配置 BIND 9 的内容有很详细的讲解，并且提供了指向其他 BIND 相关资源的链接
 - en: 'On the same site, best practices for Unix `chroot()` operations can be found:
     [http://www.unixwiz.net/techtips/chroot-practices.html](http://www.unixwiz.net/techtips/chroot-practices.html)'
+  id: totrans-68
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在同一站点，可以找到 Unix `chroot()` 操作的最佳实践：[http://www.unixwiz.net/techtips/chroot-practices.html](http://www.unixwiz.net/techtips/chroot-practices.html)
 - en: The Jailkit project ([http://olivier.sessink.nl/jailkit/](http://olivier.sessink.nl/jailkit/))
     provides a set of utilities to manage chroot jails
+  id: totrans-69
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Jailkit 项目（[http://olivier.sessink.nl/jailkit/](http://olivier.sessink.nl/jailkit/)）提供了一套用于管理
+    chroot 监狱的实用工具
 - en: Using a different root location for SELinux-aware applications
+  id: totrans-70
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 为支持 SELinux 的应用程序使用不同的根位置
 - en: SELinux-aware applications have more requirements when they run inside a chroot
     location. They require access to the SELinux subsystem (from within the chroot)
     and possibly SELinux configuration entries. This includes PAM-enabled services,
     as user logins on these services might require access to the SELinux user configuration
     files (such as the `seusers` file and default contexts).
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 支持 SELinux 的应用程序在运行于 chroot 位置时有更多的需求。它们需要访问 SELinux 子系统（从 chroot 内部）以及可能需要的
+    SELinux 配置条目。这包括启用 PAM 的服务，因为这些服务的用户登录可能需要访问 SELinux 用户配置文件（如 `seusers` 文件和默认上下文）。
 - en: How to do it…
+  id: totrans-72
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'First, create the regular chroot location as we saw earlier. To update the
     system to support SELinux-aware applications inside the chroot, complete the following
     steps:'
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，像之前一样创建常规的 chroot 位置。为了更新系统以支持在 chroot 内运行的支持 SELinux 的应用程序，完成以下步骤：
 - en: 'Mount the SELinux filesystem inside the chroot at `/sys/fs/selinux/` so that
     the application can query the SELinux policy:'
+  id: totrans-74
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在 chroot 中挂载 SELinux 文件系统到 `/sys/fs/selinux/`，以便应用程序可以查询 SELinux 策略：
 - en: '[PRE7]'
+  id: totrans-75
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'Optionally, create the `/var/chroot/etc/selinux/` location and copy the current
     definition inside it:'
+  id: totrans-76
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 可选地，创建 `/var/chroot/etc/selinux/` 位置并将当前定义复制到其中：
 - en: '[PRE8]'
+  id: totrans-77
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: Update the `seusers` file (in `/var/chroot/etc/selinux/mcs/`) to only contain
     the SELinux user mapping(s) needed inside the chroot.
+  id: totrans-78
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 更新 `seusers` 文件（在 `/var/chroot/etc/selinux/mcs/`）以仅包含在 chroot 内所需的 SELinux 用户映射。
 - en: How it works…
+  id: totrans-79
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: Applications that are SELinux-aware usually require access to the SELinux filesystem
     (`/sys/fs/selinux/`) and a kernel-provided pseudo filesystem needed in order to
     interact with the SELinux subsystem. This should be seen as a more dangerous situation,
     as this usually has the application run as a more privileged user and with access
     to a system resource that is not protected by the chroot anymore. This reduces
     the effectiveness of a chroot jail as a security measure.
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 支持 SELinux 的应用程序通常需要访问 SELinux 文件系统（`/sys/fs/selinux/`）和内核提供的伪文件系统，以便与 SELinux
+    子系统进行交互。这通常被视为一种更危险的情况，因为这通常会让应用程序以更高权限的用户身份运行，并访问不再受到 chroot 保护的系统资源。这会降低 chroot
+    监狱作为安全措施的有效性。
 - en: If applications do not support chroots themselves internally, then we will have
     to expose the `/sys/fs/selinux/` filesystems to the application that is chrooted.
     If the application supports chroot out of the box, it might only call the chroot
     after consulting SELinux (that is, from the nonchrooted parent) and run the worker
     or user processes inside a chroot. This is the case with chrooted SFTP users supported
     through OpenSSH.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果应用程序本身不支持 chroot，我们将不得不将 `/sys/fs/selinux/` 文件系统暴露给被 chroot 的应用程序。如果应用程序默认支持
+    chroot，它可能会在咨询 SELinux 后调用 chroot（即从非 chroot 父进程）并在 chroot 内运行工作进程或用户进程。这是 OpenSSH
+    支持的 chroot SFTP 用户的情况。
 - en: 'It might also be sufficient to mount the SELinux filesystem on `/selinux/`
     (a deprecated but still a supported location for the SELinux filesystem) inside
     the chroot. That way, no fake `/sys/fs/` location needs to be created:'
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 也可能只需将 SELinux 文件系统挂载到 `/selinux/`（一个已弃用但仍受支持的 SELinux 文件系统位置）内的 chroot 中。这样，就不需要创建虚假的
+    `/sys/fs/` 位置：
 - en: '[PRE9]'
+  id: totrans-83
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: The `/etc/selinux/` location is not always needed, so it shouldn't be made accessible
     inside the chroot by default. SELinux-aware applications that use SELinux user
     and role transitions or that actively modify file contexts will need to be able
     to read the files inside `/etc/selinux/` though.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: '`/etc/selinux/` 位置并非总是需要的，因此默认情况下不应在 chroot 内部提供访问权限。但是，支持 SELinux 的应用程序，如果使用
+    SELinux 用户和角色转换，或者主动修改文件上下文，则需要能够读取 `/etc/selinux/` 内的文件。'
 - en: 'Depending on the reason of the chroot jail, it might be possible as well to
     use a read-only bind-mount of the `/etc/selinux/` location:'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据 chroot 监狱的目的，可能也可以使用 `/etc/selinux/` 位置的只读绑定挂载：
 - en: '[PRE10]'
+  id: totrans-86
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: The remount afterwards is needed to mark it as read-only. A bind-mount, by itself,
     doesn't allow additional mount options to be passed, so we cannot immediately
     mount with the `ro` mount option. Of course, it is no longer possible/needed to
     modify the `seusers` file with a read-only bind-mount.
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 之后需要重新挂载，以将其标记为只读。绑定挂载本身不允许传递额外的挂载选项，因此我们无法立即使用 `ro` 挂载选项进行挂载。当然，使用只读绑定挂载后，已经无法/不需要再修改
+    `seusers` 文件。
 - en: See also
+  id: totrans-88
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: Detailed guides on SFTP chroots can be found at [https://wiki.archlinux.org/index.php/SFTP_chroot](https://wiki.archlinux.org/index.php/SFTP_chroot)
     and [http://en.wikibooks.org/wiki/OpenSSH/Cookbook/SFTP](http://en.wikibooks.org/wiki/OpenSSH/Cookbook/SFTP)
+  id: totrans-89
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 关于 SFTP chroot 的详细指南可以在 [https://wiki.archlinux.org/index.php/SFTP_chroot](https://wiki.archlinux.org/index.php/SFTP_chroot)
+    和 [http://en.wikibooks.org/wiki/OpenSSH/Cookbook/SFTP](http://en.wikibooks.org/wiki/OpenSSH/Cookbook/SFTP)
+    找到
 - en: Sharing user content with file ACLs
+  id: totrans-90
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用文件 ACL 共享用户内容
 - en: Access control lists allow for more fine-grained access controls on files. Instead
     of using a common group ownership, access to files can be individually granted
     to users or groups.
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 访问控制列表允许对文件进行更细粒度的访问控制。与使用公共组所有权不同，文件的访问可以单独授予用户或用户组。
 - en: However, the access controls that SELinux enables should also be tailored to
     this situation. Features such as the user-based access control constraints in
     SELinux might prevent sharing user content altogether, regardless of the ACLs
     set on the file.
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，SELinux 启用的访问控制也应根据这种情况进行调整。SELinux 中的基于用户的访问控制限制等特性，可能会完全阻止共享用户内容的访问，无论文件上设置了什么
+    ACL。
 - en: How to do it…
+  id: totrans-93
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'Assuming that a user wants to allow read and read-write accesses to a set of
     files and directories, the following set of steps can be used:'
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设某用户希望允许一组文件和目录的读取及读写访问，可以使用以下步骤：
 - en: 'Create an accessible location outside the user''s home directory:'
+  id: totrans-95
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在用户的主目录外创建一个可访问的位置：
 - en: '[PRE11]'
+  id: totrans-96
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'Create an SELinux file type that can be used for sharing resources:'
+  id: totrans-97
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个可以用于共享资源的 SELinux 文件类型：
 - en: '[PRE12]'
+  id: totrans-98
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Create an interface allowing users to administer the resource:'
+  id: totrans-99
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个允许用户管理资源的界面：
 - en: '[PRE13]'
+  id: totrans-100
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'Assign this type to the new location:'
+  id: totrans-101
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将该类型分配给新位置：
 - en: '[PRE14]'
+  id: totrans-102
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'Assign the interface to the user domain(s) that will participate in the shared
     development of this resource:'
+  id: totrans-103
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将该界面分配给将参与此资源共享开发的用户域：
 - en: '[PRE15]'
+  id: totrans-104
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: Move the files that need to be shared outside the user's home directory, as
     the SELinux context of the home directory will not allow sharing resources within.
+  id: totrans-105
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将需要共享的文件移到用户的主目录外，因为主目录的 SELinux 上下文不允许在其中共享资源。
 - en: '[PRE16]'
+  id: totrans-106
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'Assign the ACL that allows the (limited set of) users proper access:'
+  id: totrans-107
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 分配允许（有限用户集）用户进行适当访问的 ACL：
 - en: '[PRE17]'
+  id: totrans-108
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: How it works…
+  id: totrans-109
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: The file-level access controls can be perfectly used together with the SELinux
     access controls. However, special care needs to be taken that both control mechanisms
     (file ACLs and the SELinux policy) don't interfere with each other. SELinux might
     disallow accesses expected to work (for instance, due to SELinux constraints rather
     than type enforcement settings), but also file access controls need to be properly
     managed in order to keep the behavior on the system consistent.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件级访问控制可以与 SELinux 访问控制完美配合使用。然而，需要特别小心，确保这两种控制机制（文件 ACL 和 SELinux 策略）不会相互干扰。SELinux
+    可能会禁止一些预期中的访问（例如，由于 SELinux 限制而不是类型强制设置），但同时也需要正确管理文件访问控制，以保持系统行为的一致性。
 - en: In the recipes, the files that are shared are moved outside the user's home
     directory. This is mostly because of SELinux' UBAC feature, which disallows different
     SELinux users to access each others' regular resources (such as those labeled
@@ -523,15 +771,21 @@
     by other SELinux users under the UBAC constraints, users mapped to a different
     SELinux user will not be able to enter and search through the sharing user's home
     directory, regardless of ACLs being installed.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这些操作中，共享的文件被移到用户的主目录之外。这主要是因为 SELinux 的 UBAC 特性，禁止不同 SELinux 用户访问彼此的常规资源（例如标记为
+    `user_home_t` 的资源，也包括 `user_home_dir_t`）。由于在 UBAC 限制下，`user_home_dir_t` 不允许其他
+    SELinux 用户访问，因此映射到不同 SELinux 用户的用户将无法进入并浏览共享用户的主目录，不论是否安装了 ACL。
 - en: Not all systems have UBAC enabled, or the sharing might be within a single SELinux
     user, so this approach is not always necessary. Still, using a different location
     allows for better management. Consider the case where the first user exits the
     company, but his team wants to continue accessing and managing the shared resources.
     They would disappear if the user home directory is removed.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 不是所有系统都启用了 UBAC，或者共享可能仅限于单个 SELinux 用户，因此这种方法并不总是必要的。不过，使用不同的位置可以实现更好的管理。考虑以下情况：当第一个用户离开公司时，但他的团队希望继续访问和管理共享资源。如果删除用户的主目录，这些资源将消失。
 - en: With the files moved to a different location, the next step is to label the
     files with a file type that all users can access, but which isn't restricted by
     the UBAC feature. File types that have the `ubac_constrained_type` attribute set
@@ -541,16 +795,23 @@
     or from the `user_share_t` type). This ensures that SELinux doesn't prevent access
     to the shared resources, while still preventing unauthorized domains to access
     the resources.
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 将文件移动到不同的位置后，下一步是将文件标记为所有用户都可以访问的文件类型，但该类型不会受到 UBAC 特性限制。具有 `ubac_constrained_type`
+    属性的文件类型不能用于共享，因此创建一个新的文件类型，将其标记为常规文件。然后，用户域被授予此类型的管理权限（不仅可以管理文件，还可以将文件重新标记为 `user_share_t`
+    类型或从其标记为 `user_share_t` 类型）。这确保了 SELinux 不会阻止对共享资源的访问，同时仍然防止未经授权的域访问这些资源。
 - en: It might also be sufficient to pick a file type that is already accessible by
     users, such as the `nfs_t` type (if the SELinux Boolean, `use_nfs_home_dirs`,
     is set). However, assigning a type that is functionally used for different reasons
     (`nfs_t` is for NFS-mounted filesystems) might open up access to these resources
     from other domains as well. As such, administrators need to carefully consider
     the reasons for and the consequences of each choice.
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 也可以选择一个已经被用户访问的文件类型，例如 `nfs_t` 类型（前提是 SELinux 布尔值 `use_nfs_home_dirs` 已设置）。然而，分配一个功能上用于不同目的的类型（`nfs_t`
+    用于 NFS 挂载的文件系统）可能会导致其他域也能访问这些资源。因此，管理员需要仔细考虑每个选择的理由和后果。
 - en: After labeling the `/home/share/` location with the `user_share_t` type, the
     original user copies the resources to the new location and removes them from the
     current one. This approach (copy and remove) is used to ensure that resources
@@ -559,59 +820,86 @@
     the case with a move (`mv`) command. In more recent `coreutils` packages, support
     for `mv -Z` is made available, which allows you to move the resources directly
     while still giving the resources a proper context.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 `/home/share/` 位置标记为 `user_share_t` 类型后，原始用户将资源复制到新位置，并从当前目录中删除它们。这种方法（复制并删除）用于确保资源继承目标位置的标签（`user_share_t`），而不是保持与原始文件位置（`user_home_t`）相关联的标签，这在使用
+    `mv` 命令移动文件时会发生。最近的 `coreutils` 包提供了对 `mv -Z` 的支持，可以直接移动资源，同时仍然为资源提供正确的上下文。
 - en: 'A third approach for the user would be to move the resources first and then
     relabel them:'
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 用户的第三种方法是先移动资源，然后重新标记它们：
 - en: '[PRE18]'
+  id: totrans-117
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: Finally, with all SELinux rules and support in place, the file access controls
     are enabled on the shared resources, and a default ACL is enabled so that write
     operations by other users will automatically inherit the proper ACL on the written
     resource as well, making sure that all users cooperating on the shared resource
     don't need to continuously set ACLs on the files.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，在所有 SELinux 规则和支持到位后，文件访问控制将在共享资源上启用，并且启用默认的 ACL，以便其他用户的写操作会自动继承写入资源上的正确
+    ACL，确保所有在共享资源上合作的用户无需不断地设置文件的 ACL。
 - en: Without the default ACLs, other users might create files inside `sharedfiles/`
     that have no ACLs set, disallowing other users to access the resources.
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果没有默认的 ACL，其他用户可能会在 `sharedfiles/` 中创建没有设置 ACL 的文件，从而阻止其他用户访问这些资源。
 - en: There's more...
+  id: totrans-120
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'Another approach that could be taken is to use the `setgid` group ownership.
     For instance, if all users that participate in the shared files access are in
     a `shrgrp` group, then the following will automatically have all files created
     inside the mentioned directory have the `shrgrp` group ownership defined as well:'
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一种可行的方法是使用 `setgid` 组所有权。例如，如果所有参与共享文件访问的用户都在 `shrgrp` 组中，则以下设置将自动使在该目录中创建的所有文件都具有
+    `shrgrp` 组所有权：
 - en: '[PRE19]'
+  id: totrans-122
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: This does require the users to have a proper `umask` setting (such as `007`
     or less) so that the group permission on the newly created resource allows read
     and write accesses for group members.
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 这要求用户具有正确的 `umask` 设置（例如 `007` 或更低），以便新创建资源的组权限允许组成员读取和写入。
 - en: Enabling polyinstantiated directories
+  id: totrans-124
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 启用多实例目录
 - en: On Linux and Unix systems, the `/tmp/` and `/var/tmp/` locations are world writable.
     They are used to provide a common location for temporary files and are protected
     through the sticky bit so that users cannot remove files they don't own from the
     directory, even though the directory is world writable.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 Linux 和 Unix 系统中，`/tmp/` 和 `/var/tmp/` 位置是所有用户可写的。它们用于提供一个公共的临时文件位置，并通过粘滞位进行保护，以防止用户删除他们不拥有的文件，尽管该目录是世界可写的。
 - en: But despite this measure, there is a history of attacks against the `/tmp/`
     and `/var/tmp/` locations, such as race conditions with symbolic links and information
     leakage through (temporary or not) world or group-readable files generated within.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管采取了这种措施，但 `/tmp/` 和 `/var/tmp/` 位置仍然存在攻击历史，例如符号链接的竞态条件以及通过（临时或非临时）世界或组可读文件泄露信息。
 - en: 'Polyinstantiated directories provide a neat solution to this problem: users
     get their own, private `/tmp/` and `/var/tmp/` instance. These directory instances
     are created upon login on a different location, but then made visible (mounted)
@@ -619,61 +907,90 @@
     mount is local to the user session through the use of Linux namespaces—other users
     have their own view on the mounts, and for administrators, polyinstantiation is
     not enabled, so they keep a global view on the system.'
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 多实例目录为此问题提供了一个简洁的解决方案：用户获得自己的、私有的 `/tmp/` 和 `/var/tmp/` 实例。这些目录实例在登录时会在不同的位置创建，然后在该特定用户会话中将其显示（挂载）到
+    `/tmp/` 和 `/var/tmp/` 位置。通过使用 Linux 命名空间，这种挂载对用户会话是本地的——其他用户有他们自己对挂载的视图，对于管理员来说，多实例化未启用，因此他们保持系统的全局视图。
 - en: How to do it…
+  id: totrans-128
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'To enable polyinstantiation of `/tmp/` and `/var/tmp/`, the following steps
     should be followed:'
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 要启用 `/tmp/` 和 `/var/tmp/` 的多实例化，请遵循以下步骤：
 - en: 'Create the `/tmp-inst/` and `/var/tmp/tmp-inst/` locations:'
+  id: totrans-130
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建 `/tmp-inst/` 和 `/var/tmp/tmp-inst/` 位置：
 - en: '[PRE20]'
+  id: totrans-131
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'Set the label for these locations as `tmp_t`:'
+  id: totrans-132
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 为这些位置设置标签为 `tmp_t`：
 - en: '[PRE21]'
+  id: totrans-133
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'Edit `/etc/security/namespace.conf` and add in the following definitions:'
+  id: totrans-134
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑 `/etc/security/namespace.conf` 并添加以下定义：
 - en: '[PRE22]'
+  id: totrans-135
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'Edit the PAM configuration file used by logins, such as `system-login`, and
     add the following line to the session group after the `pam_selinux.so` one:'
+  id: totrans-136
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑用于登录的 PAM 配置文件，例如 `system-login`，并在 `pam_selinux.so` 后面的 session 组中添加以下行：
 - en: '[PRE23]'
+  id: totrans-137
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'Enable the `allow_polyinstantiation` SELinux Boolean:'
+  id: totrans-138
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 启用 `allow_polyinstantiation` SELinux 布尔值：
 - en: '[PRE24]'
+  id: totrans-139
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: How it works…
+  id: totrans-140
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 工作原理……
 - en: The system preparation for polyinstantiated directories requires that the directories
     themselves are available and have the proper permissions set. When the parent
     directory, such as `/tmp/`, is a tmpfs mount, then we cannot have the polyinstantiated
@@ -683,329 +1000,471 @@
     can still opt to have this location itself as a tmpfs mount—the important thing
     is that the directory must exist and have the proper permissions (which is represented
     by the `000` permission set).
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 多实例目录的系统准备工作要求这些目录本身可用并具有正确的权限设置。当父目录（如 `/tmp/`）是 tmpfs 挂载时，我们不能在其中创建多实例目录（例如
+    `/tmp/tmp-inst/`），因为该目录在重启后会消失（除非通过 `init` 脚本添加）；因此，将 `/tmp-inst/` 设置为单独的位置是必要的。当然，管理员仍然可以选择将该位置本身设置为
+    tmpfs 挂载——重要的是该目录必须存在并具有正确的权限（由 `000` 权限集表示）。
 - en: In the example, `/var/tmp/` is assumed not to be a tmpfs mount, so we can define
     the polyinstantiated directories inside of it.
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: 在示例中，假设 `/var/tmp/` 不是一个 tmpfs 挂载，因此我们可以在其中定义多实例目录。
 - en: 'The configuration file for polyinstantiated directories is the `namespace.conf`
     file under `/etc/security/`. In it, the mount-point is mentioned together with
     the directory in which the polyinstantiated directories are created:'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 多实例化目录的配置文件是位于`/etc/security/`下的`namespace.conf`文件。在其中，挂载点与创建多实例化目录的目录一起列出：
 - en: '[PRE25]'
+  id: totrans-144
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: The third column defines the method for polyinstantiation. On non-SELinux systems,
     the most common method used is the `user` method, which creates directories based
     on the username. On SELinux-enabled systems, the method must be either `level`
     or `context`.
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 第三列定义了多实例化的方法。在非 SELinux 系统中，最常用的方法是`user`方法，它基于用户名创建目录。在启用 SELinux 的系统中，方法必须是`level`或`context`。
 - en: In case of the `level` method, the directories are created based on the username
     and MLS level of the user session. The `context` method has directories created
     based on the username and security context. This allows for hiding temporary data
     based on the role of the user, so accidental data leakage is less likely to occur.
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`level`方法的情况下，目录是基于用户名和用户会话的MLS级别创建的。`context`方法则是基于用户名和安全上下文创建目录。这使得可以根据用户的角色隐藏临时数据，从而减少意外数据泄露的可能性。
 - en: 'Administrators can access the polyinstantiated directories as they are excluded
     from the polyinstantiation: the excluded list of users is configured as the fourth
     column in the `namespace.conf` file. Administrators can still see the directories
     that are created dynamically:'
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 管理员可以访问多实例化目录，因为它们被排除在多实例化之外：排除的用户列表在`namespace.conf`文件的第四列中配置。管理员仍然可以看到动态创建的目录：
 - en: '[PRE26]'
+  id: totrans-148
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Next, the PAM configuration file(s) are modified to enable the `pam_namespace.so`
     library. To find the PAM configuration files that need to be edited, look for
     the PAM configuration files that call `pam_selinux.so`:'
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，修改 PAM 配置文件以启用`pam_namespace.so`库。要找到需要编辑的 PAM 配置文件，请查找调用`pam_selinux.so`的
+    PAM 配置文件：
 - en: '[PRE27]'
+  id: totrans-150
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: In this example, the `system-login` PAM configuration file is the only file
     calling `pam_selinux.so`, so the `pam_namespace.so` line is added to this file.
     The line must be added after the `pam_selinux.so` call as the `pam_namespace.so`
     file uses the context of the user to decide how to call the instantiated directory.
     If `pam_selinux.so` has not been called yet, then this information is not available
     and the logon will fail.
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此示例中，`system-login` PAM 配置文件是唯一调用`pam_selinux.so`的文件，因此在该文件中添加了`pam_namespace.so`行。该行必须添加在`pam_selinux.so`调用之后，因为`pam_namespace.so`文件使用用户的上下文来决定如何调用实例化的目录。如果`pam_selinux.so`尚未被调用，则无法获取此信息，导致登录失败。
 - en: Finally, the SELinux Boolean, `allow_polyinstantiation`, is enabled so that
     the proper domains have the privilege to create (and change the contexts of) the
     proper directories, to use namespaces, to check user context, and more.
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，启用 SELinux 布尔值`allow_polyinstantiation`，使得适当的域具有创建（并更改上下文）适当目录、使用命名空间、检查用户上下文等的权限。
 - en: There's more...
+  id: totrans-153
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: Administrators can go further than just having the directories created when
     needed. During the setup of polyinstantiated directories, a script called `namespace.init`,
     which is available at `/etc/security/` is called to further handle the creation
     and modification of those directories.
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 管理员可以进一步操作，不仅仅是在需要时创建目录。在多实例化目录的设置过程中，会调用名为`namespace.init`的脚本，该脚本位于`/etc/security/`目录下，用于进一步处理这些目录的创建和修改。
 - en: This script can be adjusted to copy files towards the instantiated directory
     (the file usually contains this logic already for polyinstantiated home directories)
     or do other changes, allowing to further tune the setup for a user session.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 此脚本可以调整为将文件复制到实例化目录（该文件通常已经包含多实例化主目录的逻辑），或进行其他更改，进一步调整用户会话的设置。
 - en: The `systemd init` system also has support for polyinstantiated `/tmp/` directories
     through the `PrivateTmp` directive, which provides a private `/tmp/` directory
     for a service rather than end users.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: '`systemd init`系统也支持通过`PrivateTmp`指令为服务提供私有的`/tmp/`目录，而不是为最终用户提供。'
 - en: Configuring capabilities instead of setuid binaries
+  id: totrans-157
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 配置能力而非 setuid 二进制文件
 - en: 'Linux capabilities allow for course-grained kernel security authorizations
     on the user and application levels. Before capabilities existed, administrators
     could only grant additional privileges to users through `setuid` applications:
     applications which, when executed, inherit the privileges of the owner of the
     application (usually, `root`). With capabilities, the set of privileges can be
     restricted further.'
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 能力允许在用户和应用层面上进行粗粒度的内核安全授权。在能力机制出现之前，管理员只能通过 `setuid` 应用程序为用户授予额外的权限：这些应用程序在执行时会继承应用程序所有者的权限（通常是
+    `root`）。有了能力机制后，权限集合可以进一步限制。
 - en: For instance, the `ping` application can be granted the `cap_net_raw` capability,
     so it does not need to be `setuid` anymore. Depending on the setup, either users
     need to be granted the possible use of the capability (if the application has
     the proper flag set) or the capability is granted immediately (regardless of user
     settings).
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，可以为 `ping` 应用程序授予 `cap_net_raw` 能力，这样它就不再需要 `setuid`。根据不同的配置，可能需要为用户授予使用该能力的权限（如果应用程序已设置了相应的标志），或者立即授予该能力（不考虑用户设置）。
 - en: How to do it…
+  id: totrans-160
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'To use capabilities with SELinux, execute the following steps:'
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 要与 SELinux 一起使用能力，请执行以下步骤：
 - en: 'Enable the capabilities that are needed for an application on the application
     binary:'
+  id: totrans-162
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 启用应用程序所需的能力，作用于应用程序二进制文件：
 - en: '[PRE28]'
+  id: totrans-163
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'For the users that are allowed to use the `net_raw` capability, add the proper
     configurations in `/etc/security/capability.conf` (one line per user):'
+  id: totrans-164
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 对于允许使用 `net_raw` 能力的用户，在 `/etc/security/capability.conf` 中添加适当的配置（每个用户一行）：
 - en: '[PRE29]'
+  id: totrans-165
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: SELinux domains that will use the capability need to be granted the use of it.
     For common applications, this is usually already in place.
+  id: totrans-166
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将使用该能力的 SELinux 域需要获得使用该能力的权限。对于常见的应用程序，通常这些权限已经设置好。
 - en: '[PRE30]'
+  id: totrans-167
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'SELinux domains that are allowed to modify the capability set assigned to their
     process(es) must have the `setcap` privilege set:'
+  id: totrans-168
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 被允许修改其进程能力集的 SELinux 域，必须具有 `setcap` 权限：
 - en: '[PRE31]'
+  id: totrans-169
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'Edit the PAM configuration file(s) for the services through which the capabilities
     are allowed, and add the following line to the `auth` configuration block:'
+  id: totrans-170
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑 PAM 配置文件，通过相应的服务来允许使用能力，并在 `auth` 配置块中添加以下行：
 - en: '[PRE32]'
+  id: totrans-171
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'If capabilities need to be tracked/audited, SELinux''s `auditallow` statement
     can be used:'
+  id: totrans-172
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果需要追踪/审计能力，可以使用 SELinux 的 `auditallow` 语句：
 - en: '[PRE33]'
+  id: totrans-173
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: How it works…
+  id: totrans-174
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: The capabilities that a process is currently allowed to use are called the permitted
     capabilities. The capabilities that are active are the effective capabilities.
     A third set of capabilities are inheritable capabilities.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 当前进程允许使用的能力称为已许可的能力。处于活动状态的能力是有效的能力。第三种能力集合是可继承的能力。
 - en: 'In the example, we enabled the `cap_net_raw` capability for the `ping` application
     and marked the capability as effective if it is inherited. In other words, it
     is not enabled (permitted) by default. If we want to enable the `cap_net_raw`
     capability immediately, we would use the effective and permitted set:'
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 在示例中，我们为 `ping` 应用程序启用了 `cap_net_raw` 能力，并标记为如果继承时生效。换句话说，默认情况下它并不会启用（允许）。如果我们希望立即启用
+    `cap_net_raw` 能力，则需要使用有效且已许可的权限集：
 - en: '[PRE34]'
+  id: totrans-177
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'Applications that are capability-aware do not need to have the `effective`
     bit set. They will enable (and drop) the capabilities as they are needed through
     the proper system calls (which is why the `setcap` permission is needed for these
     domains). If `ping` was capability-aware, then the following would be sufficient
     for our example:'
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 支持能力的应用程序不需要设置 `effective` 位。它们将在需要时通过适当的系统调用来启用（和丢弃）这些能力（这就是为什么这些领域需要 `setcap`
+    权限的原因）。如果 `ping` 支持能力，那么以下设置对我们的示例就足够了：
 - en: '[PRE35]'
+  id: totrans-179
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: Next, the users that are allowed the `cap_net_raw` capability (through the selected
     set of applications) need to be granted the `cap_net_raw` capability in their
     inherited capability set. This is done through the `capability.conf` file in `/etc/security/`
     and by calling the `pam_cap.so` module from within the proper PAM configuration
     files. The use of PAM configuration files also allows us to differentiate capabilities
     based on the service through which a user logs on.
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，允许使用 `cap_net_raw` 能力的用户（通过所选应用程序）需要在其继承的能力集中获得 `cap_net_raw` 能力。这可以通过 `/etc/security/`
+    中的 `capability.conf` 文件以及通过在正确的 PAM 配置文件中调用 `pam_cap.so` 模块来实现。使用 PAM 配置文件还允许我们根据用户登录的服务来区分能力。
 - en: 'To check the currently enabled capabilities, users can execute the `capsh`
     application:'
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 要检查当前启用的能力，用户可以执行`capsh`应用：
 - en: '[PRE36]'
+  id: totrans-182
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'To see the capabilities on a file, the `getcap` application can be used:'
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 要查看文件上的能力，可以使用`getcap`应用：
 - en: '[PRE37]'
+  id: totrans-184
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: Finally, auditing the use of capabilities through the `auditallow` statement
     tells us when (and by whom) a capability was used, although the same can be accomplished
     without an SELinux policy using the Linux audit subsystem, auditing for the `setcap`
     system call.
+  id: totrans-185
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，通过`auditallow`语句审计能力的使用情况，可以告诉我们何时（以及由谁）使用了某个能力，尽管同样的事情可以通过Linux审计子系统在没有SELinux策略的情况下完成，审计`setcap`系统调用。
 - en: See also
+  id: totrans-186
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参阅
 - en: Capabilities are well explained in Chris Friedhoff's **POSIX Capabilities &
     File POSIX Capabilities** page ([http://www.friedhoff.org/posixfilecaps.html](http://www.friedhoff.org/posixfilecaps.html))
+  id: totrans-187
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 能力在Chris Friedhoff的**POSIX能力与文件POSIX能力**页面中得到了很好的解释（[http://www.friedhoff.org/posixfilecaps.html](http://www.friedhoff.org/posixfilecaps.html)）
 - en: Using group membership for role-based access
+  id: totrans-188
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用组成员关系进行基于角色的访问控制
 - en: 'In larger environments, access controls are usually granted based on group
     membership. Group membership is easier to manage than individual permissions:
     just adding or removing users from a group automatically grants or revokes permissions,
     and administrators can easily find out which permission(s) a user will have based
     on the group membership.'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 在更大的环境中，访问控制通常基于组成员关系授予。与单独的权限管理相比，组成员关系更容易管理：只需将用户添加或移出组即可自动授予或撤销权限，管理员可以轻松地根据组成员关系找出用户将拥有哪些权限。
 - en: How to do it…
+  id: totrans-190
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'In order to use group membership as a high-level method for assigning permissions,
     administrators need to take care of the following aspects:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了使用组成员关系作为分配权限的高级方法，管理员需要注意以下方面：
 - en: 'Add user(s) to the groups they should belong to:'
+  id: totrans-192
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将用户添加到他们应属于的组中：
 - en: '[PRE38]'
+  id: totrans-193
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'Assign the proper SELinux user to the group:'
+  id: totrans-194
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将适当的SELinux用户分配给该组：
 - en: '[PRE39]'
+  id: totrans-195
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: 'Restrict binaries and libraries that should only be called by a specific group:'
+  id: totrans-196
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 限制仅应由特定组调用的二进制文件和库：
 - en: '[PRE40]'
+  id: totrans-197
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'Use group notation inside the `sudoers` file to grant specific privileges to
     group members:'
+  id: totrans-198
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在`sudoers`文件中使用组表示法将特定权限授予组成员：
 - en: '[PRE41]'
+  id: totrans-199
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: How it works…
+  id: totrans-200
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: Using groups makes permission handling much easier. In the end, this allows
     administrators to just handle group membership for users and automatically assign
     privileges based on the groups.
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用组使得权限管理变得更加简单。最终，这使得管理员只需管理用户的组成员关系，并根据组自动分配权限。
 - en: 'We can grant groups an SELinux user, and through the group membership decide
     which SELinux user a regular user is logged into. Of course, users can belong
     to multiple groups. For SELinux, it is the order of the `seusers` file that decides
     which of the following mappings are used:'
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以为组授予一个SELinux用户，并通过组成员关系决定普通用户登录的SELinux用户。当然，用户可以属于多个组。对于SELinux来说，是`seusers`文件的顺序决定以下映射的使用：
 - en: SELinux user mappings for individual users take precedence over group mappings
+  id: totrans-203
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 单个用户的SELinux用户映射优先于组映射
 - en: The first group mapping in the `seusers` file that uses a group that the Linux
     user is a member of decides the SELinux user mapping if no individual SELinux
     user mappings exist for this user
+  id: totrans-204
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果没有为该用户定义单独的SELinux用户映射，那么在`seusers`文件中第一个使用该Linux用户所属组的组映射将决定SELinux用户映射。
 - en: As such, if a user is a member of two groups (say, `dba` and `web`) and there
     are mappings to both `dbadm_u` (for the `dba` group) and `webadm_u` (for the `web`
     group), then the first mapping in the `seusers` file will decide what the user's
     SELinux user will be.
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，如果一个用户是两个组的成员（例如，`dba`和`web`），并且这两个组分别有映射到`dbadm_u`（针对`dba`组）和`webadm_u`（针对`web`组），那么`seusers`文件中第一个映射将决定该用户的SELinux用户。
 - en: In order to override this, either add the user individually or create another
     group (say, `dbaweb`), grant the user this group as well, and put that group mapping
     at the beginning of the list in the `seusers` file.
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了覆盖此行为，您可以单独添加用户，或创建另一个组（比如`dbaweb`），将该用户也加入该组，并将该组映射放在`seusers`文件中的最前面。
 - en: When only a specific user group is allowed access to an application, but that
     application does not use any specific SELinux domains, then it might be more flexible
     for administrators to use the Linux DAC permissions to restrict access to the
     application. By only allowing a specific group (`dev`, in our example), read and
     execute rights on the application and application libraries, we can restrict access
     easily.
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
 - en: Another approach is to label the files with new SELinux types and grant the
     proper domains access to those types. However, this might lead to a large set
     of domains needing access to the types (and so requires massive policy development
     effort), whereas the Linux DAC approach is easily implemented.
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
 - en: Backing up and restoring files
+  id: totrans-209
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -1013,39 +1472,47 @@
     is to provide backup and restore services. For many, having a copy of the files
     available might seem sufficient as a backup approach. However, backups should
     contain more than just the content of a file.
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it…
+  id: totrans-211
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'When selecting a backup solution, make sure to check for the following:'
+  id: totrans-212
   prefs: []
   type: TYPE_NORMAL
 - en: A selection of the extended attributes of the files should be backed up as well
     (and not only the `security.selinux` one).
+  id: totrans-213
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: When files are restored onto their original location, the SELinux context should
     be restored with it as well. If the backup solution doesn't support SELinux contexts,
     the `restorecon` command should be invoked afterwards against the restored file(s).
+  id: totrans-214
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: When files are restored into a temporary area, the SELinux context should not
     be restored. Instead, the administrator should put the file back in place and
     restore the context afterwards.
+  id: totrans-215
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: The SELinux configuration in `/etc/selinux/` should definitely be backed up,
     even if no full system backups are used. Whenever the policy or file context definitions
     are altered, these should be backed up as well whenever files are backed up.
+  id: totrans-216
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: How it works…
+  id: totrans-217
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1053,41 +1520,51 @@
     functioning of a policy is based on the labels of all objects involved, not backing
     up and restoring the file labels might jeopardize the functioning of the system
     after a restore operation.
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
 - en: 'When the backup solution does not support extended attributes, it is important
     that all labels are properly set through the `semanage fcontext` command. This
     is the only way to make sure that, after a restore, the admin can run `restorecon`
     against the restored files in order to reset the file labels:'
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE42]'
+  id: totrans-220
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'However, it is seriously recommended to select a backup solution that supports
     extended attributes as many other Linux-related settings are stored as extended
     attributes. The file ACLs, for instance, are stored as extended attributes as
     well:'
+  id: totrans-221
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE43]'
+  id: totrans-222
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Other examples of extended attributes that can be used on a system are PaX
     markings (`user.pax.flags`), IMA and EVM hashes (`security.ima` and `security.evm`),
     and capabilities (`security.capability`). But herein lies the problem as well:
     some attributes shouldn''t (or cannot) be restored. The IMA and EVM attributes,
     for instance, are handled by the Linux kernel and cannot be manipulated by user
     utilities.'
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
 - en: Alongside the file labels, backing up and restoring the SELinux policy should
     be integrated as well, especially on a system with a modified SELinux policy.
     If a policy is different after a restore, then types might be missing and labels
     might become invalid.
+  id: totrans-224
   prefs: []
   type: TYPE_NORMAL
 - en: Governing application network access
+  id: totrans-225
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
@@ -1096,62 +1573,80 @@
     access to a service from unauthorized systems. We can also use `iptables` to identify
     and label network packets, allowing only authorized applications (domains) to
     send or receive those network packets.
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
 - en: 'By default, the SELinux policy supports client and server packets and allows
     the usual domains access to their client and/or server packets. For instance,
     the web server domains (such as `httpd_t`) will have the privileges to send and
     receive `http_server_packet_t` packets:'
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE44]'
+  id: totrans-228
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: This is provided through the `corenet_sendrecv_http_server_packets` interface.
     Enabling packet labeling is simply done using `iptables` as will be shown through
     this recipe. But to properly govern network access, custom packet types will need
     to be created to ensure that no default allowed access is used.
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
 - en: How to do it…
+  id: totrans-230
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'To only allow authorized domains access to particular network packets (datagrams
     and data streams), use the following approach:'
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
 - en: Identify the flow that needs to be allowed. For instance, we might only want
     DNS requests from `10.11.12.0/24` to be accepted by the `dnsmasq_t` domain, and
     requests from `10.13.14.0/24` to be accepted by the `named_t` domain.
+  id: totrans-232
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: 'Create two new packet types:'
+  id: totrans-233
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE45]'
+  id: totrans-234
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: 'Allow the domains send and receive privileges for these packets:'
+  id: totrans-235
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE46]'
+  id: totrans-236
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: 'Label the incoming traffic accordingly:'
+  id: totrans-237
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '[PRE47]'
+  id: totrans-238
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: How it works…
+  id: totrans-239
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
@@ -1159,6 +1654,7 @@
     can be governed using an SELinux policy. Even though multiple applications can
     accept incoming DNS requests, this recipe shows how to ensure that only one application
     can deal with requests that have passed a certain filter.
+  id: totrans-240
   prefs: []
   type: TYPE_NORMAL
 - en: Whenever a SECMARK label is enabled with `iptables`, the Linux kernel will automatically
@@ -1168,19 +1664,24 @@
     interface (or the `kernel_sendrecv_unlabeled_packets` interface). However, if
     that is not the case, then those domains will not be able to handle network traffic
     anymore.
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
 - en: 'As such, it is advised to use the standard labeling for other incoming (and
     outgoing) traffic. To identify which incoming traffic should be labeled, we can
     leverage assistance from the `netstat` output:'
+  id: totrans-242
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE48]'
+  id: totrans-243
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: Based on this output, labeling the appropriate traffic as `mysqld_server_packet_t`
     and `http_server_packet_t` will allow those domains to access their incoming network
     traffic.
+  id: totrans-244
   prefs: []
   type: TYPE_NORMAL
 - en: By creating additional types for `dnsmasq_t` and `named_t`, those applications
@@ -1189,39 +1690,49 @@
     labeling will still ensure that DNS requests from the previously identified network
     segments cannot be used by the wrong DNS server, even though the flow is allowed
     firewall-wise.
+  id: totrans-245
   prefs: []
   type: TYPE_NORMAL
 - en: 'With `sesearch`, interrogating the policy to see which applications (domains)
     are able to send and receive certain packets is easy:'
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
 - en: '[PRE49]'
+  id: totrans-247
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: The same approach can be taken from a client level. A mail server might need
     to connect to other mail servers, which means that the outgoing data can be labeled
     as `mail_client_packet_t` (if we use the default traffic). However, if we want
     to make sure only the mail server can connect to other mail servers (and no other
     domains that also have privileges to send and receive the `mail_client_packet_t`
     packets), then a new packet type can be used.
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
 - en: See also
+  id: totrans-249
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'For more information about SECMARK labeling, read up on the following resources:'
+  id: totrans-250
   prefs: []
   type: TYPE_NORMAL
 - en: '[http://www.selinuxproject.org/page/NB_Networking](http://www.selinuxproject.org/page/NB_Networking)'
+  id: totrans-251
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: Paul Moore's **Transitioning to Secmark** at [http://paulmoore.livejournal.com/4281.html](http://paulmoore.livejournal.com/4281.html)
+  id: totrans-252
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: James Morris's **New Secmark-based network controls for SELinux** at [http://james-morris.livejournal.com/11010.html](http://james-morris.livejournal.com/11010.html)
+  id: totrans-253
   prefs:
   - PREF_UL
   type: TYPE_NORMAL

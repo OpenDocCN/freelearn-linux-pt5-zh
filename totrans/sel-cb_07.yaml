@@ -1,0 +1,1497 @@
+- en: Chapter 7. Choosing the Confinement Level
+  id: totrans-0
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 第7章 选择约束级别
+- en: 'In this chapter, we will cover the following recipes:'
+  id: totrans-1
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在本章中，我们将介绍以下教程：
+- en: Finding common resources
+  id: totrans-2
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 查找共享资源
+- en: Defining common helper domains
+  id: totrans-3
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 定义公共辅助域
+- en: Documenting common privileges
+  id: totrans-4
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 记录公共权限
+- en: Granting privileges to all clients
+  id: totrans-5
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 授予所有客户端特权
+- en: Creating a generic application domain
+  id: totrans-6
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 创建通用应用程序域
+- en: Building application-specific domains using templates
+  id: totrans-7
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 使用模板构建应用程序特定的域
+- en: Using fine-grained application domain definitions
+  id: totrans-8
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 使用细粒度的应用程序域定义
+- en: Introduction
+  id: totrans-9
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 介绍
+- en: 'During the development of additional policies, developers can opt to use a
+    very fine-grained policy model, a domain-per-application model, or a coarse-grained,
+    functionality-based policy model. The relationship between these confinement models
+    is shown in the following diagram:'
+  id: totrans-10
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在额外政策的开发过程中，开发人员可以选择使用非常细粒度的政策模型、每个应用程序一个域的模型，或者粗粒度的、基于功能的政策模型。这些约束模型之间的关系如下图所示：
+- en: '![Introduction](img/9669OS_07_01.jpg)'
+  id: totrans-11
+  prefs: []
+  type: TYPE_IMG
+  zh: '![介绍](img/9669OS_07_01.jpg)'
+- en: 'In very fine-grained policies, multiple domains are defined, so functionally
+    different processes of the same application are all running in their own specialized
+    SELinux domain. A coarse-grained policy, on the other hand, allows to have different
+    applications with a similar functionality run with the same context. Application-level
+    policies are somewhere in the middle: they focus on one domain (or a very small
+    set of domains) for one application.'
+  id: totrans-12
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在非常细粒度的政策中，定义了多个域，因此同一个应用程序中功能不同的进程都运行在各自的专门SELinux域中。而粗粒度的政策则允许具有相似功能的不同应用程序使用相同的上下文。应用程序级别的政策则介于两者之间：它们专注于一个域（或非常少量的域）来处理一个应用程序。
+- en: Most policies are developed using a **one domain per application** principle.
+    Still, the choice of development patterns in policy development reflects the confinement
+    level of an application, as shared, coarse-grained policies might allow for more
+    interaction between applications and resources than intended, whereas, a fine-grained
+    policy is much harder to develop and maintain.
+  id: totrans-13
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 大多数政策采用**每个应用程序一个域**的原则进行开发。然而，政策开发中选择的开发模式反映了应用程序的约束级别，因为共享的粗粒度政策可能会导致应用程序与资源之间的互动超过预期，而细粒度的政策则更难开发和维护。
+- en: When we look at a functional level, we usually focus on shared resources or
+    resources that cannot be tied to a particular application. An example is the `mta`
+    SELinux policy, which manages the main infrastructure-related shared content such
+    as e-mail aliases (`etc_mail_t`), user mailboxes (`mail_home_rw_t`), e-mail spool
+    files (`mail_spool_t`), and more.
+  id: totrans-14
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 从功能层面来看，我们通常关注共享资源或那些无法与特定应用程序绑定的资源。一个例子是`mta` SELinux政策，它管理与基础设施相关的共享内容，例如电子邮件别名（`etc_mail_t`）、用户邮箱（`mail_home_rw_t`）、电子邮件传送文件（`mail_spool_t`）等。
+- en: Finding common resources
+  id: totrans-15
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 查找共享资源
+- en: During policy development, some of the resources used by the policy are or could
+    be shared with other policies. If that is the case, a functionality-driven policy
+    module is created in which those common resources are placed. This allows other
+    policies to use these resources and assign the right permissions through the interfaces
+    declared in the functionality-driven policy.
+  id: totrans-16
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在政策开发过程中，政策所使用的一些资源可能会与其他政策共享。若是这样，就会创建一个功能驱动的政策模块，将这些公共资源放在其中。这允许其他政策通过功能驱动政策中声明的接口使用这些资源并分配正确的权限。
+- en: How to do it…
+  id: totrans-17
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 如何执行……
+- en: 'Most of the work in this recipe is to figure out what resources are shared.
+    This is done by completing the following steps:'
+  id: totrans-18
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 本教程中的大部分工作是弄清楚哪些资源是共享的。通过完成以下步骤来实现：
+- en: Look for common files and directories that might be shared with other applications
+    and whose ownership is not specifically tied to an application, but is more functional
+    in nature. For these resources, declare them in a functionality-driven policy.
+  id: totrans-19
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 寻找可能与其他应用程序共享的公共文件和目录，这些文件和目录的所有权不是专门与某个应用程序绑定的，而是更具有功能性的。对于这些资源，将它们声明在功能驱动的政策中。
+- en: Check whether there are devices used that are functionally related to the policy
+    but not to a specific application in particular.
+  id: totrans-20
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 检查是否有与政策功能相关但不特定于某个应用程序的设备。
+- en: 'Validate if there is specific user-provided content that is functionally related
+    but not tied to a particular application, and where the default user content types
+    (such as `user_home_t`) are better not used. These resources need to be declared
+    in the functionality-driven policy and probably made customizable as well:'
+  id: totrans-21
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 验证是否存在特定用户提供的内容，这些内容在功能上相关但不与特定应用程序绑定，并且在这些情况下最好不要使用默认的用户内容类型（例如 `user_home_t`）。这些资源需要在功能驱动的策略中声明，并可能需要可定制化：
+- en: '[PRE0]'
+  id: totrans-22
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE0]'
+- en: 'Create the proper interfaces to handle or interact with these common resources:'
+  id: totrans-23
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 创建适当的接口来处理或与这些共享资源交互：
+- en: '[PRE1]'
+  id: totrans-24
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE1]'
+- en: How it works…
+  id: totrans-25
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 它是如何工作的…
+- en: Functionality-driven policy modules handle common resources for multiple applications
+    and policies. Some example policies that handle the functional resources for multiple
+    applications are the mail transfer agent policy (`mta`) and the web server policy
+    (`apache`). Although the web server policy was originally intended to be purely
+    for the Apache HTTPd, it has since evolved into a more functionality-driven policy
+    supporting a large amount of web server technologies.
+  id: totrans-26
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 功能驱动的策略模块处理多个应用程序和策略的共享资源。处理多个应用程序功能资源的一些示例策略包括邮件传输代理策略（`mta`）和 Web 服务器策略（`apache`）。尽管
+    Web 服务器策略最初仅用于 Apache HTTPd，但它已经发展成一个更多功能驱动的策略，支持大量的 Web 服务器技术。
+- en: Shared file locations
+  id: totrans-27
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 共享文件位置
+- en: A helpful method for finding out what resources are considered to be functional
+    in nature (rather than application-specific) is to imagine switching one application
+    in favor of another. What resource types would remain the same if we switch from
+    one system logger (say `syslog-ng`) to another (say `rsyslog`), or from Courier-IMAP
+    to Cyrus? Having knowledge of multiple similar applications helps in finding out
+    where (or what) the shared locations are.
+  id: totrans-28
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 找出哪些资源被认为是功能性的（而非应用特定的）一个有用的方法是设想将一个应用程序替换为另一个。如果我们将一个系统日志记录器（例如 `syslog-ng`）换成另一个（例如
+    `rsyslog`），或者将 Courier-IMAP 换成 Cyrus，哪些资源类型会保持不变？了解多个类似的应用程序有助于发现共享位置在哪里（或是什么）。
+- en: 'However, having similar functional requirements doesn''t necessarily make them
+    shared. The locations should also remain the same (or at least be consistent and
+    on well-known locations). Consider database files: the database files for PostgreSQL
+    and SQLite databases both have the same functional purpose, but it makes no sense
+    to label them both with the same label. Database files are specific to a particular
+    database implementation and require specific labels, so with every potential common
+    resource, make sure that the resource itself can be shared across multiple implementations.'
+  id: totrans-29
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然而，具有相似功能需求并不一定意味着它们是共享的。位置也应保持一致（或至少保持一致并位于众所周知的位置）。考虑数据库文件：PostgreSQL 和 SQLite
+    数据库的数据库文件具有相同的功能目的，但将它们都标记为相同的标签是没有意义的。数据库文件是特定于某个数据库实现的，并需要特定的标签，因此在每个潜在的共享资源中，确保该资源本身可以在多个实现之间共享。
+- en: 'Device nodes are a nice example to consider for a functionality-driven policy.
+    An example device type definition would look like the following:'
+  id: totrans-30
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 设备节点是一个很好的功能驱动策略示例。一个示例的设备类型定义可能如下所示：
+- en: '[PRE2]'
+  id: totrans-31
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE2]'
+- en: Devices are usually shared across multiple applications. Most devices are defined
+    in the `devices.te` policy module with the proper interfaces being declared to
+    allow access to the device (such as `dev_rw_cachefiles` for read/write access
+    to the previously mentioned `cachefiles_device_t` type). Not all files in `/dev/`
+    are such device files though.
+  id: totrans-32
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 设备通常在多个应用程序之间共享。大多数设备都在 `devices.te` 策略模块中定义，声明了适当的接口以允许访问设备（例如 `dev_rw_cachefiles`
+    用于对前面提到的 `cachefiles_device_t` 类型的读/写访问）。然而，`/dev/` 中并非所有文件都是这样的设备文件。
+- en: 'Consider the `/dev/log` socket, which is used to send log events to the system
+    logger. This socket, which is available regardless of the system logger being
+    used, is made available through the following logging SELinux policy module:'
+  id: totrans-33
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 考虑 `/dev/log` 套接字，它用于将日志事件发送到系统日志记录器。无论使用哪种系统日志记录器，这个套接字都是可用的，它通过以下日志记录 SELinux
+    策略模块提供：
+- en: '[PRE3]'
+  id: totrans-34
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE3]'
+- en: The `mls_trusted_object` interface makes the device (labeled `devlog_t`) accessible
+    for all security levels in an MLS-enabled policy.
+  id: totrans-35
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`mls_trusted_object` 接口使设备（标记为 `devlog_t`）在启用 MLS 的策略中对所有安全级别可访问。'
+- en: User content and customizable types
+  id: totrans-36
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 用户内容和可定制化类型
+- en: User-provided content is also important to consider. For instance, for e-mail-related
+    daemons, a user's `.forward` file (which tells the system where to forward the
+    e-mails of the user) is available in his or her home directory and is definitely
+    not owned by a particular application. Hence, its label (`mail_home_t`) is tied
+    to a functionality-driven policy (`mta`).
+  id: totrans-37
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 用户提供的内容也非常重要。例如，对于与电子邮件相关的守护进程，用户的 `.forward` 文件（指示系统将用户的电子邮件转发到哪里）通常位于其主目录中，并且绝对不会由特定应用程序拥有。因此，它的标签（`mail_home_t`）与功能驱动的策略（`mta`）相关联。
+- en: 'Don''t forget to mark user content as user content through the `userdom_user_home_content`
+    interface; otherwise, end users will not be able to label or manipulate these
+    files:'
+  id: totrans-38
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 别忘了通过 `userdom_user_home_content` 接口将用户内容标记为用户内容；否则，最终用户将无法标记或操作这些文件：
+- en: '[PRE4]'
+  id: totrans-39
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE4]'
+- en: Some user content is also best marked as customizable. A **customizable type**,
+    when assigned to a resource, is ignored during standard relabel operations (usually
+    performed by the system administrator) and as such, the resource label will not
+    be changed back to what the SELinux configuration files have defined. This is
+    particularly useful for resources whose path is not a fixed location and usually
+    not made part of the SELinux file context definitions.
+  id: totrans-40
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 有些用户内容也最好标记为可定制类型。当可定制类型分配给资源时，在标准重标操作（通常由系统管理员执行）中会被忽略，因此该资源的标签不会恢复为 SELinux
+    配置文件中定义的标签。这对于路径不是固定位置的资源特别有用，这些资源通常不会成为 SELinux 文件上下文定义的一部分。
+- en: 'If the administrator does a forced relabel operation, then the file context
+    is reset, even if the current type assigned to the resource is a customizable
+    type:'
+  id: totrans-41
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如果管理员执行强制重标操作，即使资源当前分配的类型是可定制类型，文件的上下文也会被重置：
+- en: '[PRE5]'
+  id: totrans-42
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE5]'
+- en: In a modular policy development, there is no notation available to mark a type
+    as being a customizable type. To do this, the type needs to be added to the `customizable_types`
+    file in `/etc/selinux/mcs/contexts/`.
+  id: totrans-43
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在模块化策略开发中，没有可用的符号标记类型为可定制类型。为此，类型需要添加到 `/etc/selinux/mcs/contexts/` 中的 `customizable_types`
+    文件。
+- en: Marking files with a customizable type is a solution when the path of the resource
+    isn't fixed. The `.forward` file has a fixed path, so there is no need for customizable
+    content. User content that should be publicly accessible, however, (marked as
+    `public_content_t` or `public_content_rw_t`) does not have a fixed path; hence,
+    those types are (by default) marked as customizable.
+  id: totrans-44
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 将文件标记为可定制类型是一种解决方案，当资源的路径不是固定时。`.forward` 文件有一个固定的路径，因此无需可定制内容。然而，应公开访问的用户内容（标记为
+    `public_content_t` 或 `public_content_rw_t`）没有固定路径；因此，这些类型默认标记为可定制类型。
+- en: 'When full policy development is done (for instance, through the Linux distribution
+    policy or because the developer controls the entire policy and not just additional
+    modules), then the `# customizable` comment can be placed behind the type declaration,
+    as can be seen from the following example of the CVS policy module:'
+  id: totrans-45
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 当完成完整的策略开发时（例如，通过 Linux 发行版策略或因为开发者控制整个策略而不仅仅是附加模块），则可以将 `# customizable` 注释放在类型声明后面，如以下
+    CVS 策略模块示例所示：
+- en: '[PRE6]'
+  id: totrans-46
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE6]'
+- en: The reference policy build system will then automatically add the type to the
+    `customizable_types` file during the build process.
+  id: totrans-47
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 参考策略构建系统将在构建过程中自动将类型添加到 `customizable_types` 文件中。
+- en: There's more...
+  id: totrans-48
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 还有更多...
+- en: Other common resources that can be considered are the TCP and UDP ports. Indeed,
+    network-facing applications bind to one or more ports, which are usually the same
+    for applications sharing the same functionality.
+  id: totrans-49
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 其他可以考虑的常见资源是 TCP 和 UDP 端口。事实上，面向网络的应用程序会绑定到一个或多个端口，这些端口通常在具有相同功能的应用程序中是相同的。
+- en: 'However, the TCP and UDP ports cannot be declared inside SELinux policy modules;
+    instead, they need to be labeled as part of the base policy. Updating a base policy,
+    however, is either done by the Linux distribution maintainers or the upstream
+    reference policy project. The basic rule is that the ports are named after the
+    service they are generally used by:'
+  id: totrans-50
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然而，TCP 和 UDP 端口不能在 SELinux 策略模块中声明；相反，它们需要作为基础策略的一部分进行标记。然而，更新基础策略只能由 Linux
+    发行版维护者或上游参考策略项目进行。基本规则是，端口名称通常以它们所使用的服务命名：
+- en: '[PRE7]'
+  id: totrans-51
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE7]'
+- en: Defining common helper domains
+  id: totrans-52
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 定义常见的辅助域
+- en: Next to the common resources, some applications share the same set of helper
+    commands. The `sendmail` command is a nice example of this, which is executed
+    by a large set of domains (usually, applications that need to send e-mails without
+    using the SMTP protocol themselves). The `sendmail` application is well understood
+    and most MTA applications support it for command-line e-mail sending operations.
+  id: totrans-53
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 除了公共资源外，一些应用程序共享相同的一组辅助命令。`sendmail`命令就是一个很好的例子，它被许多域执行（通常是需要发送电子邮件但不使用SMTP协议的应用）。`sendmail`应用是众所周知的，大多数MTA应用都支持它进行命令行电子邮件发送操作。
+- en: Supporting such helper domains is usually done through a functionality-driven
+    policy.
+  id: totrans-54
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 支持这样的辅助域通常是通过功能驱动的策略来完成的。
+- en: How to do it…
+  id: totrans-55
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 如何做…
+- en: 'Creating helper domains is similar to creating regular application domains,
+    but the use of attributes allows the policy to be very flexible and usable by
+    the application-specific policy modules developed further. Let''s look at the
+    MTA definition as an example of how this can be accomplished:'
+  id: totrans-56
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 创建辅助域类似于创建常规应用程序域，但属性的使用使得策略非常灵活，并且可以通过进一步开发的应用程序特定策略模块来使用。让我们以MTA定义为例，看看如何完成这项工作：
+- en: 'Define an attribute for the command type:'
+  id: totrans-57
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为命令类型定义一个属性：
+- en: '[PRE8]'
+  id: totrans-58
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE8]'
+- en: 'Create a proper label type for the command, and assign it the `mta_exec_type`
+    attribute:'
+  id: totrans-59
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为该命令创建一个适当的标签类型，并分配`mta_exec_type`属性：
+- en: '[PRE9]'
+  id: totrans-60
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE9]'
+- en: 'Configure an application domain for the command:'
+  id: totrans-61
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为该命令配置应用程序域：
+- en: '[PRE10]'
+  id: totrans-62
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE10]'
+- en: 'If the application is for system purposes, assign the domain to the `system_r`
+    role:'
+  id: totrans-63
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 如果该应用程序用于系统目的，请将域分配给`system_r`角色：
+- en: '[PRE11]'
+  id: totrans-64
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE11]'
+- en: If the application is meant to be executed by end users, do not forget to include
+    a `_run` or `_role` interface.
+  id: totrans-65
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 如果该应用程序是为最终用户执行的，别忘了包括`_run`或`_role`接口。
+- en: 'Make an interface callable by third-party application domains to allow them
+    to interact with the helper application:'
+  id: totrans-66
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使接口可被第三方应用域调用，以允许它们与辅助应用进行交互：
+- en: '[PRE12]'
+  id: totrans-67
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE12]'
+- en: 'Make another interface allowing specific policies to mark their own helper
+    executables usable for the same purpose (as they might not always use the same
+    type):'
+  id: totrans-68
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 创建另一个接口，允许特定策略标记它们自己的辅助可执行文件，以便用于相同的目的（因为它们可能并不总是使用相同的类型）：
+- en: '[PRE13]'
+  id: totrans-69
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE13]'
+- en: How it works…
+  id: totrans-70
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 它是如何工作的…
+- en: Helper domains are meant to provide reusable functionality across multiple implementations.
+    To support the flexibility of having multiple implementations, attributes are
+    usually assigned to the types so that extensions can be easily created.
+  id: totrans-71
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 辅助域旨在提供跨多个实现的可重用功能。为了支持多个实现的灵活性，通常会将属性分配给类型，以便可以轻松创建扩展。
+- en: Consider the `sendmail` example again. Most implementations will have the command-line
+    `sendmail` application marked as `sendmail_exec_t`. However, there are implementations
+    whose `sendmail` binary has many more features, especially when called from the
+    implementation processes themselves. Some implementations even have the file as
+    a symbolic link to a more generic e-mail-handler application.
+  id: totrans-72
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 再次考虑`sendmail`的例子。大多数实现会将命令行`sendmail`应用标记为`sendmail_exec_t`。然而，也有一些实现，其`sendmail`二进制文件具有更多功能，尤其是在从实现进程本身调用时。某些实现甚至将该文件作为符号链接指向一个更通用的电子邮件处理程序应用。
+- en: 'The Exim implementation, for instance, uses `exim_exec_t` instead of using
+    `sendmail_exec_t`. With the use of the attributes, the Exim policy module can
+    just call the proper interface (`mta_agent_executable`, in this case), so third-party
+    applications can still execute the command (even though it is `exim_exec_t` and
+    not `sendmail_exec_t`) and have it behave as expected (that is, with a transition
+    to the `user_mail_t` or `system_mail_t` domain as expressed by the MTA policy):'
+  id: totrans-73
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 例如，Exim实现使用`exim_exec_t`，而不是使用`sendmail_exec_t`。通过使用属性，Exim策略模块只需调用适当的接口（在这种情况下是`mta_agent_executable`），这样第三方应用仍然可以执行该命令（即使它是`exim_exec_t`而不是`sendmail_exec_t`），并且表现如预期（即，按照MTA策略过渡到`user_mail_t`或`system_mail_t`域）：
+- en: '[PRE14]'
+  id: totrans-74
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE14]'
+- en: 'Attributes allow other domains to interact with the newly defined type without
+    having to update the policy modules that define these domains. This is because
+    those domains are granted execute rights on all types that have the `mta_exec_type`
+    attribute assigned, and will invoke a domain transition to the `system_mail_t`
+    helper domain when they execute such a file. This privilege is provided through
+    the `mta_send_mail` interface, which is a good example of a helper domain interface
+    to be assigned to other domains:'
+  id: totrans-75
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 属性允许其他域与新定义的类型进行交互，而无需更新定义这些域的策略模块。这是因为这些域被授予对所有具有 `mta_exec_type` 属性的类型的执行权限，并将在执行此类文件时触发域转换到
+    `system_mail_t` 助手域。这个权限通过 `mta_send_mail` 接口提供，这是一个很好的助手域接口示例，可以分配给其他域：
+- en: '[PRE15]'
+  id: totrans-76
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE15]'
+- en: Documenting common privileges
+  id: totrans-77
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 记录公共权限
+- en: Next to the helper domains, most functionality-driven policies also group privileges
+    that can be assigned to domains. Such privileges could be to not only manage the
+    common resources, but also to extend other domains with functional requirements
+    as managed by the common policy.
+  id: totrans-78
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在助手域旁边，大多数基于功能的策略也会将可以分配给域的权限进行分组。这些权限不仅可能用于管理公共资源，还可能用于扩展其他具有功能要求的域，这些扩展由公共策略进行管理。
+- en: All e-mail daemons need to be able to bind to the proper TCP ports, handle user
+    mailboxes, and so on. By bundling these common privileges on the functional policy
+    level, any evolution pertaining to the policy can be immediately granted to all
+    domains inheriting privileges from the functional policy, rather than having to
+    update each domain individually.
+  id: totrans-79
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 所有电子邮件守护进程需要能够绑定到适当的 TCP 端口、处理用户邮箱等。通过在功能策略级别捆绑这些公共权限，任何与策略相关的演变都可以立即授予所有继承来自功能策略的权限的域，而不需要单独更新每个域。
+- en: How to do it…
+  id: totrans-80
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 如何做……
+- en: 'Common privileges can be found in a wide variety. How common privileges are
+    assigned depends on the use case. The following method, based on the e-mail server
+    definition in the MTA policy, provides a flexible approach to this:'
+  id: totrans-81
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 公共权限可以在多种不同的情况下找到。如何分配公共权限取决于使用案例。以下方法基于 MTA 策略中的电子邮件服务器定义，提供了一种灵活的解决方案：
+- en: 'Create an attribute for the functional domain to which common privileges are
+    granted:'
+  id: totrans-82
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为功能域创建一个属性，以便授予公共权限：
+- en: '[PRE16]'
+  id: totrans-83
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE16]'
+- en: 'Define an interface where the attribute is assigned to a specified domain:'
+  id: totrans-84
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 定义一个接口，将属性分配给指定的域：
+- en: '[PRE17]'
+  id: totrans-85
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE17]'
+- en: 'Build an interface that assigns the functionally related common privileges
+    to the specified argument. It should not assign attributes though! This is done
+    with the following code:'
+  id: totrans-86
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 构建一个接口，将与功能相关的公共权限分配给指定的参数。然而，它不应分配属性！这可以通过以下代码完成：
+- en: '[PRE18]'
+  id: totrans-87
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE18]'
+- en: 'Now, use the newly created interface to grant the proper permissions on the
+    attribute:'
+  id: totrans-88
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 现在，使用新创建的接口为属性授予适当的权限：
+- en: '[PRE19]'
+  id: totrans-89
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE19]'
+- en: 'If a specific application always has to inherit the privileges, assign the
+    attribute to it:'
+  id: totrans-90
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 如果特定应用程序始终需要继承权限，将该属性分配给它：
+- en: '[PRE20]'
+  id: totrans-91
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE20]'
+- en: 'If a specific application, however, optionally inherits the privileges, use
+    the domain interface:'
+  id: totrans-92
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 然而，如果某个特定应用程序选择性地继承了权限，则使用域接口：
+- en: '[PRE21]'
+  id: totrans-93
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE21]'
+- en: How it works…
+  id: totrans-94
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 它是如何工作的……
+- en: 'When assigning privileges to a domain, there are two approaches that can be
+    taken: either the privileges are assigned to an attribute (which is then associated
+    with a domain) or the privileges are directly assigned to the domain. Which one
+    to pick depends on how the policy is going to be used. Due to restrictions in
+    policy development, it is not possible to optionally (that is, triggered through
+    SELinux Booleans) assign attributes. Any attempt to do so will result in a build
+    failure, as follows:'
+  id: totrans-95
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在为域分配权限时，可以采取两种方法：要么将权限分配给属性（然后将其与域关联），要么将权限直接分配给域。选择哪种方法取决于策略的使用方式。由于策略开发的限制，不能选择性地（即通过
+    SELinux 布尔值触发）分配属性。任何尝试这样做的操作都会导致构建失败，具体如下：
+- en: '[PRE22]'
+  id: totrans-96
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE22]'
+- en: As a result, whenever permissions can be granted optionally (through SELinux
+    Booleans), policy developers will have to make sure that the permissions are granted
+    directly (instead of assigning an attribute to the domain).
+  id: totrans-97
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 结果是，每当权限可以选择性地授予时（通过 SELinux 布尔值），策略开发者必须确保权限是直接授予的（而不是将属性分配给域）。
+- en: 'However, in most cases, using attributes for domains makes sense. The policy
+    itself does not increase in size that much (as rules remain on an attribute level)
+    and administrators can easily query which domains participate in the functional
+    approach:'
+  id: totrans-98
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然而，在大多数情况下，使用属性来管理域是有意义的。政策本身的大小不会增加太多（因为规则仍然保持在属性级别），管理员可以轻松查询哪些域参与了该功能性方法：
+- en: '[PRE23]'
+  id: totrans-99
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE23]'
+- en: 'Granting the permissions through an interface also allows us to quickly look
+    at the impact of assigning an attribute, as we can then use the `seshowif` command:'
+  id: totrans-100
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 通过接口授予权限还可以帮助我们快速查看分配属性的影响，因为我们可以使用`seshowif`命令：
+- en: '[PRE24]'
+  id: totrans-101
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE24]'
+- en: The example given uses a server-domain approach, but the same can be done for
+    a client.
+  id: totrans-102
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 给出的示例使用的是服务器域方法，但同样的方法也可以应用于客户端。
+- en: Granting privileges to all clients
+  id: totrans-103
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 授予所有客户端特权
+- en: The approach of using interfaces to aggregate privileges not only benefits domains
+    that have the same functional purpose, but also clients. By combining the privileges
+    for the set of clients, it is possible to enhance client privileges by only updating
+    the interface rather than having to update all the clients' policy modules.
+  id: totrans-104
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 使用接口来聚合特权的方法，不仅对具有相同功能目的的域有益，也对客户端有益。通过将特权结合起来，只需更新接口而无需更新所有客户端的策略模块，就能提升客户端的特权。
+- en: How to do it…
+  id: totrans-105
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 如何实现…
+- en: 'Create a client interface that can be assigned to all clients of a particular
+    functional purpose. The following steps extend an example policy with antimalware
+    support:'
+  id: totrans-106
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 创建一个客户端接口，可以分配给具有特定功能目的的所有客户端。以下步骤扩展了一个带有反恶意软件支持的示例策略：
+- en: 'In the antimalware generic policy, create an `avcheck_client` attribute:'
+  id: totrans-107
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在反恶意软件通用策略中，创建一个`avcheck_client`属性：
+- en: '[PRE25]'
+  id: totrans-108
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE25]'
+- en: 'Create the interface that assigns the attribute to a client domain:'
+  id: totrans-109
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 创建一个将属性分配给客户端域的接口：
+- en: '[PRE26]'
+  id: totrans-110
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE26]'
+- en: 'Create the interface that assigns the common privileges for client domains:'
+  id: totrans-111
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 创建分配给客户端域的公共特权的接口：
+- en: '[PRE27]'
+  id: totrans-112
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE27]'
+- en: 'In the created interface, add the privileges that need to be assigned to all
+    client domains. For instance, to enable a domain transition for the ClamAV `check`
+    command, the following code is used:'
+  id: totrans-113
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在创建的接口中，添加需要分配给所有客户端域的特权。例如，要启用ClamAV `check`命令的域过渡，使用以下代码：
+- en: '[PRE28]'
+  id: totrans-114
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE28]'
+- en: All domains that act as a client are either assigned the `av_check_client` (if
+    the attribute can be assigned) or `av_check_client_privs` interface.
+  id: totrans-115
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 所有充当客户端的域要么分配了`av_check_client`（如果可以分配该属性），要么分配了`av_check_client_privs`接口。
+- en: How it works…
+  id: totrans-116
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 它是如何工作的…
+- en: 'Suppose a new antimalware policy is developed for ClamAV, and we want the clients
+    to be able to execute the `clamav_check_exec_t` applications and transition them
+    to the `clamav_check_t` domain. Instead of updating all clients with a `clamav_domtrans_check`
+    call, we only do this in the generic antimalware policy''s `av_check_client_privs`
+    interface, as follows:'
+  id: totrans-117
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 假设为ClamAV开发了一个新的反恶意软件策略，我们希望客户端能够执行`clamav_check_exec_t`应用程序，并将它们过渡到`clamav_check_t`域。我们不必更新所有客户端以进行`clamav_domtrans_check`调用，而是只需在通用反恶意软件策略的`av_check_client_privs`接口中进行此操作，如下所示：
+- en: '[PRE29]'
+  id: totrans-118
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE29]'
+- en: This ensures that all proper domains— not only those with the `avcheck_client`
+    attribute—get the necessary privileges assigned.
+  id: totrans-119
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这确保了所有适当的域——不仅仅是具有`avcheck_client`属性的域——都能获得必要的特权。
+- en: Another example that uses this principle is the PulseAudio policy. An interface
+    called `pulseaudio_client_domain` is made available and should be used by PulseAudio
+    clients. Whenever the permissions for a PulseAudio client need to be updated,
+    then the policy developer only needs to update the `pulseaudio_client_domain`
+    interface instead of all client policy modules.
+  id: totrans-120
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 另一个使用该原理的示例是PulseAudio策略。提供了一个名为`pulseaudio_client_domain`的接口，应由PulseAudio客户端使用。每当需要更新PulseAudio客户端的权限时，策略开发人员只需更新`pulseaudio_client_domain`接口，而无需更新所有客户端策略模块。
+- en: Such an approach makes policy development much more flexible and efficient,
+    as developers do not need to update all possible client domains with the added
+    privileges.
+  id: totrans-121
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这种方法使政策开发更加灵活高效，因为开发人员不需要更新所有可能的客户端域来添加特权。
+- en: Creating a generic application domain
+  id: totrans-122
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 创建通用应用程序域
+- en: In some situations, it makes sense to create a generic application domain, even
+    though multiple implementations exist for the same functionality. Examples are
+    the Java domain (which works for all the popular Java™ implementations) and init
+    domain. When this occurs, carefully consider whether the generic application domain
+    will always be sufficient, or whether specific application domains might come
+    into play later. When this isn't clear, make sure that the policy being developed
+    is flexible enough to cater both situations.
+  id: totrans-123
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在某些情况下，即使存在多个实现用于相同的功能，创建一个通用应用程序域也是有意义的。例子包括Java域（适用于所有流行的Java™实现）和init域。当这种情况发生时，仔细考虑通用应用程序域是否总是足够，或者是否会在稍后需要特定的应用程序域。当这一点不明确时，确保所开发的策略足够灵活，能够兼顾这两种情况。
+- en: How to do it…
+  id: totrans-124
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 如何操作……
+- en: 'In order to create a generic application policy that is still flexible with
+    respect to potential specific policies that would be developed later, follow the
+    upcoming set of steps:'
+  id: totrans-125
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 为了创建一个仍然灵活的通用应用程序策略，以应对未来可能开发的特定策略，请遵循以下步骤：
+- en: Identify the permissions that are (almost) always applicable to the functional
+    domain, regardless of the implementation.
+  id: totrans-126
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 确定（几乎）总是适用于功能域的权限，无论实现是什么。
+- en: 'Assign those permissions to a *base* implementation. For instance, for Java™
+    implementations, assign permissions as follows:'
+  id: totrans-127
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 将这些权限分配给一个*基础*实现。例如，对于Java™实现，将权限分配如下：
+- en: '[PRE30]'
+  id: totrans-128
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE30]'
+- en: Add permissions that are applicable to at least one (or a few) of the implementations
+    to the standard type. In our example, this would be to `java_t`. This ensures
+    that `java_t` is generally usable for most Java™ implementations.
+  id: totrans-129
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 向标准类型添加适用于至少一个（或几个）实现的权限。在我们的例子中，这将是对`java_t`的权限。这确保了`java_t`对大多数Java™实现是通用可用的。
+- en: 'Add the proper file contexts to allow most implementations to benefit from
+    the generic application policy:'
+  id: totrans-130
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 添加适当的文件上下文，以便大多数实现能够受益于通用应用程序策略：
+- en: '[PRE31]'
+  id: totrans-131
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE31]'
+- en: How it works…
+  id: totrans-132
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 它是如何工作的……
+- en: 'With the given implementation, most Java™ implementations on an SELinux-enabled
+    system will run, when executed, in the generic `java_t` domain: their executables
+    are all marked as `java_exec_t` through generic file context expressions, and
+    the `java_t` domain holds not only the set of least privileges for Java™ domains
+    (as granted through the `javadomain` attribute that gets them from the `java_base_runtime_privs`
+    interface), but also those privileges that are common for quite a few implementations.
+    This means that the `java_t` domain has more privileges than needed in most cases,
+    as it has to support a broad set of Java™ implementations.'
+  id: totrans-133
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在给定的实现下，大多数Java™实现将在启用SELinux的系统上运行时，处于通用的`java_t`域：它们的可执行文件通过通用文件上下文表达式全部标记为`java_exec_t`，并且`java_t`域不仅包含Java™域的最小权限集（这些权限通过`javadomain`属性从`java_base_runtime_privs`接口中获取），还包含一些对多个实现通用的权限。这意味着`java_t`域在大多数情况下具有比所需更多的权限，因为它需要支持广泛的Java™实现。
+- en: 'However, when a specific implementation will be created with a different policy
+    profile than the existing `java_t` domain, policy developers can easily mark this
+    domain as a Java domain, inheriting the permissions that are necessary for every
+    Java™ implementation (for instance, because they are mandated through the specifications
+    of Java™) while staying clear from the other permissions that are granted to the
+    generic `java_t` domain:'
+  id: totrans-134
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然而，当需要创建一个具有与现有`java_t`域不同的策略配置文件的特定实现时，策略开发人员可以轻松地将此域标记为Java域，从而继承每个Java™实现所需的权限（例如，因为这些权限是通过Java™的规范要求的），同时避免与通用`java_t`域授予的其他权限冲突：
+- en: '[PRE32]'
+  id: totrans-135
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE32]'
+- en: 'By creating a more specific file context definition, the executable of the
+    newly created type will get this label assigned (as the other expressions are
+    more generic, and the SELinux utilities use a *most specific definition first*
+    approach):'
+  id: totrans-136
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 通过创建一个更具体的文件上下文定义，新的类型的可执行文件将被分配此标签（因为其他表达式更为通用，SELinux工具使用*最具体的定义优先*的方法）：
+- en: '[PRE33]'
+  id: totrans-137
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE33]'
+- en: 'Building a proper set of least privilege rules is not easy and requires experience
+    in policy development. If uncertain, it might be a good idea to use SELinux Booleans,
+    such as used by the (generic) `cron` policy:'
+  id: totrans-138
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 构建一个适当的最小权限规则集并不容易，需要有策略开发经验。如果不确定，使用SELinux布尔值可能是个好主意，正如（通用的）`cron`策略所使用的那样：
+- en: '[PRE34]'
+  id: totrans-139
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE34]'
+- en: Through this approach, specific implementations can still benefit from the generic
+    policy declaration, if the amount of additional permissions is small. As the policy
+    is enhanced with other implementation details, the need for the `tunable_policy`
+    statement might be removed or a specific implementation for `fcron` can be developed
+    separately.
+  id: totrans-140
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 通过这种方法，如果额外权限的数量较小，具体实现仍然可以从通用策略声明中受益。随着策略通过其他实现细节的增强，可能不再需要`tunable_policy`声明，或者可以单独开发适用于`fcron`的特定实现。
+- en: Building application-specific domains using templates
+  id: totrans-141
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 使用模板构建特定于应用程序的域
+- en: Specific domains have the advantage that they can contain those privileges needed
+    by the domain, and no more. As there are no other application implementations
+    using the specific domain, the privileges can be tailored to the needs of the
+    application.
+  id: totrans-142
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 特定域的优势在于它们可以仅包含域所需的权限，不包含多余的权限。由于没有其他应用程序实现使用该特定域，权限可以根据应用程序的需求进行定制。
+- en: In certain situations though, it might be beneficial to automatically generate
+    the types together with the basic permissions. Generating types is done through
+    templates (rather than interfaces, although the underlying implementation of interfaces
+    and templates is quite similar). The approach and development method is aligned
+    with interface definitions and should pose no difficulties for developers to understand.
+  id: totrans-143
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然而，在某些情况下，将类型与基本权限一起自动生成可能是有益的。生成类型是通过模板完成的（而不是接口，尽管接口和模板的底层实现非常相似）。这种方法和开发方式与接口定义保持一致，应该不难让开发人员理解。
+- en: An example to consider with templates would be to automatically create system
+    `cron` job domains for individual applications. Through a template, we can automatically
+    create the domain, executable type, and temporary resource types as well as properly
+    document the interactions of that domain with the main `cron` daemon (which is
+    needed for communicating job failures or success, handling output, logging, and
+    so on).
+  id: totrans-144
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 一个考虑模板的示例是为各个应用程序自动创建系统`cron`作业域。通过模板，我们可以自动创建域、可执行类型和临时资源类型，并且正确地记录该域与主`cron`守护进程之间的交互（这对于传递作业失败或成功信息、处理输出、日志记录等是必要的）。
+- en: How to do it…
+  id: totrans-145
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 如何操作…
+- en: 'Creating templates is similar to creating interfaces. To create templates,
+    the following approach can be used:'
+  id: totrans-146
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 创建模板类似于创建接口。要创建模板，可以使用以下方法：
+- en: 'Start with a skeleton template inside the `.if` file, but call it `template`
+    instead of `interface`:'
+  id: totrans-147
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 从`.if`文件中的骨架模板开始，但将其命名为`template`而非`interface`：
+- en: '[PRE35]'
+  id: totrans-148
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE35]'
+- en: 'Add in the following type declarations:'
+  id: totrans-149
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 添加以下类型声明：
+- en: '[PRE36]'
+  id: totrans-150
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE36]'
+- en: 'Grant the proper interactions between the main daemon and the newly defined
+    types that are still inside the template definition:'
+  id: totrans-151
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 授予主守护进程与新定义的类型之间正确的交互权限，这些类型仍在模板定义中：
+- en: '[PRE37]'
+  id: totrans-152
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE37]'
+- en: 'In the application policy, call the template so that the new types are created.
+    For instance, to create the `cron` job domains for Puppet, add the following code
+    to `puppet.te`:'
+  id: totrans-153
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在应用程序策略中，调用模板以创建新类型。例如，要为Puppet创建`cron`作业域，请将以下代码添加到`puppet.te`中：
+- en: '[PRE38]'
+  id: totrans-154
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE38]'
+- en: 'Enhance the (now available) `puppet_cronjob_t` domain with the permissions
+    needed:'
+  id: totrans-155
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使用所需的权限增强（现已可用的）`puppet_cronjob_t`域：
+- en: '[PRE39]'
+  id: totrans-156
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+  zh: '[PRE39]'
+- en: How it works…
+  id: totrans-157
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 它是如何工作的…
+- en: The use of templates has been discussed earlier in the chapter on web server
+    content. Indeed, the `apache_content_template` definition, too, is a template
+    that creates additional types and documents the interaction between the newly
+    created types and the (main) web server domain.
+  id: totrans-158
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 本章之前已讨论过模板的使用。事实上，`apache_content_template`定义也是一个模板，它创建了额外的类型，并记录了新创建的类型与（主）Web服务器域之间的交互。
+- en: The use of templates allows for rapid policy development as well as properly
+    isolated permission handling. When the main application evolves and requires additional
+    permissions with respect to the specific application domains, or certain permissions
+    are no longer needed, then only the template needs to be adjusted. All that is
+    needed to apply the changes is to rebuild the SELinux policy modules, without
+    any need to alter their individual source files.
+  id: totrans-159
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 使用模板可以快速开发策略，并且能够正确地隔离权限管理。当主应用程序发生变化并且需要额外的权限时，或者某些权限不再需要时，只需要调整模板。应用更改所需的唯一操作是重新构建SELinux策略模块，无需更改它们的单独源文件。
+- en: 'It is a best practice to use prefix and/or suffix notations for template-provided
+    types and to end the name of the template with `_template`. In theory, it is perfectly
+    possible to create a template that creates the specified type(s) without any prefix
+    and postfix expressions, instead requiring the various types to be passed on one
+    at a time:'
+  id: totrans-160
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 最好的实践是使用前缀和/或后缀标记来表示模板提供的类型，并且模板的名称以`_template`结尾。从理论上讲，完全可以创建一个模板来生成指定的类型，而不使用任何前后缀表达式，而是要求一次性传递各种类型：
+- en: '[PRE40]'
+  id: totrans-161
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE40]'
+- en: 'However, this approach is inflexible under the following circumstances:'
+  id: totrans-162
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然而，在以下情况下，这种方法缺乏灵活性：
+- en: If additional types need to be supported, then the interface API itself (the
+    number of arguments passed to it and their meaning) needs to be altered, which
+    makes such changes incompatible with earlier releases. This is important because
+    there might be policy developers who are using this interface without their policy
+    being available in the repository that we're developing in, so we cannot refactor
+    this code ourselves.
+  id: totrans-163
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 如果需要支持额外的类型，那么接口API本身（传递给它的参数数量及其含义）需要进行更改，这使得这些更改与早期版本不兼容。这一点很重要，因为可能会有一些策略开发人员正在使用这个接口，但他们的策略并未出现在我们正在开发的仓库中，因此我们无法自己重构这些代码。
+- en: If a type is no longer needed, then either the interface API itself needs to
+    be changed (making it incompatible with earlier releases) or the interface will
+    be made to ignore a particular type (which easily becomes a development nightmare).
+  id: totrans-164
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 如果某个类型不再需要，则需要更改接口API本身（使其与早期版本不兼容），或者使接口忽略特定类型（这很容易变成开发噩梦）。
+- en: Developers will continuously need to look at the order and meaning of the types
+    in order not to mistakenly have the executable type marked as a domain and vice
+    versa.
+  id: totrans-165
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 开发人员将需要不断查看类型的顺序和含义，以避免错误地将可执行类型标记为域类型，反之亦然。
+- en: 'Such an approach would also make it possible to create confusing type definitions:'
+  id: totrans-166
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这种方法也可能导致创建混淆的类型定义：
+- en: '[PRE41]'
+  id: totrans-167
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE41]'
+- en: Through such an approach, developers and administrators would lose sight over
+    the relation between types.
+  id: totrans-168
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 通过这种方法，开发人员和管理员可能会忽视类型之间的关系。
+- en: Using proper prefix and postfix notations allows for a simplified management.
+    The use of a template such as `cron_system_job_template` easily informs developers
+    that there will be several types matching `*_cronjob_t`, `*_cronjob_exec_t`, and
+    `*_cronjob_tmp_t`. Policy developers and system administrators easily learn that
+    these are related with each other.
+  id: totrans-169
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 使用适当的前缀和后缀标记能够简化管理。使用像`cron_system_job_template`这样的模板可以清楚地告知开发人员，将会有多个类型匹配`*_cronjob_t`、`*_cronjob_exec_t`和`*_cronjob_tmp_t`。策略开发人员和系统管理员很容易理解这些类型之间的关系。
+- en: Using fine-grained application domain definitions
+  id: totrans-170
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 使用细粒度应用域定义
+- en: The use of templates earlier in this chapter is a start to support more fine-grained
+    application domain definitions. Instead of running a workload inside the same
+    domain as the main application, specific types are created that are meant to optimize
+    the interaction between one domain and another, ensuring that the permissions
+    granted to a particular domain remain small and manageable.
+  id: totrans-171
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 本章早期使用模板是支持更细粒度应用域定义的开始。与其在主应用程序的同一域内运行工作负载，不如创建专门的类型，旨在优化一个域与另一个域之间的交互，确保赋予特定域的权限保持小且可管理。
+- en: Using fine-grained application domains goes a step further, having processes
+    of the same application run inside their own specific domains. This is not always
+    possible (not all applications use multiple, distinct processes), but when it
+    is, using fine-grained domains provides an even more secure environment, where
+    each task runs with just the permissions needed for that individual task, even
+    though the application, in general, needs more permissions.
+  id: totrans-172
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 使用细粒度应用域向前迈出了一步，允许同一应用程序的进程在其各自的特定域内运行。这并非总是可能的（并非所有应用程序都使用多个独立的进程），但当可以做到时，使用细粒度域提供了一个更安全的环境，在这个环境中，每个任务仅使用该任务所需的权限，尽管整个应用程序通常需要更多权限。
+- en: An example implementation of fine-grained application domain definitions is
+    the postfix policy, which will be used as an example in this recipe. The Postfix
+    e-mail server is well documented and its architecture has been quite stable, making
+    it a prime candidate for a fine-grained policy development approach.
+  id: totrans-173
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 细粒度应用域定义的一个示例实现是后缀策略，它将在本食谱中作为示例使用。Postfix电子邮件服务器文档齐全，其架构相对稳定，因此成为细粒度策略开发方法的理想候选者。
+- en: However, when fine-grained application domains are used, policy development
+    and maintenance itself becomes harder. Individual interaction changes between
+    processes (which might be the case with newer versions of an application) require
+    policy updates much more often than when all processes run within the same SELinux
+    domain.
+  id: totrans-174
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然而，当使用细粒度应用程序域时，政策的制定和维护本身变得更加困难。进程之间的单独交互变化（例如应用程序的新版本可能会发生这种情况）需要比所有进程都在同一
+    SELinux 域中运行时更频繁地更新策略。
+- en: How to do it…
+  id: totrans-175
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 如何操作……
+- en: 'The following checks can be taken to see whether fine-grained application domains
+    make sense or not:'
+  id: totrans-176
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 可以采取以下检查来判断是否使用细粒度的应用程序域是合理的：
+- en: Does the application architecture use multiple processes, with each process
+    having a distinct functional task? If not, then creating fine-grained application
+    domains will not help much as every domain will have the same permissions anyhow.
+  id: totrans-177
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 应用程序架构是否使用多个进程，每个进程都有不同的功能任务？如果没有，那么创建细粒度的应用程序域不会有太大帮助，因为每个域的权限仍然是相同的。
+- en: Are there processes with different access vectors (and thus are vulnerable to
+    different threats than others)? For instance, whether some processes are directly
+    accessible through the network whereas others are local? If so, then using fine-grained
+    application domains might make sense to reduce the impact in case of the vulnerability
+    exploitation.
+  id: totrans-178
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 是否存在具有不同访问向量的进程（因此它们可能会受到与其他进程不同的威胁）？例如，是否有些进程可以通过网络直接访问，而其他进程是本地的？如果是这样，那么使用细粒度的应用程序域可能有助于减少在漏洞被利用时的影响。
+- en: Is there an interaction between a subset of the processes with other domains
+    (not managed through the same application), whereas the other processes do not
+    need to interact with these domains? If so, then using fine-grained application
+    domains might make sense to limit exposure of resources to other applications.
+  id: totrans-179
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 是否存在某些进程与其他域（非同一应用程序管理）之间的交互，而其他进程不需要与这些域交互？如果是，那么使用细粒度的应用程序域可能有助于限制资源对其他应用程序的暴露。
+- en: Does the application support different roles that might need to interact with
+    some (but not all) of the processes? A single full-application administrator might
+    still need administrative privileges to all processes and resources, but other
+    roles might not have this requirement. Using fine-grained application domains
+    allows for fine-grained roles as well.
+  id: totrans-180
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 该应用程序是否支持不同的角色，这些角色可能需要与某些（但不是所有）进程进行交互？一个全权限的应用程序管理员可能仍然需要对所有进程和资源具有管理员权限，但其他角色可能没有这个要求。使用细粒度的应用程序域也能实现细粒度的角色管理。
+- en: How it works…
+  id: totrans-181
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 它是如何工作的……
+- en: Supporting fine-grained application domains is usually done for risk mitigation.
+    But besides risk mitigation, it also provides advantages in role management as
+    well as a more efficient approach to managing types that are inherited from the
+    domain.
+  id: totrans-182
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 支持细粒度的应用程序域通常是为了风险缓解。但除了风险缓解外，它还在角色管理以及更高效的管理继承自域的类型方面提供了优势。
+- en: Reducing exploit risks
+  id: totrans-183
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 降低漏洞风险
+- en: 'Consider a part of the Postfix architecture, as shown in the next diagram:'
+  id: totrans-184
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 考虑下图所示的部分 Postfix 架构：
+- en: '![Reducing exploit risks](img/9669OS_07_02.jpg)'
+  id: totrans-185
+  prefs: []
+  type: TYPE_IMG
+  zh: '![降低漏洞风险](img/9669OS_07_02.jpg)'
+- en: The **smtpd** daemon handles the reception of an e-mail through the **network**,
+    and as such, is more prone to remote vulnerability exploits than to locally running
+    processes such as the **cleanup** process or even the **qmgr** process.
+  id: totrans-186
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '**smtpd** 守护进程处理通过 **网络** 接收电子邮件，因此比本地运行的进程（如 **cleanup** 进程或甚至 **qmgr** 进程）更容易受到远程漏洞攻击。'
+- en: By limiting resource access of the **smtpd** daemon to just the resources it
+    needs, exploits that would attempt to access the queues (resources not usually
+    accessed by **smtpd** but used by **qmgr**) would fail as the least privilege
+    approach used in the **smtpd** domain (`postfix_smtpd_t`) disallows access to
+    the **maildrop** queues (`postfix_spool_maildrop_t`).
+  id: totrans-187
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 通过将 **smtpd** 守护进程的资源访问限制为仅其需要的资源，可以防止试图访问队列的漏洞（这些队列通常不被 **smtpd** 访问，但被 **qmgr**
+    使用），因为 **smtpd** 域（`postfix_smtpd_t`）中使用的最小权限方法不允许访问 **maildrop** 队列（`postfix_spool_maildrop_t`）。
+- en: Proper risk reduction is only possible if the resources of the application (such
+    as the specific queues) are also defined in a fine-grained manner. If the application
+    has multiple configuration files and these configuration files are read by different
+    functional processes, then the configuration files should be labeled more specifically
+    as well (for instance, configuration files for routing and configuration files
+    for network settings).
+  id: totrans-188
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 适当的风险降低只有在应用程序的资源（例如特定的队列）也被精细化定义的情况下才可能实现。如果应用程序有多个配置文件，并且这些配置文件由不同的功能进程读取，那么这些配置文件也应该被更具体地标注（例如，路由配置文件和网络设置配置文件）。
+- en: If the application resources are labeled in a generic fashion, we risk that
+    all fine-grained domains have the same rights towards the generic resources, making
+    it more plausible for a vulnerable application to be exploited with larger consequences
+    to the entire application architecture.
+  id: totrans-189
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如果应用程序资源被通用方式标记，我们就有可能使所有精细化的域对通用资源拥有相同的权限，这使得一个存在漏洞的应用程序更容易被利用，进而对整个应用程序架构造成更大的后果。
+- en: Role management
+  id: totrans-190
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 角色管理
+- en: Using fine-grained application domains goes further than just mitigation of
+    exploits. With individual domains, role access can be granted to users allowing
+    them to take specific actions without requiring full application privileges.
+  id: totrans-191
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 使用精细化的应用程序域不仅仅是为了减轻漏洞利用。通过单独的域，可以为用户授予角色访问权限，使他们能够执行特定操作，而无需完全的应用程序权限。
+- en: 'For instance, operator roles can be created that allow manipulation of the
+    Postfix deferred queue and signaling of the `qmgr` process without granting those
+    users any specific rights towards the other processes. Assuming the user domain
+    for this role is `postoper_t`, this would be accomplished as follows:'
+  id: totrans-192
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 例如，可以创建操作员角色，允许操作Postfix延迟队列并信号`qmgr`进程，而不授予这些用户对其他进程的任何特定权限。假设该角色的用户域为`postoper_t`，则可以按以下方式实现：
+- en: '[PRE42]'
+  id: totrans-193
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE42]'
+- en: Type inheritance and transitions
+  id: totrans-194
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 类型继承与转换
+- en: When a domain creates new resources, these resources are assigned a type based
+    on the label of the domain as well as the transitions defined in the SELinux policy.
+    A process that is launched by a domain by default (that is, when no transitions
+    are defined in the policy) inherits the label of the parent domain, while a file
+    created inside a directory by default inherits the type of that parent directory.
+    In the case of labeled network support, the packets are labeled based on the parent
+    socket label.
+  id: totrans-195
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 当一个域创建新资源时，这些资源会根据域的标签以及SELinux策略中定义的转换来分配一个类型。默认情况下，由域启动的进程（即，在策略中未定义转换时）继承父域的标签，而默认情况下，在目录内创建的文件继承该父目录的类型。在标记网络支持的情况下，数据包会基于父套接字标签进行标记。
+- en: Sometimes the creation of a resource cannot be tied to a parent domain or parent
+    resource, making it impossible for SELinux to deduce the label to assign to this
+    resource. For this reason, **initial SIDs** are provided by the SELinux policy.
+    These tell the SELinux subsystem what the default label is for such resources
+    if no label can be deduced.
+  id: totrans-196
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 有时，资源的创建无法与父域或父资源绑定，这使得SELinux无法推断出应分配给该资源的标签。因此，**初始SID**由SELinux策略提供。这些信息告诉SELinux子系统，如果无法推断出标签，该资源的默认标签是什么。
+- en: 'For instance, the initial SIDs for a (TCP/UDP) port and for a file are as follows:'
+  id: totrans-197
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 例如，（TCP/UDP）端口和文件的初始SID如下：
+- en: '[PRE43]'
+  id: totrans-198
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE43]'
+- en: The definition of initial SIDs is part of the base SELinux policy and cannot
+    be altered using SELinux policy modules. Luckily, there is little reason for SELinux
+    developers to ever touch the initial SID definitions.
+  id: totrans-199
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 初始SID的定义是SELinux基础策略的一部分，不能通过SELinux策略模块进行更改。幸运的是，SELinux开发人员几乎没有理由去更改初始SID的定义。
+- en: 'These label inheritance rules are important in a fine-grained application domain
+    design. Applications that use multiple processes also tend to use resources such
+    as shared memory for **inter-process communication** (**IPC**). When all processes
+    run with the same domain, the shared memory is also labeled the same (such as
+    `postgresql_tmpfs_t` for the PostgreSQL managed shared memory) as a file transition
+    would be put in place:'
+  id: totrans-200
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这些标签继承规则在精细化的应用程序域设计中非常重要。使用多个进程的应用程序也倾向于使用诸如共享内存等资源进行**进程间通信**（**IPC**）。当所有进程都使用相同的域时，共享内存的标签也会相同（例如，`postgresql_tmpfs_t`用于PostgreSQL管理的共享内存），并且会应用文件转换：
+- en: '[PRE44]'
+  id: totrans-201
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE44]'
+- en: When using multiple domain definitions, it is possible that shared memory segments
+    are labeled differently as well (depending on which process creates the shared
+    memory segments, of course), so even IPC can then be properly governed. Separate
+    file transitions would be put in place depending on the domain that is creating
+    a shared memory segment.
+  id: totrans-202
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在使用多个域定义时，共享内存段也可能会被标记为不同的标签（当然，取决于哪个进程创建了共享内存段），因此即使是进程间通信（IPC）也能够得到正确的管理。根据创建共享内存段的域，可能会进行单独的文件过渡。
+- en: 'Next to file transitions, policy developers can also introduce domain transitions
+    (which changes the label of the newly created process) using the `domtrans_pattern`
+    definition. Inside the Postfix policy, this is used to create the fine-grained
+    process architecture:'
+  id: totrans-203
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 除了文件过渡外，策略开发人员还可以使用`domtrans_pattern`定义引入域过渡（它改变新创建进程的标签）。在Postfix策略中，这用于创建细粒度的进程架构：
+- en: '[PRE45]'
+  id: totrans-204
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE45]'
+- en: 'Such domain transitions can also be supported through the interfaces, as we''ve
+    seen in the earlier chapters, such as the `postfix_domtrans_smtp` interface:'
+  id: totrans-205
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这样的域过渡也可以通过接口来支持，正如我们在前面的章节中看到的，例如`postfix_domtrans_smtp`接口：
+- en: '[PRE46]'
+  id: totrans-206
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE46]'
+- en: 'A third transition type that SELinux supports is the dynamic domain transition.
+    Such SELinux policy rules inform the SELinux subsystem that a process can change
+    its own type dynamically—without needing to execute a file. This does require
+    the application to be SELinux-aware (that is, be able to interact with the SELinux
+    subsystem itself). For instance, inside the FTP policy, the following interface
+    is made available to support domains dynamically transitioning to the `anon_sftpd_t`
+    domain:'
+  id: totrans-207
+  prefs: []
+  type: TYPE_NORMAL
+  zh: SELinux支持的第三种过渡类型是动态域过渡。这样的SELinux策略规则通知SELinux子系统，进程可以动态地改变其自身类型——无需执行文件。这要求应用程序具备SELinux感知能力（即能够与SELinux子系统交互）。例如，在FTP策略中，提供了以下接口来支持域动态过渡到`anon_sftpd_t`域：
+- en: '[PRE47]'
+  id: totrans-208
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE47]'
+- en: 'In our Postfix example, we used the `/dev/shm/` shared memory, but there is
+    also POSIX shared memory, which is governed through the `shm` class. This shared
+    memory inherits the label from the domain itself, so if two applications (such
+    as `postfix_pickup_t` and `postfix_cleanup_t`) use POSIX shared memory, then the
+    target label is inherited from the process that creates the shared memory region:'
+  id: totrans-209
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在我们的Postfix示例中，我们使用了`/dev/shm/`共享内存，但也有POSIX共享内存，它通过`shm`类进行管理。这个共享内存继承自域本身的标签，因此，如果两个应用程序（如`postfix_pickup_t`和`postfix_cleanup_t`）使用POSIX共享内存，那么目标标签将从创建共享内存区域的进程继承：
+- en: '[PRE48]'
+  id: totrans-210
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE48]'
+- en: Without fine-grained access controls, this would all be handled by a single
+    domain (say `postfix_t`) and shared memory access controls would be very limited.
+  id: totrans-211
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如果没有细粒度的访问控制，这一切将由单一域（例如`postfix_t`）处理，并且共享内存的访问控制将非常有限。
