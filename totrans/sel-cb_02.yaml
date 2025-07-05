@@ -1,36 +1,52 @@
 - en: Chapter 2. Dealing with File Labels
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第2章 处理文件标签
 - en: 'In this chapter, we will cover how file labels are set and managed, and learn
     how to configure the SELinux policy ourselves to use and assign the right file
     labels. The recipes that this chapter covers are as follows:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将讨论如何设置和管理文件标签，并学习如何自己配置SELinux策略以使用和分配正确的文件标签。本章所涵盖的内容如下：
 - en: Defining file contexts through patterns
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过模式定义文件上下文
 - en: Using substitution definitions
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用替代定义
 - en: Enhancing an SELinux policy with file transitions
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过文件转换增强SELinux策略
 - en: Setting resource-sensitivity labels
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置资源敏感性标签
 - en: Configuring sensitivity categories
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 配置敏感性类别
 - en: Introduction
+  id: totrans-7
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 介绍
 - en: Setting, resetting, and governing file labels are the most common tasks administrators
     have to perform on an SELinux-enabled system. The policies that are provided by
     policy developers as well as Linux distributions offer sane defaults to use, but
@@ -38,209 +54,306 @@
     often install their custom scripts and logfiles in nondefault locations, and many
     daemons can be configured to support multiple instances on the same system—each
     of them using a different base directory.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 设置、重置和管理文件标签是管理员在启用SELinux的系统上最常执行的任务。策略开发者和Linux发行版提供了合理的默认设置，但许多实现可能有不同的服务和文件位置。公司通常会将自定义脚本和日志文件安装在非默认位置，许多守护进程可以配置为在同一系统上支持多个实例——每个实例使用不同的基础目录。
 - en: 'System administrators will know how to set context definitions through the
     `semanage` application and then reset the contexts of the target files using `setfiles`
     or `restorecon`:'
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 系统管理员将了解如何通过`semanage`应用程序设置上下文定义，然后使用`setfiles`或`restorecon`重置目标文件的上下文：
 - en: '[PRE0]'
+  id: totrans-10
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'This, however, is a local definition, which, if necessary, needs to be exported
     and imported in order to transfer it to other systems:'
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，这是一个本地定义，如果需要，必须导出并导入，以便将其传输到其他系统：
 - en: '[PRE1]'
+  id: totrans-12
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: By moving context definitions into the SELinux policy realm, such definitions
     can be easily installed on multiple systems and managed centrally as we've seen
     for SELinux policy modules.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过将上下文定义移入SELinux策略领域，这些定义可以轻松地在多个系统上安装并集中管理，正如我们在SELinux策略模块中所看到的那样。
 - en: Defining file contexts through patterns
+  id: totrans-14
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 通过模式定义文件上下文
 - en: SELinux policy modules can contain file context definitions through their `.fc`
     files. In these files, path expressions are used to point to the various locations
     that should match a particular file context, and class identifiers are used to
     differentiate file context definitions based on the file class (directories, regular
     files, symbolic links, and more).
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux策略模块可以通过其`.fc`文件包含文件上下文定义。在这些文件中，路径表达式用于指向应该匹配特定文件上下文的各种位置，类标识符用于根据文件类别（目录、常规文件、符号链接等）区分文件上下文定义。
 - en: In this recipe, we'll create a `mylogging` SELinux module, which defines additional
     path specifications for logging-related contexts. We will use direct file paths
     as well as regular expressions, and take a look at the various class identifiers.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个教程中，我们将创建一个`mylogging` SELinux模块，定义与日志相关的上下文的额外路径规范。我们将使用直接的文件路径以及正则表达式，并查看各种类标识符。
 - en: How to do it…
+  id: totrans-17
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'To define a file context through an SELinux policy module, use the following
     approach:'
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 要通过SELinux策略模块定义文件上下文，请使用以下方法：
 - en: 'With `matchpathcon`, we can check what is the context that the SELinux tools
     would reset the resource to:'
+  id: totrans-19
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`matchpathcon`，我们可以检查SELinux工具将资源重置为的上下文：
 - en: '[PRE2]'
+  id: totrans-20
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Create the `mylogging.te` file in which we mention the types that are going
     to be used in the definition. It is a best practice to handle types that are not
     defined by the SELinux module itself through a different SELinux module. In this
     example though, we also declare `var_t` to keep the example simple:'
+  id: totrans-21
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建`mylogging.te`文件，在其中提及将用于定义的类型。最佳实践是通过不同的SELinux模块处理SELinux模块本身未定义的类型。然而，在此示例中，我们也声明了`var_t`以保持示例简单：
 - en: '[PRE3]'
+  id: totrans-22
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'Next, create the `mylogging.fc` file in which we declare the path expressions
     and their associated file context:'
+  id: totrans-23
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，创建`mylogging.fc`文件，在其中声明路径表达式及其关联的文件上下文：
 - en: '[PRE4]'
+  id: totrans-24
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'Now, build the policy module and load it:'
+  id: totrans-25
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，构建策略模块并加载它：
 - en: '[PRE5]'
+  id: totrans-26
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'With `matchpathcon`, we can now verify whether the context known to the SELinux
     tools is the correct one:'
+  id: totrans-27
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`matchpathcon`，我们现在可以验证SELinux工具已知的上下文是否正确：
 - en: '[PRE6]'
+  id: totrans-28
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: How it works…
+  id: totrans-29
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: An SELinux policy module contains everything SELinux needs to properly handle
     a set of policy rules. This includes the rules themselves (which are declared
     in a `.te` file) with optional interface declarations (in the `.if` files), which
     define interfaces that other policies can call in order to generate specific SELinux
     rules. The third and final part of an SELinux policy module is the related file
     contexts file —hence the `.fc` file suffix.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 策略模块包含 SELinux 正确处理一组策略规则所需的所有内容。包括规则本身（在 `.te` 文件中声明），以及可选的接口声明（在 `.if`
+    文件中），这些接口声明定义了其他策略可以调用的接口，以便生成特定的 SELinux 规则。SELinux 策略模块的第三部分和最后一部分是相关的文件上下文文件——因此是
+    `.fc` 文件后缀。
 - en: Note
+  id: totrans-31
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Context declarations in a `.fc` file do not automatically enforce and set these
     contexts. These are merely definitions used by the SELinux utilities and libraries
     when a relabeling operation occurs.
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: '`.fc` 文件中的上下文声明不会自动强制执行并设置这些上下文。这些仅仅是 SELinux 工具和库在重新标记操作发生时使用的定义。'
 - en: 'This contexts file contains, per line:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 该上下文文件包含每一行的内容：
 - en: A path expression to which an absolute file path should match
+  id: totrans-34
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个路径表达式，应该匹配到一个绝对文件路径
 - en: An optional class identifier to discern contexts (files, directories, sockets,
     symbolic links, and so on)
+  id: totrans-35
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个可选的类标识符，用于区分上下文（文件、目录、套接字、符号链接等）
 - en: The context to be assigned to this path
+  id: totrans-36
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 要分配给此路径的上下文
 - en: 'Each part of the context definition is whitespace delimited:'
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 上下文定义的每一部分都以空格分隔：
 - en: '[PRE7]'
+  id: totrans-38
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: The lines can be ordered to the policy developers' liking. Most developers order
     paths in an alphabetical order with grouping based on the top-level directory.
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些行可以按照政策开发人员的喜好进行排序。大多数开发人员将路径按字母顺序排列，并根据顶级目录进行分组。
 - en: Path expressions
+  id: totrans-40
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 路径表达式
 - en: The regular expression support in the SELinux tools and libraries is based on
     **Perl-Compatible Regular Expressions** (**PCRE**).
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 工具和库中的正则表达式支持基于 **Perl 兼容正则表达式**（**PCRE**）。
 - en: 'Of all possible expressions, the simplest expression to use is the one without
     globbing, such as the following code:'
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 在所有可能的表达式中，最简单的表达式是没有通配符的表达式，例如以下代码：
 - en: '[PRE8]'
+  id: totrans-43
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: An important part of this is the escape of the period—if we don't escape the
     period, then the PCRE support would treat the period as any character matching
     not only a `listener.log` file, but also `listener_log` or `listenerslog`.
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 其中一个重要部分是对句点的转义——如果我们不转义句点，那么 PCRE 支持会将句点视为任何字符，这样不仅匹配到 `listener.log` 文件，还可能匹配
+    `listener_log` 或 `listenerslog`。
 - en: 'A very common expression is the one that matches a particular directory and
     all subdirectories and files inside, which is represented in the following example:'
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个非常常见的表达式是匹配特定目录及其所有子目录和文件，这在以下示例中表示：
 - en: '[PRE9]'
+  id: totrans-46
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: This ensures that there is always a context definition for a file or directory
     within.
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 这确保了每个文件或目录都有一个上下文定义。
 - en: The order of processing
+  id: totrans-48
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 处理顺序
 - en: Given the exhaustive list of path expressions that a regular system has, a file
     path can match multiple rules, so which one will the SELinux utilities use?
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 给定常规系统中路径表达式的详尽列表，一个文件路径可以匹配多个规则，那么 SELinux 工具将使用哪个规则呢？
 - en: 'Basically, the SELinux utilities follow the principle of *most specific first*.
     Given two lines A and B, this is checked in the following order, where the first
     match wins:'
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 基本上，SELinux 工具遵循 *最具体优先* 的原则。给定 A 行和 B 行，将按以下顺序检查，其中第一个匹配的获胜：
 - en: If line A has a regular expression in it and B doesn't, then B is more specific.
+  id: totrans-51
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果 A 行中有正则表达式而 B 行没有，那么 B 行更为具体。
 - en: If the number of characters before the first regular expression in line A is
     less than the number of characters before the first regular expression in line
     B, then B is more specific.
+  id: totrans-52
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果 A 行中第一个正则表达式之前的字符数少于 B 行中第一个正则表达式之前的字符数，则 B 行更为具体。
 - en: If the number of characters in line A is less than the number of characters
     in line B, then line B is more specific.
+  id: totrans-53
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果 A 行的字符数少于 B 行的字符数，则 B 行更为具体。
 - en: If line A does not specify an SELinux type (so that the context part of it is
     `<<none>>`) and line B does, then line B is more specific.
+  id: totrans-54
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果 A 行没有指定 SELinux 类型（因此它的上下文部分是 `<<none>>`），而 B 行有，那么 B 行更为具体。
 - en: The SELinux utilities will load in the definitions given through the files available
     at `/etc/selinux/mcs/contexts/files/`, but will give preference to the ones in
     `file_contexts.local` (and then `file_contexts.homedirs`) as those are the definitions
@@ -248,173 +361,253 @@
     a regular expression and a policy-provided definition doesn't, then the policy-provided
     definition is still used. This is the only exception to the preference rules between
     the various context files.
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 工具将加载通过 `/etc/selinux/mcs/contexts/files/` 中的文件给出的定义，但会优先考虑 `file_contexts.local`（然后是
+    `file_contexts.homedirs`）中的定义，因为这些是由系统管理员本地创建的定义。然而，如果本地定义使用正则表达式而策略提供的定义没有使用，则仍然使用策略提供的定义。这是各上下文文件之间优先规则的唯一例外。
 - en: 'The SELinux utilities provide a tool called `findcon` (part of the `setools`
     or `setools-console` package) that can be used to analyze this ordering, which
     shows the matching patterns within a single (!) context definition file and orders
     them from least specific to most specific:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 工具提供了一个名为 `findcon` 的工具（属于 `setools` 或 `setools-console` 包），可用于分析这个排序，显示单个（!）上下文定义文件中的匹配模式，并按照从最不具体到最具体的顺序排列：
 - en: '[PRE10]'
+  id: totrans-57
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'If only the actual context definition is needed (and not the full set of matching
     expressions with the precedence order as `findcon` shows), then `matchpathcon`
     can be used instead:'
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果只需要实际的上下文定义（而不是 `findcon` 所显示的完整匹配表达式及其优先顺序），则可以改用 `matchpathcon`：
 - en: '[PRE11]'
+  id: totrans-59
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: Class identifiers
+  id: totrans-60
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 类标识符
 - en: The second part of the context definition is an optional part—a class identifier.
     Through a class identifier, developers can tell the SELinux utilities that a context
     definition is only applicable if the path expression matches a particular file
     class. If the class identifier is omitted, then any class matches.
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 上下文定义的第二部分是可选部分——类标识符。通过类标识符，开发者可以告诉 SELinux 工具，只有当路径表达式匹配特定文件类时，上下文定义才适用。如果省略类标识符，则任何类都会匹配。
 - en: 'If a class identifier is shown, then one (per line) of the following identifiers
     can be used:'
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果显示了类标识符，则可以使用以下标识符之一（每行一个）：
 - en: The '`--`' identifier is used for regular files
+  id: totrans-63
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '''`--`'' 标识符用于常规文件'
 - en: The '`-d`' identifier is used for directories
+  id: totrans-64
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '''`-d`'' 标识符用于目录'
 - en: The '`-l`' identifier is used for symbolic links
+  id: totrans-65
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '''`-l`'' 标识符用于符号链接'
 - en: The '`-b`' identifier is used for block devices
+  id: totrans-66
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '''`-b`'' 标识符用于块设备'
 - en: The '`-c`' identifier is used for character devices
+  id: totrans-67
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '''`-c`'' 标识符用于字符设备'
 - en: The '`-p`' identifier is used for FIFO files
+  id: totrans-68
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '''`-p`'' 标识符用于 FIFO 文件'
 - en: The '`-s`' identifier is used for sockets
+  id: totrans-69
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '''`-s`'' 标识符用于套接字'
 - en: Context declaration
+  id: totrans-70
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 上下文声明
 - en: 'The final part of a context definition is the context itself that is to be
     assigned to all matching resources. It is generated through the `gen_context`
     macro, as follows:'
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 上下文定义的最后部分是要分配给所有匹配资源的上下文。它是通过 `gen_context` 宏生成的，如下所示：
 - en: '[PRE12]'
+  id: totrans-72
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: The `gen_context` macro is used to differentiate context definitions based on
     policy features. If the target policy does not support MLS, then only the first
     argument (`system_u:object_r:var_t`, in the example) is used. If the policy supports
     MLS but only a single sensitivity (`s0`), then `:s0` is appended to the context.
     Otherwise, the second argument (coincidentally also `s0` in the example) is appended
     (with a colon in front).
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: '`gen_context` 宏用于基于策略特性区分上下文定义。如果目标策略不支持 MLS，则仅使用第一个参数（示例中的 `system_u:object_r:var_t`）。如果策略支持
+    MLS，但仅支持单一敏感性（`s0`），则会在上下文中附加 `:s0`。否则，会附加第二个参数（示例中恰好也是 `s0`，前面带冒号）。'
 - en: Generally, contexts only differ on the SELinux type. The SELinux owner and SELinux
     role of the resource usually remain `system_u` and `object_r` respectively.
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，上下文只在 SELinux 类型上有所不同。资源的 SELinux 所有者和 SELinux 角色通常分别保持为 `system_u` 和 `object_r`。
 - en: 'A special value for the context is `<<none>>`, like in the following definition:'
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 上下文的特殊值是 `<<none>>`，如下所示：
 - en: '[PRE13]'
+  id: totrans-76
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: This tells the SELinux utilities that they should never try to set the context
     of this resource. Whenever an administrator triggers a filesystem relabeling operation,
     these specific locations will not have their label changed (regardless of their
     current label). This does *not* mean that an existing context should be removed!
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 这告诉 SELinux 工具，它们永远不应尝试设置此资源的上下文。每当管理员触发文件系统重新标记操作时，这些特定位置的标签将不会被更改（无论当前标签是什么）。这*并不*意味着应该移除现有上下文！
 - en: There's more...
+  id: totrans-78
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'In the recipe, we covered how to define labels in great detail. If many changes
     are made, it makes sense to force a relabel on the entire system. On Red Hat systems,
     this can be accomplished by creating a flag file and rebooting the system:'
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本教程中，我们详细介绍了如何定义标签。如果进行大量更改，强制对整个系统进行重新标记是有意义的。在Red Hat系统中，可以通过创建一个标志文件并重启系统来实现：
 - en: '[PRE14]'
+  id: totrans-80
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'On Gentoo systems, the entire system can be relabeled using the `rlpkg` command:'
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Gentoo系统中，可以使用`rlpkg`命令重新标记整个系统：
 - en: '[PRE15]'
+  id: totrans-82
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'On Red Hat systems, the command to relabel the system is called `fixfiles`:'
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Red Hat系统中，用于重新标记系统的命令是`fixfiles`：
 - en: '[PRE16]'
+  id: totrans-84
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: This is also needed if a system has been (temporarily) booted without SELinux
     support or with SELinux disabled as files will be created that have no file context.
     When an SELinux-enabled system is booted again, it will mark those files as `unlabeled_t`,
     which is a type that most domains have no access to (SELinux-wise).
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果系统（临时）以没有SELinux支持或禁用SELinux的状态启动，文件将会被创建为没有文件上下文。当SELinux启用的系统再次启动时，它将把这些文件标记为`unlabeled_t`，这是大多数域无法访问的类型（在SELinux方面）。
 - en: Using substitution definitions
+  id: totrans-86
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用替代定义
 - en: Sometimes, applications and their resources get installed at different locations
     than expected by the SELinux policy. Trying to accommodate this by defining additional
     context definitions for each and every subdirectory can easily become unmanageable.
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时，应用程序及其资源被安装在与SELinux策略预期的位置不同的地方。试图通过为每个子目录定义额外的上下文定义来适应这种情况，容易变得无法管理。
 - en: 'To help administrators, the SELinux utilities support substitution entries,
     which tell SELinux "if a path starts with *this*, then label it as if it starts
     with *that*". Administrators can set such a substitution (which is called an **equivalence
     class**) using `semanage`, as follows:'
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了帮助管理员，SELinux工具支持替代条目，这些条目告诉SELinux：“如果路径以*这个*开头，那么就像它以*那个*开头一样标记它”。管理员可以使用`semanage`设置这样的替代（称为**等价类**），如下所示：
 - en: '[PRE17]'
+  id: totrans-89
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: In this example, any location under `/mnt/chroots/bind/` will be labeled as
     if it started from the main `/` directory (so `/mnt/chroots/bind/etc/` becomes
     `etc_t` as `/etc/` is `etc_t`).
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，`/mnt/chroots/bind/`下的任何位置都会被标记为如果它是从主`/`目录开始的（所以`/mnt/chroots/bind/etc/`变成了`etc_t`，因为`/etc/`是`etc_t`）。
 - en: Target locations for `chroots` are a good use case for this. A `chroot` is an
     alternate location on the filesystem, which will act as the root filesystem for
     one or a set of applications.
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: '`chroots`的目标位置是一个很好的应用场景。`chroot`是文件系统中的一个替代位置，它将作为一个或一组应用程序的根文件系统。'
 - en: For administrators who want to set substitutions across multiple systems, it
     is not possible to make this part of an SELinux policy module. The file that we
     need to manage is called `file_contexts.subs` (there is also one that ends with
     `.subs_dist` and is managed by the Linux distribution, which we will not touch).
     Having that said, we can always look at how to update this file in a more or less
     sane manner.
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于想要在多个系统上设置替代的管理员，无法将其作为SELinux策略模块的一部分。我们需要管理的文件称为`file_contexts.subs`（还有一个以`.subs_dist`结尾，由Linux发行版管理，我们不会修改它）。话虽如此，我们始终可以找到一种相对合理的方式来更新这个文件。
 - en: Getting ready
+  id: totrans-93
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: The easiest method would be to use a central configuration management utility,
     such as Puppet, CFEngine, Chef, or Ansible, as these systems allow administrators
     to force the content of specific files to a particular value. The use of a configuration
@@ -423,75 +616,109 @@
     is (also) managed by the `semanage` command. Administrators might want to add
     in local definitions that the central configuration management utility isn't aware
     of (and thus might revert the change).
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 最简单的方法是使用一个中央配置管理工具，如Puppet、CFEngine、Chef或Ansible，因为这些系统允许管理员强制将特定文件的内容设置为特定值。使用配置管理工具本身就可以写成一本书，所以它超出了本书的范围。如果你确实想深入研究，记住`file_contexts.subs`文件也是由`semanage`命令管理的。管理员可能希望添加一些中央配置管理工具无法识别的本地定义（因此可能会恢复更改）。
 - en: In this recipe, we'll cover a generic approach, but it does require that there
     is a way to do both a file transfer followed by a single line command (executed
     with proper permissions). This, however, shouldn't be much of a challenge to most
     system administrators.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本教程中，我们将介绍一种通用的方法，但它确实要求能够进行文件传输并执行一条单行命令（以正确的权限执行）。然而，对于大多数系统管理员来说，这不应该是一个挑战。
 - en: How to do it…
+  id: totrans-96
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'In order to apply changes to a wide range of systems, follow the next set of
     steps:'
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了将更改应用到广泛的系统，请按照以下步骤操作：
 - en: 'Apply the change locally to the system:'
+  id: totrans-98
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在系统上本地应用更改：
 - en: '[PRE18]'
+  id: totrans-99
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'Export the definitions to a single file:'
+  id: totrans-100
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将定义导出到一个文件：
 - en: '[PRE19]'
+  id: totrans-101
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: Edit the `local_selinux.mods` file and remove all entries that are not related
     to the change but need to be distributed.
+  id: totrans-102
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑 `local_selinux.mods` 文件，并删除所有与更改无关但需要分发的条目。
 - en: Distribute the resulting file to the target systems.
+  id: totrans-103
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将生成的文件分发到目标系统。
 - en: 'Apply the changes locally to the system:'
+  id: totrans-104
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在系统上本地应用更改：
 - en: '[PRE20]'
+  id: totrans-105
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: How it works…
+  id: totrans-106
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: The `semanage fcontext` command instantiates an equivalence class for `/mnt/chroot/bind/`,
     which has all subdirectories and files inside of it labeled as if they were at
     /. This ensures that administrators do not need to define a large amount of file
     contexts for each and every `chroot` location they manage.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: '`semanage fcontext` 命令为 `/mnt/chroot/bind/` 创建了一个等效类，其中所有子目录和文件都会被标记，就像它们位于根目录（`/`）下一样。这确保管理员不需要为他们管理的每个
+    `chroot` 位置定义大量的文件上下文。'
 - en: However, this might become problematic as `semanage fcontext` only applies changes
     locally, and on a larger infrastructure, the same settings might need to be applied
     to multiple systems. For this, `semanage export` and `semanage import` can be
     used.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，这可能会成为问题，因为 `semanage fcontext` 只会本地应用更改，在大型基础设施中，可能需要将相同的设置应用于多个系统。为此，可以使用
+    `semanage export` 和 `semanage import`。
 - en: The output of the `semanage export` command is a set of instructions for `semanage`
     and follows the syntax of the `semanage` commands to the letter.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: '`semanage export` 命令的输出是一组 `semanage` 指令，完全遵循 `semanage` 命令的语法。'
 - en: 'When exporting the `semanage` definitions, the first set of commands that are
     stored are the `delete all` statements such as `fcontext -D` (delete all locally
     made `semanage fcontext` settings). Of course, if we only need to distribute the
@@ -499,359 +726,520 @@
     incorrect. Hence, the need to manually edit the `local_selinux.mods` file. If
     only the equivalence class definition needs to be distributed, then the file might
     just contain the following:'
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 导出 `semanage` 定义时，首先存储的命令集是 `delete all` 语句，如 `fcontext -D`（删除所有本地创建的 `semanage
+    fcontext` 设置）。当然，如果我们只需要分发替代定义，则删除所有先前的本地语句是不正确的。因此，需要手动编辑 `local_selinux.mods`
+    文件。如果仅需分发等效类定义，则文件可能仅包含以下内容：
 - en: '[PRE21]'
+  id: totrans-111
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: The exported file can then be distributed to all target systems and loaded through
     the `semanage import` command effectively applying the same set of changes to
     the system.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，可以将导出的文件分发到所有目标系统，并通过 `semanage import` 命令加载，从而有效地将相同的一组更改应用到系统。
 - en: 'If the definition was already applied on a system, then the `import` command
     will fail:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果定义已经应用于某个系统，则 `import` 命令将失败：
 - en: '[PRE22]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: It is important to note here that if one command in the file fails to apply,
     then none of the commands in the file are applied (the file is processed in one
     go). This is why the `delete all` rules are originally made part of the exported
     set of commands.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要注意的是，如果文件中的某个命令未能应用，则文件中的所有命令都不会应用（文件是一次性处理的）。因此，`delete all` 规则最初被作为导出的命令集的一部分。
 - en: This makes distributed management of such settings more challenging if locally
     applied changes need to be kept as well, unless the distributed set of changes
     are singular (one exported instruction, which is allowed to fail).
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果本地应用的更改也需要保留，那么分布式管理这些设置会变得更加具有挑战性，除非分布式的更改集是单一的（一个导出的指令，允许失败）。
 - en: There's more...
+  id: totrans-117
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: Most files inside the `/etc/selinux/mcs/contexts/` location shouldn't be managed
     through any tool except either the Linux distribution package management system
     (through the installation of the base SELinux policy) or `semanage`.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: '`/etc/selinux/mcs/contexts/` 位置中的大多数文件不应通过任何工具进行管理，除非是 Linux 发行版包管理系统（通过安装基础
+    SELinux 策略）或 `semanage`。'
 - en: That being said, most files inside this location don't change much (except for
     the `files/file_contexts` file). It might be beneficial to hook into the package
     management system to update these files (if supported) or bluntly take over the
     management of these files, assuming you track the changes that the distribution
     would make closely.
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 话虽如此，这个位置内的大多数文件变化不大（除了`files/file_contexts`文件）。将这些文件与包管理系统连接以更新它们（如果支持）可能是有益的，或者直接接管这些文件的管理，前提是你密切跟踪分发版会进行的更改。
 - en: See also
+  id: totrans-120
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参见
 - en: 'The following resources dive deeper into the topics discussed in this recipe:'
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下资源将深入讨论本配方中涉及的主题：
 - en: To find out more about the various configuration files, check out [http://selinuxproject.org/page/PolicyConfigurationFiles](http://selinuxproject.org/page/PolicyConfigurationFiles)
+  id: totrans-122
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 要了解更多关于各种配置文件的信息，请查看 [http://selinuxproject.org/page/PolicyConfigurationFiles](http://selinuxproject.org/page/PolicyConfigurationFiles)
 - en: The interaction of SELinux with `chroots` is discussed in more detail in [Chapter
     9](ch09.html "Chapter 9. Aligning SELinux with DAC"), *Aligning SELinux with DAC*
+  id: totrans-123
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: SELinux与`chroots`的交互在[第9章](ch09.html "第9章. 对齐SELinux和DAC")中讨论得更详细，*对齐SELinux与DAC*
 - en: Enhancing an SELinux policy with file transitions
+  id: totrans-124
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 通过文件转换增强SELinux策略
 - en: 'Up until now, we''ve only handled the configuration part on file contexts:
     if we would ask SELinux utilities to relabel files, then the changes we made would
     come into effect. However, unless you run with the `restorecond` daemon checking
     out all possible file modifications (which would really be a resource hog) or
     run `restorecon` manually against all files regularly, the newly defined contexts
     will not be applied to the files.'
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们只处理了文件上下文的配置部分：如果我们要求SELinux工具重新标记文件，那么我们所做的更改将生效。然而，除非你运行`restorecond`守护进程来检查所有可能的文件修改（这将非常消耗资源），或者定期手动运行`restorecon`对所有文件进行检查，否则新定义的上下文将不会应用到文件上。
 - en: What we need to do is modify the local SELinux policy so that, upon creation
     of these files, the Linux kernel automatically assigns the right label to those
     files. This is handled through file transitions, which is a specific case of a
     **type transition**.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们需要做的是修改本地的SELinux策略，以便在创建这些文件时，Linux内核会自动为这些文件分配正确的标签。这通过文件转换来处理，这是**类型转换**的一个特定情况。
 - en: 'In a type transition, we configure a policy so that if a given domain creates
     a file (or other resource class) inside a directory with a specified label, then
     the created object should automatically get a specific label. Policy-wise, this
     is written as follows:'
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 在类型转换中，我们配置策略，使得如果某个域在具有特定标签的目录中创建文件（或其他资源类），则创建的对象应该自动获得一个特定的标签。从策略的角度来看，这是如下所写的：
 - en: '[PRE23]'
+  id: totrans-128
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'SELinux has also added in support for named file transitions (from Linux 2.6.39
     onwards, and available in Gentoo, Fedora 16+, and Red Hat Enterprise Linux 7+).
     In that case, such a transition only occurs if the created resource matches a
     particular filename exactly (so no regular expressions):'
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux还增加了对命名文件转换的支持（从Linux 2.6.39版本开始，并在Gentoo、Fedora 16+、Red Hat Enterprise
+    Linux 7+中可用）。在这种情况下，仅当创建的资源与特定的文件名完全匹配时（即没有正则表达式）才会发生这种转换：
 - en: '[PRE24]'
+  id: totrans-130
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: Through the reference policy macro's, this is supported with the `filetrans_pattern`
     definition.
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过参考策略宏，这可以通过`filetrans_pattern`定义来支持。
 - en: Getting ready
+  id: totrans-132
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: In order to properly define file transitions, we need to know what the source
     domain is that is responsible for creating the resource. For instance, a `/var/run/snort/`
     directory might be created by an `init` script, but if there is no file transition,
     then this directory will be created with the type of the parent directory (which
     is `var_run_t`) instead of the proper type (`snort_var_run_t`).
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了正确定义文件转换，我们需要知道负责创建资源的源域是什么。例如，`/var/run/snort/`目录可能由`init`脚本创建，但如果没有文件转换，那么该目录将以父目录的类型（即`var_run_t`）创建，而不是正确的类型（`snort_var_run_t`）。
 - en: So make sure to write down all the involved labels (as an example, we will use
     `initrc_t` for an `init` script, `var_run_t` for the parent directory, and `snort_var_run_t`
     for the target directory) before embarking on this recipe.
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以在开始本配方之前，请确保写下所有相关的标签（例如，我们将使用`initrc_t`作为`init`脚本的标签，`var_run_t`作为父目录的标签，`snort_var_run_t`作为目标目录的标签）。
 - en: How to do it…
+  id: totrans-135
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何执行…
 - en: 'Defining a file transition can be done as follows:'
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 定义文件转换可以按照以下方式进行：
 - en: 'Search through the SELinux policies to see if there is an interface that will
     provide a file transition from a given domain to `snort_run_t`:'
+  id: totrans-137
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在SELinux策略中搜索，看看是否有一个接口能够提供从给定域到`snort_run_t`的文件转换：
 - en: '[PRE25]'
+  id: totrans-138
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'Assuming that none have been found, search for interfaces that allow `initrc_t`
     created resources to transition to a given type:'
+  id: totrans-139
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 假设没有找到相关内容，搜索允许`initrc_t`创建的资源转移到给定类型的接口：
 - en: '[PRE26]'
+  id: totrans-140
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Bingo! Now, let''s create an enhancement for the snort SELinux module (through
     a `mysnort` policy file) with the following declaration in it:'
+  id: totrans-141
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 成功！现在，让我们通过以下声明创建一个用于增强snort SELinux模块的策略（通过`mysnort`策略文件）：
 - en: '[PRE27]'
+  id: totrans-142
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'Build the new policy and load it. Then check with `sesearch` if a type transition
     is indeed declared:'
+  id: totrans-143
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 构建新的策略并加载它。然后使用`sesearch`检查是否确实声明了类型转换：
 - en: '[PRE28]'
+  id: totrans-144
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: How it works…
+  id: totrans-145
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: Linux distributions that support SELinux already provide an SELinux policy that
     works in a majority of deployments. The default policy is extensive and works
     mostly out of the box. If specific changes are needed, chances are that these
     particular SELinux rules are already defined (as part of policy interfaces) and
     only need to be instantiated and loaded.
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 支持SELinux的Linux发行版已经提供了一个在大多数部署中有效的SELinux策略。默认策略非常广泛，且大多能够开箱即用。如果需要特定的更改，那么这些特定的SELinux规则可能已经被定义（作为策略接口的一部分），只需实例化并加载即可。
 - en: 'Policy interfaces usually exist in the following two types:'
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 策略接口通常存在以下两种类型：
 - en: Interfaces whose subject is delivered through an argument, and where the object
     (against which operations are performed) and perhaps target (in our case, to which
     a transition should occur) are hardcoded
+  id: totrans-148
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 主题通过参数传递的接口，其中对象（操作执行的对象）以及可能的目标（在我们的例子中，是转换应发生的目标）是硬编码的
 - en: Interfaces whose subject is hardcoded and where the object, target, or both
     are arguments to the interface
+  id: totrans-149
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 主题硬编码且对象、目标或两者是接口参数的接口
 - en: 'An example of the first interface type that can be used in our example would
     look like the following code:'
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的示例中可以使用的第一种接口类型的示例代码如下所示：
 - en: '[PRE29]'
+  id: totrans-151
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'We could then call this interface like this:'
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后我们可以像这样调用这个接口：
 - en: '[PRE30]'
+  id: totrans-153
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: However, such interfaces would be a burden to maintain. For every daemon support
     added to the system, the `init` policy would need to be changed with a named file
     transition together with the newly added policy rules for the daemon. Considering
     the amount of daemons that can run on a system, the `init` policy would literally
     be filled with a massive amount of named file transitions—at least one for every
     daemon.
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，这种接口会增加维护负担。对于系统中每添加一个守护进程支持，`init`策略就需要通过命名文件转换和新增的守护进程策略规则来进行修改。考虑到系统中可能运行的守护进程数量，`init`策略实际上会被填充大量的命名文件转换——每个守护进程至少一个。
 - en: The interface declaration that we encountered in the example is much more manageable.
     The interface is meant to be called by the daemon policy itself and immediately
     ensures that the `initrc_t` type can create directories of the given type (`snort_var_run_t`)
     inside the generic run directory (`var_run_t`). New additions to the policy leave
     the `init` policy at rest, making maintenance of the policies easier.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们在示例中遇到的接口声明要管理得多得多。该接口旨在由守护进程策略本身调用，并立即确保`initrc_t`类型可以在通用运行目录(`var_run_t`)中创建给定类型(`snort_var_run_t`)的目录。政策的新增不会影响`init`策略，使得策略的维护变得更加容易。
 - en: Finding the right search pattern
+  id: totrans-156
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 查找正确的搜索模式
 - en: To find the right pattern, we use the `sefindif` interface to search through
     the available interfaces. Finding the right expression is a matter of experience.
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 要查找正确的模式，我们使用`sefindif`接口在可用接口中进行搜索。找到正确的表达式是一项经验性的任务。
 - en: As we know, we want to search for file transitions, the line we are looking
     for will contain `filetrans_pattern`. Then, one of the arguments involved is the
     type we are going to transition to (`snort_var_run_t`). So the expression we used
     in the example was changed to `filetrans.*snort_var_run_t`. As that didn't result
     in anything, the next search involved the domain from which a transition has to
     be made (`initrc_t`) so that the expression was changed to `filetrans.*initrc_t`.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 如我们所知，我们想要查找文件转换，我们要查找的行将包含`filetrans_pattern`。然后，其中一个涉及的参数是我们将要转换到的类型（`snort_var_run_t`）。因此，我们在示例中使用的表达式更改为`filetrans.*snort_var_run_t`。由于没有结果，接下来的搜索涉及必须进行转换的域（`initrc_t`），因此表达式改为`filetrans.*initrc_t`。
 - en: 'However, let''s assume we don''t know that `filetrans_pattern` needs to be
     searched for. The type itself (`snort_var_run_t`) or domain (`initrc_t`) might
     be sufficient to search through, like in the following searches:'
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，假设我们不知道需要搜索`filetrans_pattern`。类型本身（`snort_var_run_t`）或域（`initrc_t`）可能足以进行搜索，如以下的搜索所示：
 - en: '[PRE31]'
+  id: totrans-160
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: From the resulting list of interfaces, we can then see if an interface is available
     that suits our needs.
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 从结果列表中，我们可以看到是否有适合我们需求的接口。
 - en: Patterns
+  id: totrans-162
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 模式
 - en: Patterns such as `filetrans_pattern` are important supporting definitions inside
     the reference policy. They bundle a set of permissions related to a functional
     approach (such as read files, which are handled through a `read_files_pattern`)
     and are not tied to a particular type (unlike interfaces).
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 如`filetrans_pattern`这样的模式是参考策略中的重要支持定义。它们将一组与功能性方法相关的权限（如读取文件，这些通过`read_files_pattern`来处理）进行捆绑，并且不依赖于特定的类型（与接口不同）。
 - en: 'The need for patterns comes from the very fine-grained access controls that
     SELinux has on Linux activities. Reading a file is a nice example: it is not sufficient
     to just allow a type to perform the `read` action:'
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 模式的需求来源于SELinux对Linux活动的非常细粒度的访问控制。读取文件是一个很好的例子：仅仅允许一个类型执行`read`操作是不够的：
 - en: '[PRE32]'
+  id: totrans-165
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'Most applications first check the attributes of the file (`getattr`) and open
     the file before they can read the file. Depending on the purpose, they might also
     want to lock the file or perform I/O operations on it through `ioctl`. So instead
     of just the preceding access vector, the rule was changed to:'
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 大多数应用程序首先检查文件的属性（`getattr`）并打开文件，然后才能读取文件。根据目的，它们可能还想锁定文件或通过`ioctl`对其执行I/O操作。所以，不仅仅是前述的访问向量，规则已更改为：
 - en: '[PRE33]'
+  id: totrans-167
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'The reference policy provides a single permission set for this called `read_file_perms`,
     which turns the access vector into the following:'
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 参考策略为此提供了一个称为`read_file_perms`的单一权限集，将访问向量转换为以下内容：
 - en: '[PRE34]'
+  id: totrans-169
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'Second, the policy developers often want to allow a domain to read a file inside
     a directory that is labeled similarly. For instance, a `snort_var_run_t` file
     can be at `/var/run/snort/snort.pid` with the `/var/run/snort/` directory also
     being labeled as `snort_var_run_t`. So we would also need to grant the `initrc_t`
     type search rights inside the directory—which again is a set of permissions as
     can be seen from the `search_dir_perms` definition:'
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 其次，策略开发者通常希望允许一个域在一个标记相似的目录内读取文件。例如，一个`snort_var_run_t`文件可以位于`/var/run/snort/snort.pid`，而`/var/run/snort/`目录也标记为`snort_var_run_t`。因此，我们还需要授予`initrc_t`类型在该目录内的搜索权限——这同样是一组权限，可以从`search_dir_perms`定义中看到：
 - en: '[PRE35]'
+  id: totrans-171
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'Instead of creating multiple rules for this, a pattern is created, called `read_files_pattern`,
     which looks like the following:'
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 与其为此创建多个规则，不如创建一个模式，叫做`read_files_pattern`，它如下所示：
 - en: '[PRE36]'
+  id: totrans-173
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'This allows policy developers to use a single call:'
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 这允许策略开发者使用一个单一的调用：
 - en: '[PRE37]'
+  id: totrans-175
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'To see the various patterns supported for policy development, use `sefinddef`
     with the ''`define.*_pattern`'' expression:'
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 要查看支持策略开发的各种模式，请使用`sefinddef`并带上`'define.*_pattern`'表达式：
 - en: '[PRE38]'
+  id: totrans-177
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: Using patterns allows developers to create readable policy rules using a functional
     approach rather than a full sum-up of each individual access vector.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用模式允许开发者通过函数化方法创建可读的策略规则，而不是对每个单独的访问向量进行总结。
 - en: There's more...
+  id: totrans-179
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'In the `snort_generic_pid_filetrans_pid` interface presented earlier, we used
     a named file transition: the transition occurs only if the filename passed on
     as the last argument matches the filename of the file created.'
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 在之前展示的`snort_generic_pid_filetrans_pid`接口中，我们使用了命名文件转换：只有当传递的最后一个参数中的文件名与创建的文件的文件名匹配时，转换才会发生。
 - en: 'Named file transitions take precedence over normal file transitions. A good
     example for this are the file transitions supported for the `initrc_t` domain:'
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 命名文件转换优先于普通文件转换。一个很好的例子是`initrc_t`域支持的文件转换：
 - en: '[PRE39]'
+  id: totrans-182
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: In this case, if an `init` script creates a directory called `udev` or `tor`
     (or any of the other transition rules that are not shown in the example), then
     a proper file transition occurs. If the filename doesn't match, then a transition
     occurs to the `initrc_var_run_t` type.
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，如果一个`init`脚本创建了一个名为`udev`或`tor`的目录（或示例中未显示的任何其他转换规则），则会发生适当的文件转换。如果文件名不匹配，则会发生转换到`initrc_var_run_t`类型。
 - en: File transitions on regular files and directories are the most common, but transitions
     can also occur on various other classes, such as sockets, FIFO files, symbolic
     links, and more.
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 对常规文件和目录的文件转换最为常见，但转换也可以发生在其他各种类别上，如套接字、FIFO文件、符号链接等。
 - en: See also
+  id: totrans-185
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: Domain transitions (which assign a different context to a process rather than
     a file) are covered in [Chapter 3](ch03.html "Chapter 3. Confining Web Applications"),
     *Confining Web Applications* in more detail and are used in [Chapter 4](ch04.html
     "Chapter 4. Creating a Desktop Application Policy"), *Creating a Desktop Application
     Policy* and [Chapter 5](ch05.html "Chapter 5. Creating a Server Policy"), *Creating
     a Server Policy*
+  id: totrans-186
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 域转换（即为进程分配不同的上下文而非文件）将在[第3章](ch03.html "第3章。限制Web应用程序")，*限制Web应用程序*中详细讨论，并在[第4章](ch04.html
+    "第4章。创建桌面应用程序策略")，*创建桌面应用程序策略*和[第5章](ch05.html "第5章。创建服务器策略")，*创建服务器策略*中使用。
 - en: Setting resource-sensitivity labels
+  id: totrans-187
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 设置资源敏感度标签
 - en: When an SELinux policy is MLS-enabled and supports multiple sensitivities (which
     is not the case with MCS, as MCS only has a single sensitivity), then SELinux
     can govern information flow and access between a domain and one or more resources
@@ -859,175 +1247,256 @@
     But even with a single sensitivity (as is the case with MCS), SELinux has additional
     constraint support to ensure that domains cannot access resources that have one
     of the categories assigned that the domain doesn't have clearance for.
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 当SELinux策略启用MLS并支持多个敏感度时（而MCS则没有，因为MCS只有一个敏感度），SELinux可以根据域的许可级别和资源的敏感度级别管理信息流和资源访问。但是即使只有单一敏感度（如MCS的情况），SELinux也提供了额外的约束支持，确保域无法访问分配了该域没有许可的类别的资源。
 - en: A sensitivity level consists of a sensitivity (`s0` is generally being used
     for the lowest sensitivity and `s15`—which is a policy build-time constant and
     thus can be configured—is the highest sensitivity) together with a category set
     (which can be a list such as `c0,c5,c8.c10`).
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 敏感度级别由一个敏感度（`s0`通常用于最低敏感度，而`s15`——这是一个策略构建时的常量，因此可以配置——是最高敏感度）以及一个类别集（可以是诸如`c0,c5,c8.c10`之类的列表）组成。
 - en: A security clearance is similar to a sensitivity level but shows a sensitivity
     range (such as `s0-s3`) instead of a single sensitivity level. A security clearance
     can be seen as a range going from the lowest sensitivity level to the highest
     sensitivity level allowed by the domain.
+  id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: 安全许可类似于敏感度级别，但显示的是一个敏感度范围（例如`s0-s3`），而不是单一的敏感度级别。安全许可可以看作是从最低敏感度级别到域允许的最高敏感度级别的范围。
 - en: 'When policies are being developed for such systems, context definitions and
     policy rules can take sensitivities into account. In this recipe, we will do the
     two most common operations for MLS-enabled systems:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 在为此类系统开发策略时，上下文定义和策略规则可以考虑敏感度。在本教程中，我们将执行两个针对启用MLS系统最常见的操作：
 - en: Define a context with a higher-level sensitivity
+  id: totrans-192
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 定义一个更高敏感度的上下文
 - en: Set the clearance of a process policy-wise on a domain transition
+  id: totrans-193
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在域转换中按策略设置进程的许可级别
 - en: To accomplish this, we will use the snort intrusion detection system as an example,
     forcing it to be always executed with the `s3` sensitivity and all possible categories.
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了实现这一点，我们将以snort入侵检测系统为例，强制它始终以`s3`敏感度和所有可能的类别运行。
 - en: This example will also show us how to substitute an existing policy rather than
     enhance it, as we are going to update a definition that would otherwise collide
     with the existing definition.
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 本示例还将向我们展示如何替换现有策略，而不是增强它，因为我们将更新一个定义，否则它将与现有定义发生冲突。
 - en: How to do it…
+  id: totrans-196
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做到这一点…
 - en: 'To modify an existing domain to support specific sensitivity levels, execute
     the following steps:'
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 要修改现有域以支持特定的敏感度级别，请执行以下步骤：
 - en: 'Copy the `snort.te` and `snort.fc` files from the distribution policy repository
     to the local environment:'
+  id: totrans-198
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将`snort.te`和`snort.fc`文件从分发策略库复制到本地环境：
 - en: '[PRE40]'
+  id: totrans-199
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: Rename the files to `mysnort` (or `customsnort`), so we always know this is
     a customized policy. Don't forget to update the `policy_module` call in the `.te`
     file.
+  id: totrans-200
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将文件重命名为`mysnort`（或`customsnort`），这样我们就知道这是一个定制的策略。不要忘记更新`.te`文件中的`policy_module`调用。
 - en: 'Open the `mysnort.te` file and look for the `init_daemon_domain` call. Substitute
     the call with the following:'
+  id: totrans-201
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 打开`mysnort.te`文件，查找`init_daemon_domain`调用。将该调用替换为以下内容：
 - en: '[PRE41]'
+  id: totrans-202
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: 'In `mysnort.fc`, label the snort resources with the `s3` sensitivity. For instance,
     for the snort binary, label it as follows:'
+  id: totrans-203
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在`mysnort.fc`中，将snort资源标记为`s3`敏感度。例如，对于snort二进制文件，标记如下：
 - en: '[PRE42]'
+  id: totrans-204
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'Build the `mysnort` policy, remove the currently loaded snort SELinux policy
     module, and load the `mysnort` one:'
+  id: totrans-205
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 构建 `mysnort` 策略，移除当前加载的 snort SELinux 策略模块，并加载 `mysnort` 模块：
 - en: '[PRE43]'
+  id: totrans-206
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: Relabel all files related to snort and then start snort again.
+  id: totrans-207
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重新标记所有与 snort 相关的文件，然后再次启动 snort。
 - en: How it works…
+  id: totrans-208
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: 'There are three important aspects to this recipe:'
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个方案有三个重要方面：
 - en: We replace the entire policy rather than create an enhancement.
+  id: totrans-210
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们替换整个策略，而不是创建一个增强。
 - en: We update the policy to use a ranged daemon domain.
+  id: totrans-211
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们更新了策略以使用范围守护进程域。
 - en: We update the file contexts to use the right sensitivity.
+  id: totrans-212
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们更新文件上下文，以使用正确的敏感度。
 - en: The file context update is obvious but the reason for fully replacing the policy
     might not be.
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件上下文的更新显而易见，但完全替换策略的原因可能不太明显。
 - en: Full policy replacement
+  id: totrans-214
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 完整策略替换
 - en: In the example, we copied the existing policy for the snort SELinux module and
     made the updates in the copy, rather than trying to enhance the policy by creating
     an additional module.
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们复制了现有的 snort SELinux 模块策略，并在副本中进行了更新，而不是通过创建额外的模块来增强策略。
 - en: This is needed because we are making changes to the SELinux policy that are
     mutually exclusive to the already running SELinux policy. For instance, the file
     context changes would confuse SELinux as it would then have two fully matching
     definitions through policy modules, but each with a different resulting context.
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是必需的，因为我们正在对 SELinux 策略进行更改，这些更改与当前运行的 SELinux 策略是互斥的。例如，文件上下文的更改会让 SELinux
+    感到困惑，因为它会通过策略模块有两个完全匹配的定义，但每个定义的上下文不同。
 - en: In the example, we only copied the type enforcement declarations (`snort.te`)
     and file context declarations (`snort.fc`). If we would copy the interface definitions
     as well (`snort.if`), the policy build would give us a warning that there are
     duplicate interface definitions—the ones provided by the Linux distribution are
     still on the system after all.
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们仅复制了类型强制声明（`snort.te`）和文件上下文声明（`snort.fc`）。如果我们还复制接口定义（`snort.if`），那么策略构建时会给出警告，提示存在重复的接口定义——毕竟，Linux
+    发行版提供的接口定义仍然存在于系统中。
 - en: Ranged daemon domain
+  id: totrans-218
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 范围守护进程域
 - en: 'In the SELinux policy itself, we substituted the `init_daemon_domain(snort_t,
     snort_exec_t)` entry with the following:'
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 SELinux 策略本身中，我们将 `init_daemon_domain(snort_t, snort_exec_t)` 条目替换为以下内容：
 - en: '[PRE44]'
+  id: totrans-220
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: 'Let''s take a look at the contents of this interface:'
+  id: totrans-221
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们来看看这个接口的内容：
 - en: '[PRE45]'
+  id: totrans-222
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: The newly called interface calls the original `init_daemon_domain`, but enhances
     it with MCS- and MLS-related logic. In both cases, it calls `range_transition`
     so that when the snort `init` script (running as `initrc_t`) transitions to the
     `snort_t` domain, then the active sensitivity range is also changed to the third
     parameter.
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 新调用的接口调用了原始的`init_daemon_domain`，但增加了 MCS 和 MLS 相关的逻辑。在这两种情况下，它都调用了 `range_transition`，这样当
+    snort 的 `init` 脚本（以 `initrc_t` 运行）过渡到 `snort_t` 域时，活动的敏感度范围也会被更改为第三个参数。
 - en: In our case, the third parameter is `s3:mcs_allcats`, where `mcs_allcats` is
     a definition that expands to all categories supported by the policy (such as `c0.c255`
     if the policy supports 256 categories).
+  id: totrans-224
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的例子中，第三个参数是 `s3:mcs_allcats`，其中 `mcs_allcats` 是一个定义，扩展为策略支持的所有类别（例如，如果策略支持
+    256 类别，则为 `c0.c255`）。
 - en: In case of MLS, it also calls `mls_rangetrans_target`, which is an interface
     that sets an attribute to the `snort_t` domain, which is needed for the MLS constraints
     enabled in the policy.
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 MLS 情况下，它还调用了 `mls_rangetrans_target`，这是一个接口，将一个属性设置为 `snort_t` 域，这是策略中启用的
+    MLS 限制所需要的。
 - en: From the expanded code, we can see that there are `ifdef()` statements. These
     are blocks of SELinux policy rules that are enabled (or ignored) based on build-time
     parameters. The `enable_mcs` and `enable_mls` parameters are set if an MCS or
@@ -1035,307 +1504,442 @@
     selections (such as `distro_redhat` if the SELinux policy rules are specific for
     Red Hat Enterprise Linux and Fedora systems) and `enable_ubac` (which is when
     user-based access control is enabled).
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 从扩展的代码中，我们可以看到有 `ifdef()` 语句。这些是 SELinux 策略规则的块，基于构建时的参数启用（或忽略）。如果启用了 MCS 或
+    MLS 策略，则会设置 `enable_mcs` 和 `enable_mls` 参数。其他常用的构建时参数包括发行版选择（例如，如果 SELinux 策略规则针对
+    Red Hat Enterprise Linux 和 Fedora 系统，则为 `distro_redhat`）和 `enable_ubac`（即启用了基于用户的访问控制时）。
 - en: Constraints
+  id: totrans-227
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 限制
 - en: Most, if not all, SELinux policy development focuses on type enforcement rules
     and context definitions. SELinux does support various other statements, one of
     which is the `constrain` statement used to implement constraints.
+  id: totrans-228
   prefs: []
   type: TYPE_NORMAL
+  zh: 大多数（如果不是全部的话）SELinux策略开发集中在类型强制规则和上下文定义上。SELinux确实支持各种其他语句，其中之一是`constrain`语句，用于实现约束。
 - en: 'A constraint restricts permissions further based on a set of expressions that
     cover not only the type of the object or subject, but also SELinux role and SELinux
     user. The constraint that is related to the `mlsrangetrans` attribute (which is
     set by the `mls_rangetrans_target` interface) looks like the following:'
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: 约束基于一组表达式进一步限制权限，这些表达式不仅涵盖对象或主体的类型，还包括SELinux角色和SELinux用户。与`mlsrangetrans`属性（由`mls_rangetrans_target`接口设置）相关的约束如下所示：
 - en: '[PRE46]'
+  id: totrans-230
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: 'The constraint tells us the following things about a transition:'
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 约束告诉我们有关转换的以下信息：
 - en: The transition can occur only when the highest sensitivity level of the subject
     (domain/actor) dominates the highest sensitivity level of the object
+  id: totrans-232
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 只有当主体（域/执行者）的最高敏感度级别支配对象的最高敏感度级别时，转换才会发生。
 - en: The lowest sensitivity level of the subject is the same as the lowest sensitivity
     level of the object
+  id: totrans-233
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 主体的最低敏感度级别与对象的最低敏感度级别相同。
 - en: If not, then the type of the subject has to have the `mlsprocsetsl` attribute
     set
+  id: totrans-234
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果不是这样，则主体的类型必须设置`mlsprocsetsl`属性。
 - en: 'If not, then both of the following statements have to be true:'
+  id: totrans-235
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果不是这样，则必须同时满足以下两个条件：
 - en: The type of the subject has the `privrangetrans` attribute set
+  id: totrans-236
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 主体的类型设置了`privrangetrans`属性。
 - en: The type of the object has the `mlsrangetrans` attribute set
+  id: totrans-237
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对象的类型设置了`mlsrangetrans`属性。
 - en: Domination means that the sensitivity level of the first security level is equal
     to or higher than the sensitivity level of the second security level, and the
     categories of the first security level are the same or a superset of the categories
     of the second security level.
+  id: totrans-238
   prefs: []
   type: TYPE_NORMAL
+  zh: 支配意味着第一个安全级别的敏感度级别等于或高于第二个安全级别的敏感度级别，并且第一个安全级别的类别与第二个安全级别的类别相同或是其超集。
 - en: Constraints in the SELinux policy are part of the base policy set—this means
     that we are not able to add constraints through loadable SELinux policies. If
     we want to include additional constraints, we would need to build the entire policy
     ourselves, patching the `constraints`, `mls`, and `mcs` files inside the policy
     repository's `policy/` subdirectory.
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux策略中的约束是基础策略集的一部分——这意味着我们不能通过可加载的SELinux策略添加约束。如果我们想要包括额外的约束，我们需要自己构建整个策略，修补策略库中`policy/`子目录下的`constraints`、`mls`和`mcs`文件。
 - en: Knowing about constraints is important, but we probably never need to write
     constraints ourselves.
+  id: totrans-240
   prefs: []
   type: TYPE_NORMAL
+  zh: 了解约束是很重要的，但我们可能永远不需要自己编写约束。
 - en: See also
+  id: totrans-241
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: 'The SELinux project site is a good start for learning about constraints and
     their related statements:'
+  id: totrans-242
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux项目网站是学习约束及其相关语句的良好起点：
 - en: The MLS statements at [http://selinuxproject.org/page/NB_MLS](http://selinuxproject.org/page/NB_MLS)
+  id: totrans-243
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 可以参考SELinux语句[http://selinuxproject.org/page/NB_MLS](http://selinuxproject.org/page/NB_MLS)
 - en: The constraint statements at [http://selinuxproject.org/page/ConstraintStatements](http://selinuxproject.org/page/ConstraintStatements)
+  id: totrans-244
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 约束语句可以参考[http://selinuxproject.org/page/ConstraintStatements](http://selinuxproject.org/page/ConstraintStatements)
 - en: Configuring sensitivity categories
+  id: totrans-245
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 配置敏感度类别
 - en: Although MCS policies are MLS-enabled, they are configured to only support a
     single sensitivity (namely `s0`). Yet even with this limitation, an MCS policy
     can be very useful, for instance, in situations where a system hosts services
     for multiple customers. This is because MCS can still benefit from security clearances
     based on categories.
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然MCS策略支持MLS，但它们配置为仅支持单一敏感度（即`s0`）。尽管有这个限制，MCS策略仍然非常有用，例如在系统为多个客户提供服务的情况下。这是因为MCS仍然可以根据类别受益于安全许可。
 - en: Unlike sensitivities, categories are more like a discretionary access control
     system. Categories are meant to be used by users (or administrators) to label
     files and other resources as being a member of one or more categories. Access
     to those resources is then based on the clearance level of the process and the
     categories assigned to the resource. Categories are also not hierarchically structured.
+  id: totrans-247
   prefs: []
   type: TYPE_NORMAL
+  zh: 与敏感度不同，类别更像是一个自主访问控制系统。类别旨在由用户（或管理员）用来标记文件和其他资源，使其成为一个或多个类别的成员。对这些资源的访问则基于进程的许可级别和分配给资源的类别。类别也没有层次结构。
 - en: 'An example of a use case where categories play a major role is in multitenant
     deployments: systems that host one or more services for multiple tenants (multiple
     customers), which, of course, require proper security segregation so that one
     tenant cannot access resources of another tenant.'
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个类别发挥重要作用的使用案例是在多租户部署中：这些系统为多个租户（多个客户）托管一个或多个服务，当然，需要适当的安全隔离，以确保一个租户无法访问另一个租户的资源。
 - en: In most cases, administrators will try to separate those services through the
     runtime user (and group membership). This is, however, not always possible. There
     are situations where these separate processes still need to run as the same runtime
     user (although with support for additional Linux security subsystems—such as capabilities—the
     number of situations has significantly reduced again).
+  id: totrans-249
   prefs: []
   type: TYPE_NORMAL
+  zh: 在大多数情况下，管理员会尝试通过运行时用户（和组成员身份）来分隔这些服务。然而，这并非总是可能的。有些情况下，这些独立的进程仍然需要以相同的运行时用户身份运行（尽管通过支持额外的
+    Linux 安全子系统——如能力——这些情况已经显著减少）。
 - en: In this recipe, we'll configure a system to use multiple categories to differentiate
     between resources of different customers for a web server that the customers also
     have shell access to. Through categories, we can provide more protection for the
     resources of other customers, in case one of the customers is able to execute
     an exploit that would elevate their privileges.
+  id: totrans-250
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我们将配置一个系统，使用多个类别来区分不同客户的资源，用于客户也能访问 shell 的 Web 服务器。通过类别，我们可以为其他客户的资源提供更多保护，以防其中一个客户能够执行提升其权限的漏洞。
 - en: Getting ready
+  id: totrans-251
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You need to prepare a system for the multiple tenants. For instance, we can
     host the entire website content in `/srv/web/<companyname>/` and have the web
     server configuration at `/etc/apache/conf/<companyname>/`.
+  id: totrans-252
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要为多个租户准备系统。例如，我们可以将整个网站内容托管在 `/srv/web/<companyname>/` 中，并将 Web 服务器配置放在 `/etc/apache/conf/<companyname>/`
+    中。
 - en: In this recipe, as an example, we will configure the system for two companies
     called `CompanyX` and `CompanyY`. Each company also has a regular user (`userX`
     for the first company and `userY` for the second).
+  id: totrans-253
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，作为示例，我们将为两个公司（`CompanyX` 和 `CompanyY`）配置系统。每个公司也有一个普通用户（第一家公司为 `userX`，第二家公司为
+    `userY`）。
 - en: How to do it…
+  id: totrans-254
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'To instantiate different categories, follow this approach:'
+  id: totrans-255
   prefs: []
   type: TYPE_NORMAL
+  zh: 要实例化不同的类别，按以下方法进行：
 - en: 'Settle on the category naming (and numbers) for different customers and configure
     those in the `setrans.conf` file inside `/etc/selinux/mcs/`:'
+  id: totrans-256
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确定不同客户的类别命名（和编号），并在 `/etc/selinux/mcs/` 中的 `setrans.conf` 文件中进行配置：
 - en: '[PRE47]'
+  id: totrans-257
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: Restart the `mcstrans` service so that it is aware of this configuration.
+  id: totrans-258
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重新启动 `mcstrans` 服务，使其能够识别此配置。
 - en: 'List the categories to make sure that the changes are properly interpreted:'
+  id: totrans-259
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 列出类别，以确保更改能被正确解释：
 - en: '[PRE48]'
+  id: totrans-260
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'Create SELinux users that have clearance to handle the right categories:'
+  id: totrans-261
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建具有处理正确类别权限的 SELinux 用户：
 - en: '[PRE49]'
+  id: totrans-262
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'Configure the Linux users (logins) with the right security clearance:'
+  id: totrans-263
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 配置 Linux 用户（登录名）以获得正确的安全权限：
 - en: '[PRE50]'
+  id: totrans-264
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: 'Set the right category on the company resources:'
+  id: totrans-265
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 为公司资源设置正确的类别：
 - en: '[PRE51]'
+  id: totrans-266
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'Configure the Apache `init` scripts to launch Apache with the right security
     level by launching it through `runcon`. For instance, on a Red Hat Enterprise
     Linux 6 system for the first company''s web server, the following script is used:'
+  id: totrans-267
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 配置 Apache `init` 脚本，通过 `runcon` 启动 Apache，以正确的安全级别启动。例如，在 Red Hat Enterprise
+    Linux 6 系统中，对于第一家公司的网站服务器，使用以下脚本：
 - en: '[PRE52]'
+  id: totrans-268
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: '(Re)start the web server and validate that it is running with the right security
     level:'
+  id: totrans-269
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: （重新）启动 Web 服务器，并验证它是否以正确的安全级别运行：
 - en: '[PRE53]'
+  id: totrans-270
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: How it works…
+  id: totrans-271
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: We started by configuring the system so that we can name categories and ranges
     rather than having to use the integer representations. Next, we created an SELinux
     user for each company and assigned each (regular) Linux account to the right SELinux
     user. After updating the contexts of all company-related files, we configured
     Apache to start in the right context.
+  id: totrans-272
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们从配置系统开始，使得可以命名类别和范围，而不必使用整数表示法。接着，我们为每个公司创建了一个 SELinux 用户，并将每个（普通）Linux 账户分配给正确的
+    SELinux 用户。在更新所有公司相关文件的上下文后，我们配置了 Apache 以正确的上下文启动。
 - en: The mcstrans and setrans.conf files
+  id: totrans-273
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: mcstrans 和 setrans.conf 文件
 - en: The `setrans.conf` file is a regular text file that the MCS transition daemon
     (`mcstransd`) uses to substitute the real security level (such as `s0:c100`) with
     a human readable string (such as `CompanyX`).
+  id: totrans-274
   prefs: []
   type: TYPE_NORMAL
+  zh: '`setrans.conf` 文件是一个普通的文本文件，MCS 过渡守护进程（`mcstransd`）用它来将实际的安全级别（如 `s0:c100`）替换为人类可读的字符串（如
+    `CompanyX`）。'
 - en: The Linux utilities themselves (such as `ls` and `ps`) use the SELinux libraries
     to get information about the contexts of files and processes. These libraries
     then connect with the `mcstransd` process (through the `/var/run/setrans/.setrans-unix`
     socket), sending the real security level and retrieving the human-readable representation
     for it.
+  id: totrans-275
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux工具本身（如`ls`和`ps`）使用SELinux库获取文件和进程的上下文信息。这些库然后与`mcstransd`进程（通过`/var/run/setrans/.setrans-unix`套接字）连接，发送实际的安全级别并检索其人类可读的表示。
 - en: It is important to remember that this is only a representation and not how the
     security level is stored. In other words, do not use this in file context definition
     files (that is, the SELinux policy `.fc` files).
+  id: totrans-276
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要记住的是，这仅仅是一个表示，并非安全级别存储的方式。换句话说，不要在文件上下文定义文件中使用此表示（即SELinux策略`.fc`文件）。
 - en: SELinux users and Linux user mappings
+  id: totrans-277
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: SELinux用户和Linux用户映射
 - en: In the example, an SELinux user is created for each company. This SELinux user
     is given the clearance to work with resources tagged with the category of the
     respective companies. The real Linux accounts are then mapped to this SELinux
     user.
+  id: totrans-278
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，为每个公司创建了一个SELinux用户。这个SELinux用户被授予了与该公司类别标记的资源进行工作的许可。然后，实际的Linux账户被映射到这个SELinux用户。
 - en: 'From the example, we see that there are two definitions for each company:'
+  id: totrans-279
   prefs: []
   type: TYPE_NORMAL
+  zh: 从示例中，我们看到每个公司都有两个定义：
 - en: '[PRE54]'
+  id: totrans-280
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: The first one is a security level and can be assigned to both resources as well
     as processes (users). The second one is a security clearance (a range). In this
     particular example, the clearance tells us that the high security level (which
     can be seen as *what the process is allowed to access*) are the resources of the
     company (`s0:c100`), and the low security level (which can be seen as *the security
     level of the process itself* ) is just `s0`.
+  id: totrans-281
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个是安全级别，可以分配给资源以及进程（用户）。第二个是安全许可（一个范围）。在这个特定的示例中，许可告诉我们，高安全级别（可以视为*进程被允许访问的内容*）是公司的资源（`s0:c100`），而低安全级别（可以视为*进程本身的安全级别*）仅为`s0`。
 - en: 'The users for the company, therefore, have clearance to access the files (and
     other resources) that have their company''s category assigned to it. However,
     all activities performed by these user accounts do not get this category by default—the
     users will need to use `chcon` to set the category, as follows:'
+  id: totrans-282
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，公司的用户被授权访问分配给其公司类别的文件（和其他资源）。然而，所有由这些用户帐户执行的活动默认不会获得此类别——用户需要使用`chcon`来设置类别，如下所示：
 - en: '[PRE55]'
+  id: totrans-283
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: It is possible to give the users the security level itself rather than the clearance.
     When that occurs, any resource created by the user will also get the proper category
     set. But, do not use this as a way to confine resources—users can always remove
     categories from resources.
+  id: totrans-284
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以将安全级别本身授予用户，而不是许可。当发生这种情况时，用户创建的任何资源也将获得适当的类别设置。但是，不要将此用作限制资源的方式——用户始终可以从资源中移除类别。
 - en: 'Granting the security level can be done on the SELinux user level, but it is
     also possible to do this through the SELinux user mapping as long as the range
     passed on is dominated by the range set on the SELinux user level. For instance,
     to set `CompanyX` (`s0:c100`) as the security level rather than `CompanyXClearance`,
     which is the default for users mapped to the `userX_u` SELinux user, the following
     command can be used:'
+  id: totrans-285
   prefs: []
   type: TYPE_NORMAL
+  zh: 授予安全级别可以在SELinux用户级别完成，但也可以通过SELinux用户映射来实现，只要传递的范围受到SELinux用户级别设置的范围控制。例如，要将`CompanyX`（`s0:c100`）设置为安全级别，而不是默认的`CompanyXClearance`（这是映射到`userX_u`
+    SELinux用户的用户的默认设置），可以使用以下命令：
 - en: '[PRE56]'
+  id: totrans-286
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: Running Apache with the right context
+  id: totrans-287
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用正确的上下文运行Apache
 - en: The last change made in the example was to configure the system to start the
     web server with the right security level. This is done through the `runcon` command,
     where we pass on the sensitivity level (and not the security clearance) to make
     sure that every resource created through the web server inherits the right category
     as well as the target type.
+  id: totrans-288
   prefs: []
   type: TYPE_NORMAL
+  zh: 示例中最后的变化是配置系统以在正确的安全级别下启动Web服务器。这是通过`runcon`命令完成的，我们传递敏感性级别（而不是安全许可），以确保通过Web服务器创建的每个资源都继承正确的类别以及目标类型。
 - en: The SELinux policy knows that if an `init` script launches the Apache binary
     (`httpd`), then this application has to run in the `httpd_t` domain. However,
     now the `init` script launches `runcon`—which the SELinux policy sees as a regular
@@ -1345,29 +1949,43 @@
     On systems with an SELinux policy with unconfined domains, this might result in
     the web server to run in an unconfined domain (`initrc_t`), effectively disabling
     the SELinux protections we need for the web server!
+  id: totrans-289
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux策略知道，如果一个`init`脚本启动Apache二进制文件(`httpd`)，则此应用程序必须在`httpd_t`域中运行。然而，现在`init`脚本启动了`runcon`—SELinux策略将其视为常规二进制文件—因此应用程序将继续在`initrc_t`域中运行。因此，我们需要传递目标类型(`httpd_t`)。在没有非限制域的SELinux策略系统上，忘记这一点会阻止Web服务器的运行。在具有非限制域的SELinux策略系统上，这可能导致Web服务器在非限制域(`initrc_t`)中运行，从而有效地禁用了我们对Web服务器所需的SELinux保护！
 - en: See also
+  id: totrans-290
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参见
 - en: 'The following are some more examples on multitenancy and how SELinux interacts
     with it:'
+  id: totrans-291
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于多租户和SELinux交互的更多示例如下：
 - en: sVirt ([http://selinuxproject.org/page/SVirt](http://selinuxproject.org/page/SVirt))
     uses SELinux categories to segregate virtual guests from one another
+  id: totrans-292
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: sVirt ([http://selinuxproject.org/page/SVirt](http://selinuxproject.org/page/SVirt))
+    使用SELinux分类将虚拟客户隔离开来。
 - en: Linux containers, such as through the LXC project ([https://linuxcontainers.org](https://linuxcontainers.org)),
     use SELinux for further isolation of containers from the main system
+  id: totrans-293
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Linux 容器，例如通过LXC项目 ([https://linuxcontainers.org](https://linuxcontainers.org))，利用SELinux进一步隔离容器与主系统。
 - en: Apache has support for multitenancy through the `mod_selinux` module, which
     is covered in [Chapter 3](ch03.html "Chapter 3. Confining Web Applications"),
     *Confining Web Applications*
+  id: totrans-294
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Apache通过`mod_selinux`模块支持多租户，在[第三章](ch03.html "Chapter 3. Confining Web Applications")中详细介绍了*限制
+    Web 应用程序*。
