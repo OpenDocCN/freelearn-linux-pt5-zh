@@ -1,38 +1,56 @@
 - en: Chapter 6. Enabling Remote Execution
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第 6 章：启用远程执行
 - en: 'In this chapter, we will cover the following recipes:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将介绍以下几个教程：
 - en: Monitoring local services on a remote machine with NRPE
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 NRPE 监控远程机器上的本地服务
 - en: Setting the listening address for NRPE
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置 NRPE 的监听地址
 - en: Setting allowed client hosts for NRPE
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置 NRPE 的允许客户端主机
 - en: Creating new NRPE command definitions securely
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 安全地创建新的 NRPE 命令定义
 - en: Giving limited sudo privileges to NRPE
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 给 NRPE 授予有限的 sudo 权限
 - en: Using check_by_ssh with key authentication instead of NRPE
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 `check_by_ssh` 结合密钥认证来代替 NRPE。
 - en: Introduction
+  id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 介绍
 - en: For a dedicated Nagios Core server with access to all the relevant parts of
     the network, making checks is relatively simple using commands and plugins that
     make ICMP, TCP, and UDP connections to network hosts and services, in order to
@@ -40,682 +58,977 @@
     service, without requiring anything to be installed on the target machine. As
     an example, when the `check_http` plugin is used to check a web server, it works
     in the same way as if a browser was making the request.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于一个可以访问网络相关部分的专用 Nagios Core 服务器，通过使用能进行 ICMP、TCP 和 UDP 连接的命令和插件来进行检查相对简单，以此来判断网络主机和服务的运行状态。这些方法可用于检查任何类型的网络服务，而无需在目标机器上安装任何东西。例如，当使用
+    `check_http` 插件检查 Web 服务器时，其工作方式与浏览器发起请求的方式相同。
 - en: However, monitoring a network thoroughly usually has more to it than simply
     checking network connectivity and availability. It's also a good idea to check
     properties of the network that don't directly correspond to a network service,
     and hence can't be directly checked over a network connection.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，彻底监控一个网络通常不只是检查网络连接和可用性。检查网络的一些属性也很重要，这些属性并不直接对应于网络服务，因此不能通过网络连接直接进行检查。
 - en: These are often properties of hardware or the underlying system, such as disk
     space or system load average, or processes that are configured only to listen
     locally, commonly done for database servers.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些通常是硬件或底层系统的属性，例如磁盘空间或系统负载平均值，或仅配置为本地监听的进程，通常用于数据库服务器。
 - en: We could install Nagios Core on all of the systems, perhaps, but this would
     make maintenance difficult. It would be much better to have some means of remote
     execution of diagnostic programs, so that they are run directly on the target
     host to retrieve the information they need, and the results are returned to a
     single Nagios Core server via a dedicated network service.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可能会在所有系统上安装 Nagios Core，但这将使维护变得困难。更好的方法是有某种远程执行诊断程序的手段，使它们能直接在目标主机上运行，以获取所需的信息，然后通过专用网络服务将结果返回到单一的
+    Nagios Core 服务器。
 - en: 'There are three general approaches to managing this problem:'
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 解决这个问题有三种常见方法：
 - en: Use `check_nrpe` to run a standard Nagios Core plugin on the target machine
     and return its results transparently to the monitoring server.
+  id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 `check_nrpe` 在目标机器上运行标准的 Nagios Core 插件，并将其结果透明地返回给监控服务器。
 - en: Use `check_by_ssh` to run an arbitrary command on the target machine from the
     monitoring server by first connecting to it with SSH.
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 `check_by_ssh` 通过 SSH 连接到目标机器，然后从监控服务器上运行任意命令。
 - en: Use `check_snmp` to check an SNMP OID that's configured to provide the return
     value and output of some command on the target host.
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 `check_snmp` 检查已配置提供返回值和目标主机上某些命令输出的 SNMP OID。
 - en: This chapter covers the first two solutions, focusing on the more commonly used
     **Nagios Remote Plugin Executor** (**NRPE**), and explaining how it differs from
     the `check_by_ssh` solution. For some information on configuring SNMP, see the
     *Monitoring the output of an SNMP query* and *Creating an SNMP OID to monitor*
     recipes in [Chapter 5](ch05.html "Chapter 5. Monitoring Methods"), *Monitoring
     Methods*.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章介绍前两种解决方案，重点讲解更常用的 **Nagios 远程插件执行器**（**NRPE**），并解释它与 `check_by_ssh` 解决方案的区别。关于
+    SNMP 配置的一些信息，请参见 [第 5 章](ch05.html "第 5 章：监控方法")中的 *监控 SNMP 查询输出* 和 *创建 SNMP OID
+    进行监控* 部分。
 - en: Monitoring local services on a remote machine with NRPE
+  id: totrans-18
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 NRPE 监控远程机器上的本地服务
 - en: In this recipe, we'll learn how to install and run an NRPE server on a target
     host, `roma.naginet`. We'll use this to check the load average on that host with
     the `check_load` plugin.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个教程中，我们将学习如何在目标主机 `roma.naginet` 上安装并运行 NRPE 服务器。我们将使用它来通过 `check_load` 插件检查该主机的负载平均值。
 - en: The plugins for these checks will be executed on the target server by the NRPE
     daemon, but the results will be returned to our Nagios Core monitoring server
     `olympus.naginet`. This requires installing the `check_nrpe` plugin on the monitoring
     server, and the full Nagios Plugins set (but not Nagios Core itself) on the target
     server.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些检查的插件将在目标服务器上由NRPE守护进程执行，但结果将返回到我们的Nagios Core监控服务器`olympus.naginet`。这要求在监控服务器上安装`check_nrpe`插件，并在目标服务器上安装完整的Nagios插件集（但不包括Nagios
+    Core本身）。
 - en: This is a reasonably long and in-depth recipe as it involves installing a total
     of three software packages on two servers.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是一个相对较长且深入的教程，因为它涉及在两台服务器上安装总共三种软件包。
 - en: Getting ready
+  id: totrans-22
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You will need a monitoring server with Nagios Core 3.0 or newer installed. You
     should also have a UNIX-like target host that you intend to monitor that can run
     the NRPE daemon. Most modern UNIX-like systems including Linux and BSD should
     be able to do this. Both the monitoring server and the target host will need internet
     connectivity, and you should already be monitoring the target host itself with
     a host definition, to which we'll be adding service checks.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 你需要一台安装了Nagios Core 3.0或更高版本的监控服务器。同时，你还应该有一个类UNIX的目标主机，打算监控该主机，并且能够运行NRPE守护进程。大多数现代类UNIX系统，包括Linux和BSD，应该都能做到这一点。监控服务器和目标主机都需要互联网连接，并且你应该已经通过主机定义在监控目标主机，接下来我们会为它添加服务检查。
 - en: If your servers don't have a direct gateway to the Internet, then you can work
     around this by uploading the relevant files after downloading them onto a workstation,
     or another machine with Internet access.
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的服务器没有直接连接到互联网的网关，你可以通过将相关文件下载到工作站或其他有互联网访问的机器后上传，来解决这个问题。
 - en: You should understand the basics of configuring, compiling, and installing software
     from source. In most cases, the usual `./configure`, `make`, and `make install`
     process will be all that's necessary, and the recipe will walk you through this.
     You will need to have `make` installed, along with any other tools needed for
     the configure and build processes, including a C compiler such as `gcc`.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该了解从源代码配置、编译和安装软件的基本知识。在大多数情况下，通常的`./configure`、`make`和`make install`过程就足够了，本教程会带你完成这一过程。你需要安装`make`工具，并且还需要为配置和构建过程准备好其他工具，包括如`gcc`这样的C编译器。
 - en: You should also have a good grasp of how hosts and services interrelate in Nagios
     Core, which is discussed in the recipes of [Chapter 1](ch01.html "Chapter 1. Understanding
     Hosts, Services, and Contacts"), and how Nagios Core uses commands and plugins,
     discussed in [Chapter 2](ch02.html "Chapter 2. Working with Commands and Plugins").
     You should not need an in-depth understanding of the use of any particular plugin;
     the recipe will demonstrate the usage of the plugins to which it refers.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还应该对Nagios Core中主机和服务的相互关系有一个清晰的理解，这在[第1章](ch01.html "第1章：理解主机、服务和联系人")中有讨论，并且了解Nagios
+    Core如何使用命令和插件，这部分内容在[第2章](ch02.html "第2章：与命令和插件的工作")中有说明。你不需要深入理解任何特定插件的使用；本教程会展示如何使用相关插件。
 - en: Finally, you should be able to configure any firewalls to allow connectivity
     from the Nagios Core server to the server being monitored with TCP destination
     port `5666`.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，你应该能够配置任何防火墙，以允许Nagios Core服务器与目标服务器之间通过TCP目的端口`5666`建立连接。
 - en: How to do it...
+  id: totrans-28
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'This first part of the recipe is done on the target server:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 本教程的第一部分在目标服务器上完成：
 - en: Download and install the latest Nagios Plugins package. At the time of writing,
     the link is available at [http://nagiosplugins.org/download/](http://nagiosplugins.org/download/).
+  id: totrans-30
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 下载并安装最新的Nagios插件包。写作时，链接可通过[http://nagiosplugins.org/download/](http://nagiosplugins.org/download/)访问。
 - en: '[PRE0]'
+  id: totrans-31
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: Configure, compile, and install the plugins, the same way you would on a new
     monitoring server. You will need to have `root` privileges for the `make install`
     call.
+  id: totrans-32
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 配置、编译并安装插件，就像在新的监控服务器上做的那样。你需要拥有`root`权限来执行`make install`命令。
 - en: '[PRE1]'
+  id: totrans-33
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: You may need to install some shared libraries and headers on the system to do
     this for certain plugins, such as a `libssl` implementation. The output of the
     `./configure` script should alert you to any such problems.
+  id: totrans-34
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你可能需要为某些插件安装一些共享库和头文件，例如`libssl`实现。`./configure`脚本的输出应该会提示你遇到的任何此类问题。
 - en: Download and install the latest version of NRPE from the Nagios Exchange website.
     At the time of writing, the link is available at [http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details).
+  id: totrans-35
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 从 Nagios Exchange 网站下载并安装 NRPE 的最新版本。在本文写作时，链接可通过 [http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details](http://exchange.nagios.org/directory/Addons/Monitoring-Agents/NRPE--2D-Nagios-Remote-Plugin-Executor/details)
+    访问。
 - en: '[PRE2]'
+  id: totrans-36
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Enter the `nrpe-2.13` source directory, and configure, compile, and install
     the daemon and a stock configuration for it. You will need to have `root` privileges
     for both the `make install-daemon` and the `make install-daemon-config` calls:'
+  id: totrans-37
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 进入 `nrpe-2.13` 源目录，配置、编译并安装守护进程及其默认配置。您将需要 `root` 权限才能执行 `make install-daemon`
+    和 `make install-daemon-config` 命令：
 - en: '[PRE3]'
+  id: totrans-38
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'If you do not already have a `nagios` user on the target host, you may need
     to create one before the daemon will install properly:'
+  id: totrans-39
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果目标主机上没有 `nagios` 用户，您可能需要先创建一个用户，才能正确安装守护进程：
 - en: '[PRE4]'
+  id: totrans-40
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'Edit the newly installed file at `/usr/local/nagios/etc/nrpe.cfg` and find
     the line beginning with `allowed_hosts`. Add a comma and the IP address of your
     monitoring server to this line. In this case, we''ve added the IP address `10.128.0.11`:'
+  id: totrans-41
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑新安装的文件 `/usr/local/nagios/etc/nrpe.cfg`，找到以 `allowed_hosts` 开头的行。在此行添加逗号和监控服务器的
+    IP 地址。在本例中，我们添加了 IP 地址 `10.128.0.11`：
 - en: '[PRE5]'
+  id: totrans-42
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'Start the `nrpe` daemon, and check that it is running by searching the process
     table with `pgrep` or `ps`:'
+  id: totrans-43
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 启动 `nrpe` 守护进程，并通过使用 `pgrep` 或 `ps` 搜索进程表来检查它是否正在运行：
 - en: '[PRE6]'
+  id: totrans-44
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: If you would like the `nrpe` daemon to start on boot, add an `init` script appropriate
     to your system. An example `init-script` is generated at `./configure` time in
     the source directory. Versions are also generated for Debian-derived systems and
     SUSE systems in `init-script.debian` and `init-script.suse`. Exactly how this
     should be done will depend on your particular system, for which you may need to
     consult its documentation.
+  id: totrans-45
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果您希望 `nrpe` 守护进程在启动时自动启动，请根据您的系统添加适当的 `init` 脚本。在 `./configure` 时，源目录会生成一个示例
+    `init-script`。对于 Debian 派生系统和 SUSE 系统，也会分别生成 `init-script.debian` 和 `init-script.suse`。具体的操作方法将取决于您的系统，您可能需要查阅其文档。
 - en: This next part of the recipe is done on the monitoring server.
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来的部分将在监控服务器上完成。
 - en: 'Again, download the latest version of NRPE, the same way as done for the target
     server:'
+  id: totrans-47
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 再次以与目标服务器相同的方式下载 NRPE 的最新版本：
 - en: '[PRE7]'
+  id: totrans-48
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'Again, configure and build the software. However, note that this time the install
     line is different, as we''re installing the `check_nrpe` plugin rather than the
     `nrpe` daemon:'
+  id: totrans-49
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 再次配置并构建软件。然而，需要注意的是，这一次的安装命令不同，因为我们安装的是 `check_nrpe` 插件，而不是 `nrpe` 守护进程：
 - en: '[PRE8]'
+  id: totrans-50
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'Check that the plugin is installed correctly. It should be saved at `/usr/local/nagios/libexec/check_nrpe`:'
+  id: totrans-51
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 检查插件是否正确安装。它应保存在 `/usr/local/nagios/libexec/check_nrpe` 目录下：
 - en: '[PRE9]'
+  id: totrans-52
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'Move to the directory containing the Nagios Core object configuration. By default,
     this is `/usr/local/nagios/etc/objects`:'
+  id: totrans-53
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 转到包含 Nagios Core 对象配置的目录。默认情况下，这是 `/usr/local/nagios/etc/objects`：
 - en: '[PRE10]'
+  id: totrans-54
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Edit an appropriate file for defining new commands. For the default installation,
     `/usr/local/nagios/etc/objects/commands.cfg` is a good choice. Add the following
     definition to the end of this file:'
+  id: totrans-55
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑适当的文件以定义新命令。对于默认安装，`/usr/local/nagios/etc/objects/commands.cfg` 是一个不错的选择。在该文件末尾添加以下定义：
 - en: '[PRE11]'
+  id: totrans-56
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'Edit the file defining the target host as an object. The definition might look
     something similar to the following code snippet:'
+  id: totrans-57
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑定义目标主机为对象的文件。定义可能类似于以下代码片段：
 - en: '[PRE12]'
+  id: totrans-58
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Beneath the definition for the host, after any other services defined for it,
     add the following service definition:'
+  id: totrans-59
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在主机的定义下，其他已定义的服务之后，添加以下服务定义：
 - en: '[PRE13]'
+  id: totrans-60
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-61
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启 Nagios Core 服务器：
 - en: '[PRE14]'
+  id: totrans-62
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'With this done, a new service with the description `LOAD` will appear in the
     web interface ready to be checked, and will come up with an appropriate status,
     including the load average as read from the `nrpe` daemon on the target host:'
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此步骤后，一个名为 `LOAD` 的新服务将出现在 Web 界面中，准备进行检查，并将显示适当的状态，包括从目标主机上的 `nrpe` 守护进程读取的负载平均值：
 - en: '![How to do it...](img/5566_06_01.jpg)'
+  id: totrans-64
   prefs: []
   type: TYPE_IMG
+  zh: '![操作步骤](img/5566_06_01.jpg)'
 - en: 'We can see more detail about how the check was performed and its results in
     the details page for the service:'
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以在服务的详细页面查看有关检查执行方式及其结果的更多细节：
 - en: '![How to do it...](img/5566_06_02.jpg)'
+  id: totrans-66
   prefs: []
   type: TYPE_IMG
+  zh: '![操作步骤](img/5566_06_02.jpg)'
 - en: If the load average on `roma.naginet` exceeds the limits defined for the `check_load`
     command in `/usr/local/nagios/etc/nrpe.cfg` on the target host, the service will
     enter `WARNING` or `CRITICAL` states, and will send notifications if configured
     to do so, all in the same manner as a non-NRPE service.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果`roma.naginet`上的负载平均值超过了在目标主机的`/usr/local/nagios/etc/nrpe.cfg`中为`check_load`命令定义的限制，服务将进入`WARNING`或`CRITICAL`状态，并会在配置了通知的情况下发送通知，所有这一切都与非NRPE服务相同。
 - en: How it works...
+  id: totrans-68
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The NRPE plugin and daemon are used to run Nagios Core plugins on the target
     host, rather than on the monitoring server itself. The results of the check are
     then passed back to the monitoring server, and recorded and analyzed by Nagios
     Core the same way as if the service was running a plugin on the monitoring server,
     for example `check_http` or `check_ssh`.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: NRPE插件和守护进程用于在目标主机上运行Nagios Core插件，而不是在监控服务器上运行。这些检查的结果会被传回监控服务器，并由Nagios Core以与在监控服务器上运行插件（例如`check_http`或`check_ssh`）相同的方式记录和分析。
 - en: 'The recipe we followed does four main things:'
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们遵循的食谱主要做了四件事：
 - en: We installed the latest Nagios Plugins package to the target host, including
     the `check_load` plugin. This is necessary because the plugin is actually run
     on the target host and not on the monitoring server, as is the case with the plugins
     that check network services.
+  id: totrans-71
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 我们将最新的Nagios插件包安装到目标主机上，包括`check_load`插件。这是必要的，因为该插件实际上是在目标主机上运行的，而不是在监控服务器上，后者的插件用于检查网络服务。
 - en: We installed the `nrpe` daemon to the target host, along with a stock configuration
     file `nrpe.cfg`. This is the network service through which the `check_nrpe` plugin
     will request commands to be run on the target host. The plugins will be run by
     this process, typically as the `nagios` user.
+  id: totrans-72
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 我们将`nrpe`守护进程安装到目标主机，并附带了一个默认的配置文件`nrpe.cfg`。这是一个网络服务，通过它，`check_nrpe`插件可以请求在目标主机上运行命令。插件将由这个进程运行，通常是作为`nagios`用户。
 - en: We installed the `check_nrpe` plugin to the monitoring host, and defined a command
     of the same name to use it. The command accepts one argument in the `$ARG1$` macro;
     its value is the command that should be run on the target host. In this case,
     we supplied `check_load` for this argument.
+  id: totrans-73
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 我们将`check_nrpe`插件安装到监控主机，并定义了一个同名的命令来使用它。该命令接受一个在`$ARG1$`宏中的参数；其值是应该在目标主机上运行的命令。在这种情况下，我们为此参数提供了`check_load`。
 - en: We set up a service to monitor the output of the standard `check_load` plugin,
     via `check_nrpe`.
+  id: totrans-74
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 我们设置了一个服务，通过`check_nrpe`监控标准`check_load`插件的输出。
 - en: 'Like other Nagios Core plugins, the `check_nrpe` program can be run directly
     from the command line. If we wanted to test the response of the configuration
     that we arranged in the previous section, then we might run the following command:'
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 与其他Nagios Core插件一样，`check_nrpe`程序也可以直接从命令行运行。如果我们想要测试在前一部分中配置的响应，那么我们可能会运行以下命令：
 - en: '[PRE15]'
+  id: totrans-76
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: In this case, the state of `OK` and the load average values, as retrieved by
     `check_load`, were returned by the `nrpe` daemon as the result of the `check_nrpe`
     call.
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，`OK`状态和通过`check_load`检索的负载平均值作为`check_nrpe`调用的结果，由`nrpe`守护进程返回。
 - en: '![How it works...](img/5566OS_06_03.jpg)'
+  id: totrans-78
   prefs: []
   type: TYPE_IMG
+  zh: '![它是如何工作的...](img/5566OS_06_03.jpg)'
 - en: It's very important to note that this simple configuration of NRPE is not completely
     secure by default. The recipes listed under the *See also* section for this recipe
     provide some basic means to secure NRPE instances from abuse. These should be
     used in concert with a sensible firewall policy.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要特别注意的是，这个简单的NRPE配置默认并不完全安全。在*另见*部分列出的食谱提供了一些基本的手段来保护NRPE实例不被滥用。这些措施应该与合理的防火墙策略一起使用。
 - en: There's more...
+  id: totrans-80
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'Of course, `check_load` is not the only plugin that can be run on the target
     server this way. If we inspect the `/usr/local/nagios/etc/nrpe.cfg` file `/usr/local/nagios/etc/nrpe.cfg`
     on the target host, near the end of the file, we find some other example definitions
     of commands that `check_nrpe` will run upon requests issued from the monitoring
     server:'
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 当然，`check_load`并不是唯一可以通过这种方式在目标服务器上运行的插件。如果我们检查目标主机上的`/usr/local/nagios/etc/nrpe.cfg`文件，在文件的末尾，我们会找到一些其他的命令定义，这些命令将在监控服务器发出的请求中由`check_nrpe`运行：
 - en: '[PRE16]'
+  id: totrans-82
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: We recognize `check_load` as the second of these. Note that it already includes
     some thresholds for `WARNING` and `CRITICAL` alerts in its `-w` and `-c` parameters.
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们识别出`check_load`是这其中的第二个。请注意，它已经在其`-w`和`-c`参数中包括了一些`WARNING`和`CRITICAL`警告的阈值。
 - en: 'If we also wanted to check the number of processes on this server, we could
     add a service check for `roma.naginet`, defined as follows:'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们还想检查该服务器上的进程数量，我们可以为`roma.naginet`添加一个服务检查，定义如下：
 - en: '[PRE17]'
+  id: totrans-85
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: This service will generate a `WARNING` alert if the number of processes exceeds
     150, and a `CRITICAL` alert if it exceeds 200\. Again, the plugin is run on the
     target server, and not on the monitoring server.
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果进程数量超过150，该服务将生成一个`WARNING`警报，超过200则生成`CRITICAL`警报。同样，插件是在目标服务器上运行的，而不是在监控服务器上。
 - en: 'Another useful and common application of `check_nrpe` is to make remote checks
     on database servers, with plugins such as `check_mysql` and `check_pgsql`, in
     the case where servers do not listen on network interfaces for security reasons.
     Instead, they listen only on `localhost` or UNIX sockets, and are hence inaccessible
     to the monitoring server. To work around this problem, we could add a new command
     definition to the end of `nrpe.cfg` on the target server as follows:'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: '`check_nrpe`的另一个有用且常见的应用是在数据库服务器上进行远程检查，使用如`check_mysql`和`check_pgsql`等插件，这通常发生在服务器因安全原因不在网络接口上监听时。相反，它们仅在`localhost`或UNIX套接字上监听，因此无法访问监控服务器。为了解决这个问题，我们可以在目标服务器的`nrpe.cfg`末尾添加一个新的命令定义，如下所示：'
 - en: '[PRE18]'
+  id: totrans-88
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'A corresponding check that uses the `check_mysql` command can then be made
     on the monitoring server:'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 随后，在监控服务器上可以使用`check_mysql`命令进行相应的检查：
 - en: '[PRE19]'
+  id: totrans-90
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: See the *Monitoring database services* recipe in [Chapter 5](ch05.html "Chapter 5. Monitoring
     Methods"), *Monitoring Methods*, for some detail on how to use the `check_mysql`
     and `check_pgsql` plugins.
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 请参阅[第5章](ch05.html "第5章. 监控方法")中的*监控数据库服务*食谱，了解如何使用`check_mysql`和`check_pgsql`插件的详细信息。
 - en: NRPE is thus useful not only for making checks of system properties or hardware,
     but also for any plugin that needs to be run on the target host rather than the
     monitoring host.
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，NRPE不仅对检查系统属性或硬件有用，还适用于任何需要在目标主机上运行而不是在监控主机上运行的插件。
 - en: Finally, it's important to note that the command definitions included in the
     default `nrpe.cfg` file are intended as examples; you will probably want to fine-tune
     the parameters for some of them, and remove the ones you don't use, along with
     adding your own.
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，需要注意的是，默认`nrpe.cfg`文件中包含的命令定义仅作为示例；你可能需要微调其中一些命令的参数，并移除不使用的命令，同时添加你自己的命令。
 - en: See also
+  id: totrans-94
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Setting the listening address for NRPE*, *Setting allowed client hosts
     for NRPE*, *Creating new NRPE command definitions securely*, and *Giving limited
     sudo privileges to NRPE* recipes in this chapter
+  id: totrans-95
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*设置NRPE监听地址*、*设置允许的客户端主机*、*安全创建新的NRPE命令定义*和*授予NRPE有限的sudo权限*食谱
 - en: The *Monitoring database services* recipe in [Chapter 5](ch05.html "Chapter 5. Monitoring
     Methods"), *Monitoring Methods*
+  id: totrans-96
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第5章](ch05.html "第5章. 监控方法")中的*监控数据库服务*食谱'
 - en: Setting the listening address for NRPE
+  id: totrans-97
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 设置NRPE的监听地址
 - en: In this recipe, we'll learn how to make NRPE listen on a specific IP address
     on a target host. This might be done on hosts with multiple interfaces in order
     to prevent spurious requests made to the `nrpe` daemon from untrusted interfaces,
     perhaps the public Internet. It could also be appropriate for configuring the
     daemon only to listen on a trusted VPN interface.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我们将学习如何让NRPE在目标主机的特定IP地址上监听。这可能在具有多个网络接口的主机上进行，以防止来自不受信任接口（例如公共互联网）对`nrpe`守护进程的无效请求。此方法也适用于将守护进程配置为仅在受信任的VPN接口上监听。
 - en: This setup can be particularly useful when the server has an interface into
     a dedicated management network to which the monitoring server also has access,
     preventing the `nrpe` daemon from responding to requests on other interfaces unnecessarily,
     and thereby closing a possible security hole.
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 此配置在服务器具有一个专用管理网络接口，并且监控服务器也能访问该接口时特别有用，可以防止`nrpe`守护进程在其他接口上不必要地响应请求，从而关闭潜在的安全漏洞。
 - en: Getting ready
+  id: totrans-100
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'You should have a target host configured for checking in a Nagios Core 3.0
     or later monitoring server. The target host should be running the `nrpe` daemon,
     and listening on all interfaces (which we''ll fix). You can verify that `nrpe`
     is running with `pgrep` or `ps`:'
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该已在Nagios Core 3.0或更高版本的监控服务器上配置了目标主机。目标主机应该运行`nrpe`守护进程，并在所有接口上监听（我们会进行修复）。你可以通过`pgrep`或`ps`验证`nrpe`是否正在运行：
 - en: '[PRE20]'
+  id: totrans-102
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'You can check whether the `nrpe` daemon is listening on all interfaces by checking
     the output of `netstat`:'
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以通过检查`netstat`的输出，查看`nrpe`守护进程是否在所有接口上监听：
 - en: '[PRE21]'
+  id: totrans-104
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: The address of `0.0.0.0` shows that `nrpe` is listening on all interfaces, which
     is what we'd like to correct.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: '`0.0.0.0`地址表明`nrpe`正在所有接口上监听，这是我们想要更正的地方。'
 - en: How to do it...
+  id: totrans-106
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can configure the `nrpe` daemon only to listen on one address as follows:'
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过以下方式配置`nrpe`守护进程仅监听一个地址：
 - en: 'Edit the `nrpe` daemon''s configuration file. The default location is `/usr/local/nagios/etc/nrpe.cfg`.
     Look for the line beginning with `server_address`, which is normally commented
     out by default:'
+  id: totrans-108
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`nrpe`守护进程的配置文件。默认位置是`/usr/local/nagios/etc/nrpe.cfg`。查找以`server_address`开头的行，默认情况下通常会被注释掉：
 - en: '[PRE22]'
+  id: totrans-109
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: If you don't have such a line, then you can add it at the end of the file.
+  id: totrans-110
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果你没有这样的行，可以在文件末尾添加它。
 - en: 'Uncomment the line if it''s commented by removing the leading `#` character,
     and change the `127.0.0.1` address to the address to which you want to restrict
     the `nrpe` process listening:'
+  id: totrans-111
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果该行被注释掉，取消注释，去掉前面的`#`字符，并将`127.0.0.1`地址更改为你希望限制`nrpe`进程监听的地址：
 - en: '[PRE23]'
+  id: totrans-112
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'Restart the `nrpe` daemon. If you have installed an `init` script for it, you
     may be able to do this with the following:'
+  id: totrans-113
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重启`nrpe`守护进程。如果你为它安装了`init`脚本，你可以通过以下方式重启：
 - en: '[PRE24]'
+  id: totrans-114
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'If not, you can restart the process by sending it a `HUP` signal with the `kill`
     command, which will prompt it to re-read its configuration file and resume running:'
+  id: totrans-115
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果没有，你可以通过向其发送`HUP`信号来重启该进程，使用`kill`命令，它将提示进程重新读取配置文件并恢复运行：
 - en: '[PRE25]'
+  id: totrans-116
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'With this done, the `nrpe` daemon should now only be listening on the specified
     address. We can verify this using `netstat`:'
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成这些设置后，`nrpe`守护进程现在应该只会在指定的地址上监听。我们可以通过使用`netstat`来验证这一点：
 - en: '[PRE26]'
+  id: totrans-118
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: How it works...
+  id: totrans-119
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 工作原理...
 - en: The configuration we adjusted in the preceding section defines an address on
     which the `nrpe` daemon should listen, and implies that it should not respond
     to requests on any others.
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们在前面章节中调整的配置定义了`nrpe`守护进程应该监听的地址，并暗示它不应该响应其他地址的请求。
 - en: Because the `nrpe` server is explicitly designed to run commands at the request
     of remote servers, it's very important to take steps like these wherever appropriate
     to prevent attackers from exploiting the service.
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于`nrpe`服务器明确设计用于应远程服务器的请求运行命令，因此在适当的地方采取像这样的措施非常重要，以防止攻击者利用该服务。
 - en: See also
+  id: totrans-122
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参阅
 - en: The *Monitoring local services on a remote machine with NRPE* recipe in this
     chapter.
+  id: totrans-123
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*在远程机器上监控本地服务使用NRPE*食谱。
 - en: Setting allowed client hosts for NRPE
+  id: totrans-124
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 设置NRPE允许的客户端主机
 - en: In this recipe, we'll learn how to configure the NRPE daemon to answer requests
     from a particular IP address, typically the designated Nagios Core server or servers
     monitoring your network. This means that `nrpe` will not run plugins or return
     results for any `check_nrpe` request made from IP addresses not in this list.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个食谱中，我们将学习如何配置NRPE守护进程，使其只响应来自特定IP地址的请求，通常是指定的Nagios Core服务器或监控你的网络的服务器。这意味着`nrpe`不会执行插件或返回任何来自不在此列表中的IP地址的`check_nrpe`请求的结果。
 - en: This is an elementary security step in running an NRPE server. This should be
     done in concert with a hardware or software firewall and security policy. If your
     target host has interfaces or routes into untrusted networks, there is a risk
     of attackers making spurious requests for information about the system, clogging
     up your disk with logs from excessive check requests, or even possibly exploiting
     the `nrpe` daemon or the Nagios Plugins.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是运行NRPE服务器的基本安全步骤。应该与硬件或软件防火墙和安全策略一同实施。如果目标主机的接口或路由连接到不受信任的网络，则可能会有攻击者发送虚假请求来获取系统信息，导致日志被大量检查请求占满硬盘，甚至可能会利用`nrpe`守护进程或Nagios插件。
 - en: Getting ready
+  id: totrans-127
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'You should have a target host configured for checking in a Nagios Core 3.0
     or later monitoring server. The target host should be running the `nrpe` daemon.
     You can verify that `nrpe` is running with `pgrep` or `ps`:'
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该在Nagios Core 3.0或更高版本的监控服务器上为目标主机配置检查。目标主机应运行`nrpe`守护进程。你可以使用`pgrep`或`ps`命令验证`nrpe`是否正在运行：
 - en: '[PRE27]'
+  id: totrans-129
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'We can verify that the target host is not configured to respond to a particular
     IP address by attempting to open a `telnet` or `netcat` connection to it. If we
     are not one of the allowed hosts, `nrpe` will close the session immediately without
     waiting for any input:'
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过尝试打开`telnet`或`netcat`连接来验证目标主机是否没有配置为响应特定的IP地址。如果我们不是被允许的主机之一，`nrpe`会立即关闭会话，而无需等待任何输入：
 - en: '[PRE28]'
+  id: totrans-131
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: This assumes that NRPE is listening on its default port number `5666`. In this
     example, we'll add the IP address `10.128.0.12` to the list of hosts allowed to
     request information from NRPE.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 这假设NRPE正在监听其默认端口号`5666`。在这个示例中，我们将把IP地址`10.128.0.12`添加到允许从NRPE请求信息的主机列表中。
 - en: How to do it...
+  id: totrans-133
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'We can configure the `nrpe` daemon to respond to a new address as follows:'
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按照以下方式配置`nrpe`守护进程，以响应新的地址：
 - en: 'Edit the `nrpe` daemon''s configuration file. The default location is `/usr/local/nagios/etc/nrpe.cfg`.
     Look for the line beginning with `allowed_hosts`. It may look similar to the following
     code snippet:'
+  id: totrans-135
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`nrpe`守护进程的配置文件。默认位置是`/usr/local/nagios/etc/nrpe.cfg`。查找以`allowed_hosts`开头的行。它可能类似于以下代码片段：
 - en: '[PRE29]'
+  id: totrans-136
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Add or remove IP addresses from the line, separating them with commas. For
     this example, we''re adding one more address:'
+  id: totrans-137
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 向该行添加或删除IP地址，用逗号分隔。对于这个示例，我们将添加一个新地址：
 - en: '[PRE30]'
+  id: totrans-138
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'Restart the `nrpe` daemon. If you have installed an `init` script for it, you
     may be able to this with something similar to the following:'
+  id: totrans-139
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重启`nrpe`守护进程。如果你已经为其安装了`init`脚本，你可以使用类似以下的命令来重启它：
 - en: '[PRE31]'
+  id: totrans-140
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'If not, you can restart the process by sending it a `HUP` signal with the `kill`
     command, which will prompt it to re-read its configuration file and resume running:'
+  id: totrans-141
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果没有，你可以通过使用`kill`命令发送`HUP`信号来重启该进程，这将促使它重新读取配置文件并继续运行：
 - en: '[PRE32]'
+  id: totrans-142
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'With this done, the `nrpe` daemon should now respond only to the nominated
     hosts making `check_nrpe` requests, immediately closing the connection otherwise.
     We can verify whether our new host is allowed to talk to the `nrpe` service on
     `roma.naginet` with another `telnet` test:'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，`nrpe`守护进程现在应该只对指定的主机做出响应，其他请求将立即关闭连接。我们可以通过另一个`telnet`测试来验证我们的新主机是否被允许与`roma.naginet`上的`nrpe`服务通信：
 - en: '[PRE33]'
+  id: totrans-144
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: Note that the `nrpe` daemon is now waiting for input, rather than closing the
     connection immediately as it was doing before. This implies that we can now run
     `check_nrpe` checks from `10.128.0.12`, if we need to.
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，`nrpe`守护进程现在正在等待输入，而不是像之前那样立即关闭连接。这意味着我们现在可以从`10.128.0.12`运行`check_nrpe`检查（如果需要的话）。
 - en: How it works...
+  id: totrans-146
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: The configuration we adjusted above defines a set of addresses to which the
     `nrpe` daemon should respond if a request is made, and implies that it should
     refuse to answer requests made by any other address.
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们上面调整的配置定义了一组地址，如果有请求发出，`nrpe`守护进程应该响应，并且意味着它应该拒绝来自任何其他地址的请求。
 - en: The `nrpe` daemon inspects the IP address of incoming connections, and if the
     `allowed_hosts` directive is defined, checks that the address features in that
     list. If it does not, it closes the connection and refuses to run any plugins,
     much less return any output from them.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: '`nrpe`守护进程检查传入连接的IP地址，如果定义了`allowed_hosts`指令，它会检查该地址是否在列表中。如果不在，它会关闭连接并拒绝运行任何插件，更不用说返回任何插件的输出了。'
 - en: There's more...
+  id: totrans-149
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多……
 - en: The `allowed_hosts` directive is actually optional; if we wished, we could set
     the `nrpe` server up to respond to requests from any IP address. The default installation
     and example configuration, however, enables it by default, allowing both requests
     from the localhost IP `127.0.0.1`, and any network addresses the host had at the
     time `./configure` was run.
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: '`allowed_hosts`指令实际上是可选的；如果我们愿意的话，我们可以将`nrpe`服务器设置为响应任何IP地址的请求。然而，默认安装和示例配置默认启用了它，允许来自本地主机IP
+    `127.0.0.1`的请求，以及`./configure`运行时主机拥有的任何网络地址。'
 - en: This is a sensible policy because Nagios Core plugins are designed by third
     parties in an open source community, for monitoring purposes in trusted networks,
     and may not necessarily be very secure. A plugin doesn't actually have to have
@@ -723,169 +1036,249 @@
     for example opening a lot of TCP connections or querying a large database, an
     attacker could cause problems on the target host, if allowed, simply by making
     a large number of such `check_nrpe` requests in a short period of time.
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是一个明智的策略，因为Nagios Core插件是由第三方在开源社区中设计的，旨在用于受信任网络中的监控目的，并不一定非常安全。一个插件实际上不需要有安全漏洞就能引发这样的问题；例如，如果它所执行的检查非常消耗资源，像是打开大量TCP连接或查询一个大型数据库，攻击者只需要在短时间内发出大量的`check_nrpe`请求，就可能在目标主机上引发问题（如果允许的话）。
 - en: See also
+  id: totrans-152
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Monitoring local services on a remote machine with NRPE* recipe in this
     chapter
+  id: totrans-153
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*使用NRPE监控远程机器上的本地服务*配方
 - en: Creating new NRPE command definitions securely
+  id: totrans-154
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 安全地创建新的NRPE命令定义
 - en: In this recipe, we'll learn how to securely create new command definitions for
     `nrpe` to run upon request by a monitoring server. We need to do this because
     even if we have a huge set of plugins installed on our target host running `nrpe`,
     the daemon will only run commands defined in its configuration file.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们将学习如何安全地为 `nrpe` 创建新的命令定义，以便在监控服务器请求时运行。我们需要这么做，因为即使在目标主机上安装了大量插件并运行
+    `nrpe`，该守护进程也只会运行其配置文件中定义的命令。
 - en: We'll also learn how arguments can be passed to these commands if strictly necessary,
     and about the potentially negative security consequences of this.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还将学习如何在严格必要的情况下将参数传递给这些命令，以及这可能带来的负面安全后果。
 - en: Getting ready
+  id: totrans-157
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'You should have a target host configured for checking in a Nagios Core 3.0
     or later monitoring server. The target host should be running the `nrpe` daemon.
     You can verify that `nrpe` is running with `pgrep` or `ps`:'
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该在 Nagios Core 3.0 或更高版本的监控服务器中配置一个目标主机进行检查。目标主机应运行 `nrpe` 守护进程。你可以使用 `pgrep`
+    或 `ps` 来验证 `nrpe` 是否正在运行：
 - en: '[PRE34]'
+  id: totrans-159
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'We can inspect the list of commands that `nrpe` is already configured to run
     by looking for `command` directives in its configuration file. By default, this
     file is `/usr/local/nagios/etc/nrpe.cfg`, and the default command definitions
     are near the end of the file:'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过查找配置文件中的 `command` 指令来检查 `nrpe` 已经配置运行的命令列表。默认情况下，这个文件是 `/usr/local/nagios/etc/nrpe.cfg`，并且默认的命令定义通常在文件的末尾：
 - en: '[PRE35]'
+  id: totrans-161
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'We''ll add another command to this set to check whether the swap space available
     is above a specific threshold, using the standard Nagios Core plugin `check_swap`.
     We can test whether it is working first by running it on the target host:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将向这组命令中添加另一个命令，用于检查可用的交换空间是否超过特定的阈值，使用标准的 Nagios Core 插件 `check_swap`。我们可以通过在目标主机上运行它来测试是否工作正常：
 - en: '[PRE36]'
+  id: totrans-163
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: For completeness, we'll also show how to define a service check using this new
     plugin on the Nagios Core monitoring server.
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了完整起见，我们还将展示如何在 Nagios Core 监控服务器上使用这个新插件定义服务检查。
 - en: How to do it...
+  id: totrans-165
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can add a new command definition to an `nrpe` configuration as follows:'
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以按照如下方式向 `nrpe` 配置添加一个新的命令定义：
 - en: Edit the `nrpe` daemon's configuration file. The default location is `/usr/local/nagios/etc/nrpe.cfg`.
     Look for lines beginning with `command`, which are near the end of the file by
     default.
+  id: totrans-167
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑 `nrpe` 守护进程的配置文件。默认位置是 `/usr/local/nagios/etc/nrpe.cfg`。查找以 `command` 开头的行，这些行默认通常位于文件末尾。
 - en: 'Add the following line to the end of the file:'
+  id: totrans-168
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在文件末尾添加以下行：
 - en: '[PRE37]'
+  id: totrans-169
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'Restart the `nrpe` daemon. If you have installed an `init` script for it, you
     may be able to do this with something similar to the following command:'
+  id: totrans-170
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重启 `nrpe` 守护进程。如果你为其安装了 `init` 脚本，你可能可以使用类似以下命令来完成此操作：
 - en: '[PRE38]'
+  id: totrans-171
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'If not, you can restart the process by sending it a `HUP` signal with the `kill`
     command, which will prompt it to re-read its configuration file and resume running:'
+  id: totrans-172
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果没有，你可以通过发送 `HUP` 信号来重启进程，使用 `kill` 命令，迫使其重新读取配置文件并恢复运行：
 - en: '[PRE39]'
+  id: totrans-173
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: 'With this done, assuming that our monitoring server is part of the `allowed_hosts`
     directive and can contact the target host, a call to `check_nrpe` on the monitoring
     host should return the status and output of the `check_swap` plugin on the target
     host:'
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此步骤后，假设我们的监控服务器已包含在 `allowed_hosts` 指令中并且可以联系目标主机，则在监控主机上调用 `check_nrpe` 应该返回目标主机上
+    `check_swap` 插件的状态和输出：
 - en: '[PRE40]'
+  id: totrans-175
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'In turn, this allows us to use the check in a service definition on the monitoring
     server, with a `check_nrpe` command:'
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 反过来，这允许我们在监控服务器上使用服务定义中的检查，通过 `check_nrpe` 命令：
 - en: '[PRE41]'
+  id: totrans-177
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: How it works...
+  id: totrans-178
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: 'The configuration added in the preceding section defines a new command in `nrpe.cfg`
     called `check_swap`. The definition of new commands in `nrpe.cfg` takes the following
     general form:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 上一节中添加的配置在 `nrpe.cfg` 中定义了一个名为 `check_swap` 的新命令。在 `nrpe.cfg` 中定义新命令的一般形式如下：
 - en: '[PRE42]'
+  id: totrans-180
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: We defined a command `check_swap` for NRPE. It doesn't accept any arguments,
     where the actual `check_swap` plugin requires them; instead, the arguments are
     hard-coded into the command definition, with the two options `-w 10%` and `-c
     5%` setting the thresholds for free swap space.
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们为 NRPE 定义了一个命令 `check_swap`。它不接受任何参数，而实际的 `check_swap` 插件需要这些参数；相反，参数被硬编码到命令定义中，两个选项
+    `-w 10%` 和 `-c 5%` 设置了可用交换空间的阈值。
 - en: 'Besides checking system properties, such as the load average or the swap space,
     which might not otherwise be directly retrievable except via systems such as SNMP,
     another common use for NRPE is to report on the state of network services that
     only listen locally, or are otherwise unreachable by the monitoring host. Database
     server monitoring is a good example. We could define the following command in
     `nrpe.cfg`:'
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了检查系统属性（如负载平均值或交换空间）之外，这些属性通常只能通过像SNMP这样的系统来直接获取，NRPE的另一个常见用途是报告仅在本地监听的网络服务的状态，或者监控主机无法直接访问的服务。数据库服务器监控就是一个很好的例子。我们可以在`nrpe.cfg`中定义以下命令：
 - en: '[PRE43]'
+  id: totrans-183
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Assuming that the `check_mysql` plugin is installed on this target host, which
     it ought to be if the MySQL client library and headers were available at compile
     time, this command would then enable this check to be run from the monitoring
     host:'
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设在目标主机上安装了`check_mysql`插件，如果在编译时提供了MySQL客户端库和头文件，那么这个命令将启用从监控主机执行此检查：
 - en: '[PRE44]'
+  id: totrans-185
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: 'This can be configured as a service check using an appropriate command definition
     for `check_nrpe` as follows:'
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 这可以配置为使用适当的`check_nrpe`命令定义来进行服务检查，如下所示：
 - en: '[PRE45]'
+  id: totrans-187
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: Thus we're able to get the status of the MySQL server on the remote host `roma.naginet`
     without actually connecting directly to the MySQL server itself; we arrange for
     the NRPE service on the target host to do it on the monitoring server's behalf.
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，我们能够在不直接连接到MySQL服务器的情况下获取远程主机`roma.naginet`上MySQL服务器的状态；我们安排目标主机上的NRPE服务代表监控服务器执行此操作。
 - en: This is not just useful for network services running on the target host. It
     can be used to delegate any kind of check that a remote host can perform where
     the monitoring server cannot. Using NRPE is thus also a way to work around the
@@ -893,539 +1286,769 @@
     `192.168.1.1` would not be addressable from outside the network. If NRPE were
     running on the NAT gateway, we could use that to address the appropriate systems
     by their local addresses.
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 这不仅对在目标主机上运行的网络服务有用。它还可以用来委托任何远程主机可以执行的检查，而监控服务器无法执行。通过使用NRPE，也可以绕过NAT的可寻址性问题，因为运行在像`192.168.1.1`这样的地址上的服务从网络外部是无法寻址的。如果NRPE在NAT网关上运行，我们可以利用它通过本地地址寻址适当的系统。
 - en: There's more...
+  id: totrans-190
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'Also, near the bottom of `nrpe.cfg`, you''ll find some information on providing
     arguments to NRPE commands as part of the `check_nrpe` request, as opposed to
     hard-coding them. The comment included in the file makes it quite clear that this
     carries some risks:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，在`nrpe.cfg`文件的底部，你将找到一些关于如何将参数作为`check_nrpe`请求的一部分提供给NRPE命令的信息，而不是硬编码它们。文件中包含的注释非常明确地指出，这样做存在一些风险：
 - en: The following examples allow user-supplied arguments and can only be used if
     the NRPE daemon was compiled with support for command arguments AND the dont_blame_nrpe
     directive in this config file is set to '1'. This poses a potential security risk,
     so make sure you read the SECURITY file before doing this.
+  id: totrans-192
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 以下示例允许用户提供的参数，并且仅在NRPE守护进程编译时支持命令参数，并且此配置文件中的`dont_blame_nrpe`指令设置为'1'时才能使用。这带来潜在的安全风险，因此在执行此操作之前，请确保阅读`SECURITY`文件。
 - en: It's important to understand that, when running NRPE on a target host, you are
     running a service that is designed to allow network machines to run commands on
     the target machine with no strong authentication, which is why keeping NRPE secure
     is so important. If you allow passing arguments to commands, you need to be aware
     of the full ramifications and risks of doing so, and the recommended `SECURITY`
     file explains these well.
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 重要的是要理解，当在目标主机上运行NRPE时，你是在运行一个允许网络机器在目标机器上执行命令的服务，而没有强认证，这也是为什么保持NRPE安全如此重要。如果你允许向命令传递参数，你需要意识到这样做的全部后果和风险，推荐的`SECURITY`文件对此做了很好的解释。
 - en: 'If you really want to use it, it requires reconfiguring and recompiling the
     `nrpe` daemon with the `--enable-command-args` switch:'
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你真的想使用它，需要重新配置并重新编译`nrpe`守护进程，并使用`--enable-command-args`开关：
 - en: '[PRE46]'
+  id: totrans-195
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: 'Then set the `dont_blame_nrpe` in `nrpe.cfg` parameter to `1`, where it otherwise
     defaults to `0`:'
+  id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后将`nrpe.cfg`中的`dont_blame_nrpe`参数设置为`1`，否则默认值为`0`：
 - en: '[PRE47]'
+  id: totrans-197
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'After restarting `nrpe` (if you have rebuilt it, you will need to restart it
     completely this time, and not simply send the process a `HUP` signal), this allows
     us to use command definitions similar to the following:'
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 在重新启动`nrpe`后（如果你重新构建了它，这次你需要完全重启它，而不仅仅是发送`HUP`信号），这将允许我们使用类似于以下的命令定义：
 - en: '[PRE48]'
+  id: totrans-199
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'This command in turn allows checks from the monitoring servers like this, using
     the `-a` option of `check_nrpe`:'
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个命令允许像这样从监控服务器进行检查，使用 `check_nrpe` 的 `-a` 选项：
 - en: '[PRE49]'
+  id: totrans-201
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: Because of the security concerns, I would recommend you avoid using command
     arguments if at all possible. If you do absolutely need to use them, it's also
     important to make sure that the traffic is encrypted, especially if it contains
     usernames and passwords. Advice on how to manage this is included in the `SECURITY`
     document for the `nrpe` daemon.
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于安全问题，我建议你尽可能避免使用命令参数。如果你确实需要使用它们，确保流量是加密的，特别是当它包含用户名和密码时。这方面的建议可以在 `nrpe`
+    守护进程的 `SECURITY` 文档中找到。
 - en: See also
+  id: totrans-203
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Monitoring local services on a remote machine with NRPE* and *Giving limited
     sudo privileges to NRPE* recipes in this chapter
+  id: totrans-204
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的 *在远程机器上使用 NRPE 监控本地服务* 和 *给 NRPE 赋予有限的 sudo 权限* 食谱
 - en: The *Monitoring database services* recipe in [Chapter 5](ch05.html "Chapter 5. Monitoring
     Methods"), *Monitoring Methods*
+  id: totrans-205
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第 5 章](ch05.html "第 5 章. 监控方法")中的 *监控数据库服务* 食谱，*监控方法*'
 - en: Giving limited sudo privileges to NRPE
+  id: totrans-206
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 给 NRPE 赋予有限的 sudo 权限
 - en: In this recipe, we'll learn how to deal with the difficulty of execution permissions
     for NRPE. The majority of the standard Nagios plugins don't require special privileges
     to run, although this depends on how stringent your system's security restrictions
     are. However, some of the plugins require being run as `root`, or perhaps as a
     user other than `nrpe`. This is sometimes the case with plugins that need to make
     requests of system-level resources, such as checking the integrity of `RAID` arrays.
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个食谱中，我们将学习如何解决 NRPE 执行权限的问题。大多数标准的 Nagios 插件不需要特别的权限来运行，尽管这取决于你系统的安全限制有多严格。然而，一些插件需要以
+    `root` 用户，或许是以 `nrpe` 以外的其他用户身份运行。这种情况通常发生在那些需要请求系统级资源的插件，例如检查 `RAID` 阵列的完整性。
 - en: 'There are four general approaches to fixing this:'
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: 解决此问题有四种常见方法：
 - en: '**Bad**: One method is to change the plugins to `setuid`, meaning that they
     will always be run as the user who owns them, no matter who executes them. The
     problem with this is that setting this bit allows anyone to run the program as
     `root`, not just `nrpe`, a very common vector for exploits.'
+  id: totrans-209
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**不推荐**：一种方法是将插件设置为 `setuid`，意味着它们将始终以拥有它们的用户身份运行，无论是谁执行它们。这样做的问题在于，设置这个标志会允许任何人以
+    `root` 用户身份运行程序，而不仅仅是 `nrpe`，这是一个非常常见的攻击向量。'
 - en: '**Worse**: Another method is to run `nrpe` as `root`, or as the appropriate
     user. This is done by changing the `nrpe_user` and `nrpe_group` properties in
     `nrpe.cfg`. This is even more dangerous, and completely inconsistent with the
     principle of least privilege; we should confer a user as little permission as
     possible to allow it to do its job. Never do this!'
+  id: totrans-210
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**更糟糕的是**：另一种方法是以 `root` 用户身份运行 `nrpe`，或者以适当的用户身份运行。这是通过在 `nrpe.cfg` 中更改 `nrpe_user`
+    和 `nrpe_group` 属性来实现的。这种做法更加危险，完全违反了最小权限原则；我们应该尽可能给用户最少的权限，只让它完成所需的工作。绝对不要这样做！'
 - en: '**Better**: A third method is to use `command_prefix` in `nrpe.cfg` to prepend
     `/usr/bin/sudo` to all commands, and gives `nrpe` full `sudo` privileges to run
     only the plugins in `/usr/local/nagios/libexec`. This is a bit better, but still
     quite risky as we probably don''t need every single command to be run as `root`,
     only one or two.'
+  id: totrans-211
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**较好**：第三种方法是使用 `nrpe.cfg` 中的 `command_prefix`，将 `/usr/bin/sudo` 作为前缀添加到所有命令中，并为
+    `nrpe` 提供完全的 `sudo` 权限，仅运行 `/usr/local/nagios/libexec` 中的插件。这种方法稍好，但仍然相当冒险，因为我们可能并不需要每个命令都以
+    `root` 用户身份运行，只有一两个命令需要。'
 - en: '**Best**: The best method is to use `sudo` to assign the `nrpe` user limited
     privileges for a subset of commands, only the ones it needs to run, and only as
     the user by which it needs to be run.'
+  id: totrans-212
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**最佳**：最佳的方法是使用 `sudo` 为 `nrpe` 用户分配有限的权限，仅限于它需要运行的命令，并且仅限于必须由它运行的用户身份。'
 - en: The last solution is the most likely to be secure, so we'll examine an example
     here. We'll run the `check_procs` plugin as `root`, to get a process count. In
     most cases, you wouldn't need `root` privileges to get a complete count of all
     processes, but it might be needed on a system with a very locked-down `grsecurity`
     patch installed.
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后一种解决方案是最可能安全的，因此我们将在这里查看一个示例。我们将以 `root` 用户身份运行 `check_procs` 插件，以获取进程计数。在大多数情况下，你不需要
+    `root` 权限就能获取所有进程的完整计数，但在安装了非常严格的 `grsecurity` 补丁的系统上，可能需要 `root` 权限。
 - en: Getting ready
+  id: totrans-214
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'You should have a target host configured for checking in a Nagios Core 3.0
     or later monitoring server. The target host should be running the `nrpe` daemon,
     and listening on all interfaces. You can verify that `nrpe` is running with `pgrep`
     or `ps`:'
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该在Nagios Core 3.0或更高版本的监控服务器上配置一个目标主机进行检查。目标主机应当运行`nrpe`守护进程，并在所有接口上监听。你可以通过`pgrep`或`ps`验证`nrpe`是否正在运行：
 - en: '[PRE50]'
+  id: totrans-216
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: You should also have `sudo` installed and working on the target system, and
     understand what it does. We'll be editing the `/etc/sudoers` file to confer `root`
     privileges to our `nrpe` user, for one program only. This recipe will assume that
     the `nrpe` daemon is running as the `nagios` user in the `nagios` group.
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还应该在目标系统上安装并配置好`sudo`，并理解它的作用。我们将编辑`/etc/sudoers`文件，为我们的`nrpe`用户授予`root`权限，仅限于某个程序。这个步骤假设`nrpe`守护进程是以`nagios`用户和`nagios`组运行的。
 - en: How to do it...
+  id: totrans-218
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 操作步骤如下...
 - en: 'We can confer limited `root` privileges for one command to our `nrpe` user
     as follows:'
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以为`nrpe`用户授予有限的`root`权限，仅限于一个命令，具体操作如下：
 - en: 'Edit the `/etc/sudoers` file. The safest way to do this is generally with a
     call to `visudo`, which will make a temporary copy of the file and verify its
     syntax is correct before installing it:'
+  id: totrans-220
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`/etc/sudoers`文件。最安全的做法通常是使用`visudo`命令，它会创建文件的临时副本并验证其语法是否正确，然后再安装：
 - en: '[PRE51]'
+  id: totrans-221
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'Add the following line to the file, and save it:'
+  id: totrans-222
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将以下行添加到文件中，并保存：
 - en: '[PRE52]'
+  id: totrans-223
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: Note that if the `requiretty` directive appears anywhere in your `/etc/sudoers`
     file, you may need to remove it to make this work.
+  id: totrans-224
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 请注意，如果`requiretty`指令出现在你的`/etc/sudoers`文件中的任何位置，你可能需要将其移除才能使其正常工作。
 - en: 'Become the `nagios` user with `sudo`, and test whether running the command
     runs as `root`, with no password prompt:'
+  id: totrans-225
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`sudo`切换到`nagios`用户，测试运行命令是否以`root`身份执行，并且没有密码提示：
 - en: '[PRE53]'
+  id: totrans-226
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: 'Edit the `nrpe` daemon''s configuration file. The default location is `/usr/local/nagios/etc/nrpe.cfg`.
     Look for the command definition for `check_total_procs`, and if there isn''t one,
     create it. Note that `/usr/bin/sudo` has been added to the start of the command:'
+  id: totrans-227
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`nrpe`守护进程的配置文件。默认位置是`/usr/local/nagios/etc/nrpe.cfg`。查找`check_total_procs`的命令定义，如果没有的话，创建一个。请注意，`/usr/bin/sudo`已经添加到命令的开头：
 - en: '[PRE54]'
+  id: totrans-228
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'Restart the `nrpe` daemon. If you have installed an `init` script for it, you
     may be able to do this with something similar to the following:'
+  id: totrans-229
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重启`nrpe`守护进程。如果你为其安装了`init`脚本，你可以尝试使用类似以下命令来重启：
 - en: '[PRE55]'
+  id: totrans-230
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'If not, you can restart the process by sending it a `HUP` signal with the `kill`
     command, which will prompt it to re-read its configuration file and resume running:'
+  id: totrans-231
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果没有，你可以通过发送`HUP`信号使用`kill`命令重启该进程，这将促使其重新读取配置文件并继续运行：
 - en: '[PRE56]'
+  id: totrans-232
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: 'With this done, we should now be able to run a `check_nrpe` call from the monitoring
     server, and get a successful response:'
+  id: totrans-233
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，我们现在应该能够从监控服务器发出`check_nrpe`调用，并获得成功的响应：
 - en: '[PRE57]'
+  id: totrans-234
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: How it works...
+  id: totrans-235
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The preceding configuration does not change the behavior of `nrpe` very much;
     most of the configuration is actually done on its host system. All we changed
     was the command definition for `check_total_procs` to run it from within `sudo`.
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述配置并不会对`nrpe`的行为产生太大变化；大部分配置实际上是在它的主机系统上完成的。我们所做的唯一更改是修改`check_total_procs`的命令定义，使其通过`sudo`运行。
 - en: To make this work without a password, we defined it in the `/etc/sudoers` file
     so that no password was required to execute this particular program as `root`
     for the `nagios` user. Because `nrpe` runs as the `nagios` user, it is therefore
     able to use `sudo` with no password for this command only.
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了实现不需要密码的操作，我们在`/etc/sudoers`文件中进行了定义，使得`nagios`用户执行该程序时无需密码，以`root`权限运行。由于`nrpe`是以`nagios`用户身份运行的，因此它只能够对该命令使用`sudo`，且不需要密码。
 - en: This means that when we call the `check_total_procs` command from the monitoring
     server, it returns us the full output of the plugin as it was run with `root`
     privileges, but the `nagios` user doesn't have `root` privileges to run anything
     else potentially dangerous, such as `rm` or `halt`.
+  id: totrans-238
   prefs: []
   type: TYPE_NORMAL
+  zh: 这意味着，当我们从监控服务器调用`check_total_procs`命令时，它会返回插件的完整输出，正如它以`root`权限运行时的输出，但`nagios`用户没有`root`权限来运行任何其他可能危险的命令，如`rm`或`halt`。
 - en: There's more...
+  id: totrans-239
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: While this is a much more secure way of allowing privileges as another user
     for `nrpe`, it still requires trusting that the plugin that is being run with
     `root` privileges is secure and can't easily be exploited. Be very careful before
     running this with custom code or with stray plugins you find on the Web!
+  id: totrans-240
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管这是一种更安全的方式来允许以另一个用户身份运行`nrpe`，但仍然需要信任以`root`权限运行的插件是安全的，并且无法轻易被利用。在运行自定义代码或从网上找到的插件之前，务必非常小心！
 - en: 'If you intend to allow the `nagios` user to run more than a couple of distinct
     programs, it may look a little tidier to define them in `/etc/sudoers` with `Cmnd_Alias`:'
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你打算允许`nagios`用户运行多个不同的程序，那么在`/etc/sudoers`中通过`Cmnd_Alias`定义它们可能会显得更整洁：
 - en: '[PRE58]'
+  id: totrans-242
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: See also
+  id: totrans-243
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参见
 - en: The *Monitoring local services on a remote machine with NRPE* and *Using check_by_ssh
     with key authentication instead of NRPE* recipes in this chapter
+  id: totrans-244
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*使用NRPE监控远程机器上的本地服务*和*使用`check_by_ssh`和密钥认证代替NRPE*的示例
 - en: Using check_by_ssh with key authentication instead of NRPE
+  id: totrans-245
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用`check_by_ssh`和密钥认证代替NRPE
 - en: While all of the previous recipes in this chapter show that NRPE can be very
     effectively tied down and secured, it may be that we require some means of authentication
     to a target host in order to run the appropriate Nagios plugins on it. The `nrpe`
     daemon does not require any authentication to return information about the host's
     state; as long as the IP addresses all match, and the command is defined for running,
     it will return information.
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管本章中的所有前面示例都表明NRPE可以非常有效地被限制并加以保护，但我们可能需要某种身份验证手段来访问目标主机，以便在其上运行相应的Nagios插件。`nrpe`守护进程不需要任何身份验证即可返回关于主机状态的信息；只要IP地址匹配，并且命令已定义为可执行，它就会返回信息。
 - en: If you already use SSH keys for a public key infrastructure in your network,
     then you may find it preferable to use the `check_by_ssh` plugin instead, which
     allows you to use public keys to authenticate with a target host before running
     any commands. This is only suitable if the target host runs an `ssh` daemon.
+  id: totrans-247
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你已经在网络中使用SSH密钥进行公钥基础设施，那么你可能会更倾向于使用`check_by_ssh`插件，它允许你在运行任何命令之前，通过公钥认证与目标主机进行认证。这仅在目标主机运行`ssh`守护进程时适用。
 - en: In this recipe, we'll repeat the setup for the `check_load` plugin as done in
     the first recipe in this chapter, *Monitoring local services on a remote machine
     with NRPE*, but we'll use the `check_by_ssh` plugin instead.
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本例中，我们将重复本章第一篇示例中针对`check_load`插件的设置，*使用NRPE监控远程机器上的本地服务*，但我们将改为使用`check_by_ssh`插件。
 - en: Getting ready
+  id: totrans-249
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: You should have a Nagios Core 3.0 or newer server ready, with the `ssh` client
     software installed, and a target host running `sshd`. The OpenSSH implementations
     should work fine.
+  id: totrans-250
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该准备好一个Nagios Core 3.0或更新版本的服务器，并安装了`ssh`客户端软件，同时目标主机应运行`sshd`。OpenSSH实现应该能正常工作。
 - en: The target host should have all of the Nagios Plugins installed; in this case,
     we're using `check_load`.
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: 目标主机应该安装所有Nagios插件；在此案例中，我们使用的是`check_load`。
 - en: You should be familiar with public key authentication and its advantages and
     disadvantages. Wikipedia has an excellent article about public key cryptography
     and authentication at [http://en.wikipedia.org/wiki/Public-key_cryptography](http://en.wikipedia.org/wiki/Public-key_cryptography).
+  id: totrans-252
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该了解公钥认证及其优缺点。维基百科有一篇关于公钥加密和认证的精彩文章，地址是[http://en.wikipedia.org/wiki/Public-key_cryptography](http://en.wikipedia.org/wiki/Public-key_cryptography)。
 - en: There is a popular introduction to SSH authentication with a key infrastructure
     at [http://support.suso.com/supki/SSH_Tutorial_for_Linux](http://support.suso.com/supki/SSH_Tutorial_for_Linux).
+  id: totrans-253
   prefs: []
   type: TYPE_NORMAL
+  zh: 有一个关于使用密钥基础设施进行SSH认证的流行介绍，详见[http://support.suso.com/supki/SSH_Tutorial_for_Linux](http://support.suso.com/supki/SSH_Tutorial_for_Linux)。
 - en: We will be running through a sensible key infrastructure setup, but it would
     pay to have an understanding of how it works in case this setup does not suit
     your configuration.
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将通过合理的密钥基础设施设置进行操作，但最好了解其工作原理，以防此设置不适合你的配置。
 - en: How to do it...
+  id: totrans-255
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'We can arrange to get the output of `check_load` from our remote host by way
     of `check_by_ssh` as follows:'
+  id: totrans-256
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过`check_by_ssh`从远程主机获取`check_load`的输出，如下所示：
 - en: 'On the monitoring server, decide on a location for the private and public keys
     for the `nagios` user. I recommend placing them in `/usr/local/nagios/keys`. Create
     this directory and make it owned by the `nagios` user, and only readable by that
     user:'
+  id: totrans-257
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在监控服务器上，为`nagios`用户决定私钥和公钥的位置。我建议将它们放在`/usr/local/nagios/keys`中。创建此目录并将其归`nagios`用户所有，只允许该用户读取：
 - en: '[PRE59]'
+  id: totrans-258
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: 'Become the `nagios` user using `su` or `sudo`:'
+  id: totrans-259
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`su`或`sudo`切换到`nagios`用户：
 - en: '[PRE60]'
+  id: totrans-260
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: Generate a pair of private and public SSH keys using `ssh-keygen`. Here we've
     used 2048-bit RSA; use whichever key length and cipher is appropriate for your
     network setup.
+  id: totrans-261
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`ssh-keygen`生成一对私钥和公钥。这里我们使用了2048位的RSA密钥；根据你的网络设置选择适当的密钥长度和加密算法。
 - en: '[PRE61]'
+  id: totrans-262
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: When prompted for a passphrase, simply press *Enter* to signal that you don't
     want one.
+  id: totrans-263
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 当提示输入密码短语时，直接按*Enter*键表示你不需要密码短语。
 - en: This should create two files in `/usr/local/nagios/keys`, called `id_rsa` and
     `id_rsa.pub`. The first one is the **private key**, and should be kept secret
     at all times. The second, the **public key**, is safe to distribute and to install
     on other machines.
+  id: totrans-264
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这应该会在`/usr/local/nagios/keys`目录中创建两个文件，分别叫做`id_rsa`和`id_rsa.pub`。第一个是**私钥**，应该始终保密。第二个是**公钥**，可以安全地分发并安装到其他机器上。
 - en: 'Decide on a location for the `authorized_keys` file on the target host. The
     easiest way to do this is probably to specify a `$HOME` directory for the `nagios`
     user, and to create it if appropriate:'
+  id: totrans-265
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确定目标主机上`authorized_keys`文件的位置。最简单的方式可能是为`nagios`用户指定一个`$HOME`目录，并在适当时创建它：
 - en: '[PRE62]'
+  id: totrans-266
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: 'Copy the `/usr/local/nagios/keys/id_rsa.pub` file from the monitoring server
     to `/home/nagios/.ssh/authorized_keys` on the target machine. The best way to
     do this varies. One possible method is to use `scp`:'
+  id: totrans-267
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将`/usr/local/nagios/keys/id_rsa.pub`文件从监控服务器复制到目标机器的`/home/nagios/.ssh/authorized_keys`。执行此操作的方法有很多种，一种可能的方法是使用`scp`：
 - en: '[PRE63]'
+  id: totrans-268
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: 'You may have to set a password temporarily for the `nagios` user on the target
     host to do this:'
+  id: totrans-269
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你可能需要为目标主机上的`nagios`用户暂时设置一个密码，以完成此操作：
 - en: '[PRE64]'
+  id: totrans-270
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: 'Check that you can now log in from the monitoring server to the target server
     as the `nagios` user with no password:'
+  id: totrans-271
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 检查是否可以现在从监控服务器以`nagios`用户身份无密码登录到目标服务器：
 - en: '[PRE65]'
+  id: totrans-272
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: 'Back on the monitoring server, check that you''re able to run the `check_by_ssh`
     plugin to call one of the installed plugins on the remote server; in this example,
     we''re calling `check_load`:'
+  id: totrans-273
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 返回监控服务器，检查是否能够运行`check_by_ssh`插件，以调用远程服务器上的一个已安装插件；在此示例中，我们调用的是`check_load`：
 - en: '[PRE66]'
+  id: totrans-274
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: Note that the value for the `-C` option needs to be surrounded with quotes.
+  id: totrans-275
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 请注意，`-C`选项的值需要用引号括起来。
 - en: 'Now that we''ve verified that `check_by_ssh` works with our infrastructure,
     we can define a command to use it in `/usr/local/nagios/etc/objects/commands.cfg`:'
+  id: totrans-276
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在我们已经验证了`check_by_ssh`在我们的基础设施中能够正常工作，我们可以在`/usr/local/nagios/etc/objects/commands.cfg`中定义一个命令来使用它：
 - en: '[PRE67]'
+  id: totrans-277
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: 'We can apply that command to a new service check for `roma.naginet` as follows,
     preferably placed beneath the host definition:'
+  id: totrans-278
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们可以将该命令应用到`roma.naginet`的新服务检查，如下所示，最好将其放在主机定义下方：
 - en: '[PRE68]'
+  id: totrans-279
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: 'Validate the configuration and restart the Nagios Core server:'
+  id: totrans-280
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证配置并重启Nagios Core服务器：
 - en: '[PRE69]'
+  id: totrans-281
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: With this done, a new service with the description `LOAD_BY_SSH` should appear
     in the web interface ready to be checked, and will come up with an appropriate
     status, including the load average as read via `SSH` to the target host. To Nagios
     Core, the results of the check are just the same as if they'd come via NRPE.
+  id: totrans-282
   prefs: []
   type: TYPE_NORMAL
+  zh: 完成此操作后，带有描述`LOAD_BY_SSH`的新服务应出现在Web界面中，准备进行检查，并将显示相应的状态，包括通过`SSH`读取的目标主机的负载平均值。对Nagios
+    Core来说，检查结果与通过NRPE获取的结果完全相同。
 - en: How it works...
+  id: totrans-283
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: Checking services via NRPE and SSH is actually a reasonably similar process;
     the central idea is that we're using another network service shared by the monitoring
     server and the target host to instruct the target host to run a plugin, and return
     the results to the monitoring server.
+  id: totrans-284
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过NRPE和SSH检查服务实际上是一个相似的过程；核心思想是我们使用监控服务器和目标主机之间共享的另一个网络服务，指示目标主机运行一个插件，并将结果返回给监控服务器。
 - en: 'In the case of `check_by_ssh`, this is done over an SSH connection. It''s quite
     typical for administrators to run commands on remote hosts using the `ssh` client,
     simply by adding the command to be run to the command line:'
+  id: totrans-285
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`check_by_ssh`的情况下，这是通过SSH连接完成的。管理员通常通过`ssh`客户端在远程主机上运行命令，只需将要运行的命令添加到命令行中：
 - en: '[PRE70]'
+  id: totrans-286
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE70]'
 - en: 'All that the `check_by_ssh` plugin does is formalizes this process into a Nagios
     plugin context. The value for the `command_line` directive for the command we
     defined can be broken down as follows:'
+  id: totrans-287
   prefs: []
   type: TYPE_NORMAL
+  zh: '`check_by_ssh`插件的作用仅仅是将此过程正式化为Nagios插件的上下文。我们定义的命令行指令的`command_line`值可以分解为以下几个部分：'
 - en: '`$USER1$/check_by_ssh`: This is the path to the plugin, as is typical in command
     definitions, using the `$USER1$` macro to expand to `/usr/local/nagios/libexec`.'
+  id: totrans-288
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`$USER1$/check_by_ssh`：这是插件的路径，按照命令定义的惯例，使用`$USER1$`宏来扩展为`/usr/local/nagios/libexec`。'
 - en: '`-H $HOSTADDRESS$`: This specifies that the plugin should connect to the applicable
     host for any host or service that uses this command.'
+  id: totrans-289
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-H $HOSTADDRESS$`：这指定了插件应该连接到任何使用该命令的主机或服务。'
 - en: '`-i /usr/local/nagios/keys/id_rsa`: This specifies the location of the private
     key to be used for identification with the remote host.'
+  id: totrans-290
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-i /usr/local/nagios/keys/id_rsa`：这指定了用于与远程主机进行身份验证的私钥的路径。'
 - en: '`-C ''$ARG1$''`: This specifies that the command run by `check_by_ssh` on the
     target host is given in the first argument the service defines in its `check_command`;
     in this case, our command is:'
+  id: totrans-291
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`-C ''$ARG1$''`：这指定了`check_by_ssh`在目标主机上运行的命令，这个命令在服务的`check_command`定义中作为第一个参数；在本例中，我们的命令是：'
 - en: '[PRE71]'
+  id: totrans-292
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE71]'
 - en: Note that it's important that `$ARG1$` is in quotes, because we want to pass
     the whole command as one argument to `check_by_ssh`.
+  id: totrans-293
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，`$ARG1$`需要加上引号，因为我们希望将整个命令作为一个参数传递给`check_by_ssh`。
 - en: There's more...
+  id: totrans-294
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: Using `check_by_ssh` instead of `check_nrpe` allows full authentication via
     public key, rather than merely by having the right IP address. It also encrypts
     all traffic implicitly, minimizing the risk of sensitive data, such as usernames
     or passwords, from being intercepted. Which of the two plugins you should use
     will depend very much on the nature of your network and your security policy.
     There is no reason you can't use both of them if you wish.
+  id: totrans-295
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用`check_by_ssh`代替`check_nrpe`可以通过公钥进行完全身份验证，而不仅仅是通过拥有正确的IP地址。它还隐式加密所有流量，从而最大限度地减少敏感数据（如用户名或密码）被拦截的风险。你应该使用哪一个插件，很大程度上取决于你的网络性质和安全策略。如果你愿意，完全可以同时使用这两者。
 - en: Be careful not to confuse this plugin with `check_ssh`, which checks that the
     SSH service itself is running, and is discussed in the *Monitoring SSH for any
     host* recipe in [Chapter 5](ch05.html "Chapter 5. Monitoring Methods"), *Monitoring
     Methods*.
+  id: totrans-296
   prefs: []
   type: TYPE_NORMAL
+  zh: 请小心不要将这个插件与`check_ssh`混淆，后者检查SSH服务本身是否运行，并在[第5章](ch05.html "第5章. 监控方法")的*监控SSH服务*示例中讨论，*监控方法*。
 - en: See also
+  id: totrans-297
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: The *Monitoring local services on a remote machine with NRPE* recipe in this
     chapter
+  id: totrans-298
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 本章中的*在远程机器上监控本地服务（使用NRPE）*示例
 - en: The *Monitoring SSH for any host* recipe in [Chapter 5](ch05.html "Chapter 5. Monitoring
     Methods"), *Monitoring Methods*
+  id: totrans-299
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '[第5章](ch05.html "第5章. 监控方法")中的*监控任何主机的SSH*示例，*监控方法*'
