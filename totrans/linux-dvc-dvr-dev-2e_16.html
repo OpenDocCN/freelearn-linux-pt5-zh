@@ -1,0 +1,458 @@
+<html><head></head><body>
+		<div id="_idContainer061">
+			<h1 id="_idParaDest-192"><em class="italic"><a id="_idTextAnchor194"/>Chapter 13</em>: Demystifying the Kernel IRQ Framework</h1>
+			<p>Linux is a system on which devices notify the kernel about events by means of <strong class="bold">interrupt requests</strong> (<strong class="bold">IRQs</strong>), though some devices are polled. The CPU exposes IRQ lines, shared or not, used by connected devices so that when a device needs the CPU, it sends a request to the CPU. When the CPU gets this request, it stops its actual job and saves its context, in order to serve the request issued by the device. After serving the device, its state is restored back to exactly where it stopped when the interruption occurred.</p>
+			<p>In this chapter, we will deal with the APIs that the kernel offers to manage IRQs and the ways in which multiplexing can be done. Moreover, we will analyze and look closer at <strong class="bold">interrupt controller</strong> driver writing.</p>
+			<p>To summarize, in this chapter, the following topics will be covered:</p>
+			<ul>
+				<li>Brief presentation of interrupts</li>
+				<li>Understanding interrupt controllers and interrupt multiplexing</li>
+				<li>Diving into advanced peripheral IRQ management</li>
+				<li>Demystifying per-CPU interrupts</li>
+			</ul>
+			<h1 id="_idParaDest-193"><a id="_idTextAnchor195"/>Brief presentation of interrupts</h1>
+			<p>On many platforms, a special device is responsible for managing IRQ lines. That device is the interrupt controller and it stands between the CPU and the interrupt lines it manages. The following is a diagram that shows the interactions that take place:</p>
+			<div>
+				<div id="_idContainer059" class="IMG---Figure">
+					<img src="image/B17934_13_001.jpg" alt="Figure 13.1 – Interrupt controller and IRQ lines&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 13.1 – Interrupt controller and IRQ lines</p>
+			<p>Not only can devices raise interrupts, but some processor operations can do that too. There are then two<a id="_idIndexMarker998"/> different kinds of interrupts:</p>
+			<ul>
+				<li>Synchronous<a id="_idIndexMarker999"/> interrupts, called <strong class="bold">exceptions</strong>, are produced <a id="_idIndexMarker1000"/>by the CPU while processing <a id="_idIndexMarker1001"/>instructions. These are <strong class="bold">non-maskable interrupts</strong> (<strong class="bold">NMIs</strong>) and result <a id="_idIndexMarker1002"/>from a critical malfunction such as hardware failure. They are always processed by the CPU.</li>
+				<li>Asynchronous <a id="_idIndexMarker1003"/>interrupts, called <strong class="bold">interrupts</strong>, are issued by other hardware devices. These <a id="_idIndexMarker1004"/>are normal and <strong class="bold">maskable interrupts</strong>. These are <a id="_idIndexMarker1005"/>what we will discuss in the next sections of this chapter.</li>
+			</ul>
+			<p>Before getting deeper into interrupt management in the Linux kernel, let's talk a bit more about exceptions.</p>
+			<p>Exceptions<a id="_idIndexMarker1006"/> are consequences of programming errors, handled by the kernel, which sends a signal to the program and tries to recover from the error. These are classified into two categories, enumerated as follows:</p>
+			<ul>
+				<li><strong class="bold">Processor-detected exceptions</strong>: Those <a id="_idIndexMarker1007"/>the CPU generates in<a id="_idIndexMarker1008"/> response to an anomalous condition, which are divided into three groups:<ul><li>Faults, which can generally be corrected (bogus instruction).</li><li>Traps, which occur in the user process (invalid memory access, division by zero), are also a mechanism to switch to kernel mode in response to a system call. If the <a id="_idIndexMarker1009"/>kernel code does cause a <a id="_idIndexMarker1010"/>trap, it immediately panics.</li><li>Aborts – the serious errors.</li></ul></li>
+				<li><strong class="bold">Programmed exceptions</strong>: These are <a id="_idIndexMarker1011"/>requested by the programmer and <a id="_idIndexMarker1012"/>handled like traps.</li>
+			</ul>
+			<p>Now that we have introduced the different families of interrupts, let's learn how they are implemented from within the interrupt controller. </p>
+			<h1 id="_idParaDest-194"><a id="_idTextAnchor196"/>Understanding interrupt controllers and interrupt multiplexing</h1>
+			<p>Having a single interrupt<a id="_idIndexMarker1013"/> from the CPU is usually not enough. Most systems have tens or hundreds of them. Now comes interrupt controller, which allows them to be<a id="_idIndexMarker1014"/> multiplexed. Very often, architecture or platform-specific implementations offer specific facilities, such as the following:</p>
+			<ul>
+				<li>Masking/unmasking individual interrupts</li>
+				<li>Setting priorities</li>
+				<li>SMP affinity</li>
+				<li>Exotic features, such as wake-up interrupts</li>
+			</ul>
+			<p>IRQ management and interrupt controller drivers both rely on the concept of the IRQ domain, which is built on top of the following structures:</p>
+			<ul>
+				<li><strong class="source-inline">struct irq_chip</strong>: This is <a id="_idIndexMarker1015"/>the interrupt controller data structure. This structure also implements a set of methods that allow to drive the interrupt controller and that are directly called by core IRQ code.</li>
+				<li><strong class="source-inline">struct irqdomain</strong>: This <a id="_idIndexMarker1016"/>provides the following options:<ul><li>A pointer to the interrupt controller's firmware node (<strong class="source-inline">fwnode</strong>)</li><li>A function for converting an IRQ's firmware description into an ID local to this interrupt controller (<strong class="source-inline">hwirq</strong>, also called hardware IRQ number)</li><li>A way to retrieve the Linux view (<strong class="source-inline">virq</strong>, also called virtual IRQ number) of an IRQ from <strong class="source-inline">hwirq</strong></li></ul></li>
+				<li><strong class="source-inline">struct irq_desc</strong>: This <a id="_idIndexMarker1017"/>structure is Linux's view of an interrupt. It contains all the information about the interrupt as well as one-to-one mapping to the Linux interrupt number.</li>
+				<li><strong class="source-inline">struct irq_action</strong>: This <a id="_idIndexMarker1018"/>structure is used to describe an IRQ handler.</li>
+				<li><strong class="source-inline">struct irq_data</strong>: This<a id="_idIndexMarker1019"/> structure is embedded in the <strong class="source-inline">struct irq_desc</strong> structure and provides us with the following information: <ul><li>The data that is relevant to the IRQ chip managing this interrupt.</li><li>Both <strong class="source-inline">virq</strong> and <strong class="source-inline">hwirq</strong>.</li><li>A pointer to <strong class="source-inline">struct irq_chip</strong> (the IRQ chip data structure). Note that most IRQ chip-related function calls are given <strong class="source-inline">irq_data</strong> as a parameter, from which you can obtain the corresponding <strong class="source-inline">struct irq_desc</strong>.</li></ul></li>
+			</ul>
+			<p>All the preceding <a id="_idIndexMarker1020"/>data structures are part of the IRQ domain API. An interrupt controller is represented in the kernel by an instance of the <strong class="source-inline">struct irq_chip</strong> structure, which describes the actual hardware device, and some methods used by the IRQ core. The following code block shows its definition:</p>
+			<p class="source-code">struct irq_chip {</p>
+			<p class="source-code">    struct device    *parent_device;</p>
+			<p class="source-code">    const char       *name;</p>
+			<p class="source-code">    void   (*irq_enable)(struct irq_data *data);</p>
+			<p class="source-code">    void   (*irq_disable)(struct irq_data *data);</p>
+			<p class="source-code">    void   (*irq_ack)(struct irq_data *data);</p>
+			<p class="source-code">    void   (*irq_mask)(struct irq_data *data);</p>
+			<p class="source-code">    void   (*irq_unmask)(struct irq_data *data);</p>
+			<p class="source-code">    void   (*irq_eoi)(struct irq_data *data);</p>
+			<p class="source-code">    int    (*irq_set_affinity)(struct irq_data *data,</p>
+			<p class="source-code">                const struct cpumask *dest, bool force);</p>
+			<p class="source-code">    int    (*irq_retrigger)(struct irq_data *data);</p>
+			<p class="source-code">    int    (*irq_set_type)(struct irq_data *data,</p>
+			<p class="source-code">                           unsigned int flow_type);</p>
+			<p class="source-code">    int    (*irq_set_wake)(struct irq_data *data,</p>
+			<p class="source-code">                           unsigned int on);</p>
+			<p class="source-code">    void   (*irq_bus_lock)(struct irq_data *data);</p>
+			<p class="source-code">    void   (*irq_bus_sync_unlock)(struct irq_data *data);</p>
+			<p class="source-code">    int   (*irq_get_irqchip_state)(struct irq_data *data,</p>
+			<p class="source-code">               enum irqchip_irq_state which, bool *state);</p>
+			<p class="source-code">    int   (*irq_set_irqchip_state)(struct irq_data *data,</p>
+			<p class="source-code">               enum irqchip_irq_state which, bool state);</p>
+			<p class="source-code">    void  (*ipi_send_single)(struct irq_data *data, </p>
+			<p class="source-code">                              unsigned int cpu);</p>
+			<p class="source-code">   void   (*ipi_send_mask)(struct irq_data *data,</p>
+			<p class="source-code">                           const struct cpumask *dest);</p>
+			<p class="source-code">    unsigned long    flags;</p>
+			<p class="source-code">};</p>
+			<p>The following<a id="_idIndexMarker1021"/> list explains the meanings of the elements in the structure:</p>
+			<ul>
+				<li><strong class="source-inline">parent_device</strong>: This is a pointer to the parent of this IRQ chip.</li>
+				<li><strong class="source-inline">name</strong>: This is the name for the<strong class="source-inline">/proc/interrupts</strong> file.</li>
+				<li><strong class="source-inline">irq_enable</strong>: This <a id="_idIndexMarker1022"/>hook enables the interrupt. If not set (if <strong class="source-inline">NULL</strong>), it defaults to <strong class="source-inline">chip-&gt;unmask</strong>. </li>
+				<li><strong class="source-inline">irq_disable</strong>: This <a id="_idIndexMarker1023"/>disables the interrupt.</li>
+				<li><strong class="source-inline">irq_ack</strong>: This<a id="_idIndexMarker1024"/> callback acknowledges an interrupt. It is unconditionally invoked by <strong class="source-inline">handle_edge_irq()</strong> and, therefore, must be defined (even an empty shell) for IRQ controller drivers that use <strong class="source-inline">handle_edge_irq()</strong> to handle interrupts. For such controllers, this callback is invoked at the start of the interrupt. Some controllers do not need this. Linux calls this function as soon as an interrupt is raised, long before it is serviced. This function is mapped to <strong class="source-inline">chip-&gt;disable()</strong> in some implementations so that if another interrupt request pokes on the line, it will not cause another interrupt until after the current interrupt request has been handled.</li>
+				<li><strong class="source-inline">irq_mask</strong>: This is <a id="_idIndexMarker1025"/>the hook that masks an interrupt source in the hardware so that it cannot be raised anymore.</li>
+				<li><strong class="source-inline">irq_unmask</strong>: This <a id="_idIndexMarker1026"/>hook unmasks an interrupt source.</li>
+				<li><strong class="source-inline">irq_eoi</strong>: Linux invokes <a id="_idIndexMarker1027"/>this <strong class="bold">end of interrupt</strong> (<strong class="bold">EOI)</strong> hook right after an<a id="_idIndexMarker1028"/> IRQ servicing completes. We use this function to reconfigure the controller as necessary in order to receive another interrupt request on that line. Some implementations map this function to <strong class="source-inline">chip-&gt;enable()</strong> to reverse operations done in <strong class="source-inline">chip-&gt;ack()</strong>.</li>
+				<li><strong class="source-inline">irq_set_affinity</strong>: This <a id="_idIndexMarker1029"/>sets the CPU affinity only on SMP machines. In such machines, this function is used to specify the CPU on which the interrupt will be handled. This function is unused in single-processor environments, as interrupts are always services on the same single CPU.</li>
+				<li><strong class="source-inline">irq_retrigger</strong>: This<a id="_idIndexMarker1030"/> retriggers the interrupt in the hardware, which resends an IRQ to the CPU.</li>
+				<li><strong class="source-inline">irq_set_type</strong>: This<a id="_idIndexMarker1031"/> sets the flow type, such as <strong class="source-inline">IRQ_TYPE_LEVEL</strong>, of an IRQ.</li>
+				<li><strong class="source-inline">irq_set_wake</strong>: This <a id="_idIndexMarker1032"/>enables/disables the power management wake-on of an IRQ.</li>
+				<li><strong class="source-inline">irq_bus_lock</strong>: This <a id="_idIndexMarker1033"/>function locks access to slow bus (I2C) chips. Locking a mutex here is sufficient.</li>
+				<li><strong class="source-inline">irq_bus_sync_unlock</strong>: This <a id="_idIndexMarker1034"/>function syncs and unlocks slow bus (I2C) chips, and unlocks the mutex previously locked.</li>
+				<li><strong class="source-inline">irq_get_irqchip_state</strong> and <strong class="source-inline">irq_set_irqchip_state</strong>: These return or set the<a id="_idIndexMarker1035"/> internal state <a id="_idIndexMarker1036"/>of an interrupt, respectively.</li>
+				<li><strong class="source-inline">ipi_send_single</strong> and <strong class="source-inline">ipi_send_mask</strong>: These are used, respectively, to send <strong class="bold">inter-processor interrupts</strong> (<strong class="bold">IPIs</strong>) either to a single CPU or to a set of CPUs defined by a <a id="_idIndexMarker1037"/>mask. IPIs are used on SMP systems to <a id="_idIndexMarker1038"/>generate a CPU remote interrupt from the local CPU. We<a id="_idIndexMarker1039"/> will discuss this later in the chapter, in the <em class="italic">Demystifying per-CPU interrupts</em> section.</li>
+			</ul>
+			<p>Each interrupt controller<a id="_idIndexMarker1040"/> is given a domain, which is to the controller what an address space is to a process (see <a href="B17934_10_Epub.xhtml#_idTextAnchor146"><em class="italic">Chapter 10</em></a>, <em class="italic">Understanding the Linux Kernel Memory Allocation</em>). The interrupt controller domain is described in the kernel with a <strong class="source-inline">struct irq_domain</strong> structure. It manages mappings between hardware IRQ numbers and Linux IRQ numbers (that is, virtual IRQs). It is the hardware interrupt number translation object. The following code block shows its definition:</p>
+			<p class="source-code">struct irq_domain {</p>
+			<p class="source-code">    const char *name;</p>
+			<p class="source-code">    const struct irq_domain_ops *ops;</p>
+			<p class="source-code">    void *host_data;</p>
+			<p class="source-code">    unsigned int flags;</p>
+			<p class="source-code">    unsigned int mapcount;</p>
+			<p class="source-code">    /* Optional data */</p>
+			<p class="source-code">    struct fwnode_handle *fwnode;</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">};</p>
+			<p>For the sake of readability, only elements that are relevant to us have been listed. The following list tells us their meanings:</p>
+			<ul>
+				<li><strong class="source-inline">name</strong>: This is the name of the interrupt domain.</li>
+				<li><strong class="source-inline">ops</strong>: This is a pointer to the IRQ domain methods.</li>
+				<li><strong class="source-inline">host_data</strong>: This is a private data pointer for use by the owner. Not touched by the IRQ domain core code.</li>
+				<li><strong class="source-inline">flags</strong>: This hosts per-IRQ domain flags.</li>
+				<li><strong class="source-inline">mapcount</strong>: This is the number of mapped interrupts in this IRQ domain.</li>
+				<li>Like all the remaining elements, <strong class="source-inline">fwnode</strong> is optional. It is a pointer to the <strong class="bold">device tree</strong> (<strong class="bold">DT</strong>) node associated with the IRQ domain. Used when decoding DT interrupt specifiers.</li>
+			</ul>
+			<p>An <a id="_idIndexMarker1041"/>interrupt controller driver creates and registers an IRQ domain by calling one of the <strong class="source-inline">irq_domain_add_&lt;mapping_method&gt;()</strong> functions, where <strong class="source-inline">&lt;mapping_method&gt;</strong> is the method by which <strong class="source-inline">hwirq</strong> should be mapped to Linux <strong class="source-inline">virq</strong>. These functions are described in the following list:</p>
+			<ul>
+				<li><strong class="source-inline">irq_domain_add_linear()</strong>: This <a id="_idIndexMarker1042"/>uses a fixed-size table indexed by the <strong class="source-inline">hwirq</strong> number. When an <strong class="source-inline">hwirq</strong> number is mapped, an <strong class="source-inline">irq_desc</strong> object is allocated for this <strong class="source-inline">hwirq</strong> and the IRQ number is stored in the table. This linear mapping is suitable for controllers or domains that have a fixed and small number of <strong class="source-inline">hwirq</strong> (~ &lt; 256). The inconvenience of this mapping is the table size, being as large as the largest possible <strong class="source-inline">hwirq</strong> number. Therefore, the IRQ number lookup time is fixed, and IRQ descriptors are allocated for in-use IRQs only. Most drivers should use linear mapping. This function has the following prototype:<p class="source-code">struct irq_domain *irq_domain_add_linear(</p><p class="source-code">                   struct device_node *of_node,</p><p class="source-code">                   unsigned int size,</p><p class="source-code">                   const struct irq_domain_ops *ops,</p><p class="source-code">                   void *host_data)</p></li>
+				<li><strong class="source-inline">irq_domain_add_tree()</strong>: With this<a id="_idIndexMarker1043"/> mapping, the IRQ domain maintains the mapping between <strong class="source-inline">virqs</strong> (Linux IRQ numbers) and <strong class="source-inline">hwirsq</strong> (Hardware interrupt numbers) in a radix tree. An <strong class="source-inline">irq_desc</strong> object is allocated when an <strong class="source-inline">hwirq</strong> is mapped, and this hardware IRQ number is used as the radix tree's lookup key. If the <strong class="source-inline">hwirq</strong> number can be very large, then the treemap is a viable solution because it does not<a id="_idIndexMarker1044"/> require allocating a table as large as the largest <strong class="source-inline">hwirq</strong> number. The drawback is that the <strong class="source-inline">hwirq</strong>-to-IRQ-number lookup is affected by the number of entries in the table. Very few drivers should need this mapping. There are fewer than 10 users of this API in the kernel. It has the prototype shown in the following code block:<p class="source-code">struct irq_domain *irq_domain_add_tree(</p><p class="source-code">                  struct device_node *of_node,</p><p class="source-code">                  const struct irq_domain_ops *ops,</p><p class="source-code">                  void *host_data)</p></li>
+				<li><strong class="source-inline">irq_domain_add_nomap()</strong>: You will <a id="_idIndexMarker1045"/>probably never use this method. Nonetheless, its entire description is available in <strong class="source-inline">Documentation/IRQ-domain.txt</strong>, in the kernel source tree. Its prototype is shown in the following code block:<p class="source-code">struct irq_domain *irq_domain_add_nomap(</p><p class="source-code">                   struct device_node *of_node,</p><p class="source-code">                   unsigned int max_irq,</p><p class="source-code">                   const struct irq_domain_ops *ops,</p><p class="source-code">                   void *host_data)</p></li>
+			</ul>
+			<p>In these functions, <strong class="source-inline">of_node</strong> is a pointer to the interrupt controller's DT node. <strong class="source-inline">size</strong> corresponds to the number of interrupts in the domain. <strong class="source-inline">ops</strong> represent map/unmap domain callbacks, and <strong class="source-inline">host_data</strong> is the controller's private data pointer.</p>
+			<p>When it is initially created, the <a id="_idIndexMarker1046"/>IRQ domain is empty (no mapping). A mapping is created and added as and when the IRQ chip driver calls <strong class="source-inline">irq_create_mapping()</strong>, which has the following prototype: </p>
+			<p class="source-code">unsigned int irq_create_mapping(struct irq_domain </p>
+			<p class="source-code">              *domain, irq_hw_number_t hwirq)</p>
+			<p>In the preceding function, <strong class="source-inline">domain</strong> is the domain to which this hardware interrupt belongs, or <strong class="source-inline">NULL</strong> for the default domain; <strong class="source-inline">hwirq</strong> represents the hardware interrupt number in that domain space.</p>
+			<p>If a mapping for the <strong class="source-inline">hwirq</strong> number doesn't already exist in the IRQ domain, the function will allocate a new Linux IRQ descriptor (<strong class="source-inline">struct irq_desc</strong>) structure, returning a virtual interrupt number at the same time. Then, it will associate it with the <strong class="source-inline">hwirq</strong>  number (by means of the <strong class="source-inline">irq_domain_associate()</strong> function, which in turn invokes the <strong class="source-inline">irq_domain_ops.map</strong> callback so that the driver can perform any required hardware setup). To understand this paragraph, we need to describe the IRQ domain operation data structure (<strong class="source-inline">struct irq_domain_ops</strong>), which is defined in the following code block:</p>
+			<p class="source-code">struct irq_domain_ops {</p>
+			<p class="source-code">    int (*map)(struct irq_domain *d, unsigned int virq,</p>
+			<p class="source-code">          irq_hw_number_t hw);</p>
+			<p class="source-code">    void (*unmap)(struct irq_domain *d, </p>
+			<p class="source-code">                   unsigned int virq);</p>
+			<p class="source-code">    int (*xlate)(struct irq_domain *d, </p>
+			<p class="source-code">                   struct device_node *node,</p>
+			<p class="source-code">                   const u32 *intspec,</p>
+			<p class="source-code">                   unsigned int intsize,</p>
+			<p class="source-code">                   unsigned long *out_hwirq, </p>
+			<p class="source-code">                   unsigned int *out_type);</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">};</p>
+			<p>Elements in the data structure have been limited to the scope of this chapter. Nonetheless, the complete data structure<a id="_idIndexMarker1047"/> can be found in <strong class="source-inline">include/linux/irqdomain.h</strong> in the kernel source. The following list tells us the meanings of the elements we have enumerated:</p>
+			<ul>
+				<li><strong class="source-inline">map</strong>: This creates or updates mapping between a <strong class="source-inline">virq</strong> number and an <strong class="source-inline">hwirq</strong> number. This callback is invoked only once for a given mapping. It generally maps the <strong class="source-inline">virq</strong> number with a given handler using <strong class="source-inline">irq_set_chip_and_handler()</strong>, so that calling either <strong class="source-inline">generic_handle_irq()</strong> or <strong class="source-inline">handle_nested_irq()</strong> will trigger this handler. The function <strong class="source-inline">irq_set_chip_and_handler()</strong> is defined as in the following code block:<p class="source-code">void irq_set_chip_and_handler(unsigned int irq,</p><p class="source-code">                          struct irq_chip *chip,</p><p class="source-code">                          irq_flow_handler_t handle)</p></li>
+			</ul>
+			<p>In this function, <strong class="source-inline">irq</strong> is the Linux IRQ given as a parameter to the <strong class="source-inline">map()</strong> function, and <strong class="source-inline">chip</strong> is your IRQ chip. There are, however, dummy controllers that need almost nothing in their <strong class="source-inline">irq_chip</strong> structure. In this case, the driver passes <strong class="source-inline">dummy_irq_chip</strong>, defined in <strong class="source-inline">kernel/irq/dummychip.c</strong>, which is a kernel-predefined <strong class="source-inline">irq_chip</strong> structure defined for such controllers. <strong class="source-inline">handle</strong> determines the interrupt flow handler, the one that calls the real handler registered using <strong class="source-inline">request_irq()</strong>. Its value depends on the IRQ being edge- or level-triggered. In either case, <strong class="source-inline">handle</strong> should be set to <strong class="source-inline">handle_edge_irq</strong> or <strong class="source-inline">handle_level_irq</strong>. Both are kernel helper functions that do some operations before and after<a id="_idIndexMarker1048"/> calling the real IRQ handler. An example is shown in this code block:</p>
+			<p class="source-code">static int ativic32_irq_domain_map(</p>
+			<p class="source-code">                struct irq_domain *id,</p>
+			<p class="source-code">                unsigned int virq, </p>
+			<p class="source-code">                irq_hw_number_t hw)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">    if (int_trigger_type &amp; (BIT(hw))) {</p>
+			<p class="source-code">        irq_set_chip_and_handler(virq, </p>
+			<p class="source-code">                     &amp;ativic32_chip,</p>
+			<p class="source-code">                     handle_edge_irq);</p>
+			<p class="source-code">        type = IRQ_TYPE_EDGE_RISING;</p>
+			<p class="source-code">    } else {</p>
+			<p class="source-code">        irq_set_chip_and_handler(virq, </p>
+			<p class="source-code">                     &amp;ativic32_chip, </p>
+			<p class="source-code">                     handle_level_irq);</p>
+			<p class="source-code">        type = IRQ_TYPE_LEVEL_HIGH;</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    irqd_set_trigger_type(irq_data, type);</p>
+			<p class="source-code">    return 0;</p>
+			<p class="source-code">}</p>
+			<ul>
+				<li><strong class="source-inline">xlate</strong>: Given a DT node with an interrupt specifier, this hook decodes the hardware interrupt number in that specifier along with its Linux interrupt type value. Depending on the <strong class="source-inline">#interrupt-cells</strong> value specified in the DT controller node, the kernel provides generic translation functions:<ul><li><strong class="source-inline">irq_domain_xlate_twocell()</strong>: Generic translation function to be used for direct two-cell binding. It works with a device tree IRQ specifier with two-cell bindings<a id="_idIndexMarker1049"/> where the cell values map directly to the <strong class="source-inline">hwirq</strong> number and Linux IRQ flags.</li><li><strong class="source-inline">irq_domain_xlate_onecell()</strong>:  Generic <strong class="source-inline">xlate</strong> for direct one-cell bindings.</li><li><strong class="source-inline">Irq_domain_xlate_onetwocell()</strong>: Generic <strong class="source-inline">xlate</strong> for one- or two-cell bindings.</li></ul></li>
+			</ul>
+			<p>An example of domain operation is given in the following code block:</p>
+			<p class="source-code">static struct irq_domain_ops mcp23016_irq_domain_ops = {</p>
+			<p class="source-code">    .map    = mcp23016_irq_domain_map,</p>
+			<p class="source-code">    .xlate  = irq_domain_xlate_twocell,</p>
+			<p class="source-code">};</p>
+			<p>When an interrupt is received, the <strong class="source-inline">irq_find_mapping()</strong> function is used to find the Linux IRQ number from the <strong class="source-inline">hwirq</strong> number. Of course, the mapping must exist prior to being returned. A Linux IRQ number is always tied to a <strong class="source-inline">struct irq_desc</strong> structure, which is the structure by which Linux describes an IRQ and has the following definition:</p>
+			<p class="source-code">struct irq_desc {</p>
+			<p class="source-code">    struct irq_data        irq_data;</p>
+			<p class="source-code">    unsigned int __percpu  *kstat_irqs;</p>
+			<p class="source-code">    irq_flow_handler_t     handle_irq;</p>
+			<p class="source-code">    struct irqaction       *action;</p>
+			<p class="source-code">    unsigned int           irqs_unhandled;</p>
+			<p class="source-code">    raw_spinlock_t         lock;</p>
+			<p class="source-code">    struct cpumask         *percpu_enabled;</p>
+			<p class="source-code">    atomic_t               threads_active;</p>
+			<p class="source-code">    wait_queue_head_t      wait_for_threads;</p>
+			<p class="source-code">#ifdef CONFIG_PM_SLEEP</p>
+			<p class="source-code">    unsigned int           nr_actions;</p>
+			<p class="source-code">    unsigned int           no_suspend_depth;</p>
+			<p class="source-code">    unsigned int           force_resume_depth;</p>
+			<p class="source-code">#endif</p>
+			<p class="source-code">#ifdef CONFIG_PROC_FS</p>
+			<p class="source-code">    struct proc_dir_entry   *dir;</p>
+			<p class="source-code">#endif</p>
+			<p class="source-code">    Int               parent_irq;</p>
+			<p class="source-code">    struct module     *owner;</p>
+			<p class="source-code">    const char        *name;</p>
+			<p class="source-code">};</p>
+			<p>Some fields in this data structure<a id="_idIndexMarker1050"/> are intentionally missing. For the remainder, the following list gives us their definitions:</p>
+			<ul>
+				<li><strong class="source-inline">kstat_irqs</strong>: This is the per-CPU IRQ statistics since boot.</li>
+				<li><strong class="source-inline">handle_irq</strong>: This is the high-level IRQ events handler.</li>
+				<li><strong class="source-inline">action</strong>: This represents the list of the IRQ actions for this descriptor.</li>
+				<li><strong class="source-inline">irqs_unhandled</strong>: This is the stats field for spurious unhandled interrupts.</li>
+				<li><strong class="source-inline">lock</strong>: This represents locking for SMP.</li>
+				<li><strong class="source-inline">threads_active</strong>: This is the number of IRQ action threads currently running for this descriptor.</li>
+				<li><strong class="source-inline">wait_for_threads</strong>: This represents the wait queue for <strong class="source-inline">sync_irq</strong> to wait for threaded handlers.</li>
+				<li><strong class="source-inline">nr_actions</strong>: This is the number of installed actions on this descriptor.</li>
+				<li><strong class="source-inline">no_suspend_depth</strong> and <strong class="source-inline">force_resume_depth</strong>: This represents the number of <strong class="source-inline">irqaction</strong> instances on an IRQ descriptor that have <strong class="source-inline">IRQF_NO_SUSPEND</strong> or <strong class="source-inline">IRQF_FORCE_RESUME</strong> flags set.</li>
+				<li><strong class="source-inline">dir</strong>: This represents the <strong class="source-inline">/proc/irq/</strong> procfs entry.</li>
+				<li><strong class="source-inline">name</strong>: This names the flow <a id="_idIndexMarker1051"/>handler, visible in the <strong class="source-inline">/proc/interrupts</strong> output.</li>
+			</ul>
+			<p>When registering an interrupt handler, this handler is added to the end of the  <strong class="source-inline">irq_desc.action</strong> list associated with that interrupt line. For instance, each call to <strong class="source-inline">request_irq()</strong> (or the threaded version, <strong class="source-inline">request_threaded_irq()</strong>) creates and adds one <strong class="source-inline">struct irqaction</strong> structure to the end of the <strong class="source-inline">irq_desc.action</strong> list (knowing that <strong class="source-inline">irq_desc</strong> is the descriptor for this interrupt). For a shared interrupt, this field will contain as many <strong class="source-inline">irqaction</strong> objects as there are handlers registered. An IRQ action data structure has the following definition:</p>
+			<p class="source-code">struct irqaction {</p>
+			<p class="source-code">    irq_handler_t     handler;</p>
+			<p class="source-code">    void              *dev_id;</p>
+			<p class="source-code">    void __percpu     *percpu_dev_id;</p>
+			<p class="source-code">    struct irqaction  *next;</p>
+			<p class="source-code">    irq_handler_t     thread_fn;</p>
+			<p class="source-code">    struct task_struct     *thread;</p>
+			<p class="source-code">    unsigned int      irq;</p>
+			<p class="source-code">    unsigned int      flags;</p>
+			<p class="source-code">    unsigned long     thread_flags;</p>
+			<p class="source-code">    unsigned long     thread_mask;</p>
+			<p class="source-code">    const char        *name;</p>
+			<p class="source-code">    struct proc_dir_entry   *dir;</p>
+			<p class="source-code">};</p>
+			<p>The meanings of each element <a id="_idIndexMarker1052"/>in this data structure are as follows:</p>
+			<ul>
+				<li><strong class="source-inline">handler</strong>: This is the non-threaded (hard) interrupt handler function.</li>
+				<li><strong class="source-inline">name</strong>: This is the device name.</li>
+				<li><strong class="source-inline">dev_id</strong>: This is a cookie to identify the device.</li>
+				<li><strong class="source-inline">percpu_dev_id</strong>: This is a per-CPU cookie to identify the device.</li>
+				<li><strong class="source-inline">next</strong>: This is a pointer to the next IRQ action for shared interrupts.</li>
+				<li><strong class="source-inline">irq</strong>: This is the Linux interrupt number (<strong class="source-inline">virq</strong>).</li>
+				<li><strong class="source-inline">flags</strong>: This represents the IRQ flags (see <strong class="source-inline">IRQF_*</strong>).</li>
+				<li><strong class="source-inline">thread_fn</strong>: This is the threaded interrupt handler function for threaded interrupts.</li>
+				<li><strong class="source-inline">thread</strong>: This is a pointer to the thread structure in case of threaded interrupts.</li>
+				<li><strong class="source-inline">thread_flags</strong>: This represents the flags related to the thread.</li>
+				<li><strong class="source-inline">thread_mask</strong>: This is a bitmask for keeping track of thread activity.</li>
+				<li><strong class="source-inline">dir</strong>: This points to the <strong class="source-inline">/proc/irq/NN/&lt;name&gt;/</strong> entry.</li>
+			</ul>
+			<p>The following is the definition of important fields in the <strong class="source-inline">struct irq_data</strong> structure, which is per-IRQ chip data passed down to chip functions:</p>
+			<p class="source-code">struct irq_data {</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    unsigned int     irq;</p>
+			<p class="source-code">    unsigned long           hwirq;</p>
+			<p class="source-code">    struct irq_chip         *chip;</p>
+			<p class="source-code">    struct irq_domain *domain;</p>
+			<p class="source-code">    void              *chip_data;</p>
+			<p class="source-code">};</p>
+			<p>The following list gives the <a id="_idIndexMarker1053"/>meanings of elements in this data structure:</p>
+			<ul>
+				<li><strong class="source-inline">irq</strong>: This is the interrupt number (Linux IRQ number).</li>
+				<li><strong class="source-inline">hwirq</strong>: This is the hardware interrupt number, local to the <strong class="source-inline">irq_data.domain</strong> interrupt domain.</li>
+				<li><strong class="source-inline">chip</strong>: This represents the low-level interrupt controller hardware access.</li>
+				<li><strong class="source-inline">domain</strong>: This represents the interrupt translation domain, responsible for mapping between the <strong class="source-inline">hwirq</strong> number and the Linux IRQ number.</li>
+				<li><strong class="source-inline">chip_data</strong>: This is platform-specific, per-chip private data for the chip methods, to allow shared chip implementations.</li>
+			</ul>
+			<p>Now that we are familiar with the data structures of the IRQ framework, we can go a bit further and study how interrupts are requested and propagated all along the processing chain.</p>
+			<h1 id="_idParaDest-195"><a id="_idTextAnchor197"/>Diving into advanced peripheral IRQ management</h1>
+			<p>In <a href="B17934_03_Epub.xhtml#_idTextAnchor039"><em class="italic">Chapter 3</em></a>, <em class="italic">Dealing with Kernel Core Helpers</em>, we introduced peripheral IRQs, using <strong class="source-inline">request_irq()</strong> and <strong class="source-inline">request_threaded_irq()</strong>. With the former, you register a handler (top half) that <a id="_idIndexMarker1054"/>will be executed in an atomic context, from which you can schedule a bottom half using one of the mechanisms discussed in that same chapter. On the other hand, with the <strong class="source-inline">_threaded</strong> variant, you can provide top and bottom halves to the function, so that the former will be run as the hard IRQ handler, which may decide to raise the second and threaded handler or not, which will be run in a kernel thread. </p>
+			<p>The problem with those approaches is that sometimes, drivers requesting an IRQ do not know about the nature of the interrupt controller that provides this IRQ line, especially when the interrupt controller is a discrete chip (typically a GPIO expander connected over SPI or I2C buses). Now comes the <strong class="source-inline">request_any_context_irq()</strong>function with which drivers requesting an IRQ know whether the handler will run in a thread context, and call <strong class="source-inline">request_threaded_irq()</strong> or <strong class="source-inline">request_irq()</strong> accordingly. This means that whether the IRQ associated with our device comes from an interrupt controller that may not sleep (memory-mapped one) or from one that can sleep (behind an I2C/SPI bus), there will be no need to change the code. Its prototype is shown in the following code block:</p>
+			<p class="source-code">int request_any_context_irq(unsigned int irq,</p>
+			<p class="source-code">                            irq_handler_t handler,</p>
+			<p class="source-code">                            unsigned long flags,</p>
+			<p class="source-code">                            const char * name,</p>
+			<p class="source-code">                            void * dev_id);</p>
+			<p>Here are the meanings of each<a id="_idIndexMarker1055"/> parameter in the function:</p>
+			<ul>
+				<li><strong class="source-inline">irq</strong>: This represents the interrupt line to allocate.</li>
+				<li><strong class="source-inline">handler</strong>: This is the function to be called when the IRQ occurs. Depending on the context, this function might run as a hard IRQ or might be threaded.</li>
+				<li><strong class="source-inline">flags</strong>: This represents the interrupt type flags. It is the same as those in <strong class="source-inline">request_irq()</strong>.</li>
+				<li><strong class="source-inline">name</strong>: This will be used for debugging purposes to name the interrupt in <strong class="source-inline">/proc/interrupts</strong>.</li>
+				<li><strong class="source-inline">dev_id</strong>: This is a cookie passed back to the handler function.</li>
+			</ul>
+			<p><strong class="source-inline">request_any_context_irq()</strong> means that you can either get a hard IRQ or a threaded one. It works in the same way as the usual <strong class="source-inline">request_irq()</strong>, except that it checks whether the IRQ is configured as nested or not, and calls the right backend. In other words, it selects either a hard IRQ or threaded handling method depending on the context. This<a id="_idIndexMarker1056"/> function returns a negative value on failure. On success, it returns either <strong class="source-inline">IRQC_IS_HARDIRQ</strong> or <strong class="source-inline">IRQC_IS_NESTED</strong>. A use case is shown in the following code block:</p>
+			<p class="source-code">static irqreturn_t packt_btn_interrupt(int irq,</p>
+			<p class="source-code">                                        void *dev_id)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    struct btn_data *priv = dev_id;</p>
+			<p class="source-code">    input_report_key(priv-&gt;i_dev, BTN_0,</p>
+			<p class="source-code">                   gpiod_get_value(priv-&gt;btn_gpiod) &amp; 1);</p>
+			<p class="source-code">    input_sync(priv-&gt;i_dev);</p>
+			<p class="source-code">    return IRQ_HANDLED;</p>
+			<p class="source-code">}</p>
+			<p class="source-code">static int btn_probe(struct platform_device *pdev)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    struct gpio_desc *gpiod;</p>
+			<p class="source-code">    int ret, irq;</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    gpiod = gpiod_get(&amp;pdev-&gt;dev, "button", GPIOD_IN);</p>
+			<p class="source-code">    if (IS_ERR(gpiod))</p>
+			<p class="source-code">        return -ENODEV;</p>
+			<p class="source-code">    priv-&gt;irq = gpiod_to_irq(priv-&gt;btn_gpiod);</p>
+			<p class="source-code">    priv-&gt;btn_gpiod = gpiod;</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    ret = request_any_context_irq(</p>
+			<p class="source-code">            priv-&gt;irq,</p>
+			<p class="source-code">            packt_btn_interrupt,</p>
+			<p class="source-code">            (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING),</p>
+			<p class="source-code">            "packt-input-button", priv);</p>
+			<p class="source-code">    if (ret &lt; 0) {</p>
+			<p class="source-code">        dev_err(&amp;pdev-&gt;dev,</p>
+			<p class="source-code">           "Unable to request GPIO interrupt line\n");</p>
+			<p class="source-code">        goto err_btn;</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    return ret;</p>
+			<p class="source-code">}</p>
+			<p>The preceding<a id="_idIndexMarker1057"/> code is an excerpt of the driver sample of an input device driver. The advantage of using <strong class="source-inline">request_any_context_irq()</strong> is that you do not need to care about what can be done in the IRQ handler, since the context in which the handler will run depends on the interrupt controller that provides the IRQ line. In our example, if the GPIO belongs to a controller sitting on an I2C or SPI bus, the handler will be threaded. Otherwise (memory mapped), the handler will run in a hard IRQ context.</p>
+			<h2 id="_idParaDest-196"><a id="_idTextAnchor198"/>Understanding IRQ and propagation</h2>
+			<p>Let's consider the following<a id="_idIndexMarker1058"/> diagram with a GPIO controller whose interrupt line is connected to a native GPIO on the SoC: </p>
+			<div>
+				<div id="_idContainer060" class="IMG---Figure">
+					<img src="image/B17934_13_002.jpg" alt="Figure 13.2 – Interrupt propagation&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 13.2 – Interrupt propagation</p>
+			<p>IRQs are always<a id="_idIndexMarker1059"/> processed based on the Linux IRQ number (not <strong class="source-inline">hwirq</strong>). The general function to request an IRQ on a Linux system is <strong class="source-inline">request_threaded_irq()</strong>. <strong class="source-inline">request_irq()</strong> is a wrapper on <strong class="source-inline">request_threaded_irq()</strong> which just don't provide the bottom half. The following code block shows its prototype:</p>
+			<p class="source-code">int request_threaded_irq(unsigned int irq, </p>
+			<p class="source-code">                  irq_handler_t handler,</p>
+			<p class="source-code">                  irq_handler_t thread_fn, </p>
+			<p class="source-code">                  unsigned long irqflags,</p>
+			<p class="source-code">                  const char *devname, void *dev_id)</p>
+			<p>When called, the function extracts <strong class="source-inline">struct irq_desc</strong> associated with the IRQ using the <strong class="source-inline">irq_to_desc()</strong> macro. It then allocates a new <strong class="source-inline">struct irqaction</strong> structure and sets it up, filling parameters such as handler and flags. The following code block is an excerpt:</p>
+			<p class="source-code">action-&gt;handler = handler;</p>
+			<p class="source-code">action-&gt;thread_fn = thread_fn;</p>
+			<p class="source-code">action-&gt;flags = irqflags;</p>
+			<p class="source-code">action-&gt;name = devname;</p>
+			<p class="source-code">action-&gt;dev_id = dev_id;</p>
+			<p>That same function finally inserts/registers the descriptor in the proper IRQ list by invoking the <strong class="source-inline">__setup_irq()</strong> (by means of <strong class="source-inline">setup_irq()</strong>) function, defined in <strong class="source-inline">kernel/irq/manage.c</strong>.</p>
+			<p>Now, when an<a id="_idIndexMarker1060"/> IRQ is raised, the kernel executes some assembler code in order to save the current state and jumps to the arch-specific handler, <strong class="source-inline">handle_arch_irq</strong>. For ARM architectures, this handler is set with the value of the <strong class="source-inline">handle_irq</strong> field in <strong class="source-inline">struct machine_desc</strong> of the platform in the <strong class="source-inline">setup_arch()</strong> function implemented in <strong class="source-inline">arch/arm/kernel/setup.c</strong>. The assignation is done as follows:</p>
+			<p class="source-code">handle_arch_irq = mdesc-&gt;handle_irq</p>
+			<p>For SoCs that use the <a id="_idIndexMarker1061"/>ARM <strong class="bold">Generic Interrupt Controller</strong> (<strong class="bold">GIC</strong>), the <strong class="source-inline">handle_irq</strong> callback is set with <strong class="source-inline">gic_handle_irq</strong>, in either <strong class="source-inline">drivers/irqchip/irq-gic.c</strong> or <strong class="source-inline">drivers/irqchip/irq-gic-v3.c</strong>:</p>
+			<p class="source-code">set_handle_irq(gic_handle_irq);</p>
+			<p><strong class="source-inline">gic_handle_irq()</strong> calls <strong class="source-inline">handle_domain_irq()</strong>, which executes<strong class="source-inline"> generic_handle_irq()</strong>, in turn calling <strong class="source-inline">generic_handle_irq_desc()</strong>, which ends by calling <strong class="source-inline">desc-&gt;handle_irq()</strong>. The whole chain can be seen in <strong class="source-inline">arch/arm/kernel/irq.c</strong>. Now, <strong class="source-inline">handle_irq</strong> is the actual call for the flow handler, which we registered as <strong class="source-inline">mcp23016_irq_handler</strong> in the diagram.</p>
+			<p><strong class="source-inline">gic_hande_irq()</strong> is a GIC interrupt handler. <strong class="source-inline">generic_handle_irq()</strong> will execute the handler of the SoC's GPIO4 IRQ, which will look for GPIO pins that issued the interrupt, and call <strong class="source-inline">generic_handle_irq_desc()</strong>.</p>
+			<h2 id="_idParaDest-197"><a id="_idTextAnchor199"/>Chaining IRQs</h2>
+			<p>This section describes how<a id="_idIndexMarker1062"/> the interrupt handlers of a parent call its children's interrupt handlers, in turn calling their children's interrupt handlers, and so on. The kernel offers two approaches on how to call interrupt handlers for child devices in the IRQ handler of the parent (interrupt controller) device. These are the chained and nested methods.</p>
+			<h3>Chained interrupts</h3>
+			<p>This approach is used for <a id="_idIndexMarker1063"/>SoC's internal GPIO controllers, which are memory-mapped and which do not put the caller to sleep when these are accessed.  Chained means that those interrupts are just chains of function calls (for example, SoC's GPIO module interrupt handler is being called from the GIC interrupt handler, just as a function call). <strong class="source-inline">generic_handle_irq()</strong> is used for interrupts chaining. Child IRQ handlers are called from inside the parent's hard IRQ handler. This means that even from within the child interrupt handlers, we are still in an atomic context (HW interrupt), and the driver must not call functions that may sleep. </p>
+			<h3>Nested interrupts</h3>
+			<p>With this flow, function calls<a id="_idIndexMarker1064"/> are nested, which means interrupt handlers are not invoked in the parent's handler. <strong class="source-inline">handle_nested_irq()</strong> is used for creating nested interrupt child IRQs. Handlers are called inside a new thread created for this purpose. This method is used by controllers that sit on slow buses such as SPI or I2C (such as GPIO expanders), and whose access may sleep (I2C and SPI access routines may sleep). Nested interrupt handlers that run in a process context can call any sleeping function.</p>
+			<h1 id="_idParaDest-198"><a id="_idTextAnchor200"/>Demystifying per-CPU interrupts</h1>
+			<p>The most common ARM interrupt <a id="_idIndexMarker1065"/>controller, GIC in the ARM multi-core processor, supports three types of interrupts:</p>
+			<ul>
+				<li><strong class="bold">CPU private interrupts</strong>: These <a id="_idIndexMarker1066"/>interrupts are private per CPU. If triggered, such a per-CPU interrupt will exclusively be serviced on the target CPU or CPU to which it is bound. Private interrupts can be split into two families:<ul><li><strong class="bold">Private peripheral interrupts</strong> (<strong class="bold">PPIs</strong>): These <a id="_idIndexMarker1067"/>are private and can only be generated by hardware bound to the CPU.</li><li><strong class="bold">Software-generated interrupts</strong> (<strong class="bold">SGIs</strong>): Unlike PPIs, these are generated by the software. Thanks to<a id="_idIndexMarker1068"/> this, SGIs are usually used as interrupt IPIs for inter-core communication on multi-core systems, meaning that one CPU can generate an interrupt (by writing the appropriate message, made of the interrupt ID and the target CPU to the GIC controller) to (an)other CPU(s).  This is what we will talk about in this section.</li></ul></li>
+				<li><strong class="bold">Shared peripheral interrupts</strong> (<strong class="bold">SPIs</strong>) (not to be confused with the SPI bus): These are the classical <a id="_idIndexMarker1069"/>interrupts that we have discussed so far. Such interrupts can route to any CPU.</li>
+			</ul>
+			<p>In systems with an interrupt controller that supports private interrupts per core, some of the IRQ controller registers will be banked so that they're only accessible from one core (for example, a core will only be able to read/write its own interrupt configuration). Usually, to be able to do so, some interrupt controller registers are banked per CPU; a CPU can enable its local interrupt by writing to its banked registers.</p>
+			<p>The distributor block and<a id="_idIndexMarker1070"/> the CPU interface block are logically partitioned in the GIC. Interacting with interrupt sources, the distributor block prioritizes interrupts and delivers them to the CPU interface block. The CPU interface block links to the system's processors and manages priority masking and preemption for the processors to which it is linked.</p>
+			<p>The GIC can support up to 8 CPU interfaces, each of which can handle up to 1,020 interrupts. Interrupt ID numbers 0–1019 are assigned by the GIC as follows:</p>
+			<ul>
+				<li>Interrupt numbers 0–31 are interrupts that are private to a CPU interface. These private interrupts are banked in the distributor block and split as follows:<ul><li>SGIs use banked interrupt numbers 0–15.</li><li>PPIs use banked interrupt numbers 16–31. In SMP systems, for example, a per-CPU timer provided by clock event devices can generate such interrupts. </li></ul></li>
+				<li>SPIs use interrupt numbers 32–1,019.</li>
+				<li>The remaining interrupts are reserved, that is, interrupt numbers 1020–1023.</li>
+			</ul>
+			<p>Now that we are familiar with ARM GIC interrupt families, we can focus on the family we are interested in, that is, SGIs.</p>
+			<h2 id="_idParaDest-199"><a id="_idTextAnchor201"/>SGIs and IPIs</h2>
+			<p>In ARM processors, there are<a id="_idIndexMarker1071"/> 16 SGIs, numbered from 0 to 15, but the Linux kernel registers only a few of them: eight (from 0 to 7) to be precise. SGI8 to SGI15 are free for now. Registered SGIs are those defined in <strong class="source-inline">enum ipi_msg_type</strong>, which is defined as the following:</p>
+			<p class="source-code">enum ipi_msg_type {</p>
+			<p class="source-code">    IPI_WAKEUP,</p>
+			<p class="source-code">    IPI_TIMER,</p>
+			<p class="source-code">    IPI_RESCHEDULE,</p>
+			<p class="source-code">    IPI_CALL_FUNC,</p>
+			<p class="source-code">    IPI_CPU_STOP,</p>
+			<p class="source-code">    IPI_IRQ_WORK,</p>
+			<p class="source-code">    IPI_COMPLETION,</p>
+			<p class="source-code">    NR_IPI,</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">    MAX_IPI</p>
+			<p class="source-code">};</p>
+			<p>Their respective descriptions can be found in an array of strings, or <strong class="source-inline">ipi_types</strong>, defined in the following code block:</p>
+			<p class="source-code">static const char *ipi_types[NR_IPI] = {</p>
+			<p class="source-code">    [IPI_WAKEUP] = "CPU wakeup interrupts",</p>
+			<p class="source-code">    [IPI_TIMER] = "Timer broadcast interrupts",</p>
+			<p class="source-code">    [IPI_RESCHEDULE] = "Rescheduling interrupts",</p>
+			<p class="source-code">    [IPI_CALL_FUNC]  = "Function call interrupts",</p>
+			<p class="source-code">    [IPI_CPU_STOP]   = "CPU stop interrupts",</p>
+			<p class="source-code">    [IPI_IRQ_WORK]   = "IRQ work interrupts",</p>
+			<p class="source-code">    [IPI_COMPLETION] = "completion interrupts",</p>
+			<p class="source-code">};</p>
+			<p>IPIs<a id="_idIndexMarker1072"/> are registered in the <strong class="source-inline">set_smp_ipi_range()</strong> function, defined in the following code block:</p>
+			<p class="source-code">void __init set_smp_ipi_range(int ipi_base, int n)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    int i;</p>
+			<p class="source-code">    WARN_ON(n &lt; MAX_IPI);</p>
+			<p class="source-code">    nr_ipi = min(n, MAX_IPI);</p>
+			<p class="source-code">    for (i = 0; i &lt; nr_ipi; i++) {</p>
+			<p class="source-code">        int err;</p>
+			<p class="source-code">        err = request_percpu_irq(ipi_base + i,</p>
+			<p class="source-code">                 ipi_handler, "IPI", &amp;irq_stat);</p>
+			<p class="source-code">        WARN_ON(err);</p>
+			<p class="source-code">        ipi_desc[i] = irq_to_desc(ipi_base + i);</p>
+			<p class="source-code">        irq_set_status_flags(ipi_base + i, IRQ_HIDDEN);</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    ipi_irq_base = ipi_base;</p>
+			<p class="source-code">    /* Setup the boot CPU immediately */</p>
+			<p class="source-code">    ipi_setup(smp_processor_id());</p>
+			<p class="source-code">}</p>
+			<p>In the preceding code block, each IPI is registered with <strong class="source-inline">request_percpu_irq()</strong> on a per-CPU basis. We can see that IPIs have the same handler, <strong class="source-inline">ipi_handler()</strong>, defined as follows:</p>
+			<p class="source-code">static irqreturn_t ipi_handler(int irq, void *data)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    do_handle_IPI(irq - ipi_irq_base);</p>
+			<p class="source-code">    return IRQ_HANDLED;</p>
+			<p class="source-code">}</p>
+			<p>The underlying function executed in the<a id="_idIndexMarker1073"/> handler is <strong class="source-inline">do_handle_IPI()</strong>, defined as follows:</p>
+			<p class="source-code">static void do_handle_IPI(int ipinr)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    unsigned int cpu = smp_processor_id();</p>
+			<p class="source-code">    if ((unsigned)ipinr &lt; NR_IPI)</p>
+			<p class="source-code">        trace_ipi_entry_rcuidle(ipi_types[ipinr]);</p>
+			<p class="source-code">    switch (ipinr) {</p>
+			<p class="source-code">    case IPI_WAKEUP:</p>
+			<p class="source-code">        break;</p>
+			<p class="source-code">#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST</p>
+			<p class="source-code">    case IPI_TIMER:</p>
+			<p class="source-code">        tick_receive_broadcast();</p>
+			<p class="source-code">        break;</p>
+			<p class="source-code">#endif</p>
+			<p class="source-code">    case IPI_RESCHEDULE:</p>
+			<p class="source-code">        scheduler_ipi();</p>
+			<p class="source-code">        break;</p>
+			<p class="source-code">    case IPI_CPU_STOP:</p>
+			<p class="source-code">        ipi_cpu_stop(cpu);</p>
+			<p class="source-code">        break;</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">    default:</p>
+			<p class="source-code">        pr_crit("CPU%u: Unknown IPI message 0x%x\n",</p>
+			<p class="source-code">                cpu, ipinr);</p>
+			<p class="source-code">        break;</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    if ((unsigned)ipinr &lt; NR_IPI)</p>
+			<p class="source-code">         trace_ipi_exit_rcuidle(ipi_types[ipinr]);</p>
+			<p class="source-code">}</p>
+			<p>From the preceding function, </p>
+			<ul>
+				<li><strong class="source-inline">IPI_WAKEUP</strong>: This is<a id="_idIndexMarker1074"/> used to wake up and boot a secondary CPU. It is mostly issued by the boot CPU.</li>
+				<li><strong class="source-inline">IPI_RESCHEDULE</strong>: The <a id="_idIndexMarker1075"/>Linux kernel uses rescheduling interrupts to tell another CPU core to schedule a thread. The scheduler on SMP systems does this to distribute the load over multiple CPU cores. As a general rule, it is ideal to have as many processes running on all the cores in lower power (lower clock frequencies) rather than have one busy core running at full speed while other cores are sleeping. When the scheduler needs to offload work from one core to another sleeping core, the scheduler sends a kernel IPI message to that sleeping core, causing it to wake up from its low-power sleep and begin running a process. These IPI events are reported by <strong class="source-inline">powertop</strong> as <strong class="source-inline">Rescheduling Interrupts</strong>. </li>
+				<li><strong class="source-inline">IPI_TIMER</strong>: This is the <a id="_idIndexMarker1076"/>timer broadcast interrupt. This IPI emulates a timer interrupt on an idle CPU. It is sent by the broadcast clock event/tick device to CPUs represented in <strong class="source-inline">tick_broadcast_mask</strong>, which is the bitmap that represents the list of processors that are in a sleeping mode. Tick devices and broadcast masks are discussed in <a href="B17934_03_Epub.xhtml#_idTextAnchor039"><em class="italic">Chapter 3</em></a>, <em class="italic">Dealing with Kernel Core Helpers</em>.</li>
+				<li><strong class="source-inline">IPI_CPU_STOP</strong>: When a <a id="_idIndexMarker1077"/>kernel panic occurs on one CPU, other CPUs are instructed to dump their stack and to stop execution via the <strong class="source-inline">IPI_CPU_STOP</strong> IPI message. The target CPUs are not shut down or taken offline; instead, they stop execution and are placed in a low-power loop, in<a id="_idIndexMarker1078"/> a <strong class="bold">wait for event</strong> (<strong class="bold">WFE</strong>) state.</li>
+				<li><strong class="source-inline">IPI_CALL_FUNC</strong>: This is <a id="_idIndexMarker1079"/>used to run a function in another processor context.</li>
+				<li><strong class="source-inline">IPI_IRQ_WORK</strong>: This is <a id="_idIndexMarker1080"/>used to run a work in a hardware IRQ context. The kernel offers a bunch of mechanisms to defer works to a later time, especially out of the hardware interrupt context. There might, however, be the occasional need to run a work in a hardware interrupt context and there is no hardware conveniently signaling interrupts at the time. To achieve that, an IPI is used to run the work in a hardware interrupt context. This is mainly used in code running from non-maskable interrupts, which needs to be able to interact with the rest of the system.</li>
+			</ul>
+			<p>On a running system, you can look for available IPIs from the <strong class="source-inline">/proc/interrupt</strong> file, as shown in the following code block:</p>
+			<p class="source-code">root@udoo-labcsmart:~# cat /proc/interrupts | grep IPI</p>
+			<p class="source-code">IPI0:          0          0  CPU wakeup interrupts</p>
+			<p class="source-code">IPI1:         29         22  Timer broadcast interrupts</p>
+			<p class="source-code">IPI2:      84306     322774  Rescheduling interrupts</p>
+			<p class="source-code">IPI3:        970       1264  Function call interruptsIPI4:          0          0  CPU stop interrupts</p>
+			<p class="source-code">IPI5:    2505436    4064821  IRQ work interrupts</p>
+			<p class="source-code">IPI6:          0          0  completion interrupts</p>
+			<p class="source-code">root@udoo-labcsmart:~#</p>
+			<p>In the command output shown here, the first column is the IPI identifier and the last one is the description of the IPI. The columns in between are their respective numbers of executions on each CPU.</p>
+			<h1 id="_idParaDest-200"><a id="_idTextAnchor202"/>Summary</h1>
+			<p>Now, IRQ multiplexing has no more secrets from you. We have discussed the most important element of IRQ management in Linux systems: the IRQ domain API. You have the basics to understand existing interrupt controller drivers, as well as their binding from within the DT. IRQ propagation has been discussed in order to explore what happens between the request and the handler invocation. </p>
+			<p>In the next chapter, we deal with a completely different topic: the Linux device model.</p>
+		</div>
+	</body></html>

@@ -1,0 +1,567 @@
+<html><head></head><body>
+		<div id="_idContainer020">
+			<h1 id="_idParaDest-80"><em class="italic"><a id="_idTextAnchor082"/>Chapter 5</em>: Understanding and Leveraging the Device Tree</h1>
+			<p>The device tree<a id="_idIndexMarker375"/> is an easy-to-read hardware description file, with a JSON-like formatting style. It is a simple tree structure where devices are represented by nodes and their properties. These properties can either be empty (that is, just the key to describe Boolean values) or key-value pairs, where the value can contain an arbitrary byte stream. This chapter is a simple introduction to device trees. Every kernel subsystem or framework has its own device tree binding, and we will talk about those specific bindings when we deal with the relevant topics.</p>
+			<p>The device tree originated<a id="_idIndexMarker376"/> from <strong class="bold">Open Firmware</strong> (<strong class="bold">OF</strong>), which is a standard endorsed by computer companies, and whose main purpose is to define interfaces for computer firmware systems. That said, you can find out more about device tree specification<a id="_idIndexMarker377"/> at <a href="http://www.devicetree.org/">http://www.devicetree.org/</a>. Therefore, this chapter will cover the basics of the device tree, including the following:</p>
+			<ul>
+				<li>Understanding the basic concept of the device tree mechanism </li>
+				<li>Describing data types and their APIs</li>
+				<li>Representing and addressing devices</li>
+				<li>Handling resources</li>
+			</ul>
+			<h1 id="_idParaDest-81"><a id="_idTextAnchor083"/>Understanding the basic concept of the device tree mechanism</h1>
+			<p>The support of the<a id="_idIndexMarker378"/> device tree is enabled in the kernel by setting the <strong class="source-inline">CONFIG_OF</strong> option to <strong class="source-inline">Y</strong>. To pull the device tree API from your driver, you must add the following headers:</p>
+			<p class="source-code">#include &lt;linux/of.h&gt;</p>
+			<p class="source-code">#include &lt;linux/of_device.h&gt;</p>
+			<p>The device tree supports a few data types<a id="_idIndexMarker379"/> and writing conventions that we can summarize with a sample node description:</p>
+			<p class="source-code">/* This is a comment */</p>
+			<p class="source-code">// This is another comment</p>
+			<p class="source-code">node_label: nodename@reg{</p>
+			<p class="source-code">   string-property = "a string";</p>
+			<p class="source-code">   string-list = "red fish", "blue fish";</p>
+			<p class="source-code">   one-int-property = &lt;197&gt;; /* One cell in the property */</p>
+			<p class="source-code">   int-list-property = &lt;0xbeef 123 0xabcd4&gt;;</p>
+			<p class="source-code">   mixed-list-property = "a string", &lt;35&gt;,[0x01 0x23 0x45];</p>
+			<p class="source-code">   byte-array-property = [0x01 0x23 0x45 0x67];</p>
+			<p class="source-code">   boolean-property;</p>
+			<p class="source-code">};</p>
+			<p>In the preceding example, <strong class="source-inline">int-list-property</strong> is a property where each number (or cell) is a 32-bit integer (<strong class="source-inline">uint32</strong>), and there are three cells in this property. Here, <strong class="source-inline">mixed-list-property</strong> is, as its name suggests, a property with mixed element types. </p>
+			<p>The following are some definitions of the data types<a id="_idIndexMarker380"/> used in the device tree:</p>
+			<ul>
+				<li>Text strings are represented with double quotes. You can use commas to create a list of the strings.</li>
+				<li>Cells are 32-bit unsigned integers delimited by angle brackets.</li>
+				<li>Boolean data is nothing more than an empty property. The true or false value depends on the property being there or not.</li>
+			</ul>
+			<p>We have easily enumerated the types of data that can be found in the device tree. Before we start learning about the APIs that can be used to parse this data, first, let's understand how the device tree naming convention works.</p>
+			<h2 id="_idParaDest-82"><a id="_idTextAnchor084"/>The device tree naming convention</h2>
+			<p>Every node <a id="_idIndexMarker381"/>must have a name in the form of <strong class="source-inline">&lt;name&gt;[@&lt;address&gt;]</strong>, where <strong class="source-inline">&lt;name&gt;</strong> is a string that can be up to 31 characters in length, and <strong class="source-inline">[@&lt;address&gt;]</strong> is optional, depending on whether the node represents an addressable device or not. That said, <strong class="source-inline">&lt;address&gt;</strong> should be the primary address used to access the device. For example, for a memory-mapped device, it must correspond to the starting address of its memory region, the bus device address for an I2C device, and the chip-select index (relative to the controller) for an SPI device node. </p>
+			<p>The following presents some examples of device naming:</p>
+			<p class="source-code">i2c@021a0000 {</p>
+			<p class="source-code">    compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";</p>
+			<p class="source-code">    reg = &lt;0x021a0000 0x4000&gt;;</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    expander@20 {</p>
+			<p class="source-code">        compatible = "microchip,mcp23017";</p>
+			<p class="source-code">        reg = &lt;20&gt;;</p>
+			<p class="source-code">        [...]       </p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p>In the preceding device tree excerpt, the I2C controller is a memory-mapped device. Therefore, the address part of the node name corresponds to the beginning of its memory region, relative to the <strong class="bold">System on Chip</strong> (<strong class="bold">SoC</strong>) memory map. However, the expander is an I2C device. Thus, the address part of its node name corresponds to its I2C address.</p>
+			<h2 id="_idParaDest-83"><a id="_idTextAnchor085"/>An introduction to the concept of aliases, labels, phandles, and paths</h2>
+			<p>Aliases, labels, phandles, and paths are<a id="_idIndexMarker382"/> keywords that you need to be familiar with when dealing with the<a id="_idIndexMarker383"/> device tree. It is likely that you will face at least one, if not all, of<a id="_idIndexMarker384"/> these <a id="_idIndexMarker385"/>terms as and when you deal with device drivers. To describe these terms, let's take the following device tree excerpt as an example:</p>
+			<p class="source-code">aliases {</p>
+			<p class="source-code">    ethernet0 = &amp;fec;</p>
+			<p class="source-code">    gpio0 = &amp;gpio1;</p>
+			<p class="source-code">    [...];</p>
+			<p class="source-code">};</p>
+			<p class="source-code">bus@2000000 { /* AIPS1 */</p>
+			<p class="source-code">    gpio1: gpio@209c000 {</p>
+			<p class="source-code">        compatible = "fsl,imx6q-gpio", "fsl,imx35-gpio";</p>
+			<p class="source-code">        reg = &lt;0x0209c000 0x4000&gt;;</p>
+			<p class="source-code">        interrupts = &lt;0 66 IRQ_TYPE_LEVEL_HIGH&gt;,</p>
+			<p class="source-code">                    &lt;0 67 IRQ_TYPE_LEVEL_HIGH&gt;;</p>
+			<p class="source-code">        gpio-controller;</p>
+			<p class="source-code">        #gpio-cells = &lt;2&gt;;</p>
+			<p class="source-code">        interrupt-controller;</p>
+			<p class="source-code">        #interrupt-cells = &lt;2&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">    [...];</p>
+			<p class="source-code">};</p>
+			<p class="source-code">bus@2100000 { /* AIPS2 */</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    i2c1: i2c@21a0000 {</p>
+			<p class="source-code">        compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";</p>
+			<p class="source-code">        reg = &lt;0x021a0000 0x4000&gt;;</p>
+			<p class="source-code">        interrupts = &lt;0 36 IRQ_TYPE_LEVEL_HIGH&gt;;</p>
+			<p class="source-code">        clocks = &lt;&amp;clks IMX6QDL_CLK_I2C1&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p class="source-code">&amp;i2c1 {</p>
+			<p class="source-code">    eeprom-24c512@55 {</p>
+			<p class="source-code">        compatible = "atmel,24c512";</p>
+			<p class="source-code">        reg = &lt;0x55&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">    accelerometer@1d {</p>
+			<p class="source-code">        compatible = "adi,adxl345";</p>
+			<p class="source-code">        reg = &lt;0x1d&gt;;</p>
+			<p class="source-code">        interrupt-parent = &lt;&amp;gpio1&gt;;</p>
+			<p class="source-code">        interrupts = &lt;24 IRQ_TYPE_LEVEL_HIGH&gt;,</p>
+			<p class="source-code">        &lt;25 IRQ_TYPE_LEVEL_HIGH&gt;;</p>
+			<p class="source-code">        [...]</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">};</p>
+			<p>In the device tree, there are two ways in which a node can be referenced: by a path or by a <strong class="bold">phandle</strong>. By referencing a<a id="_idIndexMarker386"/> node using its path, you must explicitly specify the full path of this<a id="_idIndexMarker387"/> node in the device tree source, which might be complicated for a deeply nested node. On the other hand, a phandle is a unique 32-bit value associated with a node that is used to uniquely identify that node. It is assigned to the node through a <strong class="source-inline">phandle</strong> property and, sometimes, duplicated in a <strong class="source-inline">linux,phandle</strong> property for historical reasons.</p>
+			<p>However, the device tree source format allows labels to be attached to any node or property value. Given that a label<a id="_idIndexMarker388"/> must be unique all over the device tree source for a given board, it became obvious that it could be used to identify a node as well, and a decision was made to do so. Thus, logic has been added to the <strong class="bold">device tree compiler</strong> (<strong class="bold">DTC</strong>) so that, whenever a<a id="_idIndexMarker389"/> label name is prefixed with an ampersand (<strong class="source-inline">&amp;</strong>) in a cell property, it is replaced with the phandle of the node to which this label is attached. Moreover, using the same logic, whenever a label is prefixed with an ampersand outside of a cell (a simple value assignment), it is replaced by the full path of the node to which the label is attached. This way, the phandle and path references can be automatically generated by referencing a label instead of explicitly specifying a phandle value or the full path to a node.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Labels<a id="_idIndexMarker390"/> are only used in the <a id="_idIndexMarker391"/>device tree source format and are not encoded within the <strong class="bold">device tree blob</strong> (<strong class="bold">DTB</strong>). Whenever a node is labeled and referenced somewhere else using this label, at compile time, the <strong class="source-inline">dtc</strong> tool will remove that label from the node and add a <strong class="source-inline">phandle</strong> property to that node, generating and assigning a unique 32-bit value. The <strong class="source-inline">dtc</strong> tool will then use this phandle in every cell where the node has been referenced by the label (prefixed with an ampersand).</p>
+			<p>Back to our preceding excerpt, the <strong class="source-inline">gpio@0209c000</strong> node is labeled <strong class="source-inline">gpio1</strong>, and this label is also used as a reference. This will instruct the DTC to generate a phandle for this node. Therefore, in the <strong class="source-inline">accelerometer@1d</strong> node, inside the <strong class="source-inline">interrupt-parent</strong> property, the cell value (<strong class="source-inline">&amp;gpio1</strong>) will be replaced by the phandle of the node to which <strong class="source-inline">gpio1</strong> is attached (the assignment inside a cell). In the same way, inside the <strong class="source-inline">aliases</strong> node, <strong class="source-inline">&amp;gpio1</strong> will be replaced with the full path of the node to which <strong class="source-inline">gpio1</strong> is attached (the assignment outside of a cell).</p>
+			<p>After compiling and decompiling our original device tree excerpt, we obtain the following, where<a id="_idIndexMarker392"/> labels no longer exist and label references have been replaced either by a phandle or by the full node path:</p>
+			<p class="source-code">aliases {</p>
+			<p class="source-code">    gpio0 = "/soc/aips-bus@2000000/gpio@209c000";</p>
+			<p class="source-code">    ethernet0 = "/soc/aips-bus@2100000/ethernet@2188000";</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">};</p>
+			<p class="source-code">aips-bus@2000000 {</p>
+			<p class="source-code">    gpio@209c000 {</p>
+			<p class="source-code">        compatible = "fsl,imx6q-gpio", "fsl,imx35-gpio";</p>
+			<p class="source-code">        gpio-controller;</p>
+			<p class="source-code">        #interrupt-cells = &lt;0x2&gt;;</p>
+			<p class="source-code">        interrupts = &lt;0x0 0x42 0x4 0x0 0x43 0x4&gt;;</p>
+			<p class="source-code">        phandle = &lt;0x40&gt;;</p>
+			<p class="source-code">        reg = &lt;0x209c000 0x4000&gt;;</p>
+			<p class="source-code">        #gpio-cells = &lt;0x2&gt;;</p>
+			<p class="source-code">        interrupt-controller;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p class="source-code">aips-bus@2100000 {</p>
+			<p class="source-code">    i2c@21a8000 {</p>
+			<p class="source-code">        compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";</p>
+			<p class="source-code">        clocks = &lt;0x4 0x7f&gt;;</p>
+			<p class="source-code">        interrupts = &lt;0x0 0x26 0x4&gt;;</p>
+			<p class="source-code">        reg = &lt;0x21a8000 0x4000&gt;;</p>
+			<p class="source-code">        eeprom-24c512@55 {</p>
+			<p class="source-code">            compatible = "atmel,24c512";</p>
+			<p class="source-code">            reg = &lt;0x55&gt;;</p>
+			<p class="source-code">        };</p>
+			<p class="source-code">        accelerometer@1d {</p>
+			<p class="source-code">            compatible = "adi,adxl345";</p>
+			<p class="source-code">            interrupt-parent = &lt;0x40&gt;;</p>
+			<p class="source-code">            interrupts = &lt;0x18 0x4 0x19 0x4&gt;;</p>
+			<p class="source-code">            reg = &lt;0x1d&gt;;</p>
+			<p class="source-code">        };</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p>In the preceding snippet, the accelerometer node has its <strong class="source-inline">interrupt-parent</strong> property cell assigned the value of <strong class="source-inline">0x40</strong>. Looking at the <strong class="source-inline">gpio@209c000</strong> node, we can see that this value corresponds to the value of its <strong class="source-inline">phandle</strong> property, which has been generated at compile time by the DTC. It's the same for the <strong class="source-inline">aliases</strong> node, where the node references have been replaced by their full paths.</p>
+			<p>This leads us to the definition of aliases; aliases are<a id="_idIndexMarker393"/> simply nodes that are referenced via their absolute paths for a quick lookup. The <strong class="source-inline">aliases</strong> node can be seen as a fast lookup table. Unlike labels, aliases do appear in the output device tree, although paths are generated by referencing labels. With an alias, a handle to the node it is referring to is obtained by simply searching for it in the aliases section rather than searching for it in the entire device tree as it is done while looking up by phandle. Aliases can be seen as a shortcut or similar to the aliases we set in our Unix shell to refer to a complete/long/repetitive path/command.</p>
+			<p>The Linux kernel dereferences the aliases rather than using them directly in the device tree source. When using <strong class="source-inline">of_find_node_by_path()</strong> or <strong class="source-inline">of_find_node_opts_by_path()</strong> to find a node given its path, if the supplied path does not start with <strong class="source-inline">/</strong>, then the first element of the path must be a property name in the <strong class="source-inline">/aliases</strong> node. That element is replaced with the full path from the alias.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Labeling a node is only useful if the node is intended to be referenced from the property of another node. You can consider a label as a pointer to a node, either by the path or by the reference.</p>
+			<h2 id="_idParaDest-84"><a id="_idTextAnchor086"/>Understanding overwriting nodes and properties </h2>
+			<p>After taking a closer look at the result of the decompiled excerpt, you should notice one more thing: in the original sources, the <strong class="source-inline">i2c@21a0000</strong> node has been referenced through its label as an external node (<strong class="source-inline">&amp;i2c1 { [...] }</strong>) with some content inside. However, oddly, after decompiling, the final content of the <strong class="source-inline">i2c@21a0000</strong> node has been merged with the content of the external reference, and the external reference node no longer exists.</p>
+			<p>This is<a id="_idIndexMarker394"/> the third usage of labels: allowing you to overwrite nodes and <a id="_idIndexMarker395"/>properties. In the external reference, any new content (such as nodes or properties) will be appended to the original node content at compile time. However, in the case of duplication (either nodes or properties), the content of the external reference will take precedence over the original content.</p>
+			<p>Consider the following example:</p>
+			<p class="source-code">bus@2100000 { /* AIPS2 */</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    i2c1: i2c@21a0000 {</p>
+			<p class="source-code">        [...]</p>
+			<p class="source-code">        status = "disabled";</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p>Let's reference the <strong class="source-inline">i2c@21a0000</strong> node through its <strong class="source-inline">i2c1</strong> label, as follows:</p>
+			<p class="source-code">&amp;i2c1 {</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    status = "okay";</p>
+			<p class="source-code">};</p>
+			<p>We will see that the result from the compilation will be the <strong class="source-inline">status</strong> property having the value of <strong class="source-inline">"okay"</strong>. This is because the content of the external reference will have taken precedence over the original content.</p>
+			<p>To summarize, latter definitions always overwrite earlier definitions. For entire nodes to be overwritten, you simply have to redefine them as you would do so for properties.</p>
+			<h2 id="_idParaDest-85"><a id="_idTextAnchor087"/>Device tree sources and compilers</h2>
+			<p>The <strong class="bold">device tree</strong> (also referred to as <strong class="bold">DT</strong>) comes in two forms. The first is the textual form, which represents the sources (also referred to as <strong class="bold">DTS</strong>). And the second is the binary blob form, which represents the compiled device tree, also referred<a id="_idIndexMarker396"/> to as <strong class="bold">DTB</strong> (for <strong class="bold">device tree blob</strong>) or <strong class="bold">FDT</strong> (for <strong class="bold">flattened device tree</strong>). Source files have a <strong class="source-inline">.dts</strong> extension, while the<a id="_idIndexMarker397"/> binary forms have either a <strong class="source-inline">.dtb</strong> or <strong class="source-inline">.dtbo</strong> extension. .<strong class="source-inline">dtbo</strong> is a particular extension that is used for compiled device tree<a id="_idIndexMarker398"/> overlays (<strong class="bold">DTBO</strong> means <strong class="bold">device tree blob for overlay</strong>), as we will see in the next section. There are also <strong class="source-inline">.dtsi</strong> text files (where the <strong class="source-inline">i</strong> at the end means "include"). These host SoC-level definitions and are intended to be included in <strong class="source-inline">.dts</strong> files, hosting the board-level definitions.</p>
+			<p>The syntax of the device tree<a id="_idIndexMarker399"/> allows you to use <strong class="source-inline">/include/</strong> or <strong class="source-inline">#include</strong> to include other <a id="_idIndexMarker400"/>files. This inclusion mechanism makes it possible to use <strong class="source-inline">#define</strong>, but above all, it allows you to factorize the common aspects of several platforms in the shared files.</p>
+			<p>This factorization allows you to split the source files into tree levels, with the most common being the <a id="_idIndexMarker401"/>SoC level, which is provided by the SoC vendor (for example, NXP), the <strong class="bold">System on Module</strong> (<strong class="bold">SoM</strong>) level (for example, Engicam), and, finally, the carrier board or customer board level.</p>
+			<p>Therefore, all electronic boards using the same SoC do not redefine all of the peripherals of the SoC from scratch: this description is factored into a common file. By convention, such <em class="italic">common</em> files use the <strong class="source-inline">.dtsi</strong> extension, while final device trees use the <strong class="source-inline">.dts</strong> extension.</p>
+			<p>In the Linux kernel sources, ARM device tree source files can be found under the <strong class="source-inline">arch/arm/boot/dts/</strong> and <strong class="source-inline">arch/arm64/boot/dts/&lt;vendor&gt;/</strong> directories for the 32-bit and 64-bit ARM SoCs/boards, respectively. In either directory, there is a <strong class="source-inline">Makefile</strong> file that lists the device tree source files that can be compiled. </p>
+			<p>The utility used to compile the DTS files into DTB files is called DTC. The DTC sources exist in two places:</p>
+			<ul>
+				<li><strong class="bold">As a standalone upstream project</strong>: The DTC upstream project is maintained in <a href="https://git.kernel.org/cgit/utils/dtc/dtc.git">https://git.kernel.org/cgit/utils/dtc/dtc.git</a>. It is pulled into the Linux kernel source tree on a <a id="_idIndexMarker402"/>regular basis.</li>
+				<li><strong class="bold">In-kernel</strong>: The <a id="_idIndexMarker403"/>Linux version of the DTC can be found in the kernel source directory under <strong class="source-inline">scripts/dtc/</strong>. New versions are pulled from the upstream project on a regular basis. The DTC is built by the Linux kernel build process as a dependency when needed (for example, before compiling the device tree). You can use the <strong class="source-inline">make scripts</strong> command if you wish to build it explicitly in the Linux kernel source tree.</li>
+			</ul>
+			<p>From the main<a id="_idIndexMarker404"/> directory in the kernel sources, you can either compile a specific<a id="_idIndexMarker405"/> device tree or all device trees for a specific SoC. In either case, the appropriate config option to enable this or these device tree files must be enabled. For a single device tree compilation, the make target is the name of the <strong class="source-inline">.dts</strong> file with <strong class="source-inline">.dts</strong> changed to <strong class="source-inline">.dtb</strong>. For all of the enabled device trees to be compiled, the make target that you should use is <strong class="source-inline">dtbs</strong>. In both cases, you should make sure that the config option that enables the <strong class="source-inline">dtb</strong> has been set.</p>
+			<p>Consider the following excerpt from <strong class="source-inline">arch/arm/boot/dts/Makefile</strong>:</p>
+			<p class="source-code">dtb-$(CONFIG_SOC_IMX6Q) += \</p>
+			<p class="source-code">    imx6dl-alti6p.dtb \</p>
+			<p class="source-code">    imx6dl-aristainetos_7.dtb \</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">    imx6q-hummingboard.dtb \</p>
+			<p class="source-code">    imx6q-hummingboard2.dtb \</p>
+			<p class="source-code">    imx6q-hummingboard2-emmc-som-v15.dtb \</p>
+			<p class="source-code">    imx6q-hummingboard2-som-v15.dtb \</p>
+			<p class="source-code">    imx6q-icore.dtb \</p>
+			<p class="source-code">[...]</p>
+			<p>By enabling <strong class="source-inline">CONFIG_SOC_IMX6Q</strong>, you can either compile all of the device tree files listed in there or target a specific device tree. By running <strong class="source-inline">make dtbs</strong>, the kernel DTC will compile all the device tree files listed in the enabled config options.</p>
+			<p>First, let's make sure the appropriate config option has been set:</p>
+			<p class="source-code">$ grep CONFIG_SOC_IMX6Q .config</p>
+			<p class="source-code">CONFIG_SOC_IMX6Q =y</p>
+			<p>Then, let's compile all of the device tree files:</p>
+			<p class="source-code">ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- make dtbs</p>
+			<p>Assuming our platform is an ARM64 platform, we would use the following:</p>
+			<p class="source-code">ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make dtbs</p>
+			<p>Once again, the <a id="_idIndexMarker406"/>right kernel config options must be set.</p>
+			<p>You could target a <a id="_idIndexMarker407"/>particular device tree build (let's say <strong class="source-inline">imx6q-hummingboard2.dts</strong>), using a command such as the following:</p>
+			<p class="source-code">ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- make imx6q-hummingboard2.dtb</p>
+			<p>It must be noted that, given a compiled device tree (<strong class="source-inline">.dtb</strong>) file, you can do the reverse operation and extract the source (<strong class="source-inline">.dts</strong>) file:</p>
+			<p class="source-code">$ dtc -I dtb -O dts arch/arm/boot/dts/imx6q-hummingboard2.dtb &gt; path/to/my_devicetree.dts</p>
+			<p>For debug purposes, it might be useful to expose to user space the current device tree of a running system, that is, the so-called live device tree. To do so, the kernel <strong class="source-inline">CONFIG_PROC_DEVICETREE</strong> config option must be enabled. Then, you can explore and walk through the device tree in the <strong class="source-inline">/proc/device-tree</strong> directory.</p>
+			<p>If installed on the running system, the DTC can be used to convert the filesystem tree into a more readable form using the following command:</p>
+			<p class="source-code"># dtc -I fs -O dts /sys/firmware/devicetree/base &gt; MySBC.dts</p>
+			<p>After this command returns, the <strong class="source-inline">MySBC.dts</strong> file will contain the sources corresponding to the current device tree.</p>
+			<h3>The device tree overlay</h3>
+			<p>Device tree overlaying is<a id="_idIndexMarker408"/> a mechanism that allows you to patch a live device tree, that is, modify the current device tree at runtime. It allows you to update the current device tree at runtime by updating existing nodes and properties or creating new ones. However, it does not allow you to delete a node or a property.</p>
+			<p>A device tree overlay has the following format:</p>
+			<p class="source-code">/dts-v1/;</p>
+			<p class="source-code">/plugin/; /* allow undefined label references and record them */</p>
+			<p class="source-code">/{</p>
+			<p class="source-code">    fragment@0 { /* first child node */</p>
+			<p class="source-code">        target=&lt;phandle&gt;; /* phandle of the target node to extend */</p>
+			<p class="source-code">    or</p>
+			<p class="source-code">        target-path="/path"; /* full path of the node to extend */</p>
+			<p class="source-code">        __overlay__ {</p>
+			<p class="source-code">            property-a;  /* add property-a to the target */</p>
+			<p class="source-code">            property-b = &lt;0x80&gt;; /* update property-b value */</p>
+			<p class="source-code">            node-a { /* add to an existing, or create a node-a */</p>
+			<p class="source-code">                    ...</p>
+			<p class="source-code">            };</p>
+			<p class="source-code">        };</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">    fragment@1 {</p>
+			<p class="source-code">         /* second fragment overlay ... */</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">    /* more fragments follow */</p>
+			<p class="source-code">}</p>
+			<p>From the <a id="_idIndexMarker409"/>preceding excerpt, we can note that each node from the base device tree that needs to be overlayed must be enclosed inside a <strong class="source-inline">fragment</strong> node in the overlay device tree.</p>
+			<p>Then, each fragment has two elements:</p>
+			<ul>
+				<li>One of these two properties could be as follows:<ul><li><strong class="source-inline">target-path</strong>: This specifies the absolute path to the node that the fragment will modify.</li><li><strong class="source-inline">target</strong>: This specifies the relative path to the node alias (prefixed with an ampersand symbol) that the fragment will modify.</li></ul></li>
+				<li>A node, named <strong class="source-inline">__overlay__</strong>, that contains the changes that should be applied to the referred node. Such changes can be new nodes (which are added), new properties (which are added), or existing properties (which are overridden with the new value). There is no removal operation possible since a property or a node cannot be removed.</li>
+			</ul>
+			<p>Now that we are comfortable with the basics of device tree overlaying, we can learn how they are compiled and turned into a binary blob that can be loaded on demand.</p>
+			<h4>Building device tree overlays</h4>
+			<p>Unless a device<a id="_idIndexMarker410"/> tree overlay adds new nodes under the root node only (in which case, it could specify <strong class="source-inline">/</strong> in the <strong class="source-inline">target-path</strong> property in the fragment), it would be much easier to specify the target node via its phandle (<strong class="source-inline">&lt;&amp;label_name&gt;</strong>) as it would save us from manually computing the node's full path (especially if it is nested).</p>
+			<p>The thing is, there is no direct correlation or link between the base device tree and the overlay. They are each built, standalone, on their sides. Therefore, referencing a remote node (that is, a node in the base device tree) from the device tree overlay will raise errors, and the build of the overlay will fail because of undefined references or labels. It would be like building a dynamically linked application without room for symbol resolution.</p>
+			<p>To address this issue, <strong class="source-inline">-@</strong> command-line flag support has been added to the DTC. This flag must be specified for both the base device tree and all of the overlays to be compiled. It will instruct the DTC to generate extra nodes in the root (such as <strong class="source-inline">__symbols__</strong>, <strong class="source-inline">__fixups__</strong>, and <strong class="source-inline">__local_fixups__</strong>) that contain resolution data for the translation of phandle names. These extra nodes are spread as follows:</p>
+			<ul>
+				<li>When the <strong class="source-inline">-@</strong> option is added to build an overlay, it recognizes the <strong class="source-inline">/plugin/;</strong> line that marks a device tree fragment/object. That line controls the generation of <strong class="source-inline">__fixups__</strong> and <strong class="source-inline">__local_fixups__</strong> nodes.</li>
+				<li>When the <strong class="source-inline">-@</strong> option is added to build the base device tree, <strong class="source-inline">/plugin/;</strong> is not present, so the source is recognized as being the base device tree, which causes the generation of <strong class="source-inline">__symbols__</strong> nodes only.</li>
+			</ul>
+			<p>These extra<a id="_idIndexMarker411"/> nodes add room for symbol resolution.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Support for the <strong class="source-inline">-@</strong> option can only be found in <strong class="source-inline">dtc</strong> version 1.4.4 or later. Only Linux kernel versions v4.14 or higher includes a built-in version of <strong class="source-inline">dtc</strong> that meets this requirement. This option is not needed if only <strong class="source-inline">target-path</strong> properties (that is, non-phandle-based) are used in the device tree overlay.</p>
+			<p>Building a binary device tree overlay follows the same process as building a traditional binary device tree. For example, let's consider the following base device tree. Let's call it <strong class="source-inline">base.dts</strong>:</p>
+			<p class="source-code">/dts-v1/;</p>
+			<p class="source-code">/ {</p>
+			<p class="source-code">        foo: foonode {</p>
+			<p class="source-code">                foo-bool-property;</p>
+			<p class="source-code">                foo-int-property = &lt;0x80&gt;;</p>
+			<p class="source-code">                status = "disabled";</p>
+			<p class="source-code">        };</p>
+			<p class="source-code">};</p>
+			<p>Then, let's build this base device tree with the following command:</p>
+			<p class="source-code">dtc -@ -I dts -O dtb -o base.dtb base.dts</p>
+			<p>In the next step, let's<a id="_idIndexMarker412"/> consider the following device tree overlay. Let's call it <strong class="source-inline">foo-verlay.dts</strong>:</p>
+			<p class="source-code">/dts-v1/;</p>
+			<p class="source-code">/plugin/;</p>
+			<p class="source-code">/ {</p>
+			<p class="source-code">        fragment@1 {</p>
+			<p class="source-code">                target = &lt;&amp;foo&gt;;</p>
+			<p class="source-code">                __overlay__ {</p>
+			<p class="source-code">                        overlay-1-property;</p>
+			<p class="source-code">                        status = "okay";</p>
+			<p class="source-code">                        bar: barnode {</p>
+			<p class="source-code">                                bar-property;</p>
+			<p class="source-code">                        };</p>
+			<p class="source-code">                };</p>
+			<p class="source-code">        };</p>
+			<p class="source-code">};</p>
+			<p>In the preceding device tree overlay, the <strong class="source-inline">status</strong> property of the <strong class="source-inline">foo</strong> node in the base device tree has been modified from <strong class="source-inline">disabled</strong> to <strong class="source-inline">okay</strong>, which will activate this node. Following this, the <strong class="source-inline">overlay-1-property</strong> Boolean property has been added, and finally, a <strong class="source-inline">bar</strong> sub-node has been added with a single Boolean property. This device tree overlay can be compiled with the following command:</p>
+			<p class="source-code">dtc -@ -I dts -O dtb -o foo-overlay.dtbo foo-overlay.dts</p>
+			<p>As you can see, the <strong class="source-inline">-@</strong> flag has <a id="_idIndexMarker413"/>been added on both sides, enabling room for symbol resolution.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">In the Yocto build system, you could add this flag to the machine configuration or, during development, to the <strong class="source-inline">local.conf</strong> file, as follows: <strong class="source-inline">DEVICETREE_FLAGS += "-@"</strong>.</p>
+			<p>For the Linux kernel to build the device tree overlay, you should add it to the <strong class="source-inline">Makefile</strong> device tree of your SoC architecture, for example, <strong class="source-inline">arch/arm64/boot/dts/freescale/Makefile</strong> or <strong class="source-inline">arm/arm/boot/dts/Makefile</strong>, along with the <strong class="source-inline">dtbo</strong> extension, as follows:</p>
+			<p class="source-code">dtb-y += foo-overlay.dtbo</p>
+			<p>Now that we can manage to build our own device tree overlays, let's consider the logical next step, which consists of loading these overlays into the system.</p>
+			<h4>Loading device tree overlays via configfs</h4>
+			<p>This section is named<a id="_idIndexMarker414"/> such that it mentions the way <a id="_idIndexMarker415"/>the device tree overlay is going to be loaded (configfs) since there is not only one way to load device tree overlays. In this section, we will focus on doing this on a running system whose kernel has already booted and the root filesystem is already mounted. </p>
+			<p>In order to do this, your kernel must have been compiled with <strong class="source-inline">CONFIG_OF_OVERLAY</strong> and <strong class="source-inline">CONFIG_CONFIGFS</strong> for the following steps to work. The following is a check, assuming the kernel config is available in the target:</p>
+			<p class="source-code">~# zcat /proc/config.gz | grep CONFIGFS</p>
+			<p class="source-code">CONFIG_CONFIGFS_FS=y</p>
+			<p class="source-code">~# zcat /proc/config.gz | grep OF_OVERLAY</p>
+			<p class="source-code">CONFIG_OF_OVERLAY=y</p>
+			<p class="source-code">~# </p>
+			<p>Now it's time to insert the DTBs into a running kernel using <strong class="source-inline">configfs</strong>. First, we mount the <strong class="source-inline">configfs</strong> filesystem if it has not already been mounted on your system:</p>
+			<p class="source-code"># mount -t configfs none /sys/kernel/config</p>
+			<p>When <strong class="source-inline">configfs</strong> has been mounted properly, the directory should be populated with base subdirectories (<strong class="source-inline">device-tree/overlays</strong>), which, according to our mount path, will result in <strong class="source-inline">/sys/kernel/config/device-tree/overlays</strong>, as demonstrated in the following:</p>
+			<p class="source-code"># mkdir -p /sys/kernel/config/device-tree/overlays/</p>
+			<p>Then, each overlay entry must be added from within the <strong class="source-inline">overlays</strong> directory. It has to be noted that overlay entries are created and manipulated using a standard filesystem I/O.</p>
+			<p>To load an overlay, a directory corresponding to this overlay must be created under the <strong class="source-inline">overlays</strong> directory. For our example, let's use the name <strong class="source-inline">foo</strong> :</p>
+			<p class="source-code"># mkdir /sys/kernel/config/device-tree/overlays/foo</p>
+			<p>Next, to effectively load the overlay, you can <strong class="source-inline">echo</strong> the overlay firmware file path to the <strong class="source-inline">path</strong> property file, as follows:</p>
+			<p class="source-code"># echo /path/to/foo-overlay.dtbo &gt; /sys/kernel/config/device-tree/overlays/foo/path</p>
+			<p>Alternatively, you can <strong class="source-inline">cat</strong> the contents of the overlay to the <strong class="source-inline">dtbo</strong> file:</p>
+			<p class="source-code"># cat foo.dtbo &gt; /sys/kernel/config/device-tree/overlays/foo/dtbo</p>
+			<p>After that, the overlay file will be applied, and devices will be created/destroyed as required.</p>
+			<p>To remove the <a id="_idIndexMarker416"/>overlay and undo its changes, you <a id="_idIndexMarker417"/>should simply <strong class="source-inline">rmdir</strong> the corresponding overlay directory. In our example, it should be as follows:</p>
+			<p class="source-code"># rmdir /sys/kernel/config/device-tree/overlays/foo</p>
+			<p>Although you have loaded the device tree overlay dynamically, it won't be sufficient; the device driver for the added device node needs to be loaded for the device to work unless this driver is built-in and enabled (that is, selected with <strong class="source-inline">y</strong> during <strong class="source-inline">make menuconfig</strong>).</p>
+			<p>At this stage, we are done with our device tree compilation-related stuff. Now, we can learn how to write our own device trees, starting with device addressing and representation.</p>
+			<h1 id="_idParaDest-86"><a id="_idTextAnchor088"/>Representing and addressing devices</h1>
+			<p>In the device tree, a node<a id="_idIndexMarker418"/> is the representational unit of a device. In other words, a device is represented by at least one node. Following this, device nodes can either be populated with other nodes (therefore, creating a parent-child relationship) or with properties (which would describe the device corresponding to the node they populate). </p>
+			<p>While each device can<a id="_idIndexMarker419"/> operate standalone, there are situations where a device might <a id="_idIndexMarker420"/>want to be accessed by its parent or where a parent might want to access one of its children. For example, such situations occur when a bus controller (the parent node) wants to access one or more of the devices (declared as a sub-node) sitting on its bus. Typical examples include I2C controllers and I2C devices, SPI controllers and SPI devices, CPUs and memory-mapped devices, and more. Thus, the concept of device addressing has emerged. Device addressing has been introduced with a <strong class="source-inline">reg</strong> property, which is used in each addressable device but whose meaning or interpretation depends on the parent (most of the time, they are bus controllers). The meaning and interpretation of <strong class="source-inline">reg</strong> in a child device depends on the <strong class="source-inline">#address-cells</strong> and <strong class="source-inline">#size-cells</strong> properties of its parent. The <strong class="source-inline">#</strong> (sharp) character that prefixes <strong class="source-inline">size-cells</strong> and <strong class="source-inline">address-cells</strong> can be considered to mean "length of."</p>
+			<p>Each addressable device gets a <strong class="source-inline">reg</strong> property that is a list of tuples in the form of <strong class="source-inline">reg = &lt;address0 size0 [address1 size1] [address2 size2] ... &gt;</strong>, where each tuple represents an address range used by the device. <strong class="source-inline">#size-cells</strong> indicates how many 32-bit cells are used to represent the size, which might be 0 if the size is not relevant. On the other hand, <strong class="source-inline">#address-cells</strong> indicates how many 32-bit cells are used to represent the address. In other words, the address element of each tuple is interpreted according to <strong class="source-inline">#address-cells</strong>; this uses the same size as the size element, which is interpreted according to <strong class="source-inline">#size-cells</strong>.</p>
+			<p>To sum up, addressable <a id="_idIndexMarker421"/>devices inherit from the <strong class="source-inline">#size-cell</strong> and <strong class="source-inline">#address-cell</strong> properties<a id="_idIndexMarker422"/> of their parent, which is the node that represents the bus controller most of the time. The presence of <strong class="source-inline">#size-cell</strong> and <strong class="source-inline">#address-cell</strong> in a given device does not affect the device itself but its children if they are addressable.</p>
+			<p>Now that we have seen how addressing works in a general manner, let's address specific addressing for non-discoverable devices, starting with SPI and I2C.</p>
+			<h2 id="_idParaDest-87"><a id="_idTextAnchor089"/>Handling SPI and I2C device addressing</h2>
+			<p>SPI and I2C devices<a id="_idIndexMarker423"/> both belong to non-memory-mapped devices because <a id="_idIndexMarker424"/>their addresses are not accessible to the CPU. Instead, the parent device's driver (the bus controller driver) will perform indirect access on behalf of the CPU. Each I2C/SPI device node is always represented as a sub-node of the I2C/SPI controller node that the device sits on. For a non-memory-mapped device, the <strong class="source-inline">#size-cells</strong> property is 0, and the size element in the addressing tuple is empty. This means that the <strong class="source-inline">reg</strong> property for this kind of device is always one cell. The following is an example:</p>
+			<p class="source-code">&amp;i2c3 {</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    status = "okay";</p>
+			<p class="source-code">    temperature-sensor@49 {</p>
+			<p class="source-code">        compatible = "national,lm73";</p>
+			<p class="source-code">        reg = &lt;0x49&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">    pcf8523: rtc@68 {</p>
+			<p class="source-code">        compatible = "nxp,pcf8523";</p>
+			<p class="source-code">        reg = &lt;0x68&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p class="source-code">&amp;ecspi1 {</p>
+			<p class="source-code">    fsl,spi-num-chipselects = &lt;3&gt;;</p>
+			<p class="source-code">    cs-gpios = &lt;&amp;gpio5 17 0&gt;, &lt;&amp;gpio5 17 0&gt;, &lt;&amp;gpio5 17 0&gt;;</p>
+			<p class="source-code">    status = "okay";</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    ad7606r8_0: ad7606r8@1 {</p>
+			<p class="source-code">        compatible = "ad7606-8";</p>
+			<p class="source-code">        reg = &lt;1&gt;;</p>
+			<p class="source-code">        spi-max-frequency = &lt;1000000&gt;;</p>
+			<p class="source-code">        interrupt-parent = &lt;&amp;gpio4&gt;;</p>
+			<p class="source-code">        interrupts = &lt;30 0x0&gt;;</p>
+			<p class="source-code">        convst-gpio = &lt;&amp;gpio6 18 0&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p>If you look at the SoC-level file in <strong class="source-inline">arch/arm/boot/dts/imx6qdl.dtsi</strong>, you will notice that <strong class="source-inline">#size-cells</strong> and <strong class="source-inline">#address-cells</strong> are set to <strong class="source-inline">0</strong>, for the former, and <strong class="source-inline">1</strong>, for the latter, respectively, in both the I2C and SPI controller nodes (labeled <strong class="source-inline">i2c3</strong> and <strong class="source-inline">ecspi1</strong>). This helps you to<a id="_idIndexMarker425"/> understand their <strong class="source-inline">reg</strong> property, which is only one cell for the address value and none for the size value.</p>
+			<p>The I2C device's <strong class="source-inline">reg</strong> property <a id="_idIndexMarker426"/>is used to specify the device's address on the bus. For SPI devices, <strong class="source-inline">reg</strong> represents the index of the chip-select line assigned to the device among the list of chip selects the controller node has. For example, for the <strong class="source-inline">ad7606r8</strong> ADC, the chip-select index is 1, which corresponds to <strong class="source-inline">&lt;&amp;gpio5 17 0&gt;</strong> in <strong class="source-inline">cs-gpios.</strong> This is the list of chip selects of the controller node. The binding of other controllers might differ, and you should refer to their documentation in<em class="italic"> </em><strong class="source-inline">Documentation/devicetree/bindings/spi</strong>.</p>
+			<h2 id="_idParaDest-88"><a id="_idTextAnchor090"/>Memory-mapped devices and device addressing</h2>
+			<p>This section <a id="_idIndexMarker427"/>addresses simple memory-mapped devices where the memory region<a id="_idIndexMarker428"/> is accessible by the CPU. With such device nodes, the <strong class="source-inline">reg</strong> property still defines the device's address, and the <strong class="source-inline">reg = &lt;address0 size0 [address1 size1] [address2 size2] ... &gt;</strong> pattern takes place. Each region is represented with a tuple of cells, where the first cell is the base address of the memory region, and the second cell is the size of the region. It could be translated into the following pattern: <strong class="source-inline">reg = &lt;base0 length0 [base1 length1] [address2 length2] ... &gt;</strong>. Here, each tuple represents an address range used by the device.</p>
+			<p>Let's consider the following example:</p>
+			<p class="source-code">soc {</p>
+			<p class="source-code">    #address-cells = &lt;1&gt;;</p>
+			<p class="source-code">    #size-cells = &lt;1&gt;;</p>
+			<p class="source-code">    compatible = "simple-bus";</p>
+			<p class="source-code">    aips-bus@02000000 { /* AIPS1 */</p>
+			<p class="source-code">        compatible = "fsl,aips-bus", "simple-bus";</p>
+			<p class="source-code">        #address-cells = &lt;1&gt;;</p>
+			<p class="source-code">        #size-cells = &lt;1&gt;;</p>
+			<p class="source-code">        reg = &lt;0x02000000 0x100000&gt;;</p>
+			<p class="source-code">        [...];</p>
+			<p class="source-code">        spba-bus@02000000 {</p>
+			<p class="source-code">            compatible = "fsl,spba-bus", "simple-bus";</p>
+			<p class="source-code">            #address-cells = &lt;1&gt;;</p>
+			<p class="source-code">            #size-cells = &lt;1&gt;;</p>
+			<p class="source-code">             reg = &lt;0x02000000 0x40000&gt;;</p>
+			<p class="source-code">             [...]</p>
+			<p class="source-code">    </p>
+			<p class="source-code">            ecspi1: ecspi@02008000 {</p>
+			<p class="source-code">                #address-cells = &lt;1&gt;;</p>
+			<p class="source-code">                #size-cells = &lt;0&gt;;</p>
+			<p class="source-code">                compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";</p>
+			<p class="source-code">                reg = &lt;0x02008000 0x4000&gt;;</p>
+			<p class="source-code">                [...]</p>
+			<p class="source-code">            };</p>
+			<p class="source-code"> </p>
+			<p class="source-code">            i2c1: i2c@021a0000 {</p>
+			<p class="source-code">                #address-cells = &lt;1&gt;;</p>
+			<p class="source-code">                #size-cells = &lt;0&gt;;</p>
+			<p class="source-code">                compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";</p>
+			<p class="source-code">                reg = &lt;0x021a0000 0x4000&gt;;</p>
+			<p class="source-code">              [...]</p>
+			<p class="source-code">            };</p>
+			<p class="source-code">        };</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p>In the preceding<a id="_idIndexMarker429"/> excerpt, device nodes that have <strong class="source-inline">simple-bus</strong> in their <strong class="source-inline">compatible</strong> properties <a id="_idIndexMarker430"/>are SoC internal memory-mapped bus controllers connecting IP cores (such as I2C, SPI, USB, Ethernet, and other internal SoC IPs) to the CPU. Their sub-nodes, which are either IP core or other internal buses, inherit from the <strong class="source-inline">#address-cells</strong> and <strong class="source-inline">#size-cells</strong> properties. We can see that the <strong class="source-inline">i2c@021a0000</strong> I2C controller (labeled <strong class="source-inline">i2c1</strong>) is connected to the <strong class="source-inline">spba-bus@02000000</strong> bus. All of them will appear as platform devices on the system at runtime. On the other hand, this I2C controller changes its addressing scheme by defining its own <strong class="source-inline">#address-cells</strong> and <strong class="source-inline">#size-cells</strong> properties, which the I2C devices connected to it will inherit. This is the same for the SPI controller.</p>
+			<p>To summarize, in the real world, you should not interpret a <strong class="source-inline">reg</strong> property in a node without knowing the <strong class="source-inline">#size-cells</strong> and <strong class="source-inline">#address-cells</strong> properties of its parent. Memory-mapped devices must have the <strong class="source-inline">size</strong> field of their <strong class="source-inline">reg</strong> property set with the size of the memory regions of the devices, but also the <strong class="source-inline">address</strong> field, which must be defined such that it corresponds to the beginning of the device memory regions in the SoC memory map, as shown in the SoC datasheet.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The simple-bus-compatible string also indicates that the bus has no special driver, that there's no way to dynamically probe the bus, and that direct child nodes (exclusively, level-1 children) will be registered as platform devices. Sometimes, this is used in board-level device trees to instantiate GPIO-based fixed regulators. </p>
+			<h1 id="_idParaDest-89"><a id="_idTextAnchor091"/>Handling resources</h1>
+			<p>The main purpose of a<a id="_idIndexMarker431"/> device driver is to provide a set of driving functions for a given device and expose its capabilities to users. Here, the objective is to gather the device's configuration parameters, especially resources (such as the memory region, interrupt line, DMA channel, and more) that will help the driver to perform its job.</p>
+			<h2 id="_idParaDest-90"><a id="_idTextAnchor092"/>The struct resource</h2>
+			<p>Once <a id="_idIndexMarker432"/>probed, device resources assigned to the device (either in the device or the board/machine file) are gathered and allocated either by <strong class="source-inline">of_platform</strong> or by the <strong class="source-inline">platform</strong> cores using <strong class="source-inline">struct resource</strong>, as follows:</p>
+			<p class="source-code">struct resource {</p>
+			<p class="source-code">    resource_size_t start;</p>
+			<p class="source-code">    resource_size_t end;</p>
+			<p class="source-code">    const char *name;</p>
+			<p class="source-code">    unsigned long flags;</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">};</p>
+			<p>The following lists the meanings of the elements in the data structure:</p>
+			<ul>
+				<li><strong class="source-inline">start</strong>: Depending on the resource flag, this can be the starting address of a memory region, an IRQ line number, a DMA channel number, or a register offset.</li>
+				<li><strong class="source-inline">end</strong>: This is the end of the memory region or the end of the register offset. In the case of an IRQ or DMA channel, most of the time, the <strong class="source-inline">start</strong> and <strong class="source-inline">end</strong> values are the same.</li>
+				<li><strong class="source-inline">name</strong>: This is the name of the resource if any. We discuss it in more detail in the next section.</li>
+				<li><strong class="source-inline">flags</strong>: This indicates the type of resource. Possible values include the following:<ul><li><strong class="source-inline">IORESOURCE_IO</strong>: This <a id="_idIndexMarker433"/>indicates the PCI/ISA I/O port region. <strong class="source-inline">start</strong> is the first port of the region, and <strong class="source-inline">end</strong> is the last one.</li><li><strong class="source-inline">IORESOURCE_MEM</strong>: This is used for the I/O memory regions. <strong class="source-inline">start</strong> indicates the starting address of the region, and <strong class="source-inline">end</strong> indicates where it ends.</li><li><strong class="source-inline">IORESOURCE_REG</strong>: This refers to the register offsets. It is mostly used with MFD devices. <strong class="source-inline">start</strong> indicates the offset relative to a parent device register, and <strong class="source-inline">end</strong> indicates where the register section ends.</li><li><strong class="source-inline">IORESOURCE_IRQ</strong>: The resource is an IRQ line number. In this case, either both <strong class="source-inline">start</strong> and <strong class="source-inline">end</strong> have the same value or <strong class="source-inline">end</strong> is irrelevant.</li><li><strong class="source-inline">IORESOURCE_DMA</strong>: This indicates that the resource is a DMA channel number. You should consider <strong class="source-inline">end</strong> in the same way as an IRQ. However, what happens when you have more than one cell for the DMA channel identifier or when you have multiple DMA controllers is not very well defined. <strong class="source-inline">IORESOURCE_DMA</strong> is not scalable for multiple controller systems. </li></ul></li>
+			</ul>
+			<p>There is one instance of this data structure allocated per resource. That means, for a device that is assigned two memory regions and one IRQ line, there will be three data structures allocated. Moreover, resources of the same type will be allocated and indexed (starting from 0) in the order they are declared in the device tree (or the board file). This means that the first memory region assigned will have index 0, and so on.</p>
+			<p>To get the appropriate resource, we will use a generic API, <strong class="source-inline">platform_get_resource()</strong>, given the resource type and its index in this type. This function is defined as follows:</p>
+			<p class="source-code">struct resource *platform_get_resource(</p>
+			<p class="source-code">                      struct platform_device *dev,</p>
+			<p class="source-code">                      unsigned int type, unsigned int num)</p>
+			<p>In the preceding prototype, <strong class="source-inline">dev</strong> is the platform device that we write the driver for, <strong class="source-inline">type</strong> is the resource type, and <strong class="source-inline">num</strong> is the index of this resource in the same type. On success, the function returns a valid pointer to <strong class="source-inline">struct resource</strong>, or <strong class="source-inline">NULL</strong> otherwise. </p>
+			<p>When there is more than<a id="_idIndexMarker434"/> one resource in the same type, using indexes could be misleading. You might decide to rely on the resource name as an alternative, and the named variant of <strong class="source-inline">platform_get_resource()</strong> will be introduced, which is <strong class="source-inline">platform_get_resource_byname()</strong>. This function is given a resource flag (or type) and its name and returns the appropriate resource, whatever the order they are declared in. </p>
+			<p>It is defined as follows:</p>
+			<p class="source-code">struct resource *platform_get_resource_byname(</p>
+			<p class="source-code">                             struct platform_device *dev,</p>
+			<p class="source-code">                             unsigned int type,</p>
+			<p class="source-code">                           const char *name)</p>
+			<p>To understand how to use this function, first, let's introduce the concept of named resources. We will discuss this next.</p>
+			<h3>The concept of named resources</h3>
+			<p>When the driver expects a list of<a id="_idIndexMarker435"/> resources of a certain type (let's say two IRQ lines, where the first one is for Tx and the second for Rx), there is no guarantee of the way the list will be ordered, and the driver must make no assumption. What happens if the driver logic is hardcoded so that it expects Rx IRQ first, but the device tree has been populated with Tx first? To avoid such mismatches, the concept of named resources (such as clocks, IRQs, DMA channels, and memory regions) has been introduced. This consists of defining the resource list and naming them. This is so that, whatever their indexes are, a given name will always match the resource. The concept of a named resource also makes it easy to read and understand the device tree resource assignment.</p>
+			<p>The corresponding properties to name the resources are as follows:</p>
+			<ul>
+				<li><strong class="source-inline">reg-names</strong>: This is the list of names for memory regions in the <strong class="source-inline">reg</strong> property.</li>
+				<li><strong class="source-inline">interrupt-names</strong>: This gives a name to each interrupt line in the <strong class="source-inline">interrupts</strong> property.</li>
+				<li><strong class="source-inline">dma-names</strong>: This is for the <strong class="source-inline">dma</strong> property.</li>
+				<li><strong class="source-inline">clock-names</strong>: This is to name the clocks inside the <strong class="source-inline">clocks</strong> property. Note that clocks won't be discussed in this book.</li>
+			</ul>
+			<p>To demonstrate the<a id="_idIndexMarker436"/> concept, let's consider the following fake device node entry:</p>
+			<p class="source-code">fake_device {</p>
+			<p class="source-code">    compatible = "packt,fake-device";</p>
+			<p class="source-code">    reg = &lt;0x4a064000 0x800&gt;,</p>
+			<p class="source-code">          &lt;0x4a064800 0x200&gt;,</p>
+			<p class="source-code">          &lt;0x4a064c00 0x200&gt;;</p>
+			<p class="source-code">    reg-names = "ohci", "ehci", "config";</p>
+			<p class="source-code">    interrupts = &lt;0 66 IRQ_TYPE_LEVEL_HIGH&gt;,</p>
+			<p class="source-code">                 &lt;0 67 IRQ_TYPE_LEVEL_HIGH&gt;;</p>
+			<p class="source-code">    interrupt-names = "ohci", "ehci";</p>
+			<p class="source-code">};</p>
+			<p>In the preceding example, the device is assigned three memory regions and two interrupt lines. The resource name list and resources respect a one-to-one mapping. This means, for example, that the name at index <strong class="source-inline">0</strong> will be assigned to the resource at the same index. The code in the driver to extract each named resource is as follows:</p>
+			<p class="source-code">struct resource *res_mem_config, resirq, *res_mem1;</p>
+			<p class="source-code">int txirq, rxirq;</p>
+			<p class="source-code">/*let's grab region &lt;0x4a064000 0x800&gt;*/</p>
+			<p class="source-code">res_mem1 = platform_get_resource_byname(pdev,</p>
+			<p class="source-code">                   IORESOURCE_MEM, "ohci");</p>
+			<p class="source-code">/*let's grab region &lt;0x4a064c00 0x200&gt;*/</p>
+			<p class="source-code">res_mem_config = platform_get_resource_byname(pdev,</p>
+			<p class="source-code">                  IORESOURCE_MEM, "config");</p>
+			<p class="source-code">txirq = platform_get_resource_byname(pdev, </p>
+			<p class="source-code">                          IORESOURCE_IRQ, "ohci");</p>
+			<p class="source-code">rxirq = platform_get_resource_byname(pdev,</p>
+			<p class="source-code">                          IORESOURCE_MEM, "ehci");</p>
+			<p>As you can see, requesting <a id="_idIndexMarker437"/>resources in the named manner is less error-prone. That said, both <strong class="source-inline">platform_get_resource()</strong> and <strong class="source-inline">platform_get_resource_byname()</strong> are generic APIs used to deal with resources. However, there are dedicated APIs that allow you to reduce the development effort (such as <strong class="source-inline">platform_get_irq_byname()</strong>, <strong class="source-inline">platform_get_irq()</strong>, or <strong class="source-inline">platform_get_and_ioremap_resource()</strong>), as we will learn in later chapters.</p>
+			<h2 id="_idParaDest-91"><a id="_idTextAnchor093"/>Extracting application-specific data</h2>
+			<p>Application-specific data<a id="_idIndexMarker438"/> is data that is beyond the common resources (neither IRQ numbers, memory regions, regulators, nor clocks). These are arbitrary properties and child nodes that can be assigned to a device. Usually, such properties use a manufacture prefix. These can be any kind of string, Boolean, or integer value, along with their API defined in <strong class="source-inline">drivers/of/base.c</strong> in the Linux sources. Note that the examples we discuss here are not exhaustive. Now, let's reuse the node that was defined earlier in this chapter:</p>
+			<p class="source-code">node_label: nodename@reg{</p>
+			<p class="source-code">    string-property = "a string";</p>
+			<p class="source-code">    string-list = "red fish", "blue fish";</p>
+			<p class="source-code">    one-int-property = &lt;197&gt;; /* One cell property */</p>
+			<p class="source-code">   /* in the following line, each number (cell) is a</p>
+			<p class="source-code">    * 32-bit integer(uint32). There are 3 cells in</p>
+			<p class="source-code">    * this property */</p>
+			<p class="source-code">    int-list-property = &lt;0xbeef 123 0xabcd4&gt;;</p>
+			<p class="source-code">    mixed-list-property = "a string", &lt;0xadbcd45&gt;, </p>
+			<p class="source-code">                          &lt;35&gt;, [0x01 0x23 0x45];</p>
+			<p class="source-code">    byte-array-property = [0x01 0x23 0x45 0x67];</p>
+			<p class="source-code">    one-cell-property = &lt;197&gt;;</p>
+			<p class="source-code">    boolean-property;</p>
+			<p class="source-code">};</p>
+			<p>In the sections that follow, we will learn how to obtain each property in the preceding device tree node excerpt.</p>
+			<h3>Extracting string properties</h3>
+			<p>The following is an excerpt<a id="_idIndexMarker439"/> of the previous example, showing a single string and multiple string properties:</p>
+			<p class="source-code">string-property = "a string";</p>
+			<p class="source-code">string-list = "red fish", "blue fish";</p>
+			<p>Back in the driver, there are different APIs that can be used depending on the need. You should use <strong class="source-inline">of_property_read_string()</strong> to read a single string value property. Its prototype is defined as follows:</p>
+			<p class="source-code">int of_property_read_string(const struct device_node *np,</p>
+			<p class="source-code">                           const char *propname,</p>
+			<p class="source-code">                           const char **out_string)</p>
+			<p class="source-code">int of_property_read_string_index(const struct </p>
+			<p class="source-code">                                 device_node *np,</p>
+			<p class="source-code">                                 const char *propname,</p>
+			<p class="source-code">                                 int index, </p>
+			<p class="source-code">                                 const char **output)</p>
+			<p class="source-code">int of_property_read_string_array(</p>
+			<p class="source-code">                  const struct device_node *np,</p>
+			<p class="source-code">                  const char *propname, </p>
+			<p class="source-code">                  const char **out_strs,</p>
+			<p class="source-code">                  size_t sz)</p>
+			<p>In the preceding<a id="_idIndexMarker440"/> functions, <strong class="source-inline">np</strong> is the node from which the string property needs to be read. <strong class="source-inline">propname</strong> is the name of the property hosting the string or string list, and <strong class="source-inline">sz</strong> is the number of array elements to read. <strong class="source-inline">out_string</strong> is an output parameter whose pointer value will be changed to point to the string value(s).</p>
+			<p><strong class="source-inline">of_property_read_string()</strong> and <strong class="source-inline">of_property_read_string_index()</strong> return <strong class="source-inline">-ENODATA</strong> if the property does not have a value. Alternatively, they return <strong class="source-inline">-EINVAL</strong> if the property does not exist at all. Additionally, <strong class="source-inline">-EILSEQ</strong> is returned if the string is not <strong class="source-inline">NULL</strong>-terminated within the length of the property data. Finally, on success, they return <strong class="source-inline">0</strong>.</p>
+			<p><strong class="source-inline">of_property_read_string_array()</strong> searches for the specified property in the given device tree node, retrieves a list of <strong class="source-inline">NULL</strong>-terminated string values (actually a pointer to these strings, not a copy) inside that property, and assigns it to <strong class="source-inline">out_strs</strong>. In addition to the values returned by <strong class="source-inline">of_property_read_string()</strong> and <strong class="source-inline">of_property_read_string_index()</strong>, this function is special in the way that it returns the number of strings that have been read if the target array of pointers is not <strong class="source-inline">NULL</strong>. The <strong class="source-inline">out_strs</strong> parameter can be omitted (<strong class="source-inline">NULL</strong>) if you simply wish to count the number of strings in the property. </p>
+			<p>The following code shows how you can use them:</p>
+			<p class="source-code">size_t count;</p>
+			<p class="source-code">const char **res;</p>
+			<p class="source-code">const char *my_string = NULL;</p>
+			<p class="source-code">const char *blue_fish = NULL;</p>
+			<p class="source-code">of_property_read_string(pdev-&gt;dev.of_node,</p>
+			<p class="source-code">                      "string-property", &amp;my_string);</p>
+			<p class="source-code">of_property_read_string_index(pdev-&gt;dev.of_node,</p>
+			<p class="source-code">                      "string-list", 1, &amp;blue_fish);</p>
+			<p class="source-code">count = of_property_read_string_array(dp, </p>
+			<p class="source-code">                      "string-list", res, count);</p>
+			<p>In the preceding<a id="_idIndexMarker441"/> example, we learned how to extract string properties, either from a single-value property or from a list. It must be noted that a pointer to the string (or string list) is returned, not a copy. Additionally, in the last line, we see how to extract a given number of NULL-terminated string elements in the array. Here again, a pointer to these elements are returned, not copies of these.</p>
+			<h3>Reading cells and unsigned 32-bit integers</h3>
+			<p>Here are our <strong class="source-inline">int</strong> properties:</p>
+			<p class="source-code">one-int-property = &lt;197&gt;;</p>
+			<p class="source-code">int-list-property = &lt;1350000 0x54dae47 1250000 1200000&gt;;</p>
+			<p>Back in <a id="_idIndexMarker442"/>the driver, as<a id="_idIndexMarker443"/> with string properties, there is a set of APIs that you can choose according to your need. You should use <strong class="source-inline">of_property_read_u32()</strong> to read a cell value. Its prototype is defined as follows:</p>
+			<p class="source-code">int of_property_read_u32(const struct device_node *np,</p>
+			<p class="source-code">                        const char *propname,</p>
+			<p class="source-code">                        u32 *out_value)</p>
+			<p class="source-code">int of_property_read_u32_index(</p>
+			<p class="source-code">                      const struct device_node *np,</p>
+			<p class="source-code">                      const char *propname,</p>
+			<p class="source-code">                      u32 index, u32 *out_value)</p>
+			<p class="source-code">int of_property_read_u32_array(</p>
+			<p class="source-code">                      const struct device_node *np,</p>
+			<p class="source-code">                      const char *propname,</p>
+			<p class="source-code">                      u32 *out_values, size_t sz)</p>
+			<p>The preceding APIs behave in the same way as their <strong class="source-inline">_string</strong>, <strong class="source-inline">_string_index</strong>, and <strong class="source-inline">_string_array</strong> counterparts. This is because they all return <strong class="source-inline">0</strong> on success, <strong class="source-inline">-EINVAL</strong> if the property does not exist at all, or <strong class="source-inline">-ENODATA</strong> when the property does not have a value. The differences are that the type of value to read, in this case, is <strong class="source-inline">u32</strong>, that we have an <strong class="source-inline">-EOVERFLOW</strong> error if the property data isn't large enough, and that <strong class="source-inline">out_values</strong> must be allocated first because the values to be returned have been copied instead.</p>
+			<p>The following is<a id="_idIndexMarker444"/> the usage of these <a id="_idIndexMarker445"/>APIs in our example, with <strong class="source-inline">int</strong> and our list of <strong class="source-inline">int</strong> properties:</p>
+			<p class="source-code">unsigned int number;</p>
+			<p class="source-code">of_property_read_u32(pdev-&gt;dev.of_node,</p>
+			<p class="source-code">                    "one-cell-property", &amp;number);</p>
+			<p>You can use <strong class="source-inline">of_property_read_u32_array</strong> to read a list of cells. Its prototype is as follows:</p>
+			<p class="source-code">int of_property_read_u32_array(</p>
+			<p class="source-code">                           const struct device_node *np,</p>
+			<p class="source-code">                           const char *propname,</p>
+			<p class="source-code">                           u32 *out_values, size_t sz);</p>
+			<p>Here, <strong class="source-inline">sz</strong> is the number of array elements to read. Take a look at <strong class="source-inline">drivers/of/base.c</strong> to see how to interpret its return value:</p>
+			<p class="source-code">unsigned int cells_array[4]; /* return value by copy */</p>
+			<p class="source-code">if (!of_property_read_u32_array(pdev-&gt;dev.of_node,</p>
+			<p class="source-code">    "int-list-property", cells_array, 4))</p>
+			<p class="source-code">    dev_info(&amp;pdev-&gt;dev, "u32 list read successfully\n");</p>
+			<p class="source-code">/* can now process values in cells_array */</p>
+			<p class="source-code">[...]</p>
+			<p>Here, we have demonstrated how easy it would be to deal with an array of cells, that is, arrays of 32-bit integer values. In the next section, we will see how to do that with Boolean properties.</p>
+			<h3>Handling Boolean properties</h3>
+			<p>You should<a id="_idIndexMarker446"/> use <strong class="source-inline">of_property_read_bool()</strong> to read the Boolean property whose name is given in the second argument of the function:</p>
+			<p class="source-code">bool my_bool = of_property_read_bool(pdev-&gt;dev.of_node,</p>
+			<p class="source-code">                                  "boolean-property");</p>
+			<p class="source-code">if(my_bool){</p>
+			<p class="source-code">    /* boolean is true */</p>
+			<p class="source-code">} else</p>
+			<p class="source-code">    /* boolean is false */</p>
+			<p class="source-code">}</p>
+			<p>The preceding example demonstrates how to deal with Boolean properties. Now we can learn about far more complex APIs, starting with extracting and parsing sub-nodes.</p>
+			<h3>Extracting and parsing sub-nodes</h3>
+			<p>Note that you are allowed to add<a id="_idIndexMarker447"/> whatever sub-node you want to a device node. This usage is <a id="_idIndexMarker448"/>common in numerous use cases, such as population partitions in an MTD device node or describing regulator constraints in a power management chip node. For example, given a node representing a flash memory device, partitions can be represented as nested sub-nodes. The following excerpt shows how this is achieved:</p>
+			<p class="source-code">eeprom: ee24lc512@55 {</p>
+			<p class="source-code">    compatible = "microchip,24xx512";</p>
+			<p class="source-code">    reg = &lt;0x55&gt;;</p>
+			<p class="source-code">    partition@1 {</p>
+			<p class="source-code">        read-only;</p>
+			<p class="source-code">        part-name = "private";</p>
+			<p class="source-code">        offset = &lt;0&gt;;</p>
+			<p class="source-code">        size = &lt;1024&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">    config@2 {</p>
+			<p class="source-code">        part-name = "data";</p>
+			<p class="source-code">        offset = &lt;1024&gt;;</p>
+			<p class="source-code">        size = &lt;64512&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p>You can<a id="_idIndexMarker449"/> use <strong class="source-inline">for_each_child_of_node()</strong> to walk through sub-nodes of<a id="_idIndexMarker450"/> the given node:</p>
+			<p class="source-code">structdevice_node *np = pdev-&gt;dev.of_node;</p>
+			<p class="source-code">structdevice_node *sub_np;</p>
+			<p class="source-code">for_each_child_of_node(np, sub_np) {</p>
+			<p class="source-code">    /* sub_np will point successively to each sub-node */</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    int size;</p>
+			<p class="source-code">    of_property_read_u32(client-&gt;dev.of_node,</p>
+			<p class="source-code">                        "size", &amp;size);</p>
+			<p class="source-code">    ...</p>
+			<p class="source-code">}</p>
+			<p>In the preceding excerpt, we learned how to iterate over the sub-nodes of a given device tree node.</p>
+			<h1 id="_idParaDest-92"><a id="_idTextAnchor094"/>Summary</h1>
+			<p>The time to switch from hardcoded device configurations to device trees has come. This chapter gave you all the bases to handle device trees. Now you have the necessary skills to customize or add whatever node and property you want to the device tree and extract them from your driver. </p>
+			<p>In the next chapter, we will discuss the I2C driver, and use the device tree API to enumerate and configure our I2C devices.</p>
+		</div>
+	</body></html>

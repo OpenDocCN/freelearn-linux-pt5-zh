@@ -1,0 +1,869 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en-US">
+<head>
+<meta charset="utf-8"/>
+<meta name="generator" content="packt"/>
+<title>16 Security Tips and Tricks for the Busy Bee</title>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet1.css"/>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet2.css"/>
+
+</head>
+<body>
+<section id="security-tips-and-tricks-for-the-busy-bee" class="level1 pkt" data-number="17">
+<h1 data-number="17">16 Security Tips and Tricks for the Busy Bee</h1>
+<section id="join-our-book-community-on-discord-15" class="level2" data-number="17.1">
+<h2 data-number="17.1">Join our book community on Discord</h2>
+<p><a href="https://packt.link/SecNet">https://packt.link/SecNet</a></p>
+<figure>
+<img src="../media/file110.png" style="width:10em" />
+</figure>
+<p>In this final chapter, I'd like to do a roundup of some quick tips and tricks that don't necessarily fit in with the previous chapters. Think of these tips as time savers for the busy administrator. First, you will learn about some quick ways to see which system services are running, in order to ensure that nothing that isn't needed is running. Then, we'll look at how to password protect the GRUB 2 bootloader, how to securely configure BIOS/UEFI to help prevent attacks on a physically accessible machine, and how to use a checklist to perform a secure initial system setup.</p>
+<p>In this chapter, we will cover the following topics:</p>
+<ul>
+<li>Auditing system services</li>
+<li>Password protecting the GRUB2 configuration</li>
+<li>Securely configuring and then password protecting UEFI/BIOS</li>
+<li>Using a security checklist when setting up your system</li>
+</ul>
+<p>If you’re ready, let’s get going.</p>
+</section>
+<section id="technical-requirements-2" class="level2" data-number="17.2">
+<h2 data-number="17.2">Technical requirements</h2>
+<p>The code files for this chapter are available here: <a href="https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-3E">https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-3E</a>.</p>
+</section>
+<section id="auditing-system-services" class="level2" data-number="17.3">
+<h2 data-number="17.3">Auditing system services</h2>
+<p>A basic tenet of server administration, regardless of which operating system we're talking about, is to never have anything that you don't absolutely need installed on a server. You especially don't want any unnecessary network services running because that would give the bad guys extra ways to get into your system. And, there's always a chance that some evil hacker might have planted something that acts as a network service, and you'd definitely want to know about that. In this section, we'll look at a few different ways to audit your system to ensure that no unnecessary network services are running on it.</p>
+<section id="auditing-system-services-with-systemctl" class="level3" data-number="17.3.1">
+<h3 data-number="17.3.1">Auditing system services with systemctl</h3>
+<p>On Linux systems that come with <code>systemd</code>, the <code>systemctl</code> command is pretty much a universal command that does many things for you. In addition to controlling your system's services, it can also show you the status of those services, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; sudo systemctl -t service --state=active</code></pre>
+</div>
+<p>Here's the breakdown of the preceding command:</p>
+<ul>
+<li><code>-t service</code>: We want to view information about the services – or, what used to be called daemons – on the system.</li>
+<li><code>--state=active</code>: This specifies that we want to view information about all the system services that are actually running.</li>
+</ul>
+<p>A partial output of this command looks something like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>UNIT                                                  LOAD   ACTIVE SUB     DESCRIPTION
+accounts-daemon.service                               loaded active running Accounts Service
+after-local.service                                   loaded active exited  /etc/init.d/after.local Compatibility
+alsa-restore.service                                  loaded active exited  Save/Restore Sound Card State
+apparmor.service                                      loaded active exited  Load AppArmor profiles
+auditd.service                                        loaded active running Security Auditing Service
+avahi-daemon.service                                  loaded active running Avahi mDNS/DNS-SD Stack
+cron.service                                          loaded active running Command Scheduler
+. . .
+. . .</code></pre>
+</div>
+<p>Generally, you won't want to see quite this much information, although you might at times. This command shows the status of every service that's running on your system. What really interests us now is the network services that can allow someone to connect to your system. So, let's look at how to narrow things down a bit.</p>
+</section>
+<section id="auditing-network-services-with-netstat" class="level3" data-number="17.3.2">
+<h3 data-number="17.3.2">Auditing network services with netstat</h3>
+<p>Here are two reasons why you would want to keep track of what network services are running on your system:</p>
+<ul>
+<li>To ensure that no legitimate network services that you don't need are running</li>
+<li>To ensure that you don't have any malware that's listening for network connections from its master</li>
+</ul>
+<p>The <code>netstat</code> command is both handy and easy to use. First, let's say that you want to see a list of network services that are listening, waiting for someone to connect to them. (Due to formatting restrictions, I can only show part of the output here. We'll look at some lines that I can't show here in just a moment. Also, you can download the text file with the full output from the Packt Publishing website.):</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; netstat -lp -A inet
+(Not all processes could be identified, non-owned process info
+ will not be shown, you would have to be root to see it all.)
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address Foreign Address State PID/Program name
+tcp 0 0 *:ideafarm-door *:* LISTEN -
+tcp 0 0 localhost:40432 *:* LISTEN 3296/SpiderOakONE
+tcp 0 0 *:ssh *:* LISTEN -
+tcp 0 0 localhost:ipp *:* LISTEN -
+tcp 0 0 localhost:smtp *:* LISTEN -
+tcp 0 0 *:db-lsp *:* LISTEN 3246/dropbox
+tcp 0 0 *:37468 *:* LISTEN 3296/SpiderOakONE
+tcp 0 0 localhost:17600 *:* LISTEN 3246/dropbox
+. . .
+. . .</code></pre>
+</div>
+<p>Here's the breakdown:</p>
+<ul>
+<li><code>-lp</code>: The <code>l</code> means that we want to see which network ports are listening. In other words, we want to see which network ports are waiting for someone to connect to them. The <code>p</code> means that we want to see the name and process ID number of the program or service that is listening on each port.</li>
+<li><code>-A inet</code>: This means that we only want to see information about the network protocols that are members of the <code>inet</code> family. In other words, we want to see information about the <code>raw</code>, <code>tcp</code>, and <code>udp</code> network sockets, but we don't want to see anything about the Unix sockets that only deal with interprocess communications within the operating system.</li>
+</ul>
+<p>Since this output is from the openSUSE workstation that I used to write the original version of this chapter, you won't see any of the usual server-type services here. However, you will see a few things that you likely won't want to see on your servers. For example, let's look at the very first item:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Proto Recv-Q Send-Q Local Address      Foreign Address         State       PID/Program name
+tcp        0      0 *:ideafarm-door    *:*                     LISTEN      -</code></pre>
+</div>
+<p>The <code>Local Address</code> column specifies the local address and port of this listening socket. The asterisk means that this socket is on the local network, while <code>ideafarm-door</code> is the name of the network port that is listening. (By default, <code>netstat</code> will show you the names of ports whenever possible by pulling the port information out of the <code>/etc/services</code> file.)</p>
+<p>Now, because I didn't know what the <code>ideafarm-door</code> service is, I used my favorite search engine to find out. By plugging the term <code>ideafarm-door</code> into DuckDuckGo, I found the answer:</p>
+<figure>
+<img src="../media/file111.png" alt="Figure 16.1: WhatPortIs" /><figcaption aria-hidden="true">Figure 16.1: WhatPortIs</figcaption>
+</figure>
+<p>The top search result took me to a site named <strong>WhatPortIs</strong>. According to this, <code>ideafarm-door</code> is, in reality, port <code>902</code>, which belongs to the <strong>VMware Server Console</strong>. Okay, that makes sense because I do have VMware Player installed on this machine. So, that's all good.</p>
+<blockquote>
+<p>You can check out the <code>WhatPortIs</code> site here: <a href="http://whatportis.com/">http://whatportis.com/</a>.</p>
+</blockquote>
+<p>Here’s the next item on the list:</p>
+<div class="C0-SHConPACKT">
+<pre><code>tcp        0      0 localhost:40432    *:*       LISTEN      3296/SpiderOakONE</code></pre>
+</div>
+<p>This item shows the local address as <code>localhost</code> and that the listening port is port <code>40432</code>. This time, the <code>PID/Program Name</code> column actually tells us what this is. <code>SpiderOak ONE</code> is a cloud-based backup service that you might or might not want to see running on your server.</p>
+<p>Now, let's look at a few more items:</p>
+<div class="C0-SHConPACKT">
+<pre><code>tcp 0      0 *:db-lsp                   *:*      LISTEN      3246/dropbox
+tcp 0      0 *:37468                    *:*      LISTEN      3296/SpiderOakONE
+tcp 0      0 localhost:17600            *:*      LISTEN      3246/dropbox
+tcp 0      0 localhost:17603            *:*      LISTEN      3246/dropbox</code></pre>
+</div>
+<p>Here, we can see that <code>dropbox</code> and <code>SpiderOakONE</code> are both listed with the asterisk for the local address. So, they're both using the local network address. The name of the port for <code>dropbox</code> is <code>db-lsp</code>, which stands for <strong>Dropbox LAN Sync Protocol</strong>. The <code>SpiderOakONE</code> port doesn't have an official name, so it's just listed as port <code>37468</code>. The bottom two lines show that <code>dropbox</code> also uses the local machine's address, on ports <code>17600</code> and <code>17603</code>.</p>
+<p>So far, we've looked at nothing but TCP network sockets. Let's see how they differ from UDP sockets:</p>
+<div class="C0-SHConPACKT">
+<pre><code>udp        0      0 192.168.204.1:ntp       *:*                                 -
+udp        0      0 172.16.249.1:ntp        *:*                                 -
+udp        0      0 linux-0ro8:ntp          *:*                                 -</code></pre>
+</div>
+<p>The first thing to note is that there's nothing under the <code>State</code> column. That's because, with UDP, there are no states. They are actually listening for data packets to come in, and they're ready to send data packets out. But since that's about all that UDP sockets can do, there was really no sense in defining different states for them.</p>
+<p>In the first two lines, we see some strange local addresses. That's because I have both VMware Player and VirtualBox installed on this workstation. The local addresses of these two sockets are for the VMware and VirtualBox virtual network adapters. The last line shows the hostname of my OpenSUSE workstation as the local address. In all three cases, the port is the <strong>Network Time Protocol</strong> port, for time synchronization.</p>
+<p>Now, let's look at one last set of UDP items:</p>
+<div class="C0-SHConPACKT">
+<pre><code>udp        0      0 *:58102         *:*                                 5598/chromium --pas
+udp        0      0 *:db-lsp-disc   *:*                                 3246/dropbox
+udp        0      0 *:43782         *:*                                 5598/chromium --pas
+udp        0      0 *:36764         *:*                                 
+udp        0      0 *:21327         *:*                                 3296/SpiderOakONE
+udp        0      0 *:mdns          *:*                                 5598/chromium --pas</code></pre>
+</div>
+<p>Here, we see that my Chromium web browser is ready to accept network packets on a few different ports. We also see that Dropbox uses UDP to accept discovery requests from other local machines that have Dropbox installed. I assume that port <code>21327</code> performs the same function for SpiderOak ONE.</p>
+<p>Of course, since this machine is one of my workhorse workstations, Dropbox and SpiderOak ONE are almost indispensable to me. I installed them myself, so I've always known that they were there. However, if you see anything like this on a server, you'll want to investigate to see if the server admins know that these programs are installed, and then find out why they're installed. It could be that they're performing a legitimate function, and it could be that they're not.</p>
+<blockquote>
+<p>A difference between Dropbox and SpiderOak ONE is that with Dropbox, your files don't get encrypted until they've been uploaded to the Dropbox servers. So, the Dropbox folk have the encryption keys to your files. On the other hand, SpiderOak ONE encrypts your files on your local machine, and the encryption keys never leave your possession. So, if you really do need a cloud-based backup service and you're dealing with sensitive files, something such as SpiderOak ONE would definitely be better than Dropbox. (And no, the SpiderOak ONE folk aren't paying me to say that.)</p>
+</blockquote>
+<p>If you want to see port numbers and IP addresses instead of network names, add the <code>n</code> option. As before, here's the partial output:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; netstat -lpn -A inet
+(Not all processes could be identified, non-owned process info
+ will not be shown, you would have to be root to see it all.)
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address      Foreign Address     State       PID/Program name
+tcp        0      0 0.0.0.0:902        0.0.0.0:*           LISTEN      -
+tcp        0      0 127.0.0.1:40432    0.0.0.0:*           LISTEN      3296/SpiderOakONE
+tcp        0      0 0.0.0.0:22         0.0.0.0:*           LISTEN      -
+tcp        0      0 127.0.0.1:631      0.0.0.0:*           LISTEN      -
+tcp        0      0 127.0.0.1:25       0.0.0.0:*           LISTEN      -
+tcp        0      0 0.0.0.0:17500      0.0.0.0:*           LISTEN      3246/dropbox
+tcp        0      0 0.0.0.0:37468      0.0.0.0:*           LISTEN      3296/SpiderOakONE
+tcp        0      0 127.0.0.1:17600    0.0.0.0:*           LISTEN      3246/dropbox
+. . .
+. . .</code></pre>
+</div>
+<p>All you have to do to view the established TCP connections is to leave out the <code>l</code> option. On my workstation, this makes for a very long list, so I'll only show a few items:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; netstat -p -A inet
+(Not all processes could be identified, non-owned process info
+ will not be shown, you would have to be root to see it all.)
+Active Internet connections (w/o servers)
+Proto Recv-Q Send-Q Local Address      Foreign Address         State       PID/Program name
+tcp        1      0 linux-0ro8:41670   ec2-54-88-208-223:https CLOSE_WAIT  3246/dropbox
+tcp        0      0 linux-0ro8:59810   74-126-144-106.wa:https ESTABLISHED 3296/SpiderOakONE
+tcp        0      0 linux-0ro8:58712   74-126-144-105.wa:https ESTABLISHED 3296/SpiderOakONE
+tcp        0      0 linux-0ro8:caerpc  atl14s78-in-f2.1e:https ESTABLISHED 10098/firefox
+. . .
+. . .</code></pre>
+</div>
+<p>The <code>Foreign Address</code> column shows the address and port number of the machine at the remote end of the connection. The first item shows that the connection with a Dropbox server is in a <code>CLOSE_WAIT</code> state. This means that the Dropbox server has closed the connection, and we're now waiting on the local machine to close the socket.</p>
+<p>Because the names of those foreign addresses don't make much sense, let's add the <code>n</code> option to see the IP addresses instead:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; netstat -np -A inet
+(Not all processes could be identified, non-owned process info
+ will not be shown, you would have to be root to see it all.)
+Active Internet connections (w/o servers)
+Proto Recv-Q Send-Q Local Address         Foreign Address      State        PID/Program name
+tcp        0      1 192.168.0.222:59594   37.187.24.170:443    SYN_SENT     10098/firefox
+tcp        0      0 192.168.0.222:59810   74.126.144.106:443   ESTABLISHED  3296/SpiderOakONE
+tcp        0      0 192.168.0.222:58712   74.126.144.105:443   ESTABLISHED  3296/SpiderOakONE
+tcp        0      0 192.168.0.222:38606   34.240.121.144:443   ESTABLISHED  10098/firefox
+. . .
+. . .</code></pre>
+</div>
+<p>This time, we see something new. The first item shows a <code>SYN_SENT</code> state for the Firefox connection. This means that the local machine is trying to establish a connection to the foreign IP address. Also, under <code>Local Address</code>, we can see the static IP address for my OpenSUSE workstation.</p>
+<p>If I had space to display the entire <code>netstat</code> output here, you'd see nothing but <code>tcp</code> under the <code>Proto</code> column. That's because the UDP protocol doesn't establish connections in the same way that the TCP protocol does.</p>
+<blockquote>
+<p>Something to keep in mind is that rootkits can replace legitimate Linux utilities with their own trojaned versions. For example, a rootkit could have its own trojaned version of <code>netstat</code> that would show all network processes except for those that are associated with the rootkit. That's why you want to do everything you can to prevent unauthorized users from gaining root privileges, to prevent them from being able to install rootkits.</p>
+</blockquote>
+<p>If you need more information about <code>netstat</code>, see the <code>netstat</code> man page.</p>
+<section id="hands-on-lab-viewing-network-services-with-netstat" class="level4" data-number="17.3.2.1">
+<h4 data-number="17.3.2.1">Hands-on lab – viewing network services with netstat</h4>
+<p>In this lab, you'll practice what you've just learned about <code>netstat</code>. Do this on a virtual machine that has a desktop interface so that you can use Firefox to visit websites. Follow these steps:</p>
+<ol>
+<li>View the list of network services that are listening for a connection:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>netstat -lp -A inet
+netstat -lpn -A inet</code></pre>
+</div>
+<ol>
+<li>View the list of established connections:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>netstat -p -A inet
+netstat -pn -A inet</code></pre>
+</div>
+<ol>
+<li>Open Firefox and navigate to any website. Then, repeat <em>Step 2</em>.</li>
+<li>Repeat <em>Step 2</em> again, but preface each command with <code>sudo</code>. Note how the output is different from that of <em>Step 2</em>.</li>
+<li>From your host machine, log into the virtual machine via SSH. Then, repeat <em>Step 2</em>.</li>
+</ol>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>You've just seen how to audit network services with <code>netstat</code>. Now, let's learn how to do this with Nmap.</p>
+</section>
+</section>
+<section id="auditing-network-services-with-nmap" class="level3" data-number="17.3.3">
+<h3 data-number="17.3.3">Auditing network services with Nmap</h3>
+<p>The <code>netstat</code> tool is very good, and it can give you lots of good information about what's going on with your network services. The slight downside is that you have to log in to every individual host on your network in order to use it.</p>
+<p>If you'd like to remotely audit your network to see what services are running on each computer without having to log in to each and every one, then you need a tool such as Nmap. It's available for all the major operating systems, so even if you're stuck having to use Windows on your workstation, you're in luck. An up-to-date version is already installed on Kali Linux, if that's what you're using. It's also in the repositories of every major Linux distro, so installing it is quite simple. If you’re running Windows or macOS, you can download a version for either of them directly from the Nmap website.</p>
+<blockquote>
+<p>You can download Nmap for all of the major operating systems from <a href="https://nmap.org/download.html">https://nmap.org/download.html</a>.</p>
+<blockquote>
+<p>In all cases, you'll also find instructions for installation.</p>
+</blockquote>
+</blockquote>
+<p>You'll use Nmap the same way on all operating systems, with only one exception. On Linux and macOS machines, you'll preface certain Nmap commands with <code>sudo</code>, while on Windows machines, you won't. (Although, on Windows 10/11, you might have to open the <code>command.exe</code> terminal as an administrator.) Since I just happen to be working on my trusty OpenSUSE workstation, I'll show you how it works on Linux. Let's start by doing a SYN packet scan:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; sudo nmap -sS 192.168.0.37
+Starting Nmap 6.47 ( http://nmap.org ) at 2017-12-24 19:32 EST
+Nmap scan report for 192.168.0.37
+Host is up (0.00016s latency).
+Not shown: 996 closed ports
+PORT STATE SERVICE
+22/tcp open ssh
+515/tcp open printer
+631/tcp open ipp
+5900/tcp open vnc
+MAC Address: 00:0A:95:8B:E0:C0 (Apple)
+Nmap done: 1 IP address (1 host up) scanned in 57.41 seconds
+donnie@linux-0ro8:~&gt;</code></pre>
+</div>
+<p>Here's the breakdown:</p>
+<ul>
+<li><code>-sS</code>: The lowercase <code>s</code> denotes the type of scan that we want to perform. The uppercase <code>S</code> denotes that we're doing a SYN packet scan. (More on that in a moment.)</li>
+<li><code>192.168.0.37</code>: In this case, I'm only scanning a single machine. However, I could also scan either a group of machines or an entire network.</li>
+<li><code>Not shown: 996 closed ports</code>: The fact that it's showing all of these closed ports instead of <code>filtered</code> ports tells me that there's no firewall on this machine. (Again, more on that in a moment.)</li>
+</ul>
+<p>Next, we see a list of ports that are open. (More on that in a moment.)</p>
+<p>The MAC address of this machine indicates that it's an Apple product of some sort. In a moment, I'll show you how to get more details about what kind of Apple product that it might be.</p>
+<p>Now, let's look at this more in detail.</p>
+<section id="port-states" class="level4" data-number="17.3.3.1">
+<h4 data-number="17.3.3.1">Port states</h4>
+<p>An Nmap scan will show the target machine's ports in one of three <strong>port states</strong>:</p>
+<ul>
+<li><code>filtered</code>: This means that the port is blocked by a firewall.</li>
+<li><code>open</code>: This means that the port is not blocked by a firewall and that the service that's associated with that port is running.</li>
+<li><code>closed</code>: This means that the port is not blocked by a firewall, and that the service that's associated with that port is not running.</li>
+</ul>
+<p>So, in our scan of the Apple machine, we see that the Secure Shell service is ready to accept connections on port <code>22</code>, that the print service is ready to accept connections on ports <code>515</code> and <code>631</code>, and that the <strong>Virtual Network Computing</strong> (<strong>VNC</strong>) service is ready to accept connections on port <code>5900</code>. All of these ports would be of interest to a security-minded administrator. If Secure Shell is running, it would be interesting to know if it's configured securely. The fact that the print service is running means that this is set up to use the <strong>Internet Printing Protocol</strong> (<strong>IPP</strong>). It would be interesting to know why we're using IPP instead of just regular network printing, and it would also be interesting to know if there are any security concerns with this version of IPP. And of course, we already know that VNC isn't a secure protocol, so we would want to know why it's even running at all. We also saw that no ports are listed as <code>filtered</code>, so we would also want to know why there's no firewall on this machine.</p>
+<p>One little secret that I'll finally reveal is that this machine is the same one that I used for the Greenbone Security Assistant scan demos. So, we already have some of the needed information. The Greenbone scan told us that Secure Shell on this machine uses weak encryption algorithms and that there's a security vulnerability with the print service. In just a bit, I'll show you how to get some of that information with Nmap.</p>
+</section>
+<section id="scan-types" class="level4" data-number="17.3.3.2">
+<h4 data-number="17.3.3.2">Scan types</h4>
+<p>There are lots of different scanning options, each with its own purpose. The SYN packet scan that we're using here is considered a stealthy type of scan because it generates less network traffic and fewer system log entries than certain other types of scans. With this type of scan, Nmap sends a SYN packet to a port on the target machine, as if it were trying to create a TCP connection to that machine. If the target machine responds with a SYN/ACK packet, it means that the port is in an <code>open</code> state and is ready to create the TCP connection. If the target machine responds with an RST packet, it means that the port is in a <code>closed</code> state. If there's no response at all, it means that the port is <code>filtered</code>, blocked by a firewall. As a normal Linux administrator, this is one of the types of scans that you would do most of the time.</p>
+<p>The <code>-sS</code> scan shows you the state of TCP ports, but it doesn't show you the state of UDP ports. To see the UDP ports, use the <code>-sU</code> option:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; sudo nmap -sU 192.168.0.37
+Starting Nmap 6.47 ( http://nmap.org ) at 2017-12-28 12:41 EST
+Nmap scan report for 192.168.0.37
+Host is up (0.00018s latency).
+Not shown: 996 closed ports
+PORT     STATE         SERVICE
+123/udp  open          ntp
+631/udp  open|filtered ipp
+3283/udp open|filtered netassistant
+5353/udp open          zeroconf
+MAC Address: 00:0A:95:8B:E0:C0 (Apple)
+Nmap done: 1 IP address (1 host up) scanned in 119.91 seconds
+donnie@linux-0ro8:~&gt;</code></pre>
+</div>
+<p>Here, you see something a bit different: two ports are listed as <code>open|filtered</code>. That's because, due to the way that UDP ports respond to Nmap scans, Nmap can't always tell whether a UDP port is <code>open</code> or <code>filtered</code>. In this case, we know that these two ports are probably open because we've already seen that their corresponding TCP ports are open.</p>
+<p>ACK packet scans can also be useful, but not to see the state of the target machine's network services. Rather, it's a good option for when you need to see if there might be a firewall blocking the way between you and the target machine. An ACK scan command looks like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo nmap -sA 192.168.0.37</code></pre>
+</div>
+<p>You're not limited to scanning just a single machine at a time. You can scan either a group of machines or an entire subnet at once:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo nmap -sS 192.168.0.1-128
+sudo nmap -sS 192.168.0.0/24</code></pre>
+</div>
+<p>The first command scans only the first 128 hosts on this network segment. The second command scans all 254 hosts on a subnet that's using a 24-bit netmask.</p>
+<p>A discovery scan is useful for when you need to just see what devices are on the network:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo nmap -sn 192.168.0.0/24</code></pre>
+</div>
+<p>With the <code>-sn</code> option, Nmap will detect whether you're scanning the local subnet or a remote subnet. If the subnet is local, Nmap will send out an <strong>Address Resolution Protocol</strong> (<strong>ARP</strong>) broadcast that requests the IPv4 addresses of every device on the subnet. That's a reliable way of discovering devices because ARP isn't something that will ever be blocked by a device's firewall. (I mean, without ARP, the network would cease to function.) However, ARP broadcasts can't go across a router, which means that you can't use ARP to discover hosts on a remote subnet. So, if Nmap detects that you're doing a discovery scan on a remote subnet, it will send out ping packets instead of ARP broadcasts. Using ping packets for discovery isn't as reliable as using ARP because some network devices can be configured to ignore ping packets. Anyway, here's an example from my own home network:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; sudo nmap -sn 192.168.0.0/24
+Starting Nmap 6.47 ( http://nmap.org ) at 2017-12-25 14:48 EST
+Nmap scan report for 192.168.0.1
+Host is up (0.00043s latency).
+MAC Address: 00:18:01:02:3A:57 (Actiontec Electronics)
+Nmap scan report for 192.168.0.3
+Host is up (0.0044s latency).
+MAC Address: 44:E4:D9:34:34:80 (Cisco Systems)
+Nmap scan report for 192.168.0.5
+Host is up (0.00026s latency).
+MAC Address: 1C:1B:0D:0A:2A:76 (Unknown)
+. . .
+. . .</code></pre>
+</div>
+<p>We see three hosts in this snippet, and there are three lines of output for each host. The first line shows the IP address, the second shows whether the host is up, and the third shows the MAC address of the host's network adapter. The first three pairs of characters in each MAC address denote the manufacturer of that network adapter. (For the record, that unknown network adapter is on a recent model Gigabyte motherboard. I have no idea why it's not in the Nmap database.)</p>
+<p>The final scan that we'll look at does four things for us:</p>
+<ul>
+<li>It identifies <code>open</code>, <code>closed</code>, and <code>filtered</code> TCP ports.</li>
+<li>It identifies the versions of the running services.</li>
+<li>It runs a set of vulnerability scanning scripts that come with Nmap.</li>
+<li>It attempts to identify the operating system of the target host.</li>
+</ul>
+<p>The scan command that does all of these things looks like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo nmap -A 192.168.0.37</code></pre>
+</div>
+<p>I guess that you could think of the <code>-A</code> option as the <em>all</em> option since it really does do it all. (Well, almost all, since it doesn't scan UDP ports.) First, here's the command that I ran to do the scan:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; sudo nmap -A 192.168.0.37</code></pre>
+</div>
+<p>Here are the results, broken down into sections for formatting purposes:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Starting Nmap 6.47 ( http://nmap.org ) at 2017-12-24 19:33 EST
+Nmap scan report for 192.168.0.37
+Host is up (0.00016s latency).
+Not shown: 996 closed ports</code></pre>
+</div>
+<p>Right away, we see that there's no active firewall on this machine because no ports are in the <code>filtered</code> state. By default, Nmap scans only the most 1,000 most popular ports. Since 996 ports are in the <code>closed</code> state, we obviously only have four active network services that would listen on any of these 1,000 ports:</p>
+<div class="C0-SHConPACKT">
+<pre><code>PORT STATE SERVICE VERSION
+22/tcp open ssh OpenSSH 5.1 (protocol 1.99)
+|_ssh-hostkey: ERROR: Script execution failed (use -d to debug)
+|_sshv1: Server supports SSHv1
+515/tcp open printer?</code></pre>
+</div>
+<p>Port <code>22</code> is open for Secure Shell access, which we would normally expect. However, look at the SSH version. Version 5.1 is a really old version of OpenSSH. (At the time of writing, the current version is version 9.1.) What's worse is that this OpenSSH server supports version 1 of the Secure Shell protocol. Version 1 is seriously flawed and is easily exploitable, so you never want to see this on your network.</p>
+<p>Next, we have amplifying information on the print service vulnerability that we found with the Greenbone Security Assistant scan:</p>
+<div class="C0-SHConPACKT">
+<pre><code>631/tcp open ipp CUPS 1.1
+| http-methods: Potentially risky methods: PUT
+|_See http://nmap.org/nsedoc/scripts/http-methods.html
+| http-robots.txt: 1 disallowed entry
+|_/
+|_http-title: Common UNIX Printing System</code></pre>
+</div>
+<p>In the <code>631/tcp</code> line, we see that the associated service is <code>ipp</code>. This protocol is based on the same HTTP that we use to look at web pages. The two methods that HTTP uses to send data from a client to a server are <code>POST</code> and <code>PUT</code>. What we really want is for every HTTP server to use the <code>POST</code> method because the <code>PUT</code> method makes it very easy for someone to compromise a server by manipulating a URL. So, if you scan a server and find that it allows using the <code>PUT</code> method for any kind of HTTP communications, you have a potential problem. In this case, the solution would be to update the operating system and hope that the updates fix the problem. If this were a web server, you'd want to have a chat with the web server administrators to let them know what you found.</p>
+<p>Next, we see that the VNC service is running on this machine:</p>
+<div class="C0-SHConPACKT">
+<pre><code>5900/tcp open vnc Apple remote desktop vnc
+| vnc-info:
+| Protocol version: 3.889
+| Security types:
+|_ Mac OS X security type (30)
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at http://www.insecure.org/cgi-bin/servicefp-submit.cgi :
+SF-Port515-TCP:V=6.47%I=7%D=12/24%Time=5A40479E%P=x86_64-suse-linux-gnu%r(
+SF:GetRequest,1,&quot;\x01&quot;);
+MAC Address: 00:0A:95:8B:E0:C0 (Apple)
+Device type: general purpose</code></pre>
+</div>
+<p>VNC can be handy at times. It's like Microsoft's Remote Desktop service for Windows, except that it's free, open source software. But it's also a security problem because it's an unencrypted protocol. So, all your information goes across the network in plain text. If you must use VNC, run it through an SSH tunnel.</p>
+<p>Next, let's see what Nmap found out about the operating system of our target machine:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Running: Apple Mac OS X 10.4.X
+OS CPE: cpe:/o:apple:mac_os_x:10.4.10
+OS details: Apple Mac OS X 10.4.10 - 10.4.11 (Tiger) (Darwin 8.10.0 - 8.11.1)
+Network Distance: 1 hop
+Service Info: OS: Mac OS X; CPE: cpe:/o:apple:mac_os_x</code></pre>
+</div>
+<p>Wait, what? Mac OS X 10.4? Isn't that really, really ancient? Well, yeah, it is. The secret that I've been guarding for the past couple of chapters is that the target machine for my Greenbone Security Assistant and Nmap scan demos has been my ancient, collectible Apple eMac from the year 2003. I figured that scanning it would give us some interesting results to look at, and it would appear that I was right. (And yes, that is <em>eMac</em>, not <em>iMac</em>.)</p>
+<p>The final thing we see is the <code>TRACEROUTE</code> information. It's not very interesting, though, because the target machine was sitting right next to me, with only one Cisco switch between us:</p>
+<div class="C0-SHConPACKT">
+<pre><code>TRACEROUTE
+HOP RTT ADDRESS
+1 0.16 ms 192.168.0.37
+OS and Service detection performed. Please report any incorrect results at http://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 213.92 seconds
+donnie@linux-0ro8:~&gt;</code></pre>
+</div>
+<blockquote>
+<p>Let's say that the target machine has had its SSH service changed to some alternate port, instead of having it run on the default port, <code>22</code>. If you scan the machine with a normal <code>-sS</code> or <code>-sT</code> scan, Nmap won't correctly identify the SSH service on that alternate port. However, a <code>-A</code> scan will correctly identify the SSH service, regardless of which port it's using.</p>
+</blockquote>
+<p>Okay, let’s do a lab.</p>
+</section>
+<section id="hands-on-lab-scanning-with-nmap-1" class="level4" data-number="17.3.3.3">
+<h4 data-number="17.3.3.3">Hands-on lab – scanning with Nmap</h4>
+<p>In this lab, you'll see the results of scanning a machine with various services either enabled or disabled. You'll start with a virtual machine that has its firewall disabled. Let's get started:</p>
+<ol>
+<li>Briefly peruse the Nmap help screen by using the following command:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap</code></pre>
+</div>
+<ol>
+<li>From either your host machine or from another virtual machine, perform these scans against a virtual machine that has its firewall disabled (substitute your own IP address for the one I'm using here):</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo nmap -sS 192.168.0.252
+sudo nmap -sT 192.168.0.252
+sudo nmap -SU 192.168.0.252
+sudo nmap -A 192.168.0.252
+sudo nmap -sA 192.168.0.252</code></pre>
+</div>
+<ol>
+<li>Stop the SSH service on the target machine on Ubuntu:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl stop ssh</code></pre>
+</div>
+<p>On either CentOS or AlmaLinux, use this command:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl stop sshd</code></pre>
+</div>
+<ol>
+<li>Repeat <em>step 2</em>.</li>
+</ol>
+<p>You've reached the end of this lab – congratulations!</p>
+<p>Now that you've seen how to scan a system, let's look at the GRUB2 bootloader.</p>
+</section>
+</section>
+</section>
+<section id="password-protecting-the-grub-2-bootloader" class="level2" data-number="17.4">
+<h2 data-number="17.4">Password protecting the GRUB 2 bootloader</h2>
+<p>People sometimes forget passwords, even if they're administrators. And sometimes, people buy used computers but forget to ask the seller what the password is. (Yes, I've done that.) That's okay, though, because all of the major operating systems have ways to let you either reset or recover a lost administrator password. That's handy, except that it does kind of make the whole idea of having login passwords a rather moot point when someone has physical access to the machine. Let's say that your laptop has just been stolen. If you haven't encrypted the hard drive, it would only take a few minutes for the thief to reset the password and steal your data. If you have encrypted the drive, the level of protection would depend on which operating system you're running. With standard Windows folder encryption, the thief would be able to access the encrypted folders just by resetting the password. With LUKS whole-disk encryption on a Linux machine, the thief wouldn't be able to get past the point of having to enter the encryption passphrase.</p>
+<p>With Linux, we have a way to safeguard against unauthorized password resets, even if we're not using whole-disk encryption. All we have to do is to password protect the <strong>Grand Unified Bootloader</strong> (<strong>GRUB</strong>), which would prevent a thief from booting into emergency mode to do the password reset.</p>
+<blockquote>
+<p>Whether or not you need the advice in this section depends upon your organization's physical security setup. That's because booting a Linux machine into emergency mode requires physical access to the machine. It's not something that you can do remotely. In an organization with proper physical security, servers – especially ones that hold sensitive data – are locked away in a room that's locked within another room. Only a very few trusted personnel are allowed to enter, and they have to present their credentials at both access points. So, setting a password on the bootloader of those servers would be rather pointless, unless you're dealing with a regulatory agency that dictates otherwise.</p>
+<blockquote>
+<p>On the other hand, password protecting the bootloaders of workstations and laptops that are out in the open could be quite useful. However, that alone won't protect your data. Someone could still boot the machine from a live disk or a USB memory stick, mount the machine's hard drive, and obtain the sensitive data. That's why you also want to encrypt your sensitive data, as I showed you in <em>Chapter 6</em>, <em>Encryption Technologies</em>.</p>
+</blockquote>
+</blockquote>
+<p>To reset a password, all you have to do is interrupt the boot process when the boot menu comes up and either change a couple of kernel parameters, or select the <strong>Recovery</strong> mode option if it’s available. Either way, the machine will boot into emergency mode without asking for a password. However, resetting passwords isn't the only thing you can do from emergency mode. Once you’ve booted into emergency mode, you have full root user control over the whole system.</p>
+<p>Now, just so you'll know what I'm talking about when I say that you can edit kernel parameters from the GRUB 2 boot menu, let me show you how to perform a password reset on a Red Hat-type system.</p>
+<section id="hands-on-lab-resetting-the-password-for-red-hatcentosalmalinux" class="level3" data-number="17.4.1">
+<h3 data-number="17.4.1">Hands-on lab – resetting the password for Red Hat/CentOS/AlmaLinux</h3>
+<p>With only one very minor exception, this procedure works exactly the same on CentOS 7, AlmaLinux 8, and AlmaLinux 9. Let's get started:</p>
+<ol>
+<li><p>Boot the virtual machine. When the boot menu comes up, interrupt the boot process by hitting the <span class="KeystrokePACKT">down</span> arrow key once. Then, hit the <span class="KeystrokePACKT">up</span> arrow key once to select the default boot option:</p>
+<figure>
+<img src="../media/file112.png" alt="Figure 16.2: Selecting the boot option" /><figcaption aria-hidden="true">Figure 16.2: Selecting the boot option</figcaption>
+</figure></li>
+<li><p>Hit the <span class="KeystrokePACKT">e</span> key to edit the kernel parameters. When the GRUB 2 configuration comes up, cursor down until you see this line:</p>
+<figure>
+<img src="../media/file113.png" alt="Figure 16.3: Edit the kernel options" /><figcaption aria-hidden="true">Figure 16.3: Edit the kernel options</figcaption>
+</figure>
+<blockquote>
+<p>Note that on CentOS 7, the line begins with <code>linux16</code>, as shown here. On AlmaLinux 8/9, the line begins with <code>linux</code>.</p>
+</blockquote></li>
+<li>Delete the words <code>rhgb quiet</code> from this line and then add <code>rd.break enforcing=0</code> to the end of the line. Here's what these two new options do for you:</li>
+<li><code>rd.break</code>: This will cause the machine to boot into emergency mode, which gives you root user privileges without you having to enter a root user password. Even if the root user password hasn't been set, this still works.</li>
+<li><code>enforcing=0</code>: When you do a password reset on an SELinux-enabled system, the security context for the <code>/etc/shadow</code> file will change to the wrong type. If the system is in enforcing mode when you do this, SELinux will prevent you from logging in until the <code>shadow</code> file is relabeled. However, relabeling during the boot process can take a very long time, especially with a large drive. By setting SELinux to permissive mode, you can wait until after you've rebooted to restore the proper security context on just the <code>shadow</code> file.</li>
+<li><p>When you've finished editing the kernel parameters, hit <span class="KeystrokePACKT">Ctrl</span> + <span class="KeystrokePACKT">X</span> to continue the boot process. This will take you to emergency mode with the <code>switch_root</code> command prompt:</p>
+<figure>
+<img src="../media/file114.png" alt="Figure 16.4: In emergency mode" /><figcaption aria-hidden="true">Figure 16.4: In emergency mode</figcaption>
+</figure></li>
+<li>In emergency mode, the filesystem is mounted as read-only. You'll need to remount it as read-write and enter <code>chroot</code> mode before you can reset the password, using these two commands:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>mount -o remount,rw /sysroot
+chroot /sysroot</code></pre>
+</div>
+<p>After you enter these two commands, the command prompt will change to that of a normal bash shell:</p>
+<figure>
+<img src="../media/file115.png" alt="Figure 16.5: Entering the chroot" /><figcaption aria-hidden="true">Figure 16.5: Entering the chroot</figcaption>
+</figure>
+<p>Now that you've reached this stage, you're finally ready to reset the password.</p>
+<ol>
+<li>If you want to reset the root user password, or even if you want to create a root password where none previously existed, just enter:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>passwd</code></pre>
+</div>
+<p>Then, enter the new desired password.</p>
+<ol>
+<li>If the system has never had a root user password and you still don't want it to have one, you can reset the password for an account that has full sudo privileges. For example, on my system, the command would look like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>passwd donnie</code></pre>
+</div>
+<ol>
+<li>Next, remount the filesystem as read-only. Then, enter <code>exit</code> twice to resume rebooting:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>mount -o remount,ro /
+exit
+exit</code></pre>
+</div>
+<ol>
+<li>The first thing you need to do after rebooting is to restore the proper SELinux security context on the <code>/etc/shadow</code> file. Then, put SELinux back into enforcing mode:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo restorecon /etc/shadow
+sudo setenforce 1</code></pre>
+</div>
+<p>Here's a before and after screenshot of the context settings for my <code>shadow</code> file:</p>
+<figure>
+<img src="../media/file116.png" alt="Figure 16.6: SELinux context settings for the shadow file" /><figcaption aria-hidden="true">Figure 16.6: SELinux context settings for the shadow file</figcaption>
+</figure>
+<p>Here, you see that resetting the password changed the type of the file to <code>unlabeled_t</code>. Running the <code>restorecon</code> command changed the type back to <code>shadow_t</code>.</p>
+<p>You've reached the end of this lab – congratulations!</p>
+<p>Now, we'll look at the same procedure for Ubuntu.</p>
+</section>
+<section id="hands-on-lab-resetting-the-password-for-ubuntu" class="level3" data-number="17.4.2">
+<h3 data-number="17.4.2">Hands-on lab – resetting the password for Ubuntu</h3>
+<p>The procedure for resetting a password on an Ubuntu system is quite a bit different and quite a bit simpler. However, there is one slight difference between doing this on Ubuntu 16.04 and Ubuntu 18.04 or newer. That is, to see the boot menu on Ubuntu 16.04, you don't have to do anything. On Ubuntu 18.04, you have to press either the <span class="KeystrokePACKT">Shift</span> key (on BIOS-based systems) or the <span class="KeystrokePACKT">Esc</span> key (on UEFI-based systems) in order to see the boot menu. On the current Ubuntu 22.04, you’ll press the <span class="KeystrokePACKT">Esc</span> key for either BIOS-based or UEFI-based systems. Other than that, the procedure is identical for everything from Ubuntu 16.04 through the current Ubuntu 22.04. So now, let’s get started:</p>
+<ol>
+<li>Boot the virtual machine. Press the <span class="KeystrokePACKT">Esc</span> key to bring up the boot menu.</li>
+<li><p>Press the down arrow key to highlight the <span class="KeystrokePACKT">Advanced Options for Ubuntu</span> menu item, and press the <span class="KeystrokePACKT">Enter</span> key:</p>
+<figure>
+<img src="../media/file117.png" alt="Figure 16.7: Ubuntu Advanced Options submenu" /><figcaption aria-hidden="true">Figure 16.7: Ubuntu Advanced Options submenu</figcaption>
+</figure></li>
+<li><p>From the <strong>Advanced Options for Ubuntu</strong> submenu, select the <strong>recovery mode</strong> option, and press Enter:</p>
+<figure>
+<img src="../media/file118.png" alt="Figure 16.8: Select the recovery mode option" /><figcaption aria-hidden="true">Figure 16.8: Select the recovery mode option</figcaption>
+</figure></li>
+<li><p>When the <strong>Recovery Menu</strong> comes up, select the <strong>root</strong> option, and press the <span class="KeystrokePACKT">Enter </span>key:</p>
+<figure>
+<img src="../media/file119.png" alt="Figure 16.9: Select the root option" /><figcaption aria-hidden="true">Figure 16.9: Select the root option</figcaption>
+</figure></li>
+<li><p>Press the <span class="KeystrokePACKT">Enter</span> key again. This will take you to a root shell:</p>
+<figure>
+<img src="../media/file120.png" alt="Figure 16.10: In recovery mode" /><figcaption aria-hidden="true">Figure 16.10: In recovery mode</figcaption>
+</figure></li>
+<li>Since Ubuntu doesn't normally have a password assigned to the root user, you would most likely just reset the password of whoever had full sudo privileges, like so:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>passwd donnie</code></pre>
+</div>
+<ol>
+<li>When you've finished, reboot as you normally would:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>shutdown -r now</code></pre>
+</div>
+<p>The machine will now boot up for normal operation.</p>
+<p>You've reached the end of this lab – congratulations!</p>
+<p>Of course, we don't want everybody and his brother to be able to edit kernel parameters or enter <strong>Recovery</strong> mode when booting a machine. So, let's fix that.</p>
+</section>
+<section id="preventing-kernel-parameter-edits-on-red-hatcentosalmalinux" class="level3" data-number="17.4.3">
+<h3 data-number="17.4.3">Preventing kernel parameter edits on Red Hat/CentOS/AlmaLinux</h3>
+<p>Ever since the introduction of Red Hat/CentOS 7.2, setting a GRUB 2 password to prevent kernel parameter edits is easy. Fortunately, this trick still works on the newest iterations of Red Hat and AlmaLinux. All you have to do is to run one command and choose a password:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo grub2-setpassword
+[sudo] password for donnie:
+Enter password:
+Confirm password:
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>That's all there is to it. The password hash will be stored in the <code>/boot/grub2/user.cfg</code> file.</p>
+<p>Now, when you reboot the machine and try to do a kernel parameter edit, you'll be prompted to enter a username and password:</p>
+<figure>
+<img src="../media/file121.png" alt="Figure 16.11: Password protection for RHEL 7.2 and newer" /><figcaption aria-hidden="true">Figure 16.11: Password protection for RHEL 7.2 and newer</figcaption>
+</figure>
+<p>Note that you'll enter <code>root</code> as the username, even if the <code>root</code> user's password hasn't been set on the system. The <code>root</code> user, in this case, is just the superuser for GRUB 2.</p>
+<p>When you boot your Red Hat, CentOS, or AlmaLinux machine, you’ll see a <strong>0-rescue</strong> option come up at the bottom of the boot menu. (You can see it above in Figure 16.2.) If you select it, you’ll find that it does nothing but take you to a normal login prompt that will require you to enter your username and password. (Red Hat-type distros really do have a Rescue mode, but you have to boot the machine from the installation media to get to it.)</p>
+</section>
+<section id="preventing-kernel-parameter-edits-or-recovery-mode-access-on-ubuntu" class="level3" data-number="17.4.4">
+<h3 data-number="17.4.4">Preventing kernel parameter edits or Recovery mode access on Ubuntu</h3>
+<p>Ubuntu doesn't have that cool utility that Red Hat, CentOS, and AlmaLinux have, so you'll have to set a GRUB 2 password by hand-editing a configuration file.</p>
+<p>In the <code>/etc/grub.d/</code> directory, you'll see the files that make up the GRUB 2 configuration:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu3:/etc/grub.d$ ls -l
+total 76
+-rwxr-xr-x 1 root root  9791 Oct 12 16:48 00_header
+-rwxr-xr-x 1 root root  6258 Mar 15  2016 05_debian_theme
+-rwxr-xr-x 1 root root 12512 Oct 12 16:48 10_linux
+-rwxr-xr-x 1 root root 11082 Oct 12 16:48 20_linux_xen
+-rwxr-xr-x 1 root root 11692 Oct 12 16:48 30_os-prober
+-rwxr-xr-x 1 root root  1418 Oct 12 16:48 30_uefi-firmware
+-rwxr-xr-x 1 root root   214 Oct 12 16:48 40_custom
+-rwxr-xr-x 1 root root   216 Oct 12 16:48 41_custom
+-rw-r--r-- 1 root root   483 Oct 12 16:48 README
+donnie@ubuntu3:/etc/grub.d$</code></pre>
+</div>
+<p>The file you want to edit is the <code>40_custom</code> file. However, before you edit the file, you'll need to create the password hash. Do that with the <code>grub-mkpasswd-pbkdf2</code> utility:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu3:/etc/grub.d$ grub-mkpasswd-pbkdf2
+Enter password:
+Reenter password:
+PBKDF2 hash of your password is grub.pbkdf2.sha512.10000.F1BA16B2799CBF6A6DFBA537D43222A0D5006124ECFEB29F5C81C9769C6C3A66BF53C2B3AB71BEA784D4386E86C991F7B5D33CB6C29EB6AA12C8D11E0FFA0D40.371648A84CC4131C3CFFB53604ECCBA46DA75AF196E970C98483385B0BE026590C63A1BAC23691517BC4A5D3EDF89D026B599A0D3C49F2FB666F9C12B56DB35D
+donnie@ubuntu3:/etc/grub.d$</code></pre>
+</div>
+<p>Open the <code>40_custom</code> file in your favorite text editor and add a line that defines who the superuser(s) will be. Add another line for the password hash. In my case, the file now looks like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>#!/bin/sh
+exec tail -n +3 $0
+# This file provides an easy way to add custom menu entries. Simply type the
+# menu entries you want to add after this comment. Be careful not to change
+# the &#39;exec tail&#39; line above.
+set superusers=&quot;donnie&quot;
+password_pbkdf2 donnie grub.pbkdf2.sha512.10000.F1BA16B2799CBF6A6DFBA537D43222A0D5006124ECFEB29F5C81C9769C6C3A66BF53C2B3AB71BEA784D4386E86C991F7B5D33CB6C29EB6AA12C8D11E0FFA0D40.371648A84CC4131C3CFFB53604ECCBA46DA75AF196E970C98483385B0BE026590C63A1BAC23691517BC4A5D3EDF89D026B599A0D3C49F2FB666F9C12B56DB35D</code></pre>
+</div>
+<blockquote>
+<p>The string of text that begins with <code>password_pbkdf2</code> is all one line that wraps around on the printed page.</p>
+</blockquote>
+<p>After you save the file, the last step is to generate a new <code>grub.cfg</code> file:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu3:/etc/grub.d$ sudo update-grub
+Generating grub configuration file ...
+Found linux image: /boot/vmlinuz-4.4.0-104-generic
+Found initrd image: /boot/initrd.img-4.4.0-104-generic
+Found linux image: /boot/vmlinuz-4.4.0-101-generic
+Found initrd image: /boot/initrd.img-4.4.0-101-generic
+Found linux image: /boot/vmlinuz-4.4.0-98-generic
+Found initrd image: /boot/initrd.img-4.4.0-98-generic
+done
+donnie@ubuntu3:/etc/grub.d$</code></pre>
+</div>
+<p>Now, when I reboot this machine, I have to enter my password before I can either edit kernel parameters or access the <strong>Advanced options for Ubuntu</strong> submenu:</p>
+<figure>
+<img src="../media/file122.png" alt="Figure 16.12: Password protection for Ubuntu" /><figcaption aria-hidden="true">Figure 16.12: Password protection for Ubuntu</figcaption>
+</figure>
+<p>There's only one problem with this. Not only does this prevent anyone except the superuser from editing the kernel parameters, but it also prevents anyone except for the superuser from booting normally. Yes, that's right. Even for normal booting, Ubuntu will now require you to enter the username and password of the authorized superuser. Fortunately, this is an easy fix.</p>
+<p>The fix requires inserting a single word into the <code>/boot/grub/grub.cfg</code> file. Easy enough, right? However, it's not an elegant solution because you're not really supposed to hand-edit the <code>grub.cfg</code> file. At the top of the file, we see this:</p>
+<div class="C0-SHConPACKT">
+<pre><code># DO NOT EDIT THIS FILE
+#
+# It is automatically generated by grub-mkconfig using templates
+# from /etc/grub.d and settings from /etc/default/grub
+#</code></pre>
+</div>
+<p>This means that every time we do something that will update the <code>grub.cfg</code> file, any hand-edits that we've made to the file will be lost. This includes when we do a system update that installs a new kernel, or when we do a <code>sudo apt autoremove</code> that removes any old kernels that we no longer need. The supreme irony though, is that the official GRUB 2 documentation tells us to hand-edit the <code>grub.cfg</code> file to deal with these sorts of problems. A much better way is to modify the shell script that the <code>update-grub</code> utility uses to build the <code>grub.cfg</code> file. This will prevent you from accidentally overwriting any changes that you need to preserve.</p>
+<p>In the <code>/etc/grub.d/</code> directory, you’ll see several scripts that are used to build <code>grub.cfg</code>. The one we want is in the <code>10_linux</code> file. Open it in your text editor, and navigate down to the vicinity of line number 197. Look for these two lines:</p>
+<div class="C0-SHConPACKT">
+<pre><code>echo &quot;menuentry &#39;$(echo &quot;$title&quot; | grub_quote)&#39; ${CLASS} \$menuentry_id_option &#39;gnulinux-$version-$type-$boot_device_id&#39; {&quot; | sed &quot;s/^/$submenu_indentation/&quot;
+. . .
+. . .
+echo &quot;menuentry &#39;$(echo &quot;$os&quot; | grub_quote)&#39; ${CLASS} \$menuentry_id_option &#39;gnulinux-simple-$boot_device_id&#39; {&quot; | sed &quot;s/^/$submenu_indentation/&quot;</code></pre>
+</div>
+<p>(Note that each of these is one line that wraps around on the printed page.)</p>
+<p>In each line, add <code>--unrestricted</code> after <code>{CLASS}</code>, so that the lines now look like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>echo &quot;menuentry &#39;$(echo &quot;$title&quot; | grub_quote)&#39; ${CLASS} --unrestricted \$menuentry_id_option &#39;gnulinux-$version-$type-$boot_device_id&#39; {&quot; | sed &quot;s/^/$submenu_indentation/&quot;
+. . .
+. . .
+echo &quot;menuentry &#39;$(echo &quot;$os&quot; | grub_quote)&#39; ${CLASS} --unrestricted \$menuentry_id_option &#39;gnulinux-simple-$boot_device_id&#39; {&quot; | sed &quot;s/^/$submenu_indentation/&quot;</code></pre>
+</div>
+<p>Finally, run the <code>sudo update-grub</code> command, and you’ll be able to boot the machine normally on the default option. But, it’s a different story if you want to enter the <strong>Advanced options for Ubuntu</strong> submenu. With a superuser password set, you’ll always need to enter the superuser password in order to enter the <strong>Advanced options for Ubuntu</strong> submenu. This is true even with the <code>--unrestricted </code>option that you added to <code>10_linux script.</code> Effectively, this prevents anyone without the password from accessing the <strong>Recovery</strong> option.</p>
+</section>
+<section id="disabling-the-submenu-for-ubuntu" class="level3" data-number="17.4.5">
+<h3 data-number="17.4.5">Disabling the submenu for Ubuntu</h3>
+<p>On Ubuntu systems, you can easily disable the Ubuntu submenu so that you’ll see all boot options by default, which will look something like this:</p>
+<figure>
+<img src="../media/file123.png" alt="Figure 16.13: The Ubuntu boot menu without the submenu" /><figcaption aria-hidden="true">Figure 16.13: The Ubuntu boot menu without the submenu</figcaption>
+</figure>
+<p>If desired, you can also make it so that you don’t have to press the <span class="KeystrokePACKT">Shift</span> or <span class="KeystrokePACKT">Esc</span> key in order to see the boot menu.</p>
+<p>First, open the <code>/etc/default/grub</code> file in your text editor. Disable the submenu by adding by adding the <code>GRUB_DISABLE_SUBMENU=y</code> line. To make the boot menu visible by default, look for these two lines:</p>
+<div class="C0-SHConPACKT">
+<pre><code>GRUB_TIMEOUT_STYLE=hidden
+GRUB_TIMEOUT=0</code></pre>
+</div>
+<p>Comment out the first line, and change the value for the second line to a non-zero number. The lines should now look something like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code># GRUB_TIMEOUT_STYLE=hidden
+GRUB_TIMEOUT=10</code></pre>
+</div>
+<p>Finally, run the <code>sudo update-grub</code> command. Now, when you reboot the machine, you'll see the boot menu come up by itself, and you’ll see the whole list of boot options instead of just the default boot option and a submenu option. After a ten-second timeout, the system will automatically boot on the default option.</p>
+<p>The major flaw with disabling the Ubuntu submenu is that if you’ve configured GRUB with the <code>--unrestricted</code> option as I’ve just shown you, users will be able to boot into <strong>Recovery</strong> mode without entering a password. So, it’s now just as if you never password-protected GRUB in the first place. If you do disable the Ubuntu submenu, remember to also disable the <strong>Recovery</strong> mode option. Open the <code>/etc/default/grub</code> file in your editor, and look for this line:</p>
+<div class="C0-SHConPACKT">
+<pre><code># GRUB_DISABLE_RECOVERY=&quot;true&quot;</code></pre>
+</div>
+<p>Remove the <code>#</code> sign from in front of the line so that it now looks like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>GRUB_DISABLE_RECOVERY=&quot;true&quot;</code></pre>
+</div>
+<p>Update the GRUB configuration as you’ve done before:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo update-grub</code></pre>
+</div>
+<p>Finally, reboot the machine and verify that the <strong>Recovery</strong> mode option is gone. If you disable the <strong>Recovery</strong> boot menu option and still need to boot into <strong>Recovery</strong> mode, you can still do that by editing the kernel parameters at the beginning of the boot process. The procedure is somewhat different from what you’ve just seen with AlmaLinux, since you don’t have to worry about SELinux on Ubuntu. Rather than duplicate the procedure here, I’ll leave a link to a tutorial for it in the <em>Further reading</em> section. (The linked article is for Ubuntu 18.04, but the procedure still works for the current Ubuntu 22.04.)</p>
+<p>So, you’re now asking, <em>Why would I ever need to disable the Ubuntu submenu?</em> Well, you’ll never actually <em>need</em> to. For me, it’s just a matter of preference. Unlike the Red Hat distros, Ubuntu doesn’t automatically delete old Linux kernels if a new one gets installed during an update operation. If you don’t remember to do a <code>sudo apt autoremove</code> command after you update in order to get rid of them, you could fill up your <code>/boot/ </code>partition, which could prevent future updates from installing a new kernel. By disabling the submenu and making the boot menu visible by default, I can see how many Linux kernels are installed as soon as I boot the machine. (But hey, that’s just me, and I’m kind of weird. Just ask anyone who knows me.) On a production machine, it would make more sense to leave both the submenu and the <strong>Recovery</strong> option enabled, and set a GRUB 2 password.</p>
+<blockquote>
+<p>You'll find the security section of the official GRUB 2 documentation at <a href="http://www.gnu.org/software/grub/manual/grub/grub.html#Security">http://www.gnu.org/software/grub/manual/grub/grub.html#Security</a>.</p>
+</blockquote>
+</section>
+</section>
+<section id="securely-configuring-biosuefi" class="level2" data-number="17.5">
+<h2 data-number="17.5">Securely configuring BIOS/UEFI</h2>
+<p>This topic is different from anything we've looked at thus far because it has nothing to do with the operating system. Rather, we're now going to talk about the computer hardware.</p>
+<p>Every computer motherboard has either a BIOS or a UEFI chip, which stores both the hardware configuration for the computer and the bootstrap instructions that are needed to start the boot process after the power is turned on. UEFI has replaced the old-style BIOS on newer motherboards, and it has more security features than the old BIOS had.</p>
+<p>I can't give you any specific information about BIOS/UEFI setup because every model motherboard has a different way of doing things. What I can give you is some more generalized information.</p>
+<p>When you think about BIOS/UEFI security, you might be thinking about disabling the ability to boot from anything other than the normal system drive. In the following screenshot, you see that I've disabled all SATA drive ports except for the one to which the system drive is connected:</p>
+<figure>
+<img src="../media/file124.png" alt="Figure 16.14: Disabling drive ports on my Hewlett-Packard Envy" /><figcaption aria-hidden="true">Figure 16.14: Disabling drive ports on my Hewlett-Packard Envy</figcaption>
+</figure>
+<p>When computers are out in the open where the general public can have easy physical access to them, this might be a consideration. For servers that are locked away in their own secure room with limited access, there's no real reason to worry about this, unless the security requirements of some regulatory body dictate otherwise. For machines that are out in the open, having the whole disk encrypted would prevent someone from stealing data after booting from either an optical disk or a USB device. However, you may still have other reasons to prevent anyone from booting the machine from these alternate boot devices.</p>
+<p>Another consideration might be if you work in a secure environment where super-sensitive data are handled. If you're worried about unauthorized exfiltration of sensitive data, you might consider disabling the ability to write to USB devices. This will also prevent people from booting the machine from USB devices:</p>
+<figure>
+<img src="../media/file125.png" alt="Figure 16.15: Disabling USB devices" /><figcaption aria-hidden="true">Figure 16.15: Disabling USB devices</figcaption>
+</figure>
+<blockquote>
+<p>At times, you might not want to completely disable a machine’s USB ports. Instead, you can leave them enabled and use USBGuard to allow only certain USB devices to be connected. Rather than do my own write-up about it, I’ll refer you to this excellently-written tutorial that I found:</p>
+<blockquote>
+<p><a href="https://www.cyberciti.biz/security/how-to-protect-linux-against-rogue-usb-devices-using-usbguard/">https://www.cyberciti.biz/security/how-to-protect-linux-against-rogue-usb-devices-using-usbguard/</a></p>
+</blockquote>
+<blockquote>
+<p>The main catch with USBGuard is that it still won’t prevent someone from booting from a USB device.</p>
+</blockquote>
+</blockquote>
+<p>However, there's more than just this to BIOS/UEFI security. Today's modern server CPUs come with a variety of security features to help prevent data breaches. For example, let's look at a list of security features that are implemented in Intel Xeon CPUs:</p>
+<ul>
+<li>Identity-protection technology</li>
+<li>Advanced Encryption Standard New Instructions</li>
+<li>Trusted Execution Technology</li>
+<li>Hardware-assisted virtualization technology</li>
+</ul>
+<p>AMD, that plucky underdog in the CPU market, have their own new security features in their line of EPYC server CPUs. These features include:</p>
+<ul>
+<li>Secure Memory Encryption</li>
+<li>Secure Encrypted Virtualization</li>
+</ul>
+<p>In any case, you would configure these CPU security options in your server's UEFI setup utility.</p>
+<blockquote>
+<p>You can read about Intel Xeon security features at <a href="https://www.intel.com/content/www/us/en/newsroom/news/xeon-scalable-platform-built-sensitive-workloads.html">https://www.intel.com/content/www/us/en/newsroom/news/xeon-scalable-platform-built-sensitive-workloads.html</a>.</p>
+<blockquote>
+<p>You can read about AMD EPYC security features at <a href="https://semiaccurate.com/2017/06/22/amds-epyc-major-advance-security/">https://semiaccurate.com/2017/06/22/amds-epyc-major-advance-security/</a> and at <a href="https://www.servethehome.com/amd-psb-vendor-locks-epyc-cpus-for-enhanced-security-at-a-cost/">https://www.servethehome.com/amd-psb-vendor-locks-epyc-cpus-for-enhanced-security-at-a-cost/</a></p>
+</blockquote>
+</blockquote>
+<p>And of course, for any machines that are out in the open, it's a good idea to password-protect the BIOS or UEFI:</p>
+<figure>
+<img src="../media/file126.png" alt="Figure 16.16: Password protect the BIOS/UEFI" /><figcaption aria-hidden="true">Figure 16.16: Password protect the BIOS/UEFI</figcaption>
+</figure>
+<p>If for no other reason, do it to keep people from monkeying around with your settings.</p>
+<p>Now that you know a bit about locking down BIOS/UEFI, let's talk about security checklists.</p>
+</section>
+<section id="using-a-security-checklist-for-system-setup" class="level2" data-number="17.6">
+<h2 data-number="17.6">Using a security checklist for system setup</h2>
+<p>Previously, I told you about OpenSCAP, which is a really useful tool for locking down your system with just a minimal amount of effort. OpenSCAP comes with various profiles that you can apply to help bring your systems into compliance with the standards of different regulatory agencies. However, there are certain things that OpenSCAP can't do for you. For example, certain regulatory agencies require that your server's hard drive be partitioned in a certain way, with certain directories separated out into their own partitions. If you've already set up your server with everything under one big partition, you can't fix that just by doing a remediation procedure with OpenSCAP. The process of locking down your server to ensure that it's compliant with any applicable security regulations has to begin before you even install the operating system. For this, you need the appropriate checklist.</p>
+<p>There are a few different places where you can obtain a generic security checklist if that's all you need. The University of Texas at Austin published a generic checklist for Red Hat Enterprise Linux 7, which you can adjust if you need to use it with CentOS 7, Oracle Linux 7, or Scientific Linux 7. (Sadly, they don’t offer anything that’s more up-to-date.)</p>
+<p>You might find that some checklist items don't apply to your situation, and you can adjust them as required:</p>
+<figure>
+<img src="../media/file127.png" alt="Figure 16.17: University of Texas checklist" /><figcaption aria-hidden="true">Figure 16.17: University of Texas checklist</figcaption>
+</figure>
+<p>For specific business fields, you'll need to get a checklist from the applicable regulatory body. If you work in the financial sector or with a business that accepts credit card payments, you'll need a checklist from the Payment Card Industry Security Standards Council:</p>
+<figure>
+<img src="../media/file128.png" alt="Figure 16.18: The PCI-DSS website" /><figcaption aria-hidden="true">Figure 16.18: The PCI-DSS website</figcaption>
+</figure>
+<p>For healthcare organizations here in the US, there's HIPAA with its requirements. For publicly-traded companies here in the US, there's Sarbanes-Oxley with its requirements.</p>
+<blockquote>
+<p>You can get the University of Texas checklist at <a href="https://wikis.utexas.edu/display/ISO/Operating+System+Hardening+Checklists">https://wikis.utexas.edu/display/ISO/Operating+System+Hardening+Checklists</a>.</p>
+<blockquote>
+<p>You can get a PCI-DSS checklist at <a href="https://www.pcisecuritystandards.org/">https://www.pcisecuritystandards.org/</a>.</p>
+</blockquote>
+<blockquote>
+<p>You can get a HIPAA checklist at <a href="https://www.hhs.gov/hipaa/for-professionals/security/guidance/cybersecurity/index.html">https://www.hhs.gov/hipaa/for-professionals/security/guidance/cybersecurity/index.html</a></p>
+</blockquote>
+<blockquote>
+<p>You can get a Sarbanes-Oxley checklist at <a href="https://www.sarbanes-oxley-101.com/sarbanes-oxley-checklist.htm">https://www.sarbanes-oxley-101.com/sarbanes-oxley-checklist.htm</a>.</p>
+</blockquote>
+</blockquote>
+<p>Other regulatory bodies may also have their own checklists. If you know that you have to deal with any of them, be sure to get the appropriate checklist.</p>
+</section>
+<section id="summary-15" class="level2" data-number="17.7">
+<h2 data-number="17.7">Summary</h2>
+<p>Once again, we've come to the conclusion of another chapter, and we covered a lot of cool topics. We started by looking at various ways to audit which services are running on your systems, and we saw some examples of what you probably don't want to see. We then saw how to use the password protection features of GRUB 2, and we saw the little quirks that we have to deal with when using those features. Next, we had a change of pace by looking at how to further lock down a system by properly setting up a system's BIOS/UEFI. Finally, we looked at why we need to begin preparations to set up a hardened system by obtaining and following the proper checklist.</p>
+<p>Not only does this conclude another chapter, but it also concludes this book. However, this doesn't conclude your journey into the land of <em>Mastering Linux Security and Hardening</em>. Oh, no. As you continue this journey, you'll find that there's still more to learn, and still more that won't fit into the confines of just one book. Where you go from here mainly depends on the particular area of IT administration in which you work. Different types of Linux servers, whether they be web servers, DNS servers, or whatever else, have their own special security requirements, and you'll want to follow the learning path that best fits your needs.</p>
+<p>I've enjoyed the part of the journey on which I've been able to accompany you. I hope that you've enjoyed it just as much as I have.</p>
+</section>
+<section id="questions-15" class="level2" data-number="17.8">
+<h2 data-number="17.8">Questions</h2>
+<ol>
+<li>You need to see a list of network services that are listening for incoming connections. Which of the following commands would you use?
+<ol type="A">
+<li><code>sudo systemctl -t service --state=active</code></li>
+<li><code>netstat -i</code></li>
+<li><code>netstat -lp -A inet</code></li>
+<li><code>sudo systemctl -t service --state=listening</code></li>
+</ol></li>
+<li>Which of the following commands would you use to see only a list of established TCP connections?
+<ol type="A">
+<li><code>netstat -p -A inet</code></li>
+<li><code>netstat -lp -A inet</code></li>
+<li><code>sudo systemctl -t service --state=connected</code></li>
+<li><code>sudo systemctl -t service --state=active</code></li>
+</ol></li>
+<li>When Nmap tells you that a port is in an open state, what does that mean?
+<ol type="A">
+<li>That the port is open on the firewall.</li>
+<li>That the port is open on the firewall and that the service that's associated with that port is running.</li>
+<li>That the port is accessible via the internet.</li>
+<li>That the port's Access Control List is set to open.</li>
+</ol></li>
+<li>Which of these Nmap scan options would you most likely use to scan for open TCP ports?
+<ol type="A">
+<li><code>-sn</code></li>
+<li><code>-sU</code></li>
+<li><code>-sS</code></li>
+<li><code>-sA</code></li>
+</ol></li>
+<li>What do you want to do when resetting the root user password on a Red Hat/CentOS/AlmaLinux machine?
+<ol type="A">
+<li>Ensure that AppArmor is in enforcing mode.</li>
+<li>Ensure that SELinux is in enforcing mode.</li>
+<li>Ensure that AppArmor is in complain mode.</li>
+<li>Ensure that SELinux is in permissive mode.</li>
+</ol></li>
+<li>How does discovery mode work in Nmap?
+<ol type="A">
+<li>It discovers network devices by sending ping packets to the network's broadcast address.</li>
+<li>It discovers network devices by sending SYN packets to the network's broadcast address.</li>
+<li>It sends out ARP packets for a local network and ping packets for a remote network.</li>
+<li>It sends out ping packets for a local network and ARP packets for a remote network.</li>
+</ol></li>
+<li>You want to use Nmap to perform a UDP port scan of an entire subnet. Which of the following commands would you use?
+<ol type="A">
+<li><code>sudo nmap -sU 192.168.0.0</code></li>
+<li><code>sudo nmap -U 192.168.0.0</code></li>
+<li><code>sudo nmap -U 192.168.0.0/24</code></li>
+<li><code>sudo nmap -sU 192.168.0.0/24</code></li>
+</ol></li>
+<li>How would you begin the process of hardening a new computer system?
+<ol type="A">
+<li>Apply an OpenSCAP profile when installing the operating system.</li>
+<li>Begin the initial setup by following a checklist.</li>
+<li>Install the operating system, then apply an OpenSCAP profile.</li>
+<li>Install the operating system, then follow a hardening checklist.</li>
+</ol></li>
+<li>On a Red Hat/CentOS/AlmaLinux server, what would you most likely do to force users to enter a password before editing kernel parameters during bootup?
+<ol type="A">
+<li>Enter the <code>sudo grub2-password</code> command.</li>
+<li>Hand-edit the grub configuration file.</li>
+<li>Enter the <code>sudo grub2-setpassword</code> command.</li>
+<li>Enter the <code>sudo grub-setpassword</code> command.</li>
+<li>Enter the <code>sudo grub-password</code> command.</li>
+</ol></li>
+</ol>
+</section>
+<section id="further-reading-15" class="level2" data-number="17.9">
+<h2 data-number="17.9">Further reading</h2>
+<ul>
+<li>netstat – The easy tutorial: <a href="https://openmaniak.com/netstat.php">https://openmaniak.com/netstat.php</a></li>
+<li>Four ways to find which process is listening on a specific port: <a href="https://www.putorius.net/process-listening-on-port.html">https://www.putorius.net/process-listening-on-port.html</a></li>
+<li>netstat versus ss User Guide: <a href="https://computingforgeeks.com/netstat-vs-ss-usage-guide-linux/">https://computingforgeeks.com/netstat-vs-ss-usage-guide-linux/</a></li>
+<li>The official Nmap website: <a href="https://nmap.org/">https://nmap.org/</a></li>
+<li>The GNU GRUB manual: <a href="https://www.gnu.org/software/grub/manual/grub/grub.html">https://www.gnu.org/software/grub/manual/grub/grub.html</a></li>
+<li>How to boot Ubuntu 18.04 into emergency and rescue mode (An alternate method that still works on Ubuntu 22.04.): <a href="https://linuxconfig.org/how-to-boot-ubuntu-18-04-into-emergency-and-rescue-mode">https://linuxconfig.org/how-to-boot-ubuntu-18-04-into-emergency-and-rescue-mode</a></li>
+<li>How to see the GRUB boot menu on Ubuntu 18.04: <a href="https://askubuntu.com/questions/16042/how-to-get-to-the-grub-menu-at-boot-time">https://askubuntu.com/questions/16042/how-to-get-to-the-grub-menu-at-boot-time</a></li>
+</ul>
+</section>
+<section id="answers-13" class="level2" data-number="17.10">
+<h2 data-number="17.10">Answers</h2>
+<ol>
+<li>c</li>
+<li>a</li>
+<li>b</li>
+<li>c</li>
+<li>d</li>
+<li>c</li>
+<li>d</li>
+<li>b</li>
+<li>c</li>
+</ol>
+</section>
+</section>
+</body>
+</html>

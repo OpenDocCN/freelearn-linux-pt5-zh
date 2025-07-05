@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en-US">
+<head>
+<meta charset="utf-8"/>
+<meta name="generator" content="packt"/>
+<title>15 Prevent Unwanted Programs from Running</title>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet1.css"/>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet2.css"/>
+
+</head>
+<body>
+<section id="prevent-unwanted-programs-from-running" class="level1 pkt" data-number="16">
+<h1 data-number="16">15 Prevent Unwanted Programs from Running</h1>
+<section id="join-our-book-community-on-discord-14" class="level2" data-number="16.1">
+<h2 data-number="16.1">Join our book community on Discord</h2>
+<p><a href="https://packt.link/SecNet">https://packt.link/SecNet</a></p>
+<figure>
+<img src="../media/file104.png" style="width:10em" />
+</figure>
+<p>Once upon a time, we didn’t have to worry much about Linux malware. While it’s still true that Linux users don’t have to worry about viruses, there are other types of malware that can definitely ruin a Linux user’s day. Cryptomining programs planted on your server can eat up memory and CPU cycles, causing your server to work much harder and use more power than it should. Ransomware, which can encrypt either important files or a system’s bootloader, can make these important files or even the whole system inaccessible. Even paying the demanded ransom isn’t always a guarantee that your system will be returned to proper order. One way to prevent these programs from doing their damage is to only allow authorized programs to run, and to block everything else. We have two ways of doing that, which are the topics of this chapter:</p>
+<ul>
+<li>Mount partitions with the <em>no</em> options</li>
+<li>Use <code>fapolicyd</code> on Red Hat-type systems</li>
+</ul>
+<p>So, if you’re ready, let’s get going.</p>
+</section>
+<section id="mount-partitions-with-the-no-options" class="level2" data-number="16.2">
+<h2 data-number="16.2">Mount Partitions with the no options</h2>
+<p>In <em>Chapter 12</em>, <em>Scanning, Auditing, and Hardening</em>, I showed you how OpenSCAP can automatically bring your Linux systems into compliance with the security standards of certain regulatory bodies. I also told you the inconvenient truth that there are certain things that OpenSCAP can’t do, and that you’ll have to do for yourself. One thing that it can’t do is to partition your system drives as some of these regulatory bodies require. For example, the <strong>Security Technical Implementation Guides</strong> (<strong>STIG</strong>s) that the U.S. Government uses require the following Linux system and data directories to be mounted on their own partitions:</p>
+<ul>
+<li><code>/var</code></li>
+<li><code>/var/log/</code></li>
+<li><code>/var/tmp/</code></li>
+<li><code>/var/log/audit/</code></li>
+<li><code>/tmp/</code></li>
+<li><code>/home/</code></li>
+<li><code>/boot/</code></li>
+</ul>
+<div class="C0-SHConPACKT">
+<pre><code>/boot/efi/ (You’ll only have this one if your machine is set up in EFI mode.)</code></pre>
+</div>
+<p>The reason for this is twofold:</p>
+<ul>
+<li>If the root (<code>/</code>) partition of a Linux operating system becomes too full, it can cause the operating system to completely lock up. Mounting these directories in their own partitions can help prevent the <code>/</code> partition from filling up.</li>
+<li>The STIGs, and possibly other security regulations, require that these partitions be mounted with options that prevent executable programs from running on them, SGID and SUID file permissions from being effective, and device files to be created on them.</li>
+</ul>
+<p>As I mentioned, OpenSCAP won’t automatically set up this partitioning scheme for you. So, you’ll need to set it up as you install the operating system. This requires careful planning in order to get the partitions sized correctly. I mean, you don’t want to waste space by making certain partitions too large, and you don’t want to run out of space on partitions that really need the extra space.</p>
+<blockquote>
+<p>RHEL 9.1 and all of its clones were released a few weeks before I began writing this chapter. You might already have noticed that there’s a bug in the 9.1 installer that wasn’t in the 9.0 installer. That is, the option to create a normal user account isn’t visible on the installer screen. I mean, it’s there, but you can’t see it and can’t scroll down to it. To bring it up, just keep hitting the <span class="KeystrokePACKT">Tab</span> key until you’ve highlighted the option to create the root user password. Then, hit the <span class="KeystrokePACKT">Tab</span> key once more, and then hit the <span class="KeystrokePACKT">Enter</span> key. (Of course, there’s always the chance that the problem will get fixed by the time you read this.)</p>
+</blockquote>
+<p>To get this set up, you’ll need to select the installer option to create a custom partitioning scheme. To make this somewhat realistic, set the size of your virtual machine’s virtual drive to about 1 TB. (Don’t worry if you don’t have that much space on your host machine’s drive. VirtualBox will create a dynamically-sized drive that won’t use 1 TB worth of space on the host drive unless you put 1 TB worth of files on it.) Let’s see what this looks like on AlmaLinux 9:</p>
+<figure>
+<img src="../media/file105.png" alt="Figure 15.1: Choose to create a custom partitioning scheme" /><figcaption aria-hidden="true">Figure 15.1: Choose to create a custom partitioning scheme</figcaption>
+</figure>
+<p>After selecting the <strong>Custom</strong> option, hit the <strong>Done</strong> button at the top of the screen. On the next screen, click the <code>+</code> box to create a mount point. Note that you can create a standard partition, a logical volume, or a thin-provisioned logical volume. (I’m going to go with standard partitions.)</p>
+<figure>
+<img src="../media/file106.png" alt="Figure 15.2: Create a mount point" /><figcaption aria-hidden="true">Figure 15.2: Create a mount point</figcaption>
+</figure>
+<p>Let’s start by creating the <code>/boot/</code> mount point:</p>
+<figure>
+<img src="../media/file107.png" alt="Figure 15.3: Creating the first mount point" /><figcaption aria-hidden="true">Figure 15.3: Creating the first mount point</figcaption>
+</figure>
+<p>Create the rest of the required mount points for the partitions that I mentioned in the above list. Your completed scheme might look something like this:</p>
+<figure>
+<img src="../media/file108.png" alt="Figure 15.4: Create the rest of the mount points" /><figcaption aria-hidden="true">Figure 15.4: Create the rest of the mount points</figcaption>
+</figure>
+<p>Of course, your own use case will dictate how large you make each of these partitions. Here, you see that the <code>/home/</code> directory is the largest, which suggests that I want to use this machine as a Samba file server. If I were to use this machine for some other purpose, such as a database server, I would resize these partitions as required.</p>
+<blockquote>
+<p>There’s a long-standing upstream bug in the RHEL installer that also affects the RHEL clones. That is, regardless of how much or how little space you need for each partition, you’ll have to make each one at least 1 GB in size. Otherwise, the installation will fail with an <code>error in POSTTRANS scriptlet in rpm package kernel-core</code> message. This has been a known problem for a long time, but it still hasn’t been fixed. (Yes, it does waste some disk space, but there’s nothing we can do about it.)</p>
+</blockquote>
+<p>Now, here’s where we’re going to cheat a bit. We’re going to pretend that we’re dealing with the US government, which requires us to meet the STIG specifications. So, on the installer screen, we’ll click on the option to apply a security profile. On the next screen, we’ll scroll down to where we see the STIG profile, and select it. At the bottom, you’ll see that this profile adds the <code>noexec</code>, <code>nodev</code>, and <code>nosuid</code> options to the partitions, as applicable. (The <code>/var/</code> partition only requires the <code>nodev</code> option, and the <code>/boot/</code> partition only requires the <code>nodev</code> and <code>nosuid</code> options.)</p>
+<figure>
+<img src="../media/file109.png" alt="Figure 15.5: Applying the STIG profile" /><figcaption aria-hidden="true">Figure 15.5: Applying the STIG profile</figcaption>
+</figure>
+<p>Here’s what these three mount options do for us:</p>
+<ul>
+<li><strong>noexec</strong>: Executable files cannot run from any partition that’s mounted with this option. (This includes executable shell scripts, unless you invoke the script with <code>sh</code>. I’ll show you more about this in just a bit.)</li>
+<li><strong>nodev</strong>: Users can’t create any device files on partitions that are mounted with this option.</li>
+<li><strong>nosuid</strong>: On partitions that are mounted with this option, adding either the SUID or SGID permission to files will have no effect.</li>
+</ul>
+<p>When the installation completes, our <code>/etc/fstab</code> file will look something like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>UUID=72d0a3b3-cd07-45c0-938e-4e3377750adb /             xfs     defaults        0 0
+UUID=7bf3315e-525e-4940-b562-7e0b634d65de /boot       xfs     defaults,nosuid,nodev 0 0
+UUID=4df2f723-e875-4194-9ccd-b4a2733fd617 /home       xfs     defaults,noexec,nosuid,nodev 0 0
+UUID=d89b01b1-c3ee-48b6-bb40-0311fdd2838a /tmp        xfs     defaults,nodev,noexec,nosuid 0 0
+UUID=d79889b0-1635-47d5-950d-8dbca088c464 /var         xfs     defaults,nodev        0 0
+UUID=be9a3d41-0e07-4466-8eb7-57fb850df2d4 /var/log     xfs     defaults,nodev,noexec,nosuid 0 0
+UUID=ed001588-333b-4027-bef1-754fcc5e868d /var/log/audit     xfs     defaults,nodev,noexec,nosuid 0 0
+UUID=05c1b1e9-7f32-4791-9d41-492fce6f5166 /var/tmp     xfs     defaults,nodev,noexec,nosuid 0 0
+UUID=c4fdabb8-7e45-4717-b7f5-1cad5f8e7720 none            swap    defaults        0 0
+tmpfs /dev/shm tmpfs defaults,relatime,inode64,nodev,noexec,nosuid 0 0</code></pre>
+</div>
+<p>(Note that some of these lines might wrap around on the printed page.)</p>
+<p>Now, let’s see if we can run an executable script from any of these directories. In my own home directory, I created a shell script that looks like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>#!/bin/bash
+echo &quot;This is a test of the noexec option.&quot;
+exit</code></pre>
+</div>
+<p>After adding the executable permission for myself, I tried to run it. Then, I copied it to the <code>/tmp/</code> directory and tried to run it again. Here’s what I got:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ chmod u+x donnie_script.sh 
+[donnie@localhost ~]$ ./donnie_script.sh
+-bash: ./donnie_script.sh: Permission denied
+[donnie@localhost ~]$ cp donnie_script.sh /tmp
+[donnie@localhost ~]$ cd /tmp
+[donnie@localhost tmp]$ ./donnie_script.sh
+-bash: ./donnie_script.sh: Permission denied
+[donnie@localhost tmp]$</code></pre>
+</div>
+<p>So, I can’t run it, at least not as a normal user. But, what if I were to try it with <code>sudo</code>? Let’s see:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost tmp]$ sudo ./donnie_script.sh
+[sudo] password for donnie: 
+sudo: unable to execute ./donnie_script.sh: Permission denied
+[donnie@localhost tmp]$</code></pre>
+</div>
+<p>Cool, the <code>noexec</code> option actually works. Well, for this it does. What would happen if we were to invoke the script with <code>sh?</code> Let’s see:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sh ./donnie_script.sh
+This is a test of the noexec option.
+[donnie@localhost ~]$ cd /tmp
+[donnie@localhost tmp]$ sh ./donnie_script.sh
+This is a test of the noexec option.
+[donnie@localhost tmp]$</code></pre>
+</div>
+<p>So, with shell scripts, the blocking isn’t perfect. Let’s see what happens with a compiled executable file. Start by downloading the command-line wallet/mining program for the DERO cryptocurrency project from here:</p>
+<p><a href="https://dero.io/download.html#linux">https://dero.io/download.html#linux</a></p>
+<p>Transfer the file to your virtual machine and untar it:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ tar xzvf dero_linux_amd64.tar.gz 
+./dero_linux_amd64/
+./dero_linux_amd64/Start.md
+./dero_linux_amd64/explorer-linux-amd64
+./dero_linux_amd64/simulator-linux-amd64
+./dero_linux_amd64/dero-miner-linux-amd64
+./dero_linux_amd64/derod-linux-amd64
+./dero_linux_amd64/dero-wallet-cli-linux-amd64
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Note that the executable permission is already set for all of the executable files, so you won’t have to add it.</p>
+<p>Now, for the moment of truth. Enter the <code>dero_linux_amd64</code> directory and attempt to run the <code>derod-linux-amd64</code> program:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ cd dero_linux_amd64/
+[donnie@localhost dero_linux_amd64]$ ./derod-linux-amd64
+-bash: ./derod-linux-amd64: Permission denied
+[donnie@localhost dero_linux_amd64]$</code></pre>
+</div>
+<p>Since this is a compiled executable instead of a shell script, prefacing the command with <code>sh </code>won’t do anything for us in any case. Anyway, keep this DERO stuff handy, because we’ll use it again in the next section.</p>
+<blockquote>
+<p>If you’re wondering what DERO is, think of it as a private version of Ethereum. You can build other tokens on it and create smart contract applications on it, just like you can do with Ethereum. The difference is that DERO protects your privacy, and Ethereum doesn’t.</p>
+</blockquote>
+<p>In <em>Chapter 12</em>, <em>Scanning, Auditing, and Hardening</em>, I showed you that only the RHEL-type distros give us the option of applying a SCAP profile as we install the operating system. On non-RHEL distros, you’ll need to apply the SCAP profile after the installation has completed, assuming that an appropriate profile is available for your distro. In any case, if you don’t need to apply a whole SCAP profile but still want to add these security options to your partitions, or if no SCAP profile is available for your distro, just hand-edit the <code>/etc/fstab</code> file to add them in.</p>
+<p>Next, we’ll look at another control mechanism that, so far at least, is exclusive to the world of Red Hat.</p>
+</section>
+<section id="understanding-fapolicyd" class="level2" data-number="16.3">
+<h2 data-number="16.3">Understanding fapolicyd</h2>
+<p>The <strong>File Access Policy Daemon</strong> (<strong>fapolicyd</strong>) is a fairly new addition to Red Hat Enterprise Linux and its various clones. It’s free-as-in-speech software so that anyone can use it, but so far neither Ubuntu nor SUSE have made it available for their distros. To get a quick feel for how it works, go back to the virtual machine that you’ve just been using. First, move the entire <code>derod-linux-amd64</code> directory over to the top level of the <code>/</code> partition:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo mv dero_linux_amd64/ /
+[sudo] password for donnie: 
+[donnie@localhost ~]$ </code></pre>
+</div>
+<p>By moving the directory instead of copying it, your ownership of the directory and its files will be preserved:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost /]$ ls -ld dero_linux_amd64/
+drwx------. 3 donnie donnie 4096 Jan  2 15:42 dero_linux_amd64/
+[donnie@localhost /]$</code></pre>
+</div>
+<p>Now, copy the script that you created over to <code>/usr/local/bin/</code>:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost dero_linux_amd64]$ cd
+[donnie@localhost ~]$ sudo cp donnie_script.sh /usr/local/bin
+[sudo] password for donnie: 
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>When you look at the permissions settings on this script file, you’ll see something very unusual:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ cd /usr/local/bin
+[donnie@localhost bin]$ ls -l
+total 16364
+-rwx------. 1 root root       61 Dec 31 16:01 donnie_script.sh
+[donnie@localhost bin]$</code></pre>
+</div>
+<p>You see that doing a <code>cp</code> operation automatically changes the ownership of this file to the owner of the target directory, which in this case is the root user. That’s just normal operation, so there’s nothing to see there. What’s so unusual is that we have a permissions setting of <code>700</code> on this file. That’s because of something else that our STIG profile has done. That is, the STIG profile has set a <strong>UMASK</strong> of <code>077</code> on this system, as we see here:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ umask
+0077
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>This means that any normal files that you create will have read and write permissions for only the owner, and any directories that you create will have read, write, and execute permissions for only the owner. To make this demo work we’ll need to change the permissions settings to a value of <code>755</code>, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost bin]$ sudo chmod 755 donnie_script.sh
+[sudo] password for donnie: 
+[donnie@localhost bin]$ ls -l
+total 16364
+-rwxr-xr-x. 1 root root       61 Dec 31 16:01 donnie_script.sh
+[donnie@localhost bin]$</code></pre>
+</div>
+<p>Cool. We can now make the demo work. We’ll start by entering the <code>/dero-linux-amd64/</code> directory and trying to invoke the <code>derod-linux-amd64</code> executable:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ cd /dero_linux_amd64/
+[donnie@localhost dero_linux_amd64]$ derod-linux-amd64 
+-bash: /dero_linux_amd64/derod-linux-amd64: Operation not permitted
+[donnie@localhost dero_linux_amd64]$</code></pre>
+</div>
+<p>Even though you’re now invoking this program from a partition that isn’t mounted with the <code>noexec</code> option, you’re still not allowed to run it. That’s because it’s now being blocked by <code>fapolicyd</code>. That is, you can’t run it with your normal user privileges, even though both the directory and the executable file belong to you.</p>
+<blockquote>
+<p>There’s an idiosyncrasy with <code>fapolicyd</code> that I haven’t seen documented anywhere, and that I only found out by accident. That is, it will only block untrusted programs when a normal, unprivileged user tries to run them. But, you can run them just fine with the proper <code>sudo</code> privileges. (This is all the more reason to grant only limited <code>sudo</code> privileges to all but your most trusted administrators.)</p>
+</blockquote>
+<p>Next, let’s see what we can do with the shell script:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost bin]$ donnie_script.sh 
+This is a test of the noexec option.
+[donnie@localhost bin]$</code></pre>
+</div>
+<p>So, why can I invoke this script here, but not in my home directory? It’s because in my home directory, the <code>noexec</code> mount option is blocking the script. But here in the <code>/usr/local/bin/</code> directory, we don’t have that mount option. Instead, all we have is just <code>fapolicyd</code>. We can use the <code>fapolicyd-cli -list</code> command to view the rules that are in effect, which might explain why I was able to run this script. (Note that formatting constraints don’t allow me to show the entire output.):</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo fapolicyd-cli -list
+[sudo] password for donnie: 
+. . .
+. . .
+11. deny_audit perm=any all : ftype=%languages
+12. allow perm=any all : ftype=text/x-shellscript
+13. deny_audit perm=execute all : all
+14. allow perm=open all : all
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Look at rule number 12. This rule allows shell scripts to run on all partitions that don’t have the <code>noexec</code> mount option, even by unprivileged users. That makes sense, considering that even unprivileged users make extensive use of shell scripts in order to automate repetitive tasks. But, if you’re absolutely certain that no unprivileged user will ever have cause to run shell scripts on a system, you can always disable that rule. And, in any case, you’d still be able to run shell scripts if you have the proper <code>sudo</code> privileges.</p>
+<p>And, speaking of rules, let’s look at them next.</p>
+<section id="understanding-the-fapolicyd-rules" class="level3" data-number="16.3.1">
+<h3 data-number="16.3.1">Understanding the fapolicyd rules</h3>
+<p>The <code>fapolicyd</code> framework uses rules in the <code>/etc/fapolicyd/rules.d/</code> directory to create a list of programs that are either allowed or denied to execute on the system. When you install <code>fapolicyd</code>, you’ll get a set of default rules that are already set up and ready-to-go. If you need to allow more than what the default rules allow, you can create your own custom rules or add your desired program to the list of trusted applications.</p>
+<p>In the <code>/etc/fapolicyd/rules.d/</code> directory, there are 11 rules files. Each one serves a different purpose:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo ls -l /etc/fapolicyd/rules.d
+[sudo] password for donnie: 
+total 44
+-rw-r--r--. 1 root fapolicyd 456 Dec 29 14:42 10-languages.rules
+-rw-r--r--. 1 root fapolicyd 131 Dec 29 14:42 20-dracut.rules
+-rw-r--r--. 1 root fapolicyd 192 Dec 29 14:42 21-updaters.rules
+-rw-r--r--. 1 root fapolicyd 225 Dec 29 14:42 30-patterns.rules
+-rw-r--r--. 1 root fapolicyd 101 Dec 29 14:42 40-bad-elf.rules
+-rw-r--r--. 1 root fapolicyd 248 Dec 29 14:42 41-shared-obj.rules
+-rw-r--r--. 1 root fapolicyd  71 Dec 29 14:42 42-trusted-elf.rules
+-rw-r--r--. 1 root fapolicyd 143 Dec 29 14:42 70-trusted-lang.rules
+-rw-r--r--. 1 root fapolicyd  96 Dec 29 14:42 72-shell.rules
+-rw-r--r--. 1 root fapolicyd  76 Dec 29 14:42 90-deny-execute.rules
+-rw-r--r--. 1 root fapolicyd  69 Dec 29 14:42 95-allow-open.rules
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>The numbers at the beginning of the file names indicate the order in which these rules files will be processed, because the order in which the rules get processed really does matter. Rather than try to explain what these different classes of rules do for us, I’ll just let you open each file and read the contents. They’re all very short and include a comment to explain what each file does.</p>
+<p>Although you can create custom rules for your own custom applications, that’s not the recommended method. For performance and safety reasons, it’s better to just add your application to the trusted list, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo fapolicyd-cli --file add /dero_linux_amd64/derod-linux-amd64
+[sudo] password for donnie: 
+[donnie@localhost ~]$</code></pre>
+</div>
+<blockquote>
+<p>I mentioned <em>safety</em> reasons because when you write your own custom rules, it’s easy to make a mistake that will lock up the entire system. You don’t have to worry about that so much if you’re just adding files to the trusted list.</p>
+</blockquote>
+<p>This command adds the desired file, along with its associated SHA256 hash value, to the <code>/etc/fapolicyd/fapolicyd.trust</code> file, as we see here:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo cat /etc/fapolicyd/fapolicyd.trust
+[sudo] password for donnie: 
+# AUTOGENERATED FILE VERSION 2
+# This file contains a list of trusted files
+#
+#  FULL PATH        SIZE                             SHA256
+# /home/user/my-ls 157984 61a9960bf7d255a85811f4afcac51067b8f2e4c75e21cf4f2af95319d4ed1b87
+/dero_linux_amd64/derod-linux-amd64 16750936 847ea80b83a1df887d245085db60a9b0626aacb6cd4f0f192eb2e982643c5529
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>To make this change take effect, we need to update the database and restart the <code>fapolicyd</code> service, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo fapolicyd-cli --update
+[sudo] password for donnie: 
+Fapolicyd was notified
+[donnie@localhost ~]$ sudo systemctl restart fapolicyd
+[sudo] password for donnie: 
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Now, when I invoke this application with my normal user privileges, it will run just fine:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ cd /dero_linux_amd64/
+[donnie@localhost dero_linux_amd64]$ ./derod-linux-amd64 
+02/01 16:13:31  INFO    derod   DERO HE daemon :  It is an alpha version, use it for testing/evaluations purpose only.
+02/01 16:13:31  INFO    derod   Copyright 2017-2021 DERO Project. All rights reserved.
+02/01 16:13:31  INFO    derod           {&quot;OS&quot;: &quot;linux&quot;, &quot;ARCH&quot;: &quot;amd64&quot;, &quot;GOMAXPROCS&quot;: 1}
+02/01 16:13:31  INFO    derod           {&quot;Version&quot;: &quot;3.5.2-114.DEROHE.STARGATE+01102022&quot;}
+. . .
+. . .</code></pre>
+</div>
+<p>So now, you’re likely wondering if you have to manually add each new application that you would install to the trusted list. Well, that depends upon how you install it. If you just download a compiled program as we did in the previous example, or compile one yourself, then yeah, you will have to manually add it to the trusted list. But, by default, every program that gets installed by the system package manager is automatically trusted. That means that if you use either <code>dnf</code> to install a package from the repository, or <code>rpm</code> to install an <code>rpm</code> package that you either downloaded or created, then the associated application is automatically trusted.</p>
+<p>So far, we’ve looked at how the three <em>no</em> mount options and <code>fapolicyd</code> work together and complement each other. In this case, the mount options and <code>fapolicyd</code> all got set up automatically because we applied the STIG OpenSCAP profile as we installed the operating system. We can also install <code>fapolicyd</code> without the STIG profile, which is what we’ll look at next.</p>
+</section>
+<section id="installing-fapolicyd" class="level3" data-number="16.3.2">
+<h3 data-number="16.3.2">Installing fapolicyd</h3>
+<p>Normally, <code>fapolicyd</code> isn’t automatically installed on AlmaLinux. In this case it was, because the STIG profile that we applied requires it as well as the restrictive mounting options for our partitions. To install <code>fapolicyd</code> on a system on which it hasn’t already been installed, just do:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo dnf install fapolicyd
+. . .
+. . .
+[donnie@localhost ~]$ sudo systemctl enable --now fapolicyd
+Created symlink /etc/systemd/system/multi-user.target.wants/fapolicyd.service → /usr/lib/systemd/system/fapolicyd.service.
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>There’s still a bit more about <code>fapolicyd</code> that I haven’t shown you, but I think you’ve seen enough to get the gist of it. To get more details about it and to see how to also use it as a file-integrity checker, be sure to visit the official Red Hat documentation for it. (The link is below in the <em>Further reading</em> section.)</p>
+<blockquote>
+<p>Adding the <code>noexec</code>, <code>nosuid</code>, and <code>nodev</code> mount options to your partitions works well, except that you can’t add them to all of your partitions. Obviously, you can’t add them to any partitions that are supposed to have executable files in them, or else your system would never work. The <code>fapolicyd</code> framework gives you a way to prevent rogue programs from running on those partitions, as long as the malicious intruder hasn’t already gained root privileges.</p>
+</blockquote>
+<p>All right, let’s wrap this baby up.</p>
+</section>
+</section>
+<section id="summary-14" class="level2" data-number="16.4">
+<h2 data-number="16.4">Summary</h2>
+<p>In this chapter, we looked at two ways to prevent untrusted programs from running on your systems. The first method, which can be used on any Linux distro, is to separate the various system and data directories into their own separate partitions, and then to mount each of these partitions with the appropriate combination of the <code>noexec</code>, <code>nosuid</code>, and <code>nodev</code> options. The second method, which so far is only available on Red Hat and its clones, is to use the <code>fapolicyd</code> framework. We saw how to automatically enable both of these methods by applying the STIG OpenSCAP profile as we install the operating system. Finally, we saw how to install <code>fapolicyd</code> separately, without having to apply the STIG profile.</p>
+<p>In the next chapter, we’ll be wrapping things up with a quick look at various topics that didn’t neatly fit into any of the preceding chapters. I’ll see you there.</p>
+</section>
+<section id="further-reading-14" class="level2" data-number="16.5">
+<h2 data-number="16.5">Further reading</h2>
+<p>The bug in the RHEL installer: <a href="https://forums.rockylinux.org/t/kernel-core-error-at-install/3683">https://forums.rockylinux.org/t/kernel-core-error-at-install/3683</a></p>
+<p>The STIG for Red Hat 8: <a href="https://www.stigviewer.com/stig/red_hat_enterprise_linux_8/">https://www.stigviewer.com/stig/red_hat_enterprise_linux_8/</a></p>
+<p>Linux Ransomware: <a href="https://phoenixnap.com/blog/linux-ransomware">https://phoenixnap.com/blog/linux-ransomware</a></p>
+<p>Linux File Access Policy Daemon (<code>fapolicyd</code>) video: <a href="https://youtu.be/txThobi7oqc">https://youtu.be/txThobi7oqc</a></p>
+<p>Official <code>fapolicyd</code> documentation at Red hat: <a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/assembly_blocking-and-allowing-applications-using-fapolicyd_security-hardening">https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/assembly_blocking-and-allowing-applications-using-fapolicyd_security-hardening</a></p>
+</section>
+<section id="questions-14" class="level2" data-number="16.6">
+<h2 data-number="16.6">Questions</h2>
+<ol>
+<li>Which of the following statements is true?
+<ol type="A">
+<li>You can use the <code>noexec</code>, <code>nosuid</code>, and <code>nodev</code> mount options on any Linux distro.</li>
+<li>You can use <code>fapolicyd</code> on any Linux distro.</li>
+<li>You can prevent rogue programs from running by using the <code>noexec</code> mounting option on the <code>/</code> partition.</li>
+<li>To use the <code>noexec</code>, <code>nosuid</code>, and <code>nodev</code> mount options, you can edit the <code>/etc/mtab</code> file.</li>
+</ol></li>
+<li>You need to run a program that <code>fapolicyd</code> normally won’t allow. What is the best way to deal with this?
+<ol type="A">
+<li>Add it by hand-editing the <code>/etc/fapolicyd/fapolicyd.trust</code> file.</li>
+<li>Add it by creating a custom rule.</li>
+<li>Add it by running the <code>sudo fapolicyd-cli --file add</code> command.</li>
+<li>Add it by hand-editing the <code>/etc/fapolicyd/fapolicyd.conf</code> file.</li>
+</ol></li>
+<li>When you apply the STIG OpenSCAP profile, what permissions settings will files and directories have when you create them?
+<ol type="A">
+<li>644 for files, 755 for directories.</li>
+<li>600 for files, 700 for directories.</li>
+<li>640 for files, 750 for directories.</li>
+<li>755 for files, 755 for directories.</li>
+</ol></li>
+<li>Which of the following is true about applying the STIG OpenSCAP profile?
+<ol type="A">
+<li>You can apply the profile to any Linux operating system during the installation process.</li>
+<li>Applying the STIG profile to the operating system during the installation process does everything for you.</li>
+<li>Before you apply the STIG profile, you’ll need to set up a custom partition scheme to separate certain directories onto their own partitions.</li>
+<li>On Red Hat-type systems, you can only apply the STIG profile after you’ve installed the system.</li>
+</ol></li>
+<li>What type of hash value does <code>fapolicyd</code> use in its <code>fapolicyd.trust </code>file?
+<ol type="A">
+<li>SHA1</li>
+<li>Blowfish</li>
+<li>MD5</li>
+<li>SHA256</li>
+</ol></li>
+</ol>
+</section>
+<section id="answers-12" class="level2" data-number="16.7">
+<h2 data-number="16.7">Answers</h2>
+<ol>
+<li>a</li>
+<li>c</li>
+<li>b</li>
+<li>c</li>
+<li>d</li>
+</ol>
+</section>
+</section>
+</body>
+</html>

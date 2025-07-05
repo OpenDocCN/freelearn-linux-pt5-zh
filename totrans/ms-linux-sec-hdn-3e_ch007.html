@@ -1,0 +1,1684 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en-US">
+<head>
+<meta charset="utf-8"/>
+<meta name="generator" content="packt"/>
+<title>6 Encryption Technologies</title>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet1.css"/>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet2.css"/>
+
+</head>
+<body>
+<section id="encryption-technologies" class="level1 pkt" data-number="7">
+<h1 data-number="7">6 Encryption Technologies</h1>
+<section id="join-our-book-community-on-discord-5" class="level2" data-number="7.1">
+<h2 data-number="7.1">Join our book community on Discord</h2>
+<p><a href="https://packt.link/SecNet">https://packt.link/SecNet</a></p>
+<figure>
+<img src="../media/file36.png" style="width:10em" />
+</figure>
+<p>You may work for a super-secret government agency, or you may be just a regular Joe or Jane citizen. Either way, you still have sensitive data that you need to protect from prying eyes. Business secrets, government secrets, personal secrets—it doesn't matter; it all needs protection. Locking down users home directories with restrictive permissions settings, as we saw in <em>Chapter 3</em>, <em>Securing Normal User Accounts</em>, is only part of the puzzle; we also need encryption. This encryption will provide three things for us:</p>
+<ul>
+<li><strong>Confidentiality</strong>: This ensures that only people who are authorized to see the data can see it.</li>
+<li><strong>Integrity</strong>: This ensures that the original data hasn't been altered by unauthorized people.</li>
+<li><strong>Availability</strong>: This ensures that sensitive data is always available, and can't be deleted by unauthorized people.</li>
+</ul>
+<p>The two general types of data encryption that we'll look at in this chapter are meant to protect data at rest and data in transit. We'll begin with using file, partition, and directory encryption to protect data at rest. We'll wrap up with a look at using OpenSSL to protect data in transit.</p>
+<p>In this chapter, we'll cover the following topics:</p>
+<div class="C1-SHConPACKT">
+<pre><code>GNU Privacy Guard (GPG)
+Encrypting partitions with Linux Unified Key Setup (LUKS)</code></pre>
+</div>
+<ul>
+<li>Encrypting directories with eCryptfs</li>
+<li>Using VeraCrypt for the cross-platform sharing of encrypted containers</li>
+<li>OpenSSL and the Public Key Infrastructure</li>
+<li>Commercial certificate authorities</li>
+<li>Creating keys, certificate requests, and certificates</li>
+<li>Creating an on-premises certificate authority</li>
+<li>Adding a certificate authority to an operating system</li>
+<li>OpenSSL and the Apache web server</li>
+<li>Setting up mutual authentication</li>
+</ul>
+<p>If you’re ready to get cryptic, let’s get started.</p>
+</section>
+<section id="gnu-privacy-guard-gpg" class="level2" data-number="7.2">
+<h2 data-number="7.2">GNU Privacy Guard (GPG)</h2>
+<p>We'll begin with <strong>GNU Privacy Guard</strong> (<strong>GPG</strong>). This is a free open source implementation of Phil Zimmermann's Pretty Good Privacy, which he created back in 1991. You can use either one of them to either encrypt or cryptographically sign files or messages. In this section, we'll focus strictly on GPG.</p>
+<p>There are some advantages of using GPG:</p>
+<ul>
+<li>It uses strong, hard-to-crack encryption algorithms.</li>
+<li>It uses the private/public key scheme, which eliminates the need to transfer a password to a message or file recipient in a secure manner. Instead, just send along your public key, which is useless to anyone other than the intended recipient.</li>
+<li>You can use GPG to just encrypt your own files for your own use, the same as you'd use any other encryption utility.</li>
+<li>It can be used to encrypt email messages, allowing you to have true end-to-end encryption for sensitive emails.</li>
+<li>There are a few GUI-type frontends available to make it somewhat easier to use.</li>
+</ul>
+<p>But, as you might know, there are also some disadvantages:</p>
+<ul>
+<li>Using public keys instead of passwords is great when you work directly only with people who you implicitly trust. But for anything beyond that, such as distributing a public key to the general population so that everyone can verify your signed messages, you're dependent upon a web-of-trust model that can be very hard to set up.</li>
+<li>For the end-to-end encryption of email, the recipients of your email must also have GPG set up on their systems and know how to use it. That might work in a corporate environment, but lots of luck getting your friends to set that up. (I've never once succeeded in getting someone else to set up email encryption.)</li>
+<li>If you use a standalone email client, such as Mozilla Thunderbird, you can install a plugin that will encrypt and decrypt messages automatically. But every time a new Thunderbird update is released, the plugin breaks, and it always takes a while before a new working version gets released.</li>
+<li>Even if you could get other people to set up their email clients with GPG, it’s still not the perfect privacy solution. That’s because the email <strong>metadata</strong>--the email addresses of the sender and the recipient--can’t be encrypted. So, hackers, advertisers, or government agencies can still see who you’re exchanging email messages with, and use that information to build a profile that tells them a lot about your activities, your beliefs, and what kind of a person you are. If you really need complete privacy, your best bet is to go with a private messenger solution, such as the <strong>Session</strong> messenger. (That however, is beyond the scope of this book.)</li>
+</ul>
+<p>Even with its numerous weaknesses, GPG is still one of the best ways to share encrypted files and emails. GPG comes preinstalled on most Linux distros. So, you can use any of your <em>newer</em> virtual machines for these demos. (I say <em>newer</em>, because the procedure will differ slightly on older distros, such as CentOS 7.)</p>
+<section id="hands-on-lab-creating-your-gpg-keys" class="level3" data-number="7.2.1">
+<h3 data-number="7.2.1">Hands-on lab – creating your GPG keys</h3>
+<ol>
+<li>On a text-mode AlmaLinux machine, the first thing you need to do is to install the <code>pinentry</code> package. Do that with:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo dnf install pinentry</code></pre>
+</div>
+<p>(Note that you won’t have to do this with either a GUI-mode AlmaLinux machine or with Ubuntu Server.)</p>
+<ol>
+<li>Next, create your pair of GPG keys:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>gpg --full-generate-key</code></pre>
+</div>
+<p>Note that since you're setting this up for yourself, you don't need <code>sudo</code> privileges.</p>
+<p>The first thing that this command does is to create a populated <code>.gnupg</code> directory in your home directory:</p>
+<div class="C1-SHConPACKT">
+<pre><code>gpg: /home/donnie/.gnupg/trustdb.gpg: trustdb created
+gpg: key 56B59F39019107DF marked as ultimately trusted
+gpg: directory &#39;/home/donnie/.gnupg/openpgp-revocs.d&#39; created
+gpg: revocation certificate stored as &#39;/home/donnie/.gnupg/openpgp-revocs.d/BD057E0E01E664424E8B812E56B59F39019107DF.rev&#39;
+public and secret key created and signed.</code></pre>
+</div>
+<p>You'll then be asked to select which kinds of keys you want. We'll just go with the default <code>RSA and RSA</code>. RSA keys are stronger and harder to crack than the older DSA keys. Elgamal keys are good, but they may not be supported by older versions of GPG:</p>
+<div class="C1-SHConPACKT">
+<pre><code>Please select what kind of key you want:
+ (1) RSA and RSA (default)
+ (2) DSA and Elgamal
+ (3) DSA (sign only)
+ (4) RSA (sign only)
+(14) Existing key from card
+Your selection?</code></pre>
+</div>
+<p>For decent encryption, you'll want to go with a key of at least 3,072 bits, because anything smaller is now considered vulnerable. (This is according to the newest guidance from the U.S. National Institute of Standards and Technology, or NIST.) That’s now the default on our newest Linux distros, so you’re already good there. On older distros, such as CentOS 7, the default is only 2048 bits, so you’ll need to change it.</p>
+<p>Next, select how long you want the keys to remain valid before they automatically expire. For our purposes, we'll go with the default <code>key does not expire</code>:</p>
+<div class="C1-SHConPACKT">
+<pre><code>Please specify how long the key should be valid. 
+ 0 = key does not expire 
+ &lt;n&gt; = key expires in n days 
+ &lt;n&gt;w = key expires in n weeks 
+ &lt;n&gt;m = key expires in n months 
+ &lt;n&gt;y = key expires in n years 
+Key is valid for? (0) </code></pre>
+</div>
+<p>Provide your personal information:</p>
+<div class="C1-SHConPACKT">
+<pre><code>GnuPG needs to construct a user ID to identify your key. 
+Real name: Donald A. Tevault 
+Email address: donniet@something.net 
+Comment: No comment 
+You selected this USER-ID: 
+ &quot;Donald A. Tevault (No comment) &lt;donniet@something.net&gt;&quot; 
+Change (N)ame, (C)omment, (E)mail or (O)kay/(Q)uit?
+Create a passphrase for your private key:
+You need a Passphrase to protect your secret key. 
+We need to generate a lot of random bytes. It is a good idea to perform some other action (type on the keyboard, move the mouse, utilize the disks) during the prime generation; this gives the random number generator a better chance to gain enough entropy. </code></pre>
+</div>
+<p>On older Linux distros, this could take a while, even when you're doing all of the recommended things to create entropy. On newer Linux distros, the random number generator works more efficiently, so you can disregard the notice about how the key generation could take a long time. Here’s what you’ll see when the process has finished:</p>
+<div class="C1-SHConPACKT">
+<pre><code>gpg: /home/donnie/.gnupg/trustdb.gpg: trustdb created 
+gpg: key 19CAEC5B marked as ultimately trusted 
+public and secret key created and signed. 
+gpg: checking the trustdb 
+gpg: 3 marginal(s) needed, 1 complete(s) needed, PGP trust model 
+gpg: depth: 0 valid: 1 signed: 0 trust: 0-, 0q, 0n, 0m, 0f, 1u 
+pub 2048R/19CAEC5B 2017-10-26 
+ Key fingerprint = 8DE5 8894 2E37 08C4 5B26 9164 C77C 6944 19CA EC5B 
+uid Donald A. Tevault (No comment) &lt;donniet@something.net&gt; 
+sub 2048R/37582F29 2017-10-26</code></pre>
+</div>
+<ol>
+<li>Verify that the keys did get created:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ gpg --list-keys
+ /home/donnie/.gnupg/pubring.gpg
+ -------------------------------
+ pub 2048R/19CAEC5B 2017-10-26
+ uid Donald A. Tevault (No comment) &lt;donniet@something.net&gt;
+ sub 2048R/37582F29 2017-10-26
+ [donnie@localhost ~]$</code></pre>
+</div>
+<ol>
+<li>While you're at it, take a look at the files that you created:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ ls -l .gnupg/
+total 12
+drwx------. 2 donnie donnie   58 Oct 26 14:53 openpgp-revocs.d
+drwx------. 2 donnie donnie  110 Oct 26 14:53 private-keys-v1.d
+-rw-r--r--. 1 donnie donnie 1970 Oct 26 14:53 pubring.kbx
+-rw-------. 1 donnie donnie   32 Oct 26 14:43 pubring.kbx~
+-rw-------. 1 donnie donnie 1280 Oct 26 15:51 trustdb.gpg
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>These files are your public and private keyrings, a revocation database, and a trusted users database.</p>
+</section>
+<section id="hands-on-lab-symmetrically-encrypting-your-own-files" class="level3" data-number="7.2.2">
+<h3 data-number="7.2.2">Hands-on lab – symmetrically encrypting your own files</h3>
+<p>You may find GPG useful for encrypting your own files, even when you never plan to share them with anyone else. For this, you'll use symmetric encryption, which involves using your own private key for encryption. Before you try this, you'll need to generate your keys, as I outlined in the previous section:</p>
+<blockquote>
+<p>Symmetric key encryption is, well, just that, symmetric. It's symmetric in the sense that the key that you would use to encrypt a file is the same key that you would use to decrypt the file. That's great for if you're just encrypting files for your own use. But if you need to share an encrypted file with someone else, you'll need to figure out a secure way to give that person the password. I mean, it's not like you'd want to just send the password in a plain-text email.</p>
+</blockquote>
+<ol>
+<li>In addition to your own user account, you'll also need a user account for Maggie. On AlmaLinux, create her account like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo useradd maggie
+sudo passwd maggie</code></pre>
+</div>
+<p>For Ubuntu, create Maggie’s account like this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo adduser maggie</code></pre>
+</div>
+<ol>
+<li>Let's encrypt a super-secret file that we just can't allow to fall into the wrong hands:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ gpg -c secret_squirrel_stuff.txt
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Note that the <code>-c</code> option indicates that I chose to use symmetric encryption with a passphrase for the file. The passphrase that you enter will be for the file, not for your private key.</p>
+<ol>
+<li>Look at your new set of files. One slight flaw with this is that GPG makes an encrypted copy of the file, but it also leaves the original, unencrypted file intact:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ ls -l
+ total 1748
+ -rw-rw-r--. 1 donnie donnie 37 Oct 26 14:22 secret_squirrel_stuff.txt
+ -rw-rw-r--. 1 donnie donnie 94 Oct 26 14:22
+ secret_squirrel_stuff.txt.gpg
+[donnie@localhost ~]$</code></pre>
+</div>
+<ol>
+<li>Let's get rid of that unencrypted file with <code>shred</code>. We'll use the <code>-u</code> option to delete the file, and the <code>-z</code> option to overwrite the deleted file with zeros:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ shred -u -z secret_squirrel_stuff.txt
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>It doesn't look like anything happened, because <code>shred</code> doesn't give you any output. But <code>ls -l</code> will prove that the file is gone.</p>
+<ol>
+<li>Now, if I were to look at the encrypted file with <code>less secret_squirrel_stuff.txt.gpg</code>, I would be able to see its contents after being asked to enter my private key passphrase. Try this for yourself:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>less secret_squirrel_stuff.txt.gpg
+Shhh!!!! This file is super-secret.
+secret_squirrel_stuff.txt.gpg (END)</code></pre>
+</div>
+<ol>
+<li>As long as my private key remains loaded into my keyring, I'll be able to view my encrypted file again without having to reenter the passphrase. Now, just to prove to you that the file really is encrypted, I'll create a shared directory, and move the file there for others to access. Again, go ahead and give it a try:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo mkdir /shared
+sudo chown donnie: /shared
+sudo chmod 755 /shared
+mv secret_squirrel_stuff.txt.gpg /shared</code></pre>
+</div>
+<p>When I go into that directory to view the file with <code>less</code>, I can still see its contents without having to reenter my passphrase.</p>
+<ol>
+<li>But now, let's see what happens when Maggie tries to view the file. Use <code>su - maggie</code> to switch to her account, and have her try:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>su - maggie
+cd /shared
+[maggie@localhost shared]$ less secret_squirrel_stuff.txt.gpg
+&quot;secret_squirrel_stuff.txt.gpg&quot; may be a binary file. See it anyway?</code></pre>
+</div>
+<p>And when she hits the <em>Y</em> key to see it anyway, she gets this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>&lt;8C&gt;^M^D^C^C^B&lt;BD&gt;2=&lt;D3&gt;͈u&lt;93&gt;&lt;CE&gt;&lt;C9&gt;MОOy&lt;B6&gt;^O&lt;A2&gt;&lt;AD&gt;}Rg9&lt;94&gt;&lt;EB&gt;&lt;C4&gt;^W^E
+ &lt;A6&gt;&lt;8D&gt;&lt;B9&gt;&lt;B8&gt;&lt;D3&gt;(&lt;98&gt;&lt;C4&gt;æF^_8Q2b&lt;B8&gt;C&lt;B5&gt;&lt;DB&gt;^]&lt;F1&gt;&lt;CD&gt;#&lt;90&gt;H&lt;EB&gt;&lt;90&gt;&lt;
+ C5&gt;^S%X [&lt;E9&gt;&lt;EF&gt;&lt;C7&gt;
+ ^@y+&lt;FC&gt;&lt;F2&gt;&lt;BA&gt;&lt;U+058C&gt;H&#39;+&lt;D4&gt;v&lt;84&gt;Y&lt;98&gt;G&lt;D7&gt;֊
+secret_squirrel_stuff.txt.gpg (END)</code></pre>
+</div>
+<p>Poor Maggie really wants to see my file, but all she can see is encrypted gibberish.</p>
+<p>What I've just demonstrated is another advantage of GPG. After entering your private key passphrase once, you can view any of your encrypted files without having to manually decrypt them, and without having to reenter your passphrase. With other symmetric file encryption tools, such as <code>bcrypt</code>, you wouldn't be able to view your files without manually decrypting them first.</p>
+<ol>
+<li>But let's now say that you no longer need to have this file encrypted, and you want to decrypt it in order to let other people see it. Exit Maggie's account by typing <code>exit</code>. Then, just use <code>gpg</code> with the <code>-d</code> option:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>[maggie@localhost shared]$ exit
+[donnie@localhost shared]$ gpg -o secret_squirrel_stuff.txt -d secret_squirrel_stuff.txt.gpg
+ gpg: AES256.CFB encrypted data
+ gpg: encrypted with 1 passphrase
+ Shhh!!!! This file is super-secret.
+ [donnie@localhost shared]$</code></pre>
+</div>
+<p>This works differently from how it worked on older Linux distros. On our newer distros, we now have to use the <code>-o</code> option along with the filename of the decrypted file that we want to create. Also, note that the <code>-o</code> option has to come before the <code>-d</code> option, or else you’ll get an error message.</p>
+</section>
+<section id="hands-on-lab-encrypting-files-with-public-keys" class="level3" data-number="7.2.3">
+<h3 data-number="7.2.3">Hands-on lab – encrypting files with public keys</h3>
+<p>In this lab, you'll learn about how to encrypt and share a file with GPG public key encryption:</p>
+<ol>
+<li>To begin, create a user account for Frank, as you did for Maggie in the previous lab.</li>
+<li>Create a key set for both yourself and for Frank, as I've already shown you. Next, extract your own public keys into an <code>ASCII</code> text file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>cd .gnupg
+gpg --export -a -o donnie_public-key.txt</code></pre>
+</div>
+<p>Log in as Frank, and repeat this command for him.</p>
+<ol>
+<li>Normally, the participants in this would send their keys to each other either through an email attachment or by placing the keys in a shared directory. In this case, you and Frank will receive each other's public key files and place them into your respective <code>.gnupg</code> directories. Once that's done, import each other's keys:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu:~/.gnupg$ gpg --import frank_public-key.txt
+gpg: key 4CFC6990: public key &quot;Frank Siamese (I am a cat.) &lt;frank@any.net&gt;&quot; imported
+gpg: Total number processed: 1
+gpg: imported: 1 (RSA: 1)
+donnie@ubuntu:~/.gnupg$
+frank@ubuntu:~/.gnupg$ gpg --import donnie_public-key.txt
+gpg: key 9FD7014B: public key &quot;Donald A. Tevault &lt;donniet@something.net&gt;&quot; imported
+gpg: Total number processed: 1
+gpg:               imported: 1  (RSA: 1)
+frank@ubuntu:~/.gnupg$</code></pre>
+</div>
+<ol>
+<li>Now for the good stuff. Create a super-secret message for Frank, asymmetrically encrypt it (<code>-e</code>), and sign it (<code>-s</code>). Signing the message is the verification that the message really is from you, rather than from an impostor:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu:~$ gpg -s -e secret_stuff_for_frank.txt
+. . .
+. . .
+It is NOT certain that the key belongs to the person named
+in the user ID.  If you *really* know what you are doing,
+you may answer the next question with yes.
+Use this key anyway? (y/N) y
+Current recipients:
+2048R/CD8104F7 2017-10-27 &quot;Frank Siamese (I am a cat.) &lt;frank@any.net&gt;&quot;
+Enter the user ID.  End with an empty line:
+donnie@ubuntu:~$</code></pre>
+</div>
+<p>So, the first thing you have to do is to enter the passphrase for your private key. Where it says to enter the user ID, enter <code>frank</code>, since he's the intended recipient of your message. But look at the line after that, where it says <code>There is no assurance this key belongs to the named user</code>. That's because you still haven't trusted Frank's public key. We'll get to that in a bit. The last line of the output again says to enter a user ID so that we can designate multiple recipients. But Frank is the only one you care about right now, so just hit the <em>Enter</em> key to break out of the routine. This results in a <code>.gpg</code> version of your message to Frank:</p>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu:~$ ls -l
+total 8
+. . .
+-rw-rw-r-- 1 donnie donnie 143 Oct 27 18:37 secret_stuff_for_frank.txt
+-rw-rw-r-- 1 donnie donnie 790 Oct 27 18:39 secret_stuff_for_frank.txt.gpg
+donnie@ubuntu:~$</code></pre>
+</div>
+<ol>
+<li>The final step on your end is to send Frank his encrypted message file by whatever means available.</li>
+<li>When Frank receives his message, he'll use the <code>-d</code> option to view it:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>frank@ubuntu:~$ gpg -d secret_stuff_for_frank.txt.gpg
+. . .
+. . .
+gpg: gpg-agent is not available in this session
+gpg: encrypted with 2048-bit RSA key, ID CD8104F7, created 2017-10-27
+      &quot;Frank Siamese (I am a cat.) &lt;frank@any.net&gt;&quot;
+This is TOP SECRET stuff that only Frank can see!!!!!
+If anyone else see it, it&#39;s the end of the world as we know it.
+(With apologies to REM.)
+gpg: Signature made Fri 27 Oct 2017 06:39:15 PM EDT using RSA key ID 9FD7014B
+gpg: Good signature from &quot;Donald A. Tevault &lt;donniet@something.net&gt;&quot;
+gpg: WARNING: This key is not certified with a trusted signature!
+gpg:          There is no indication that the signature belongs to the owner.
+Primary key fingerprint: DB0B 31B8 876D 9B2C 7F12  9FC3 886F 3357 9FD7 014B
+frank@ubuntu:~$</code></pre>
+</div>
+<ol>
+<li>Frank enters the passphrase for his private key, and he sees the message. At the bottom, he sees the warning about how your public key isn't trusted, and that <code>There is no indication that the signature belongs to the owner</code>. Let's say that you and Frank know each other personally, and he knows for a fact that the public key really is yours. He then adds your public key to the trusted list:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>frank@ubuntu:~$ cd .gnupg
+frank@ubuntu:~/.gnupg$ gpg --edit-key donnie
+gpg (GnuPG) 1.4.20; Copyright (C) 2015 Free Software Foundation, Inc.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+gpg: checking the trustdb
+gpg: 3 marginal(s) needed, 1 complete(s) needed, PGP trust model
+gpg: depth: 0  valid:   2  signed:   0  trust: 0-, 0q, 0n, 0m, 0f, 2u
+pub  2048R/9FD7014B  created: 2017-10-27  expires: never       usage: SC
+                     trust: ultimate      validity: ultimate
+sub  2048R/9625E7E9  created: 2017-10-27  expires: never       usage: E
+[ultimate] (1). Donald A. Tevault &lt;donniet@something.net&gt;
+gpg&gt;</code></pre>
+</div>
+<ol>
+<li>The last line of this output is the command prompt for the <code>gpg</code> shell. Frank is concerned with trust, so he'll enter the <code>trust</code> command:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>gpg&gt; trust
+pub  2048R/9FD7014B  created: 2017-10-27  expires: never       usage: SC
+                     trust: unknown       validity: unknown
+sub  2048R/9625E7E9  created: 2017-10-27  expires: never       usage: E
+[ unknown] (1). Donald A. Tevault &lt;donniet@something.net&gt;
+Please decide how far you trust this user to correctly verify other users&#39; keys
+(by looking at passports, checking fingerprints from different sources, etc.)
+  1 = I don&#39;t know or won&#39;t say
+  2 = I do NOT trust
+  3 = I trust marginally
+  4 = I trust fully
+  5 = I trust ultimately
+  m = back to the main menu
+Your decision? 5
+Do you really want to set this key to ultimate trust? (y/N) y</code></pre>
+</div>
+<ol>
+<li>Frank has known you for quite a while, and he knows for a fact that you're the one who sent the key. So, he chooses option <code>5</code> for ultimate trust. Once Frank logs out and logs back in, that trust will take effect:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>frank@ubuntu:~$ gpg -d secret_stuff_for_frank.txt.gpg
+You need a passphrase to unlock the secret key for
+user: &quot;Frank Siamese (I am a cat.) &lt;frank@any.net&gt;&quot;
+2048-bit RSA key, ID CD8104F7, created 2017-10-27 (main key ID 4CFC6990)
+gpg: gpg-agent is not available in this session
+gpg: encrypted with 2048-bit RSA key, ID CD8104F7, created 2017-10-27
+      &quot;Frank Siamese (I am a cat.) &lt;frank@any.net&gt;&quot;
+This is TOP SECRET stuff that only Frank can see!!!!!
+If anyone else see it, it&#39;s the end of the world as we know it.
+(With apologies to REM.)
+gpg: Signature made Fri 27 Oct 2017 06:39:15 PM EDT using RSA key ID 9FD7014B
+gpg: Good signature from &quot;Donald A. Tevault &lt;donniet@something.net&gt;&quot;
+frank@ubuntu:~$</code></pre>
+</div>
+<ol>
+<li>With no more warning messages, this looks much better. At your end, do the same thing with Frank's public key.</li>
+</ol>
+<blockquote>
+<p>As you can see in the screen output in <em>step 8</em>, you can assign the marginal, full, or ultimate trust level to someone else's public key. Space doesn't permit me to provide a full explanation of the trust levels, but you can read a rather colorful explanation here: PGP Web of Trust: Core Concepts Behind Trusted Communication — <a href="https://www.linux.com/tutorials/pgp-web-trust-core-concepts-behind-trusted-communication/.">https://www.linux.com/tutorials/pgp-web-trust-core-concepts-behind-trusted-communication/.</a></p>
+</blockquote>
+<p>What's so very cool about this is that even though the whole world may have your public key, it's useless to anyone who isn't a designated recipient of your message.</p>
+<p>Now, let's look at how to sign a file <em>without</em> encrypting it.</p>
+</section>
+<section id="hands-on-lab-signing-a-file-without-encryption" class="level3" data-number="7.2.4">
+<h3 data-number="7.2.4">Hands-on lab – signing a file without encryption</h3>
+<p>If a file isn't secret but you still need to ensure authenticity and integrity, you can just sign it without encrypting it:</p>
+<ol>
+<li>Create an unencrypted message for Frank and then sign it:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu:~$ gpg -s not_secret_for_frank.txt
+You need a passphrase to unlock the secret key for
+user: &quot;Donald A. Tevault &lt;donniet@something.net&gt;&quot;
+2048-bit RSA key, ID 9FD7014B, created 2017-10-27
+gpg: gpg-agent is not available in this session
+donnie@ubuntu:~$ ls -l
+. . .
+-rw-rw-r-- 1 donnie donnie  40 Oct 27 19:30 not_secret_for_frank.txt
+-rw-rw-r-- 1 donnie donnie 381 Oct 27 19:31 not_secret_for_frank.txt.gpg</code></pre>
+</div>
+<p>Just as before, this creates a <code>.gpg</code> version of the file.</p>
+<ol>
+<li>Send the message to Frank.</li>
+<li>Log in as Frank. Have him try to open it with <code>less</code>:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>frank@ubuntu:~$ less not_secret_for_frank.txt.gpg</code></pre>
+</div>
+<p>On older Linux distros, you’ll see a lot of gibberish because of the signature, but you’ll also see the plain-text message. On newer Linux distros, you’ll only see the plain-text message, without the gibberish.</p>
+<ol>
+<li>Have Frank use <code>gpg</code> with the <code>--verify</code> option to verify that the signature really does belong to you:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>frank@ubuntu:~$ gpg --verify not_secret_for_frank.txt.gpg
+gpg: Signature made Fri 27 Oct 2017 07:31:12 PM EDT using RSA key ID 9FD7014B
+gpg: Good signature from &quot;Donald A. Tevault &lt;donniet@something.net&gt;&quot;
+frank@ubuntu:~$</code></pre>
+</div>
+<p>This wraps it up for our discussion of encrypting individual files. Let's now take a look at encrypting block devices and directories.</p>
+</section>
+</section>
+<section id="encrypting-partitions-with-linux-unified-key-setup-luks" class="level2" data-number="7.3">
+<h2 data-number="7.3">Encrypting partitions with Linux Unified Key Setup (LUKS)</h2>
+<p>Being able to encrypt individual files can be handy, especially if you want to share sensitive files with other users. But, other types of encryption are also available:</p>
+<ul>
+<li><strong>Block encryption</strong>: We can use this for either whole-disk encryption or to encrypt individual partitions.</li>
+<li><strong>File-level encryption</strong>: We'd use this to encrypt individual directories without having to encrypt the underlying partitions.</li>
+<li><strong>Containerized Encryption</strong>: Using third-party software that doesn't come with any Linux distribution, we can create encrypted, cross-platform containers that can be opened on either Linux, macOS, or Windows machines.</li>
+</ul>
+<p><strong>Linux Unified Key Setup</strong> (<strong>LUKS</strong>) falls into the first category. It's built into pretty much every Linux distribution, and directions for use are the same for each. LUKS is now the default encryption mechanism for pretty much all of the newest Linux distros.</p>
+<blockquote>
+<p>You might be wondering if there's any performance impact with all of this disk encryption business. Well, with today's fast CPUs, not really. I run Fedora with full-disk encryption on a low-spec, Core i5 laptop, and other than having to enter the disk-encryption password when I first boot up, I don't even notice that encryption is taking place.</p>
+</blockquote>
+<p>Okay, let's look at encrypting a disk while installing the operating system.</p>
+<section id="disk-encryption-during-operating-system-installation" class="level3" data-number="7.3.1">
+<h3 data-number="7.3.1">Disk encryption during operating system installation</h3>
+<p>When you install most any Linux-based operating system, you have the option of encrypting the drive during the installation. Just click the <strong>Encryption</strong> option on the drive setup screen:</p>
+<figure>
+<img src="../media/file37.png" alt="19501_06_01.png" /><figcaption aria-hidden="true">19501_06_01.png</figcaption>
+</figure>
+<p>Other than that, I just let the installer create the default partitioning scheme. On this AlmaLinux 9 machine, that means that the <code>/</code> filesystem and the <code>swap</code> partition will both be encrypted logical volumes. (I'll cover that in a moment.)</p>
+<p>Before the installation can continue, I have to create a passphrase to mount the encrypted disk:</p>
+<figure>
+<img src="../media/file38.png" alt="19501_06_02.png" /><figcaption aria-hidden="true">19501_06_02.png</figcaption>
+</figure>
+<p>Now, whenever I reboot the system, I need to enter this passphrase:</p>
+<figure>
+<img src="../media/file39.png" alt="19501_06_03.png" /><figcaption aria-hidden="true">19501_06_03.png</figcaption>
+</figure>
+<p>Rather than actually encrypting a normal disk partition, the installer will set up encrypted <strong>logical volumes</strong>. Once the machine is up and running, I can look at the list of logical volumes. Here, I see both the <code>/</code> logical volume and the <code>swap</code> logical volume:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo lvdisplay
+  --- Logical volume ---
+  LV Path                /dev/almalinux/swap
+  LV Name                swap
+  VG Name                almalinux
+. . .
+. . .
+   --- Logical volume ---
+  LV Path                /dev/almalinux/root
+  LV Name                root
+  VG Name                almalinux
+. . .
+. . .
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Now, let’s look at the list of <strong>physical volumes</strong>. Actually, there's only one physical volume in the list, and it's listed as a <code>luks</code> physical volume:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo pvdisplay
+  --- Physical volume ---
+  PV Name               /dev/mapper/luks-b0acc532-5347-417e-a86e-a3ee8431fba7
+  VG Name               almalinux
+  PV Size               &lt;19.30 GiB / not usable 2.00 MiB
+  Allocatable           yes (but full)
+  PE Size               4.00 MiB
+  Total PE              4940
+  Free PE               0
+  Allocated PE          4940
+  PV UUID               mRI75u-aVJI-uRjC-GY1O-ih7N-T3co-vssRRX
+   
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>In the <code>/etc/</code> directory, you’ll find the <code>crypttab</code> file, which contains an entry for this physical volume.</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo cat /etc/crypttab 
+luks-b0acc532-5347-417e-a86e-a3ee8431fba7 UUID=b0acc532-5347-417e-a86e-a3ee8431fba7 none discard
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>This shows that the underlying physical volume is encrypted, which means that both the <code>/</code> and the <code>swap</code> logical volumes are also encrypted. That's a good thing because leaving the swap space unencrypted—a common mistake when setting up disk encryption manually—can lead to data leakage. (We’ll talk more about this <code>crypttab</code> file in just a bit.)</p>
+<section id="hands-on-lab-adding-an-encrypted-partition-with-luks" class="level4" data-number="7.3.1.1">
+<h4 data-number="7.3.1.1">Hands-on lab – adding an encrypted partition with LUKS</h4>
+<p>There may be times when you'll need to either add another encrypted drive to an existing machine or encrypt a portable device, such as a USB memory stick. This procedure works for both scenarios. Also, the procedure is the same for all of the Linux distros that we’re using, so it doesn’t matter which virtual machine you use. Follow these steps to add an encrypted partition:</p>
+<p>Bump the size up to 20 GB:</p>
+<figure>
+<img src="../media/file40.png" alt="19501_06_05.png" /><figcaption aria-hidden="true">19501_06_05.png</figcaption>
+</figure>
+<ol>
+<li>After rebooting the machine, you'll now have a <code>/dev/sdb</code> drive to play with. We can see that here:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code> donnie@ubuntu2204-packt:~$ ls -l /dev/sd*
+brw-rw---- 1 root disk 8,  0 Oct 27 19:33 /dev/sda
+brw-rw---- 1 root disk 8,  1 Oct 27 19:33 /dev/sda1
+brw-rw---- 1 root disk 8,  2 Oct 27 19:33 /dev/sda2
+brw-rw---- 1 root disk 8,  3 Oct 27 19:33 /dev/sda3
+brw-rw---- 1 root disk 8, 16 Oct 27 19:33 /dev/sdb
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<ol>
+<li>Open the drive in <code>gdisk</code>. Use the entire drive for the partition, and leave the partition type set at the default type <code>8300</code>:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo gdisk /dev/sdb</code></pre>
+</div>
+<ol>
+<li>View the details about your new <code>/dev/sdb1</code> partition:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo gdisk -l /dev/sdb
+GPT fdisk (gdisk) version 1.0.8
+Partition table scan:
+  MBR: protective
+  BSD: not present
+  APM: not present
+  GPT: present
+. . .
+. . .
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048        41943006   20.0 GiB    8300  Linux filesystem
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<ol>
+<li>Next, use <code>cryptsetup</code> to convert the partition to LUKS format. In this command, the <code>-v</code> signifies verbose mode, and the <code>-y</code> signifies that you'll have to enter your passphrase twice in order to properly verify it. Note that when it says to type <code>yes</code> all in uppercase, it really does mean to type it in uppercase:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo cryptsetup -v -y luksFormat /dev/sdb1
+WARNING!
+========
+This will overwrite data on /dev/sdb1 irrevocably.
+Are you sure? (Type &#39;yes&#39; in capital letters): YES
+Enter passphrase for /dev/sdb1: 
+Verify passphrase: 
+Key slot 0 created.
+Command successful.
+donnie@ubuntu2204-packt:~</code></pre>
+</div>
+<ol>
+<li>Look at the information about your new encrypted partition:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo cryptsetup luksDump /dev/sdb1
+LUKS header information
+Version:        2
+Epoch:          3
+Metadata area:  16384 [bytes]
+Keyslots area:  16744448 [bytes]
+UUID:           e38e087a-205c-4aeb-81d5-03f03b8e8020
+Label:          (no label)
+Subsystem:      (no subsystem)
+Flags:          (no flags)
+. . .
+. . .</code></pre>
+</div>
+<p>There's a lot more to the output than I can show here, but you get the idea.</p>
+<ol>
+<li>Map the partition to a device name. You can name the device pretty much whatever you want. For now, just name this one <code>secrets</code>. I know, it's a corny name. In real life, you won't want to make it so obvious where you're storing your secrets:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo cryptsetup luksOpen /dev/sdb1 secrets
+Enter passphrase for /dev/sdb1: 
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<ol>
+<li>Look in the <code>/dev/mapper/</code> directory. You'll see your new <code>secrets</code> device listed as a symbolic link to some sort of <code>dm</code> device. (In this case, it’s <code>dm-1</code>.):</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ cd /dev/mapper
+donnie@ubuntu2204-packt:/dev/mapper$ ls -l secrets 
+lrwxrwxrwx 1 root root 7 Oct 27 19:50 secrets -&gt; ../dm-1
+donnie@ubuntu2204-packt:/dev/mapper$</code></pre>
+</div>
+<ol>
+<li>Use <code>dmsetup</code> to look at the information about your new device:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo dmsetup info secrets
+Name:              secrets
+State:             ACTIVE
+Read Ahead:        256
+Tables present:    LIVE
+Open count:        0
+Event number:      0
+Major, minor:      253, 1
+Number of targets: 1
+UUID: CRYPT-LUKS2-e38e087a205c4aeb81d503f03b8e8020-secrets
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<ol>
+<li>Format the partition in the usual manner. You can use any filesystem that's supported by your Linux distro. On a production server, that will generally mean either XFS or EXT4. Just for fun, let’s go with XFS:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo mkfs.xfs /dev/mapper/secrets
+meta-data=/dev/mapper/secrets    isize=512    agcount=4, agsize=1309631 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1    bigtime=0 inobtcount=0
+data     =                       bsize=4096   blocks=5238523, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<ol>
+<li>Create a mount point and mount the encrypted partition:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo mkdir /secrets
+donnie@ubuntu2204-packt:~$ sudo mount /dev/mapper/secrets /secrets/
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<ol>
+<li>Use the <code>mount</code> command to verify that the partition is mounted properly:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ mount | grep &#39;secrets&#39;
+/dev/mapper/secrets on /secrets type xfs (rw,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota)
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+</section>
+</section>
+<section id="configuring-the-luks-partition-to-mount-automatically" class="level3" data-number="7.3.2">
+<h3 data-number="7.3.2">Configuring the LUKS partition to mount automatically</h3>
+<p>The only missing piece of the puzzle is to configure the system to automatically mount the LUKS partition upon boot-up. To do that, configure two different files:</p>
+<ul>
+<li><strong>/etc/crypttab</strong></li>
+<li><strong>/etc/fstab</strong></li>
+</ul>
+<p>If you encrypted the <code>sda</code> drive while installing the operating system, you'll already have a <code>crypttab</code> file that contains information about that drive. It would look something like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>luks-b0acc532-5347-417e-a86e-a3ee8431fba7 UUID=b0acc532-5347-417e-a86e-a3ee8431fba7 none discard</code></pre>
+</div>
+<p>The first two fields describe the name and location of the encrypted partition. The third field is for the encryption passphrase. If it's set to <code>none</code>, as it is here, then the passphrase will have to be manually entered upon boot-up.</p>
+<p>In the <code>fstab</code> file, we have the entry that actually mounts the partition:</p>
+<div class="C0-SHConPACKT">
+<pre><code>/dev/mapper/almalinux-root /           xfs     defaults,x-systemd.device-timeout=0 0 0
+UUID=28218289-34cb-4c57-9755-379c65d580af /boot       xfs     defaults        0 0
+/dev/mapper/almalinux-swap none      swap    defaults,x-systemd.device-timeout=0 0 0</code></pre>
+</div>
+<p>Well, there are actually two entries in this case, because we have two logical volumes, <code>/</code> and <code>swap</code>, on top of the encrypted physical volume. The <code>UUID</code> line is the <code>/boot/</code> partition, which is the only part of the drive that isn't encrypted. Now, let's add our new encrypted partition so that it will mount automatically, as well.</p>
+</section>
+<section id="hands-on-lab-configuring-the-luks-partition-to-mount-automatically" class="level3" data-number="7.3.3">
+<h3 data-number="7.3.3">Hands-on lab – configuring the LUKS partition to mount automatically</h3>
+<p>In this lab, you'll set up the encrypted partition that you created in the previous lab to automatically mount when you reboot the machine:</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>This is where it would be extremely helpful to remotely log in to your virtual machine from your desktop host machine. By using a GUI-type terminal, be it Terminal from a Linux or macOS machine or Cygwin from a Windows machine, you'll have the ability to perform copy-and-paste operations, which you won't have if you work directly from the virtual machine terminal. (Trust me, you don't want to be typing in those long UUIDs.)</p>
+</blockquote>
+</blockquote>
+<ol>
+<li>The first step is to obtain the UUID of the encrypted partition:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo cryptsetup luksUUID /dev/sdb1
+e38e087a-205c-4aeb-81d5-03f03b8e8020
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<ol>
+<li>Copy that UUID and paste it into the <code>/etc/crypttab</code> file. (If a <code>cryptab</code> file isn’t already there, just create a new one.) Also, note that you'll paste the UUID in twice. The first time, you'll prepend it with <code>luks-</code>, and the second time you'll append it with <code>UUID=</code>:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>luks-e38e087a-205c-4aeb-81d5-03f03b8e8020 UUID=e38e087a-205c-4aeb-81d5-03f03b8e8020 none</code></pre>
+</div>
+<ol>
+<li>Edit the <code>/etc/fstab</code> file, adding the last line in the file for your new encrypted partition. Note that you again have to use <code>luks-</code>, followed by the UUID number:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>/dev/mapper/luks-e38e087a-205c-4aeb-81d5-03f03b8e8020 /secrets xfs defaults 0 0</code></pre>
+</div>
+<blockquote>
+<p>When editing the <code>fstab</code> file for adding normal, unencrypted partitions, I always like to do <code>sudo mount -a</code> to check the <code>fstab</code> file for typos. That won't work with LUKS partitions though, because <code>mount</code> won't recognize the partition until the system reads in the <code>crypttab</code> file, and that won't happen until I reboot the machine. So, just be extra careful with editing <code>fstab</code> when adding LUKS partitions.</p>
+</blockquote>
+<ol>
+<li>Now for the moment of truth. Reboot the machine to see if everything works. Use the <code>mount</code> command to verify that your endeavors have been successful:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ mount | grep &#39;secrets&#39;
+/dev/mapper/luks-e38e087a-205c-4aeb-81d5-03f03b8e8020 on /secrets type xfs (rw,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota)
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<ol>
+<li>End of lab.</li>
+</ol>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>Although it's possible to include passwords or keys in the <code>/etc/crypttab</code> file, my own preference is to not do so. If you must do so, be sure that the passwords or keys are stored on an encrypted <code>/</code> partition, for which you'll always have to enter a password upon boot-up. You can read more about that here: Store the passphrase of encrypted disk in <code>/etc/crypttab</code> encrypted: <a href="https://askubuntu.com/questions/181518/store-the-passphrase-of-encrypted-disk-in-etc-crypttab-encrypted">https://askubuntu.com/questions/181518/store-the-passphrase-of-encrypted-disk-in-etc-crypttab-encrypted</a></p>
+</blockquote>
+</blockquote>
+<p>Now that we've seen LUKS, let's move on to eCryptfs.</p>
+</section>
+</section>
+<section id="encrypting-directories-with-ecryptfs" class="level2" data-number="7.4">
+<h2 data-number="7.4">Encrypting directories with eCryptfs</h2>
+<p>Encrypting entire partitions is cool, but you might, at times, just need to use file-level encryption to encrypt an individual directory. For that, we can use eCryptfs. We'll need to use our Ubuntu machines for this, because Red Hat and its offspring no longer include eCryptfs. (It was in Red Hat 6 and CentOS 6, but it's no longer even available for installation in any newer versions.)</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>It’s possible to use eCryptfs on a LUKS-encrypted disk. But, it’s not at all necessary, and I really don’t recommend it.</p>
+</blockquote>
+</blockquote>
+<section id="hands-on-lab-encrypting-a-home-directory-for-a-new-user-account" class="level3" data-number="7.4.1">
+<h3 data-number="7.4.1">Hands-on lab – encrypting a home directory for a new user account</h3>
+<p>In <em>Chapter</em> 3, Securing Normal User Accounts, I showed you how Ubuntu allows you to encrypt a user's home directory as you create his or her user account. To review, let's see the command for creating Goldie's account:</p>
+<ol>
+<li>If it hasn't already been done, install the <code>ecryptfs-utils</code> package:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo apt install ecryptfs-utils</code></pre>
+</div>
+<ol>
+<li>On an Ubuntu VM, create Goldie's account with an encrypted directory:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo adduser --encrypt-home goldie</code></pre>
+</div>
+<ol>
+<li>Have Goldie log in. Have her unwrap her mount passphrase, write it down, and store it in a secure place. She'll need it if she ever needs to recover a corrupted directory:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>ecryptfs-unwrap-passphrase .ecryptfs/wrapped-passphrase</code></pre>
+</div>
+<p>When you use <code>adduser --encrypt-home</code>, home directories for new users will automatically be set to a restrictive permissions value that will keep everyone out except for the owner of the directory. This happens even on Ubuntu 20.04 when you leave the <code>adduser.conf</code> file set with its default settings.</p>
+</section>
+<section id="creating-a-private-directory-within-an-existing-home-directory" class="level3" data-number="7.4.2">
+<h3 data-number="7.4.2">Creating a private directory within an existing home directory</h3>
+<p>Let's say that you have users on your Ubuntu servers who, for whatever strange reason, don't want to encrypt their entire home directories, and want to keep the <code>755</code> permissions settings on their home directories so that other people can access their files. But they also want a private directory that nobody but them can access.</p>
+<p>Instead of encrypting an entire home directory, any user can create an encrypted private directory within his or her own home directory. Let's check it out:</p>
+<ol>
+<li>If it hasn't already been done, install the <code>ecryptfs-utils</code> package:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo apt install ecryptfs-utils</code></pre>
+</div>
+<p>To create this private directory, use the interactive <code>ecryptfs-setup-private</code> utility. If you have admin privileges, you can do this for other users. Users without admin privileges can do it for themselves. For our demo, let's say that Charlie, my big Siamese/Gray Tabby guy, needs his own encrypted private space. (Who knew that cats had secrets, right?)</p>
+<ol>
+<li>Create Charlie's account in the normal manner, <em>without</em> the encrypted home directory option.</li>
+<li>Then, log in as Charlie and have him create his own private directory:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>charlie@ubuntu2:~$ ecryptfs-setup-private
+Enter your login passphrase [charlie]:
+Enter your mount passphrase [leave blank to generate one]:
+Enter your mount passphrase (again):
+************************************************************************
+YOU SHOULD RECORD YOUR MOUNT PASSPHRASE AND STORE IT IN A SAFE LOCATION.
+  ecryptfs-unwrap-passphrase ~/.ecryptfs/wrapped-passphrase
+THIS WILL BE REQUIRED IF YOU NEED TO RECOVER YOUR DATA AT A LATER TIME.
+************************************************************************
+. . .
+. . .
+charlie@ubuntu2:~$</code></pre>
+</div>
+<ol>
+<li>For the login passphrase, Charlie enters his normal password or passphrase for logging in to his user account. He could have let the system generate its own mount passphrase, but he decided to enter his own. Since he did enter his own mount passphrase, he didn't need to do the <code>ecryptfs-unwrap-passphrase</code> command to find out what the passphrase is. But, just to show how that command works, let's say that Charlie entered <code>TurkeyLips</code> as his mount passphrase:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>charlie@ubuntu2:~$ ecryptfs-unwrap-passphrase .ecryptfs/wrapped-passphrase
+Passphrase:
+TurkeyLips
+charlie@ubuntu2:~$</code></pre>
+</div>
+<p>Yes, it's a horribly weak passphrase, but for our demo purposes, it works.</p>
+<ol>
+<li>Have Charlie log out, and then log back in. After this, he can start using his new private directory. Also, you can see that he has three new hidden directories within his home directory. All three of these new directories are only accessible by Charlie, even if he set his top-level home directory so that it’s open to everybody:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>charlie@ubuntu2:~$ ls -la
+total 40
+drwxr-xr-x 6 charlie charlie 4096 Oct 30 17:00 .
+drwxr-xr-x 4 root root 4096 Oct 30 16:38 ..
+-rw------- 1 charlie charlie 270 Oct 30 17:00 .bash_history
+-rw-r--r-- 1 charlie charlie 220 Aug 31 2015 .bash_logout
+-rw-r--r-- 1 charlie charlie 3771 Aug 31 2015 .bashrc
+drwx------ 2 charlie charlie 4096 Oct 30 16:39 .cache
+drwx------ 2 charlie charlie 4096 Oct 30 16:57 .ecryptfs
+drwx------ 2 charlie charlie 4096 Oct 30 16:57 Private
+drwx------ 2 charlie charlie 4096 Oct 30 16:57 .Private
+-rw-r--r-- 1 charlie charlie 655 May 16 08:49 .profile
+charlie@ubuntu2:~$</code></pre>
+</div>
+<ol>
+<li>Run the <code>grep 'ecryptfs' *</code> command in the <code>/etc/pam.d</code> directory. You'll see that PAM is configured to automatically mount users' encrypted directories whenever they log in to the system:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2:/etc/pam.d$ grep &#39;ecryptfs&#39; *
+common-auth:auth    optional    pam_ecryptfs.so unwrap
+common-password:password    optional    pam_ecryptfs.so
+common-session:session    optional    pam_ecryptfs.so unwrap
+common-session-noninteractive:session    optional    pam_ecryptfs.so unwrap
+donnie@ubuntu2:/etc/pam.d$</code></pre>
+</div>
+<ol>
+<li>End of lab.</li>
+</ol>
+<p>All righty, then. We now know how to encrypt users' home directories. Now, let's find out how to encrypt other directories.</p>
+</section>
+<section id="hands-on-lab-encrypting-other-directories-with-ecryptfs" class="level3" data-number="7.4.3">
+<h3 data-number="7.4.3">Hands-on lab – encrypting other directories with eCryptfs</h3>
+<p>Encrypting other directories is a simple matter of mounting them with the <code>ecryptfs </code>filesystem:</p>
+<ol>
+<li>Create a <code>secrets2</code> directory in the top level of the filesystem:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo mkdir /secrets2
+[sudo] password for donnie: 
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<ol>
+<li>Use <code>mount</code> with the <code>-t ecryptfs</code> option to encrypt the directory. Note that you’ll list the directory name twice, because the it will be used as its own mount point. From the menu, choose <code>1</code> to enter your desired passphrase, and choose the encryption algorithm and the key length:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo mount -t ecryptfs /secrets2/ /secrets2/
+Select key type to use for newly created files: 
+ 1) passphrase
+ 2) tspi
+Selection: 1
+Passphrase: 
+Select cipher: 
+ 1) aes: blocksize = 16; min keysize = 16; max keysize = 32
+ 2) blowfish: blocksize = 8; min keysize = 16; max keysize = 56
+ 3) des3_ede: blocksize = 8; min keysize = 24; max keysize = 24
+ 4) twofish: blocksize = 16; min keysize = 16; max keysize = 32
+ 5) cast6: blocksize = 16; min keysize = 16; max keysize = 32
+ 6) cast5: blocksize = 8; min keysize = 5; max keysize = 16
+Selection [aes]:</code></pre>
+</div>
+<p>Go with the default of <code>aes</code>, and <code>16</code> bytes for the key.</p>
+<ol>
+<li>Go with the default of <code>no</code> for <code>plaintext passthrough</code>, and with <code>yes</code> for filename encryption:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>Enable plaintext passthrough (y/n) [n]:
+Enable filename encryption (y/n) [n]: y</code></pre>
+</div>
+<ol>
+<li>Go with the default <code>Filename Encryption Key</code> and verify the mounting options:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>Filename Encryption Key (FNEK) Signature [e339e1ebf3d58c36]:
+Attempting to mount with the following options:
+  ecryptfs_unlink_sigs
+  ecryptfs_fnek_sig=e339e1ebf3d58c36
+  ecryptfs_key_bytes=16
+  ecryptfs_cipher=aes
+  ecryptfs_sig=e339e1ebf3d58c36</code></pre>
+</div>
+<ol>
+<li>This warning only comes up when you mount the directory for the first time. For the final two questions, type <code>yes</code> in order to prevent that warning from coming up again:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>WARNING: Based on the contents of [/root/.ecryptfs/sig-cache.txt],
+it looks like you have never mounted with this key
+before. This could mean that you have typed your
+passphrase wrong.
+Would you like to proceed with the mount (yes/no)? : yes
+Would you like to append sig [e339e1ebf3d58c36] to
+[/root/.ecryptfs/sig-cache.txt]
+in order to avoid this warning in the future (yes/no)? : yes
+Successfully appended new sig to user sig cache file
+Mounted eCryptfs</code></pre>
+</div>
+<ol>
+<li>Just for fun, create a file within your new encrypted <code>secrets2</code> directory, and then unmount the directory. Then, try to do a directory listing:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>cd /secrets2
+sudo vim secret_stuff.txt
+cd
+sudo umount /secrets2
+donnie@ubuntu2204-packt:~$ ls -l /secrets2/
+total 12
+-rw-rw-r-- 1 donnie donnie 12288 Oct 28 19:04 ECRYPTFS_FNEK_ENCRYPTED.FXbXCS5fwxKABUQtEPlumGPaN-RGvqd13yybkpTr1eCVWVHdr-lrmi1X9Vu-mLM-A-VeqIdN6KNZGcs-
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<p>By choosing to encrypt filenames, nobody can even tell what files you have when the directory is unmounted. When you're ready to access your encrypted files again, just remount the directory the same as you did before.</p>
+</section>
+</section>
+<section id="encrypting-the-swap-partition-with-ecryptfs" class="level2" data-number="7.5">
+<h2 data-number="7.5">Encrypting the swap partition with eCryptfs</h2>
+<p>If you're just encrypting individual directories with eCryptfs instead of using LUKS whole-disk encryption, you'll need to encrypt your swap partition in order to prevent accidental data leakage. Fixing that problem requires just one simple command:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu:~$ sudo ecryptfs-setup-swap
+WARNING:
+An encrypted swap is required to help ensure that encrypted files are not leaked to disk in an unencrypted format.
+HOWEVER, THE SWAP ENCRYPTION CONFIGURATION PRODUCED BY THIS PROGRAM WILL BREAK HIBERNATE/RESUME ON THIS SYSTEM!
+NOTE: Your suspend/resume capabilities will not be affected.
+Do you want to proceed with encrypting your swap? [y/N]: y
+INFO: Setting up swap: [/dev/sda5]
+WARNING: Commented out your unencrypted swap from /etc/fstab
+swapon: stat of /dev/mapper/cryptswap1 failed: No such file or directory
+donnie@ubuntu:~$</code></pre>
+</div>
+<p>Don't mind the warning about the missing <code>/dev/mapper/cryptswap1</code> file. It will get created the next time you reboot the machine.</p>
+</section>
+<section id="using-veracrypt-for-cross-platform-sharing-of-encrypted-containers" class="level2" data-number="7.6">
+<h2 data-number="7.6">Using VeraCrypt for cross-platform sharing of encrypted containers</h2>
+<p>Once upon a time, there was TrueCrypt, a cross-platform program that allowed the sharing of encrypted containers across different operating systems. But the project was always shrouded in mystery because its developers would never reveal their identities. And then, right out of the blue, the developers released a cryptic message about how TrueCrypt was no longer secure, and shut down the project.</p>
+<p>VeraCrypt is the successor to TrueCrypt, and it allows the sharing of encrypted containers across Linux, Windows, macOS, and FreeBSD machines. Although LUKS and eCryptfs are good, VeraCrypt offers more flexibility in certain ways:</p>
+<ul>
+<li>As mentioned, VeraCrypt offers cross-platform sharing, whereas LUKS and eCryptfs don't.</li>
+<li>VeraCrypt allows you to encrypt either whole partitions or whole storage devices, or to create virtual encrypted disks.</li>
+<li>Not only can you create encrypted volumes with VeraCrypt, you can also hide them, giving you plausible deniability.</li>
+<li>VeraCrypt comes in both command-line and GUI variants, so it's appropriate for either server use or for the casual desktop user.</li>
+<li>Like LUKS and eCryptfs, VeraCrypt is free open source software, which means that it's free to use, and that the source code can be audited for either bugs or backdoors.</li>
+</ul>
+<section id="hands-on-lab-getting-and-installing-veracrypt" class="level3" data-number="7.6.1">
+<h3 data-number="7.6.1">Hands-on lab – getting and installing VeraCrypt</h3>
+<p>Follow these steps to install VeraCrypt:</p>
+<ol>
+<li>Download VeraCrypt from here: <a href="https://www.veracrypt.fr/en/Downloads.html">https://www.veracrypt.fr/en/Downloads.html</a></li>
+<li>The Linux version of VeraCrypt comes two ways. First, there’s <code>.tar.bz2</code> file, which contains a set of universal installer scripts that should work on any Linux distribution. Once you extract the <code>.tar.bz2</code> archive file, you'll see three scripts for GUI installation and two for console-mode installation. There are scripts for both 32-bit and 64-bit versions of Linux:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@donnie-VirtualBox:~$ tar xjvf veracrypt-1.25.9-setup.tar.bz2 
+veracrypt-1.25.9-setup-console-x64
+veracrypt-1.25.9-setup-console-x86
+veracrypt-1.25.9-setup-gtk3-console-x64
+veracrypt-1.25.9-setup-gtk3-gui-x64
+veracrypt-1.25.9-setup-gui-x64
+veracrypt-1.25.9-setup-gui-x86
+donnie@donnie-VirtualBox:~$</code></pre>
+</div>
+<ol>
+<li>The executable permission is already set, so all you have to do to install is this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@donnie-VirtualBox:~$ ./veracrypt-1.25.9-setup-gui-x64</code></pre>
+</div>
+<p>You'll need sudo privileges, but the installer will prompt you for your sudo password. After reading and agreeing to a rather lengthy license agreement, the installation only takes a few seconds.</p>
+<p>End of lab</p>
+<blockquote>
+<p>More recently, the VeraCrypt developers have also begun supplying <code>.deb</code> and <code>.rpm </code>installer packages for specific Linux distros. For Debian/Ubuntu-type systems, use <code>sudo dpkg -i</code> to install the <code>.deb</code> file. On RHEL/CentOS/AlmaLinux/SUSE systems, use <code>sudo rpm -Uvh</code> to install the <code>.rpm</code> file. Note that you might receive an error message telling you to install other packages as dependencies. Also, note that there’s no <code>.rpm</code> package for the RHEL/AlmaLinux 9 distros. Not to worry though, because I’ve just verified that the CentOS 8 package works just fine on AlmaLinux 9.</p>
+</blockquote>
+<section id="hands-on-lab-creating-and-mounting-a-veracrypt-volume-in-console-mode" class="level4" data-number="7.6.1.1">
+<h4 data-number="7.6.1.1">Hands-on lab – creating and mounting a VeraCrypt volume in console mode</h4>
+<p>I haven't been able to find any documentation for the console-mode variant of VeraCrypt, but you can see a list of the available commands just by typing <code>veracrypt</code>. For this demo, you'll create a 2 GB encrypted directory. But you can just as easily do it elsewhere, such as on a USB memory stick.</p>
+<ol>
+<li>To create a new encrypted volume, type the following:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>veracrypt -c</code></pre>
+</div>
+<ol>
+<li>This will take you into an easy-to-use interactive utility. For the most part, you'll be fine just accepting the default options:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu:~$ veracrypt -c
+Volume type:
+ 1) Normal
+ 2) Hidden
+Select [1]:
+Enter volume path: /home/donnie/good_stuff
+Enter volume size (sizeK/size[M]/sizeG): 2G
+Encryption Algorithm:
+ 1) AES
+ 2) Serpent
+. . .
+. . .
+Select [1]:
+. . .
+. . .</code></pre>
+</div>
+<ol>
+<li>For the filesystem, the default option of <code>FAT</code> gives you the best cross-platform compatibility between Linux, macOS, and Windows:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>Filesystem:
+ 1) None
+ 2) FAT
+ 3) Linux Ext2
+ 4) Linux Ext3
+ 5) Linux Ext4
+ 6) NTFS
+ 7) exFAT
+Select [2]:</code></pre>
+</div>
+<ol>
+<li>Select your password and a <strong>PIM</strong> (short for <strong>Personal Iterations Multiplier</strong>). For my PIM, I entered <code>8891</code>. (High PIM values give better security, but they will also cause the volume to take longer to mount.) Then, type at least 320 random characters in order to generate the encryption key. (This is where it would be handy to have my cats walking across my keyboard):</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>Enter password:
+Re-enter password:
+Enter PIM: 8891
+Enter keyfile path [none]:
+Please type at least 320 randomly chosen characters and then press Enter:</code></pre>
+</div>
+<ol>
+<li>After you hit the <strong>Enter</strong> key, be patient, because the final generation of your encrypted volume will take a few moments. Here, you see that my 2 GB <code>good_stuff</code> container has been successfully created:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu:~$ ls -l good_stuff
+-rw------- 1 donnie donnie 2147483648 Nov  1 17:02 good_stuff
+donnie@ubuntu:~$</code></pre>
+</div>
+<ol>
+<li>Mount this container in order to use it. Begin by creating a mount point directory:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu:~$ mkdir good_stuff_dir
+donnie@ubuntu:~$</code></pre>
+</div>
+<ol>
+<li>Use the <code>veracrypt</code> utility to mount your container on this mount point:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu:~$ veracrypt good_stuff good_stuff_dir
+Enter password for /home/donnie/good_stuff:
+Enter PIM for /home/donnie/good_stuff: 8891
+Enter keyfile [none]:
+Protect hidden volume (if any)? (y=Yes/n=No) [No]:
+Enter your user password or administrator password:
+donnie@ubuntu:~$</code></pre>
+</div>
+<ol>
+<li>To see what VeraCrypt volumes you have mounted, use <code>veracrypt -l</code>:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu:~$ veracrypt -l
+1: /home/donnie/secret_stuff /dev/mapper/veracrypt1 /home/donnie/secret_stuff_dir
+2: /home/donnie/good_stuff /dev/mapper/veracrypt2 /home/donnie/good_stuff_dir
+donnie@ubuntu:~$</code></pre>
+</div>
+<ol>
+<li>End of lab. That's all there is to it.</li>
+</ol>
+</section>
+</section>
+<section id="using-veracrypt-in-gui-mode" class="level3" data-number="7.6.2">
+<h3 data-number="7.6.2">Using VeraCrypt in GUI mode</h3>
+<p>Desktop users of any of the supported operating systems can install the GUI variant of VeraCrypt. Be aware, though, that you can't install both the console-mode variant and the GUI variant on the same machine, because one will overwrite the other. Here’s what that looks like:</p>
+<figure>
+<img src="../media/file41.png" alt="19501_06_06.png" /><figcaption aria-hidden="true">19501_06_06.png</figcaption>
+</figure>
+<p>Since the main focus of this book is server security, I won't go into the details of the GUI version here. But it's fairly self-explanatory, and you can view the full VeraCrypt documentation on their website.</p>
+<blockquote>
+<p>You can get VeraCrypt from here: <a href="https://www.veracrypt.fr/en/Home.html">https://www.veracrypt.fr/en/Home.html</a>.</p>
+</blockquote>
+</section>
+</section>
+<section id="openssl-and-the-public-key-infrastructure" class="level2" data-number="7.7">
+<h2 data-number="7.7">OpenSSL and the public key infrastructure</h2>
+<p>With OpenSSL, we can encrypt information on the fly as it goes across the network. There's no need to manually encrypt our data before we send it across the network because OpenSSL encryption happens automatically. This is important because online commerce and banking couldn't exist without it.</p>
+<p>The <strong>Secure Sockets Layer</strong> (<strong>SSL</strong>) is the original in-transit encryption protocol. Ironically, even though we're using the OpenSSL suite of programs and libraries, we no longer want to use SSL. Instead, we now want to use the <strong>Transport Layer Security</strong> (<strong>TLS</strong>) protocol . SSL is full of legacy code and a lot of vulnerabilities that go along with that legacy code. TLS is newer, and is much more secure. But, even when working with TLS, we can still use the OpenSSL suite.</p>
+<p>One reason that the older SSL protocol is so bad is because of past government regulations, especially here in the U.S., that prohibited the use of strong encryption. For the first few years of the public Internet, U.S. website operators couldn't legally implement encryption keys that were longer than a measly 40 bits. Even back then, a 40-bit key didn't provide a whole lot of security. But the U.S. government considered strong encryption as a type of munition, and tried to control it so that the governments of other countries couldn't use it. Meanwhile, an Australian outfit named Fortify started producing a strong encryption plugin that people could install in their Netscape web browsers. This plugin allowed the use of 128-bit encryption, and my geek buddies and I all eagerly installed it on our own machines. Looking back, I'm not sure that it did a lot of good, because website operators in the U.S. were still prohibited from using strong encryption keys on their web servers.</p>
+<p>Amazingly, the Fortify outfit still has their website up. You can still download the Fortify plugin, even though it's now completely useless. Here’s a screenshot of the Fortify website:</p>
+<figure>
+<img src="../media/file42.png" alt="19501_06_07.png" /><figcaption aria-hidden="true">19501_06_07.png</figcaption>
+</figure>
+<p>An encrypted SSL/TLS session uses both symmetric and asymmetric mechanisms. For acceptable performance, it uses symmetric encryption to encrypt the data in transit. But symmetric encryption requires a private key to be exchanged between the two communication partners. To do that, SSL/TLS first negotiates an asymmetric session using the same public key exchange mechanism that we looked at in the GPG section.</p>
+<p>Once that asymmetric session is set up, the two communication partners can safely exchange the private key that they'll use for the symmetric session.</p>
+<section id="commercial-certificate-authorities" class="level3" data-number="7.7.1">
+<h3 data-number="7.7.1">Commercial certificate authorities</h3>
+<p>To make this magic work, you need to install a security certificate onto your web server. The certificate serves two purposes:</p>
+<ul>
+<li>It contains the public key that's needed to set up an asymmetric key-exchange session.</li>
+<li>Optionally, it can verify the identity of, or authenticate, your website. So, for example, users can theoretically be sure that they're connected to their real bank, instead of to Joe Hacker's Bank of Crooks and Criminals that's disguised as their bank.</li>
+</ul>
+<p>When you shop for a certificate, you'll find quite a few vendors, which are all referred to as <strong>certificate authorities</strong>, or <strong>CAs</strong>. Most CAs, including vendors such as Thawte, Symantec, GoDaddy, and Let's Encrypt, among others, offer several different grades of certificates. To help explain the differences between the grades of certificates, here's a screenshot from the GoDaddy site:</p>
+<p>At the left-hand side of the list, at the cheapest price, is the <strong>standard</strong> <strong>Domain Verification</strong> <strong>(DV)</strong> offering. Vendors advertise this type of certificate as for use where all you really care about is encryption. Identity verification is limited to domain verification, which means that yeah, records for your site have been found on a publicly accessible DNS server.</p>
+<p>At the right, we see the <strong>premium</strong> <strong>Extended Verification</strong> (<strong>EV</strong>) offering. This is the top-of-the-line, highest-grade certificate that certificate vendors offer. With this extended verification grade of certificate, you have to jump through some hoops to prove that you are who you really are and that your website and your business are both legit. It used to be that both Firefox and Chrome would show a green High-Assurance bar in the URL of any site with an EV certificate, but they no longer do, for reasons that I’ll explain in a moment.</p>
+<p>So, just how good is this <strong>Premium SSL EV</strong> certificate with rigorous identity testing? Well, not quite as good as I thought. Two days after I wrote this explanation about the different types of certificates for the previous edition of this book, I received the latest edition of the <em>Bulletproof TLS Newsletter</em> from Feisty Duck Publishing. The big news was that Google and Mozilla decided to remove the green high assurance bar from future editions of Chrome and Firefox. Their reasons are as follows:</p>
+<ul>
+<li>The green high assurance bar is meant to help users avoid phishing attacks. But for that to be useful, users have to notice that the high assurance bar is even there. Studies have shown that most people don't even notice it.</li>
+<li>Ian Carrol, a security researcher, questions the value of extended validation certificates. As an experiment, he was able to register a bogus certificate for Stripe, Inc., which is a legitimate company. The certificate vendor finally did notice their mistake and revoked the certificate, but it's something that shouldn't have happened in the first place.</li>
+<li>On top of everything else, it's also possible to register extended validation certificates with incorrect information. This indicates that the verification process isn't quite as thorough as the certificate vendors would have us believe.</li>
+</ul>
+<p>But in spite of these occasional problems, I still believe that extended validation certificates are useful. When I access my bank account, I like to believe that extra identity verification is never a bad thing.</p>
+<blockquote>
+<p>Something else that's rather curious is that certificate vendors still market their certificates as SSL certificates. Don't be fooled, though. As long as the website owners configure their servers correctly, they'll be using the more secure TLS protocol, rather than SSL.</p>
+</blockquote>
+<p><strong>Let's Encrypt</strong> is a fairly new organization that has the goal of ensuring that all websites everywhere are set up with encryption. It's a worthy goal, but it has also introduced a new problem. Here’s what the Let's Encrypt website looks like:</p>
+<figure>
+<img src="../media/file43.png" alt="19501_06_09.png" /><figcaption aria-hidden="true">19501_06_09.png</figcaption>
+</figure>
+<p>To obtain a certificate from one of the traditional vendors, you have to use the OpenSSL utility to create your keys and a certificate request. Then, you'll submit the certificate request, proof of identity if applicable, and your payment to the certificate authority. Depending upon which grade of certificate you purchase, you'll have to wait anywhere from one to several days before you get the certificate.</p>
+<p>Let's Encrypt is totally free of charge, and you don't have to jump through hoops to get the certificate. Instead, you configure your web server to automatically obtain a new Let's Encrypt certificate each time you set up a new website. If Let's Encrypt sees that your new site has a valid record on a publicly accessible DNS server, it will automatically create and install the certificate on your server. Other than having to configure your web server to use Let's Encrypt, it's no fuss, no muss.</p>
+<p>The problem with Let's Encrypt is that it's even easier to abuse than the extended validation certificates. Shortly after Let's Encrypt began operation, criminals began setting up domains that appeared to be subdomains of legitimate business websites. So, people see that the website is encrypted and that the domain name seems to be legit, and they merrily enter their credentials without giving things a second thought. Let's Encrypt is handy and useful for legitimate purposes, but be aware of its downside, too.</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>Before you choose a certificate vendor, do some research. Sometimes, even the big name vendors have problems. A few years ago, Google removed Symantec from Chrome's list of trusted certificate authorities because Symantec had allegedly violated industry best practices several times. That's rather ironic, considering that Symantec has had a long history of being a trusted vendor of security products.</p>
+</blockquote>
+</blockquote>
+<p>Now that we've covered the basics of SSL/TLS encryption, let's see how to implement it with the OpenSSL suite.</p>
+</section>
+<section id="creating-keys-certificate-signing-requests-and-certificates" class="level3" data-number="7.7.2">
+<h3 data-number="7.7.2">Creating keys, certificate signing requests, and certificates</h3>
+<p>The good news is that, regardless of which <em>newer</em> Linux distribution we're on, this procedure is the same. (I say <em>newer</em>, because the newest versions of Ubuntu and RHEL/AlmaLinux use OpenSSL version 3. Some of the Version 3 commands are different from what you’ll see on the older versions.) The not-so-good news is that OpenSSL can be a bit tricky to learn because it has loads of sub-commands, each with its own set of options and arguments. Bear with me, and I'll break it down the best I can.</p>
+<section id="creating-a-self-signed-certificate-with-an-rsa-key" class="level4" data-number="7.7.2.1">
+<h4 data-number="7.7.2.1">Creating a self-signed certificate with an RSA key</h4>
+<p>A self-signed certificate is useful when all you need is encryption, or for testing purposes. There's no identity verification involved with self-signed certificates, so you never want to use them on servers that your users need to trust. Let's say that I need to test my new website setup before putting it into production, and I don't want to do my testing with a for-real key and certificate. I'll create the key and the self-signed certificate with one single command:</p>
+<div class="C0-SHConPACKT">
+<pre><code>openssl req -newkey rsa:2048 -nodes -keyout donnie-domain.key-x509 -days 365 -out donnie-domain.crt</code></pre>
+</div>
+<p>Here's the breakdown:</p>
+<ul>
+<li><strong>openssl</strong>: I'm using OpenSSL with just my normal user privileges. For now, I'm doing everything in my own home directory, so there's no need for root or sudo privileges.</li>
+<li><strong>req</strong>: This is the sub-command for managing certificate signing requests (CSRs). When creating self-signed certificates, OpenSSL will create a temporary CSR.</li>
+<li><strong>-newkey rsa:2048</strong>: I'm creating an RSA keypair that's 2,048 bits in length. I'd actually like to use something a bit longer, but that might impact server performance when setting up the TLS handshake. (Again, this is preceded by only a single dash.)</li>
+<li><strong>-nodes</strong>: This means that I'm not encrypting the private key that I'm about to create. If I were to encrypt the private key, I would have to enter the private key passphrase every time I restart the web server.</li>
+<li><strong>-keyout donnie-domain.key-x509</strong>: I'm creating the private key with the name <code>donnie-domain.key-x509</code>. The <code>x509</code> part indicates that this will be used for a self-signed certificate.</li>
+<li><strong>-days 365</strong>: The certificate will expire in one year.</li>
+<li><strong>-out donnie-domain.crt</strong>: Finally, I'm creating the <code>donnie-domain.crt</code> certificate.</li>
+</ul>
+<p>When you run this command, you'll be prompted to enter information about your business and your server. (We'll look at that in just a moment.) After creating this key and certificate, I'll need to move them to their proper locations and configure my web server to find them. (We'll also touch on that in a bit.)</p>
+<p>Encrypting the private key is an optional step, which I didn't do. If I were to encrypt the private key, I would have to enter the passphrase every time that I restart the web server. That could be problematic if there are any web server admins who don't have the passphrase. And, even though this sounds counter-intuitive, encrypting the private key that's on the web server doesn't really help that much with security. Any malicious person who can get physical access to the web server can use memory forensics tools to get the private key from system memory, even if the key is encrypted. But if you plan to make a backup of the key to store elsewhere, definitely encrypt that copy. So now, let's make an encrypted backup copy of my private key that I can safely store somewhere other than on the web server:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ openssl rsa -aes256 -in donnie-domain.key-x509 -out donnie-domain-encrypted.key-x509 
+writing RSA key
+Enter PEM pass phrase:
+Verifying - Enter PEM pass phrase:
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>There are two things to look at here:</p>
+<ul>
+<li><strong>rsa -aes256</strong> means that I'm using the AES256 encryption algorithm to encrypt an RSA key.</li>
+<li>To ensure that I made a copy instead of overwriting the original unencrypted key, I specified <code>donnie-domain-encrypted.key-x509</code> as the name for the copy.</li>
+</ul>
+</section>
+<section id="creating-a-self-signed-certificate-with-an-elliptic-curve-key" class="level4" data-number="7.7.2.2">
+<h4 data-number="7.7.2.2">Creating a self-signed certificate with an Elliptic Curve key</h4>
+<div class="C0-SHConPACKT">
+<pre><code>RSA keys were okay in their day, but they do have their disadvantages. (I&#39;ll cover this more in just a bit.) Elliptic Curve (EC) keys are superior in pretty much every way. So, let&#39;s now create a self-signed certificate with an EC key, instead of with an RSA key, like so:
+openssl req -new -x509 -nodes -newkey ec:&lt;(openssl ecparam -name secp384r1) -keyout cert.key.x509 -out cert.crt -days 3650</code></pre>
+</div>
+<p>The only part of this that's different is the <code>ec:&lt;(openssl ecparam -name secp384r1)</code> part. It looks strange, but it's really quite logical. When creating an EC key, you have to specify a parameter with the <code>ecparam</code> command. You'll normally see this as two separate <code>openssl</code> commands, but it's handier to combine the two commands together as one command within another command. The inner <code>openssl</code> command is feeding its output back to the outer <code>openssl</code> command via the input redirection symbol (<code>&lt;</code>). The <code>-name secp384r1</code> part means that we're creating a 384-bit EC key with the <code>secp384</code> named curve algorithm.</p>
+</section>
+<section id="creating-an-rsa-key-and-a-certificate-signing-request" class="level4" data-number="7.7.2.3">
+<h4 data-number="7.7.2.3">Creating an RSA key and a Certificate Signing Request</h4>
+<p>Normally, we won't use a self-signed certificate for anything that's meant for the general public to interface with. Instead, we want to obtain a certificate from a commercial CA because we want users to know that they're connecting to a server for which the identity of its owners has been verified. To obtain a certificate from a trusted CA, you'll first need to create a key and a <strong>Certificate Signing Request</strong> (<strong>CSR</strong>). Let's do that now:</p>
+<div class="C0-SHConPACKT">
+<pre><code>openssl req --out CSR.csr -new -newkey rsa:2048 -nodes -keyout server-privatekey.key</code></pre>
+</div>
+<p>Here's the breakdown:</p>
+<ul>
+<li><strong>openssl</strong>: I'm using OpenSSL with just my normal user privileges. For now, I'm doing everything in my own home directory, so there's no need for root or sudo privileges.</li>
+<li><strong>req</strong>: This is the sub-command for managing CSRs.</li>
+<li><strong>--out CSR.csr</strong>: The <code>--out</code> means that I'm creating something. In this case, I'm creating the CSR with the name <code>CSR.csr</code>. All CSRs will have the <code>.csr</code> filename extension.</li>
+<li><strong>-new</strong>: This is a new request. (And yes, this is preceded by a single dash, unlike the <code>out</code> in the previous line that's preceded by two dashes.)</li>
+<li><strong>-newkey rsa:2048</strong>: I'm creating an RSA key pair that's 2,048 bits in length. I'd actually like to use something a bit longer, but that will impact server performance when setting up the TLS handshake. (Again, this is preceded by only a single dash.)</li>
+<li><strong>-nodes</strong>: This means that I'm not encrypting the private key that I'm about to create. If I were to encrypt the private key, I would have to enter the private key passphrase every time I restart the web server.</li>
+<li><strong>-keyout server-privatekey.key</strong>: Finally, I'm creating the private key with the name <code>server-privatekey.key</code>. Since this key isn't for a self-signed certificate, I didn't put the <code>-x509</code> at the end of the key's filename.</li>
+</ul>
+<p>Let's now look at a snippet from the command output:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ openssl req --out CSR.csr -new -newkey rsa:2048 -nodes -keyout server-privatekey.key
+Generating a RSA private key
+. . .
+. . .
+Country Name (2 letter code) [XX]:US
+State or Province Name (full name) []:GA
+Locality Name (eg, city) [Default City]:Saint Marys
+Organization Name (eg, company) [Default Company Ltd]:Tevault Enterprises
+Organizational Unit Name (eg, section) []:Education
+Common Name (eg, your name or your server&#39;s hostname) []:www.tevaultenterprises.com
+Email Address []:any@any.net
+Please enter the following &#39;extra&#39; attributes
+to be sent with your certificate request
+A challenge password []:TurkeyLips
+An optional company name []:</code></pre>
+</div>
+<p>So, I've entered my information about my company location, name, and website name. Note the bottom where it asks me for a <strong>challenge password</strong>. This password doesn't encrypt either the key or the certificate. Rather, it's just a shared secret between the certificate authority and me that's embedded into the certificate. I'll need to keep it in a safe place in case I ever need to reinstall the certificate. (And, for goodness' sake, when you do this for real, pick a better password than <code>TurkeyLips</code>.)</p>
+<p>As before, I didn't encrypt the private key. But if you need to make a backup copy, just follow the procedure that you saw in the previous section.</p>
+<p>To obtain a certificate from a commercial CA, go to their website and follow their directions. When you receive your certificate, install it in the proper place in your web server and configure the web server to find it.</p>
+</section>
+<section id="creating-an-ec-key-and-a-csr" class="level4" data-number="7.7.2.4">
+<h4 data-number="7.7.2.4">Creating an EC key and a CSR</h4>
+<p>Up until a few years ago, you would have wanted to use RSA keys on your web servers. They don't have the security weaknesses that certain other key types have, and they're widely supported by pretty much every web browser. But RSA keys do have two weaknesses:</p>
+<ul>
+<li>Even at the standard 2,048-bit length, they require more computational power than other key types. Increasing the key length for better security could degrade web server performance.</li>
+<li>RSA doesn't offer <strong>Perfect Forward Secrecy</strong> (<strong>PFS</strong>). In other words, if someone were to capture a session key that's produced by the RSA algorithm, they would be able to decrypt material from the past. If the same person were to capture a session key that was produced by a PFS algorithm, they would only be able to decrypt the current communication stream.</li>
+</ul>
+<p>Using the new-fangled EC algorithms instead of the creaky old RSA solves both of these problems. But if you pick up a book from even a couple of years ago, you'll see that it recommends using RSA keys for backward compatibility with older web browsers. That's partly because certain operating systems, along with their associated proprietary web browsers, lingered on for far longer than they should have. (<em>I'm looking at you, Windows XP.</em>) Now though, as I sit here writing this in October 2022, I think it's safe to start ignoring the needs of anyone who refuses to move on from these antiquated platforms. I mean, Windows XP and Windows 7 both reached end-of-life several years ago. So, let's get with the times, people.</p>
+<p>Unlike what we just saw with the RSA keys, we can't create the EC private key and the CSR all with one simple command. With EC, we need to do this in two separate steps.</p>
+<p>First, I'll create the private key:</p>
+<div class="C0-SHConPACKT">
+<pre><code>openssl genpkey -algorithm EC -out eckey.pem -pkeyopt ec_paramgen_curve:P-384 -pkeyopt ec_param_enc:named_curve</code></pre>
+</div>
+<p>Here's the breakdown:</p>
+<ul>
+<li><strong>genpkey -algorithm EC</strong>: The <code>genpkey</code> command is a fairly recent addition to OpenSSL and is now the recommended way to create private keys. Here, I'm telling it to create a key with the EC algorithm.</li>
+<li><strong>-out eckey.pem</strong>: I'm creating the <code>eckey.pem</code> key, which is in the <strong>Privacy Enhanced Mail</strong> (<strong>PEM</strong>) format. The RSA keys that I created in the previous section were also PEM keys, but I used the <code>.key</code> filename extension on them. You can use either the <code>.key</code> or the <code>.pem</code> filename extension, and they'll both work. But if you use the <code>.pem</code> extension, everyone who looks at them can tell at a glance that they are PEM keys.</li>
+<li><strong>-pkeyopt ec_paramgen_curve:P-384</strong>: This tells OpenSSL to create an EC key that's 384 bits in length. A beautiful thing about EC is that its shorter-length keys provide the same encryption strength as the longer RSA keys. In this case, we have a 384-bit key that's actually stronger than a 2,048-bit RSA key. And, it requires less computational power. (I call that a total win!)</li>
+<li><strong>-pkeyopt ec_param_enc:named_curve</strong>: This is the encoding method that I'm using for the EC parameters. It has to be set to either <code>named_curve or explicit</code>.</li>
+</ul>
+<p>Now, I'll create a CSR and sign it with my new private key, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ openssl req -new -key eckey.pem -out eckey.csr
+. . .
+. . .
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>The output that I didn't include is the same as what you saw in the RSA key section.</p>
+<p>The final steps are the same as before. Choose a CA and let them tell you how to submit the CSR. When they issue the certificate, install it on your web server.</p>
+</section>
+</section>
+<section id="creating-an-on-premises-ca" class="level3" data-number="7.7.3">
+<h3 data-number="7.7.3">Creating an on-premises CA</h3>
+<p>Buying a certificate from a commercial CA is good when you're dealing with the general public on a website that they need to trust. But for an organization's own internal use, it's not always necessary or feasible to buy commercial certificates. Let's say that your organization has a group of developers who need their own client certificates to access the development server. Buying a commercial certificate for each developer would be costly, and it would require the development server to have a publicly accessible domain name so that the commercial CA can do domain verification. Even going with the free-of-charge Let's Encrypt certificates isn't a good option, because that would also require that the development server have a publicly accessible domain name. Option 2 is to go with self-signed certificates. But that won't work because client authentication doesn't work with self-signed certificates. That leaves Option 3, setting up a private, on-premises CA.</p>
+<p>If you search around on the web, you'll find lots of guides for setting up your own private CA. But almost all of them are woefully outdated, and most of them are for setting up a CA with OpenSSL. There's nothing wrong with using OpenSSL for a CA, except that setting it up is a rather convoluted, multi-stage process. Then, when you finally do have it set up, you have to use complex commands from the command line in order to do anything. What we want is something a bit more user-friendly for both you and your users.</p>
+</section>
+<section id="hands-on-lab-setting-up-a-dogtag-ca" class="level3" data-number="7.7.4">
+<h3 data-number="7.7.4">Hands-on lab – setting up a Dogtag CA</h3>
+<p>Dogtag PKI is much simpler to set up, and it has a nice web interface that OpenSSL doesn't have. It's available in the normal repositories of Debian/Ubuntu and RHEL/AlmaLinux, but under different package names. In the Debian/Ubuntu repositories, the package name is <code>dogtag-pki</code>. In the RHEL/AlmaLinux repositories, the name is <code>pki-ca</code>. (For some reason that I don't understand, you'll never see Red Hat folk use the "Dogtag" name.)</p>
+<p>Before we install the Dogtag packages, we need to do a couple of simple chores:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Set a Fully Qualified Domain Name (FQDN) on the server</code></pre>
+</div>
+<p>Either create a record in a local DNS server for the Dogtag server, or create an entry for it in its own <code>/etc/hosts</code> file</p>
+<p>You can do this on either your AlmaLinux 9 or your Ubuntu 22.04 VM, and I’ll give directions for both. To access the Dogtag dashboard, we'll use a second Linux VM with a desktop environment installed. With all this out of the way, let's get started:</p>
+<ol>
+<li>On your server virtual machine, set an FQDN, substituting your own for the one that I'm using:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo hostnamectl set-hostname donnie-ca.local</code></pre>
+</div>
+<ol>
+<li>Edit the <code>/etc/hosts</code> file to add a line like the following:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>192.168.0.53 donnie-ca.local</code></pre>
+</div>
+<p>Use your virtual machine's own IP address and FQDN.</p>
+<ol>
+<li>Next, increase the number of file descriptors that your system can have open at one time. (Otherwise, you'll get a warning message when you run the directory server installer.) Do that by editing the <code>/etc/security/limits.conf</code> file. At the end of the file, add these two lines:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>root            hard    nofile          4096
+root            soft    nofile          4096</code></pre>
+</div>
+<ol>
+<li>Reboot the machine so that the new hostname and file descriptor limits can take effect.</li>
+<li>Dogtag stores its certificate and user information in an LDAP database. In this step, we'll install the LDAP server package, along with the Dogtag package. For AlmaLinux 9, do this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo dnf install 389-ds-base pki-ca</code></pre>
+</div>
+<p>For Ubuntu 22.04, do this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>   sudo apt install 389-ds-base dogtag-pki</code></pre>
+</div>
+<p>Next, create an LDAP Directory Server (DS) instance by first creating an <code>instance.inf</code> file in the root user’s home directory:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo vim /root/instance.inf</code></pre>
+</div>
+<div class="C1-SHConPACKT">
+<pre><code>Make its contents look something like this, using your own suffix and root_password:
+# /root/instance.inf
+[general]
+config_version = 2
+[slapd]
+root_password = TurkeyLips
+[backend-userroot]
+sample_entries = yes
+suffix = dc=donnie-ca,dc=local</code></pre>
+</div>
+<ol>
+<li>(Yes, I know that it’s bad practice to put passwords into plain-text configuration files. That’s okay, though. We’ll take care of that in just a bit.)</li>
+<li>We can now use this <code>instance.inf</code> file, along with the <code>dscreate</code> utility, to create the Directory Server instance:</li>
+</ol>
+<div class="C0-SHConPACKT">
+<pre><code>sudo dscreate from-file /root/instance.inf</code></pre>
+</div>
+<ol>
+<li>Finally, it's time to create the CA:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo pkispawn</code></pre>
+</div>
+<p>Accept all the defaults until you get to the very end. When it asks <strong>Begin Installation?</strong>, type <code>Yes</code>. When you get to the Directory Server part, enter the password that you used to create the DS instance in the previous step. Note that you'll be offered the choice to access the LDAP DS instance via a secure port. But since we're setting up LDAP and Dogtag on the same machine, this isn't necessary.</p>
+<ol>
+<li>Ensure that the Dogtag service will automatically start by enabling the <code>pki-tomcatd.target</code>. Do that with:</li>
+</ol>
+<div class="C0-SHConPACKT">
+<pre><code>sudo systemctl enable pki-tomcatd.target
+sudo shutdown -r now</code></pre>
+</div>
+<ol>
+<li>After everything is set up, you’ll no longer need the <code>instance.inf</code> file that holds your password in plain-text. Get rid of it by doing:</li>
+</ol>
+<div class="C0-SHConPACKT">
+<pre><code>sudo shred -u -z /root/instance.inf</code></pre>
+</div>
+<ol>
+<li>You'll access the Dogtag web interface via port <code>8443/tcp</code>. On the AlmaLinux machine, open that port like this:</li>
+</ol>
+<div class="C0-SHConPACKT">
+<pre><code>sudo firewall-cmd --permanent --add-port=8443/tcp
+sudo firewall-cmd --reload</code></pre>
+</div>
+<p>On the Ubuntu machine, assuming that you’re using the Uncomplicated Firewall, open the port like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo ufw allow 8443/tcp</code></pre>
+</div>
+<ol>
+<li>On another Linux virtual machine that has a desktop interface, edit the <code>/etc/hosts</code> file to add the same line that you added to the server <code>hosts</code> file in <em>step 2</em>. Then, open the Firefox web browser on that machine and navigate to the Dogtag dashboard. In keeping with the example in this scenario, the URL would look like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>https://donnie-ca.local:8443</code></pre>
+</div>
+<p>You'll receive a warning about the certificate being invalid because it's self-signed. That's normal, because every CA has to start with a self-signed certificate, and you haven't yet imported this certificate into your trust store. Temporarily add the exception and continue. (In other words, clear the checkmark from the <strong>Add permanently</strong> box. You'll see why in the next lab.) Click through the links until you reach this screen:</p>
+<figure>
+<img src="../media/file44.png" alt="19501_06_10.png" /><figcaption aria-hidden="true">19501_06_10.png</figcaption>
+</figure>
+<ol>
+<li>Click the <strong>SSL End Users Services</strong> link. This is where end users can request the various types of certificates. Click the back button to return to the previous screen. This time, click on the <strong>Agent Services</strong> link. You won't be able to go there because it requires you to install a certificate into your web browser for authentication.</li>
+<li>The certificate that you need to install is in the <code>/root/.dogtag/pki-tomcat/ </code>directory of your Dogtag VM. Copy this file to the VM on which you're using Firefox to access the Dogtag dashboard. Do the following:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo su -
+cd /root/.dogtag/pki-tomcat
+scp ca_admin_cert.p12 donnie@192.168.0.14:
+exit</code></pre>
+</div>
+<p>Of course, substitute your own username and IP address. Note that the file will automatically land in your own home directory, and that its ownership will change from root to your own username.</p>
+<ol>
+<li><p>On the VM with Firefox, import the certificate into Firefox. From the Firefox menu, choose <strong>Settings</strong>, then <strong>Privacy and Security</strong>. At the very bottom of the screen, click on <strong>View Certificates</strong>. Click the <strong>Your Certificates</strong> tab at the top and the <strong>Import</strong> button at the bottom. Navigate to your home directory and choose the certificate that you just sent over from the Dogtag server VM. Once the import operation is complete, you should see the <strong>PKI Administrator</strong> certificate in the list of imported certificates:</p>
+<figure>
+<img src="../media/file45.png" alt="19501_06_11.png" /><figcaption aria-hidden="true">19501_06_11.png</figcaption>
+</figure></li>
+<li>Now try to access the <strong>Agent Services</strong> page. You'll be allowed access once you confirm that you want to use the certificate that you just imported.</li>
+<li>End of lab.</li>
+</ol>
+<p>When a users need to request a certificate for their own use, they'll use <code>openssl</code> to create a key and a CSR, as I've already shown you earlier in this chapter. They'll then go to the SSL End User Services page and paste the contents of their CSR into the box for the certificate that they're requesting. An administrator will then go to the Agent Services page to approve the request and issue the certificate. (To help familiarize yourself with Dogtag, I encourage you to click around on the web interface, exploring all the options.)</p>
+</section>
+<section id="adding-a-ca-to-an-operating-system" class="level3" data-number="7.7.5">
+<h3 data-number="7.7.5">Adding a CA to an operating system</h3>
+<p>Most of the major web browsers, such as Firefox, Chrome, and Chromium, come with their own pre-defined database of trusted CAs and their associated certificates. When you create a private CA, you'll need to import the CA certificate into your browser's trust store. Otherwise, your users will keep receiving messages about how the sites that they're viewing are using untrusted certificates. Indeed, that's the case with our Dogtag server. Any user who accesses it to request a certificate will receive a warning about how the CA is using a non-trusted certificate. We'll fix that by exporting the CA certificate from the Dogtag server and importing it into all of your users' browsers. Let's dig in, shall we?</p>
+<section id="hands-on-lab-exporting-and-importing-the-dogtag-ca-certificate" class="level4" data-number="7.7.5.1">
+<h4 data-number="7.7.5.1">Hands-on lab – exporting and importing the Dogtag CA certificate</h4>
+<p>The Dogtag web portal doesn't have an option for this, so we'll have to use the command line:</p>
+<ol>
+<li>In your home directory of the Dogtag server, create the <code>password.txt</code> file. On the first line of the file, insert the password for the server's certificate. (It's the password that you set when you ran the <code>pkispawn</code> command.)</li>
+<li>Extract the server key and certificate like so:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo pki-server ca-cert-chain-export --pkcs12-file pki-server.p12 --pkcs12-password-file password.txt</code></pre>
+</div>
+<p>Run an <code>ls -l</code> command to verify that the <code>pki-server.p12</code> file was created.</p>
+<ol>
+<li>The problem with the <code>p12</code> file is that it contains both the server's private key and its certificate. But to add a certificate to the CA section of your browser's trusted store, you have to have just the certificate without the key. Extract the certificate like so:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>openssl pkcs12 -info -in pki-server.p12 -out pki-server.crt -nokeys</code></pre>
+</div>
+<ol>
+<li><p>Transfer this new <code>pki-server.crt</code> file to a machine with a graphical desktop. In Firefox, open <strong>Settings/Privacy &amp; Security</strong>. Click the <strong>View Certificates</strong> button at the bottom. Click the <strong>Authorities</strong> tab and import the new certificate. Select <strong>Trust this CA to identify websites</strong> and to <strong>Trust this CA to identify email users</strong>:</p>
+<figure>
+<img src="../media/file46.png" alt="19501_06_12.png" /><figcaption aria-hidden="true">19501_06_12.png</figcaption>
+</figure></li>
+<li>Close Firefox and then open it again to ensure that the certificate takes effect. Navigate to the Dogtag portal. This time, you shouldn't receive any warning messages about using an untrusted certificate.</li>
+<li>End of lab.</li>
+</ol>
+</section>
+<section id="importing-the-ca-into-windows" class="level4" data-number="7.7.5.2">
+<h4 data-number="7.7.5.2">Importing the CA into Windows</h4>
+<p>With either Firefox or Chrome, you'll import the CA certificate directly into the browser's trust store, regardless of which operating system you're running. But if you're stuck running one of Microsoft's own proprietary browsers on that off-brand operating system that's known as Windows, then you'll need to import the certificate into the Windows trust store instead of into the browser. Fortunately, that's incredibly easy to do. After you copy the certificate to the Windows machine, just open up Windows File Explorer and double-click on the certificate file. Then, click the <strong>Install Certificate</strong> button on the pop-up dialog box. If your organization is running an Active Directory domain, just ask one of the AD administrators to import it into Active Directory for you.</p>
+</section>
+</section>
+<section id="openssl-and-the-apache-web-server" class="level3" data-number="7.7.6">
+<h3 data-number="7.7.6">OpenSSL and the Apache web server</h3>
+<p>A default installation of any web server isn't all that secure, so you'll need to harden it up a bit. One way to do that is by disabling the weaker SSL/TLS encryption algorithms. The general principles apply to all web servers, but for our examples, we'll just look at Apache. (The topic of web server hardening is quite extensive. For the present, I'll confine the discussion to hardening the SSL/TLS configuration.) You can use either Ubuntu 22.04 or AlmaLinux 9 for this section, but the package names and configuration files are different between the two distros. The configurations also differ between CentOS 7 and AlmaLinux 9, so we'll look at them as well. But, before I can explain the configuration options, I need to say a word or two about the history of the SSL/TLS protocol.</p>
+<p>In the 1990s, engineers at Netscape invented the SSL protocol. Version 1 never saw the light of day, so the first released version was SSL version 2 (SSLv2). SSLv2 had its share of weaknesses, many of which were addressed in SSLv3. At the insistence of Microsoft, the next version was renamed Transport Layer Security (TLS) version 1 (TLSv1). (I have no idea why Microsoft objected to the SSL name.) The current version is TLSv1.3, which is finally now supported by most Linux distros. By default, Apache still supports some of the older protocols. Our goal is to disable those older protocols. Only a couple of years ago, that would have meant disabling SSLv2 and SSLv3 and leaving TLSv1 through TLSv1.2, due to questionable browser support for anything newer. Now, though, I think it's safe to disable support for anything older than TLSv1.3. When I wrote the Second Edition of this book back in 2019, Apple Safari was the only major browser that didn’t support TLSv1.3. Fortunately, even Apple is now on board with the newest TLS.</p>
+<section id="hardening-apache-ssltls-on-ubuntu" class="level4" data-number="7.7.6.1">
+<h4 data-number="7.7.6.1">Hardening Apache SSL/TLS on Ubuntu</h4>
+<p>For this demo, we'll use two Ubuntu 22.04 virtual machines. We'll install Apache on the first one and <code>sslscan</code> on the second one. (This <code>sslscan</code> package isn’t available in the AlmaLinux repository.):</p>
+<ol>
+<li>To install Apache on your Ubuntu machine, just do the following:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo apt install apache2</code></pre>
+</div>
+<p>This also installs the <code>mod_ssl</code> package, which contains the libraries and configuration files for SSL/TLS implementation.</p>
+<p>And, of course, if you have a firewall enabled, be sure that port <code>443/tcp </code>is open.</p>
+<ol>
+<li>The Apache service is already enabled and running, so you don't have to mess with that. But you do need to enable the default SSL site and the SSL module with these three commands:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo a2ensite default-ssl.conf
+sudo a2enmod ssl
+sudo systemctl restart apache2</code></pre>
+</div>
+<ol>
+<li>Before we look at the SSL/TLS configuration, let's set up a scanner machine to externally test our configuration. On the second Ubuntu VM, install the <code>sslscan</code> package:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo apt install sslscan</code></pre>
+</div>
+<p>On the scanner machine, scan the Ubuntu machine on which you installed Apache, substituting the IP address of your own machine:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sslscan 192.168.0.3</code></pre>
+</div>
+<p>Note the algorithms and the protocol versions that are supported. You should see that SSLv2, SSLv3, TLSv1.0, and TLSv1.1 are all disabled. TLSv1.2 and TLSv1.3 are the only ones that are enabled.</p>
+<ol>
+<li>On the Ubuntu VM with Apache, edit the <code>/etc/apache2/mods-enabled/ssl.conf</code> file. Look for the line that says this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>SSLProtocol all -SSLv3</code></pre>
+</div>
+<p>Change it to this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>SSLProtocol all -SSLv3 -TLSv1.2</code></pre>
+</div>
+<ol>
+<li>Restart the Apache daemon to make this change take effect:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl restart apache2</code></pre>
+</div>
+<ol>
+<li>Scan this machine again, and note the output. You should see that the older TLSv1.2 protocol has also now been disabled. So, congratulations! You've just made a quick and easy security upgrade to your web server.</li>
+<li>End of lab.</li>
+</ol>
+<p>Now, let's take a look at RHEL 9/AlmaLinux 9.</p>
+</section>
+<section id="hardening-apache-ssltls-on-rhel-9almalinux-9" class="level4" data-number="7.7.6.2">
+<h4 data-number="7.7.6.2">Hardening Apache SSL/TLS on RHEL 9/AlmaLinux 9</h4>
+<p>For this demo, you'll install Apache and <code>mod_ssl</code> on an AlmaLinux 9 VM. (Unlike on Ubuntu, you have to install these as two separate packages.) Use the same scanner VM that you used in the previous lab. A new feature of the RHEL 8/9 distros is that you can now set system-wide crypto policies for most of your services and applications that require cryptography. We'll take a quick look at it here, and again in <em>Chapter 7</em>, <em>SSH Hardening</em>:</p>
+<ol>
+<li>Before doing anything, shut down your AlmaLinux 9 VM and create a snapshot from the VirtualBox console. That’s because in just a bit, you’ll need to go back to a clean snapshot in order to test the crypto policies feature.</li>
+<li>On your AlmaLinux 9 VM, install Apache and <code>mod_ssl</code>, and start the service:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo dnf install httpd mod_ssl
+sudo systemctl enable --now httpd</code></pre>
+</div>
+<ol>
+<li>Open port <code>443 </code>on the firewall:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload</code></pre>
+</div>
+<ol>
+<li>From the scanner VM, scan the Apache VM, substituting your own IP address:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sslscan 192.168.0.160</code></pre>
+</div>
+<p>As you just saw on the Ubuntu server, nothing older than TLSv1.2 is supported.</p>
+<ol>
+<li>Next, on the Apache VM, view the status of the system-wide crypto configuration:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo update-crypto-policies --show</code></pre>
+</div>
+<p>You should see <code>DEFAULT</code> as the output. With <code>DEFAULT</code>, you get TLSv1.2 as the minimum protocol version along with the goodness of TLSv1.3. But you'll also see some TLSv1.2 algorithms that we can do without.</p>
+<ol>
+<li>Shut down the Apache VM. Go to the VirtualBox console and restore the snapshot that you created in Step 1, in order to get rid of the Apache installation. Then, restart the virtual machine and set the crypto policy to <code>FUTURE</code>, like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo update-crypto-policies --set FUTURE</code></pre>
+</div>
+<blockquote>
+<p>I had a good reason for having you create and restore the snapshot before setting <code>FUTURE</code> mode. It’s just that if you install Apache before setting <code>FUTURE</code> mode, you’ll no longer be able to start Apache. So, if you want to run your Apache webserver with <code>FUTURE</code> mode, you’ll need to set <code>FUTURE</code> mode first, then install Apache.</p>
+</blockquote>
+<ol>
+<li>Reboot the Apache VM so that the <code>FUTURE</code> mode will take effect. Verify that <code>FUTURE</code> mode has taken effect by doing:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo update-crypto-policies --show</code></pre>
+</div>
+<ol>
+<li>Install the <code>mod_ssl</code> and Apache packages, and start Apache as you did in Step 2.</li>
+<li>Scan the webserver VM as you did in Step 4. You'll see that TLSv1.2 is still enabled, but with a much smaller list of enabled algorithms.</li>
+<li>End of lab.</li>
+</ol>
+<p>There are two other crypto policy modes besides the two that I've shown here. <code>LEGACY</code> mode enables some really old algorithms that we don't want to use unless it's absolutely necessary to support older clients. But, as I keep saying, anyone who's using a client that's that old needs to upgrade. There's also the <code>FIPS</code> mode, which you might need to use if you’re doing business with the U.S. government. Even though the <code>update-crypto-policies</code> utility appears to work with <code>FIPS</code> mode, Red Hat recommends against doing that. Instead, they recommend setting <code>FIPS</code> mode as you install the operating system. We’ll look at that next.</p>
+</section>
+<section id="setting-fips-mode-on-rhel-9almalinux-9" class="level4" data-number="7.7.6.3">
+<h4 data-number="7.7.6.3">Setting FIPS mode on RHEL 9/AlmaLinux 9</h4>
+<p>FIPS stands for Federal Information Processing Standards, and is a set of cybersecurity requirements for people and companies who want to do business with the United States government. Setting your server to run in <code>FIPS</code> mode involves more than just disabling some weak encryption algorithms. It also involves installing a set of modules that help harden other aspects of the operating system.</p>
+<p>Even though the <code>update-crypto-policies</code> utility has an option for setting <code>FIPS</code> mode, you’ll never use it. To set <code>FIPS</code> mode on a machine on which the operating system has already been installed, you’d instead use the <code>sudo fips-mode-setup --enable</code> command. But, Red Hat even recommends against doing that. Instead, they recommend setting <code>FIPS</code> mode as you install the operating system. Their concern is that setting <code>FIPS</code> mode after installing the operating system might leave behind encryption keys that were created with non-<code>FIPS</code> algorithms. Instead, they recommend setting <code>FIPS</code> mode as you install the operating system. Fortunately, that’s easy. All you have to do is interrupt the installer’s boot process and make a quick edit to the kernel configuration. Here’s how to do it as you create a new AlmaLinux VM:</p>
+<ol>
+<li><p>Create a new AlmaLinux VM and boot up the AlmaLinux installer. Hit the <strong>Up arrow</strong> key to highlight the <strong>Install AlmaLinux</strong> option. Instead of hitting the <strong>Enter</strong> key to continue, hit the <strong>Tab</strong> key to bring up the kernel options. Here’s what you should see:</p>
+<figure>
+<img src="../media/file47.png" />
+</figure></li>
+<li><p>At the bottom of the screen, add <code>fips=1</code> to the end of the kernel option line. It should now look like this:</p>
+<figure>
+<img src="../media/file48.png" />
+</figure></li>
+<li>Hit the Enter key and continue installation as you normally would.</li>
+<li>Once the installation is complete and the VM has rebooted, check the status of <code>FIPS</code> mode, like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ fips-mode-setup --check
+FIPS mode is enabled.
+[donnie@localhost ~]$</code></pre>
+</div>
+<ol>
+<li>Finally, install <code>mod_ssl</code> and Apache. Open the the firewall port and scan the VM with <code>sslscan</code>, as you did in the previous exercise.</li>
+<li>End of lab.</li>
+</ol>
+<p>There is one caveat that you should know about when setting <code>FIPS</code> mode on any RHEL 9-type distro. It’s that the current version of the FIPS standard is version 140-3. However, at the time of this writing in October 2022, RHEL 9 and its offspring still only meet the standards for FIPS 140-2. The Red Hat documentation gives no insight into when that might change.</p>
+<blockquote>
+<p>If you’re wondering why I’m not covering <code>FIPS</code> mode on Ubuntu, it’s just that it’s not possible to set <code>FIPS </code>mode on the free-of-charge version of Ubuntu. If you want to run Ubuntu in <code>FIPS</code> mode, you’ll have to purchase a support contract.</p>
+</blockquote>
+<p>Now, let’s take a quick look at the legacy CentOS 7.</p>
+</section>
+<section id="hardening-apache-ssltls-on-rhel-7centos-7" class="level4" data-number="7.7.6.4">
+<h4 data-number="7.7.6.4">Hardening Apache SSL/TLS on RHEL 7/CentOS 7</h4>
+<p>Okay, I did say that we'd look at doing this on a CentOS 7 machine. But, I'll make it brief.</p>
+<p>You'll install Apache and <code>mod_ssl</code> on CentOS 7 the same way that you did on AlmaLinux 9, except that you'll use the <code>yum</code> command instead of the <code>dnf</code> command. As with AlmaLinux, you'll need to enable and start Apache with <code>systemctl</code>, but you won't need to enable the ssl site or the ssl module. And, of course, make sure that port <code>443</code> is open on the firewall.</p>
+<p>When you do an sslscan of a CentOS 7 machine, you'll see a very long list of supported algorithms, from TLSv1 through TLSv1.2. Even with TLSv1.2, you'll see a few really bad things, like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Accepted  TLSv1.2  112 bits  ECDHE-RSA-DES-CBC3-SHA        Curve P-256 DHE 256
+Accepted  TLSv1.2  112 bits  EDH-RSA-DES-CBC3-SHA          DHE 2048 bits
+Accepted  TLSv1.2  112 bits  DES-CBC3-SHA      </code></pre>
+</div>
+<p>The <code>DES</code> and <code>SHA</code> in these lines indicate that we're supporting use of the antiquated <strong>Data Encryption Standard</strong> (<strong>DES</strong>) and version 1 of the <strong>Secure Hash Algorithm</strong> (<strong>SHA</strong>). That is not good. Get rid of them by editing the <code>/etc/httpd/conf.d/ssl.conf</code> file. Look for these two lines:</p>
+<div class="C0-SHConPACKT">
+<pre><code>SSLProtocol all -SSLv2 -SSLv3
+SSLCipherSuite HIGH:3DES:!aNULL:!MD5:!SEED:!IDEA</code></pre>
+</div>
+<p>Change them to this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>SSLProtocol all -SSLv2 -SSLv3 -TLSv1 -TLSv1.1
+SSLCipherSuite HIGH:!3DES:!aNULL:!MD5:!SEED:!IDEA:!SHA</code></pre>
+</div>
+<p>Reload Apache with this command:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo systemctl reload httpd</code></pre>
+</div>
+<p>Scan the machine again, and you'll see a lot fewer supported algorithms. (And by the way, one advantage of the new TLSv1.3 is that it completely gets rid of these legacy algorithms.)</p>
+<p>Next, let's look at how users can identify themselves to a server.</p>
+</section>
+</section>
+<section id="setting-up-mutual-authentication" class="level3" data-number="7.7.7">
+<h3 data-number="7.7.7">Setting up mutual authentication</h3>
+<p>When you access your bank's secure website, your web browser requires that the web server authenticate itself to the browser. In other words, the browser demands to see the server's certificate for the website so that it can verify if it's valid. This way, you have some assurance that you're logging in to the bank's real, genuine website instead of a counterfeit site. You then have to authenticate yourself to the web server, but you'll normally do that with a username and password.</p>
+<p>If a web server is set up to allow it, users can instead authenticate themselves with a certificate. This way, there's no password for the bad guys to either steal or crack. You already saw how this is done when you imported Dogtag's <code>ca_admin_cert.p12</code> certificate into your web browser. This certificate gave you the awesome power to access Dogtag's administrator page. Your normal end users won't have this certificate, so all they can access is just the end-user page where they can request certificates.</p>
+<p>The major web servers—Apache, Nginx, lighttpd, and some others—support mutual authentication. Space doesn't permit me to go into the details of setting this up on a server, but the documentation for whichever server you use will cover it.</p>
+<p>Next, let’s get back to the future!</p>
+</section>
+</section>
+<section id="introducing-quantum-resistant-encryption-algorithms" class="level2" data-number="7.8">
+<h2 data-number="7.8">Introducing quantum-resistant encryption algorithms</h2>
+<p>You’ve likely heard of quantum computers, which have nothing to do with the old <em>Quantum Leap</em> show on television. This new type of computer is still in the experimental stage, and likely will remain there for some time to come. Still, there’s a lot of hype about what they’ll be like when they finally are ready for production use. Supposedly, they’ll be way more powerful than the current generation of computers, and they’ll supposedly be able to easily crack even the strongest of the current encryption algorithms. Indeed, that’s a rather scary prediction. (Perhaps it’s fitting that I’m typing this on Halloween, the scariest day of the year.)</p>
+<p>Even though there’s some skepticism about whether this dire prediction will come true, or of whether production-grade quantum computers will even see the light of day, the U.S. federal government is taking this seriously. Here’s the list of quantum-resistant algorithms that the National Institutes of Standards and Technology (NIST) currently recommends:</p>
+<ul>
+<li><strong>CRYSTALS-Kyber</strong>: This one is for general encryption. Cloudflare, Amazon, and IBM already use it.</li>
+<li><strong>CRYSTALS-Dilithium</strong>: This is for encrypted digital signatures. NIST recommends this one as the primary signature algorithm.</li>
+<li><strong>FALCON</strong>: This is also a signature algorithm. NIST recommends it for whenever you need a signature that’s smaller than what CRYSTALS-Dilithium can provide.</li>
+<li><strong>SPHINCS+</strong>: This is the third signature algorithm, which is slower and larger than the first two. It uses a different approach than what the first two use, which is why NIST recommends it as a backup, in case the first two get hacked.</li>
+</ul>
+<p>So, how do we know that a particular encryption algorithm is resistant to quantum computer hacking if viable quantum computers don’t yet exist? Well, I wish that I could tell you, but I can’t. At any rate, you might not have to worry too much abut this just yet, but it’s still worthwhile to learn.</p>
+<p>Okay, let’s wrap this baby up and move on to the next chapter.</p>
+</section>
+<section id="summary-5" class="level2" data-number="7.9">
+<h2 data-number="7.9">Summary</h2>
+<p>As always, we've covered a lot of ground in this chapter. We began by using GPG to encrypt, sign, and share encrypted files. We then looked at various methods of encrypting drives, partitions, directories, and sharable containers. After that, we looked at how to use OpenSSL to create keys, CSRs, and certificates. But since we don't want to use self-signed certificates all the time and commercial certificates aren't always necessary, we looked at how to set up a private CA with Dogtag. We then looked at simple ways to harden the TLS configuration on the Apache web server, and we touched on the subject of mutual authentication. Finally, we saw an introduction to quantum-resistant encryption algorithms.</p>
+<p>Along the way, we had plenty of hands-on labs. That's good, because after all, idle hands are the devil's workshop, and we certainly don't want any of that.</p>
+<p>In the next chapter, we'll look at ways to harden Secure Shell. I'll see you there.</p>
+</section>
+<section id="questions-5" class="level2" data-number="7.10">
+<h2 data-number="7.10">Questions</h2>
+<ol>
+<li>Which of the following is not an advantage of GPG?
+<ol type="A">
+<li>It uses strong, hard-to-crack algorithms.</li>
+<li>It works well for sharing secrets with people you don't know.</li>
+<li>Its public/private key scheme eliminates the need to share passwords.</li>
+<li>You can use it to encrypt files that you don’t intend to share, for your own personal use.</li>
+</ol></li>
+<li>You need to send an encrypted message to Frank. What must you do before you can encrypt his message with GPG so that you don't have to share a password?
+<ol type="A">
+<li>Nothing. Just encrypt the message with your own private key.</li>
+<li>Import Frank's private key into your keyring and send Frank your private key.</li>
+<li>Import Frank's public key into your keyring and send Frank your public key.</li>
+<li>Just import Frank's public key into your keyring.</li>
+<li>Just import Frank's private key into your keyring.</li>
+</ol></li>
+<li>Which of the following would be the proper choice for whole-disk encryption on a Linux system?
+<ol type="A">
+<li>Bitlocker</li>
+<li>VeraCrypt</li>
+<li>eCryptfs</li>
+<li>LUKS</li>
+</ol></li>
+<li>If you use eCryptfs to encrypt users' home directories and you're not using whole-disk encryption, what other action must you take in order to prevent leakage of sensitive data?
+<ol type="A">
+<li>None.</li>
+<li>Ensure that users use strong private keys.</li>
+<li>Encrypt the swap partition.</li>
+<li>You must use eCryptfs in whole-disk mode.</li>
+</ol></li>
+<li>In which of the following scenarios would you use VeraCrypt?
+<ol type="A">
+<li>Whenever you want to implement whole-disk encryption.</li>
+<li>Whenever you just want to encrypt users' home directories.</li>
+<li>Whenever you'd prefer to use a proprietary, closed source encryption system.</li>
+<li>Whenever you need to create encrypted containers that you can share with Windows, macOS, and BSD users.</li>
+</ol></li>
+<li>You need to ensure that your web browser trusts certificates from the Dogtag CA. How do you do it?
+<ol type="A">
+<li>You use <code>pki-server</code> to export the CA certificate and key, and then use <code>openssl pkcs12</code> to extract just the certificate. Then, import the certificate into your browser.</li>
+<li>You import the <code>ca_admin.cert</code> certificate into your browser.</li>
+<li>You import the <code>ca_admin_cert.p12</code> certificate into your browser.</li>
+<li>You import the <code>snakeoil.pem</code> certificate into your browser.</li>
+</ol></li>
+</ol>
+</section>
+<section id="further-reading-5" class="level2" data-number="7.11">
+<h2 data-number="7.11">Further reading</h2>
+<p>Explanations about TLS and OpenSSL:</p>
+<ul>
+<li>OpenSSL Tutorial-How do SSL certificate, private keys, and CSRs work?: <a href="https://phoenixnap.com/kb/openssl-tutorial-ssl-certificates-private-keys-csrs">https://phoenixnap.com/kb/openssl-tutorial-ssl-certificates-private-keys-csrs</a></li>
+<li>Transport Layer Security version 1.3 in Red Hat 8: <a href="https://www.redhat.com/en/blog/transport-layer-security-version-13-red-hat-enterprise-linux-8">https://www.redhat.com/en/blog/transport-layer-security-version-13-red-hat-enterprise-linux-8</a></li>
+<li>The OpenSSL website: <a href="https://www.openssl.org/">https://www.openssl.org/</a></li>
+<li>Feisty Duck Publishing, who offer books, training, and newsletters about OpenSSL: <a href="https://www.feistyduck.com/">https://www.feistyduck.com/</a></li>
+</ul>
+<p>Problems with EV certificates:</p>
+<ul>
+<li>Chrome browser moving EV UI to Page Info: <a href="https://chromium.googlesource.com/chromium/src/+/HEAD/docs/security/ev-to-page-info.md">https://chromium.googlesource.com/chromium/src/+/HEAD/docs/security/ev-to-page-info.md</a></li>
+<li>Extended Validation is Broken: <a href="https://www.cyberscoop.com/easy-fake-extended-validation-certificates-research-shows/">https://www.cyberscoop.com/easy-fake-extended-validation-certificates-research-shows/</a></li>
+<li>EV Certificates issued with "Default City" as the location: <a href="https://groups.google.com/forum/#!topic/mozilla.dev.security.policy/1oReSOPCNy0">https://groups.google.com/forum/#!topic/mozilla.dev.security.policy/1oReSOPCNy0</a></li>
+<li>EV certificates issued with erroneous information: <a href="https://twitter.com/Scott_Helme/status/1163546360328740864">https://twitter.com/Scott_Helme/status/1163546360328740864</a></li>
+</ul>
+<p>Problems with free Let's Encrypt certificates:</p>
+<ul>
+<li>CyberCriminals abusing free Let's Encrypt certificates: <a href="https://www.infoworld.com/article/3019926/cyber-criminals-abusing-free-lets-encrypt-certificates.html">https://www.infoworld.com/article/3019926/cyber-criminals-abusing-free-lets-encrypt-certificates.html</a></li>
+</ul>
+<p>Dogtag CA:</p>
+<ul>
+<li>How to increase the number of file descriptors in Linux: <a href="https://www.tecmint.com/increase-set-open-file-limits-in-linux/">https://www.tecmint.com/increase-set-open-file-limits-in-linux/</a></li>
+<li>Dogtag PKI Wiki: <a href="https://www.dogtagpki.org/wiki/PKI_Main_Page">https://www.dogtagpki.org/wiki/PKI_Main_Page</a></li>
+<li>Import CA into Linux and Windows: <a href="https://thomas-leister.de/en/how-to-import-ca-root-certificate/">https://thomas-leister.de/en/how-to-import-ca-root-certificate/</a></li>
+<li>Red Hat (Dogtag) Certificate Authority Documentation: <a href="https://access.redhat.com/documentation/en-us/red_hat_certificate_system/9/">https://access.redhat.com/documentation/en-us/red_hat_certificate_system/9/</a></li>
+</ul>
+<p>RHEL 9/AlmaLinux 9:</p>
+<ul>
+<li>Setting system-wide cryptographic policies: <a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/using-the-system-wide-cryptographic-policies_security-hardening">https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/using-the-system-wide-cryptographic-policies_security-hardening</a></li>
+</ul>
+<p>FIPS</p>
+<ul>
+<li>FIPS home page: <a href="https://www.nist.gov/itl/fips-general-information">https://www.nist.gov/itl/fips-general-information</a></li>
+<li>Installing Red Hat in FIPS mode: <a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/assembly_installing-the-system-in-fips-mode_security-hardening">https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/assembly_installing-the-system-in-fips-mode_security-hardening</a></li>
+</ul>
+<p>Quantum-resistant encryption</p>
+<ul>
+<li>NIST announces quantum-resistant algorithms: <a href="https://www.nist.gov/news-events/news/2022/07/nist-announces-first-four-quantum-resistant-cryptographic-algorithms">https://www.nist.gov/news-events/news/2022/07/nist-announces-first-four-quantum-resistant-cryptographic-algorithms</a></li>
+<li>Some people are skeptical about quantum-computing: <a href="https://www.fudzilla.com/news/55434-quantum-computing-is-neither-dead-or-alive">https://www.fudzilla.com/news/55434-quantum-computing-is-neither-dead-or-alive</a></li>
+</ul>
+</section>
+<section id="answers-3" class="level2" data-number="7.12">
+<h2 data-number="7.12">Answers</h2>
+<ol>
+<li>B</li>
+<li>C</li>
+<li>D</li>
+<li>C</li>
+<li>D</li>
+<li>A</li>
+</ol>
+</section>
+</section>
+</body>
+</html>

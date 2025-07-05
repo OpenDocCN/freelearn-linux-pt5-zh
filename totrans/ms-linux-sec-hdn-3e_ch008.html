@@ -1,0 +1,1745 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en-US">
+<head>
+<meta charset="utf-8"/>
+<meta name="generator" content="packt"/>
+<title>7 SSH Hardening</title>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet1.css"/>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet2.css"/>
+
+</head>
+<body>
+<section id="ssh-hardening" class="level1 pkt" data-number="8">
+<h1 data-number="8">7 SSH Hardening</h1>
+<section id="join-our-book-community-on-discord-6" class="level2" data-number="8.1">
+<h2 data-number="8.1">Join our book community on Discord</h2>
+<p><a href="https://packt.link/SecNet">https://packt.link/SecNet</a></p>
+<figure>
+<img src="../media/file49.png" style="width:10em" />
+</figure>
+<p>The <strong>Secure Shell</strong> (<strong>SSH</strong>) suite is one of those must-have tools for Linux administrators. It allows you to take care of Linux servers from the comfort of your cubicle, or even from the comfort of your own home. Either way, it's a lot better than having to don your parka and jump through security hoops to enter a cold server room. The <em>secure</em> in Secure Shell means that everything that you either type or transfer gets encrypted. That eliminates the possibility of someone obtaining sensitive data by plugging a sniffer into your network.</p>
+<p>By this stage in your Linux career, you should already know how to use Secure Shell, or SSH, to do remote logins and remote file transfers. What you may not know is that the default configuration of SSH is actually quite insecure. In this chapter, we'll look at how to harden the default configuration in various ways. We'll look at how to use encryption algorithms that are stronger than the default, how to set up passwordless authentication, and how to set up a jail for users of the Secure File Transfer Protocol (SFTP). As a bonus, we'll look at how to scan SSH servers to find vulnerable configurations and how to share a remote directory via <strong>Secure Shell Filesystem</strong> (<strong>SSHFS</strong>).</p>
+<p>In this chapter, we'll cover the following topics:</p>
+<ul>
+<li>Ensuring that SSH protocol 1 is disabled</li>
+<li>Creating and managing keys for passwordless logins</li>
+<li>Disabling root user login</li>
+<li>Disabling username/password logins.</li>
+<li>Enabling two-factor authentication</li>
+<li>Configuring Secure Shell with strong encryption algorithms</li>
+<li>Setting system-wide encryption policies on RHEL 8/9-type systems</li>
+<li>FIPS mode on RHEL 8/9-type systems</li>
+<li>Configuring more detailed logging</li>
+<li>Access control with whitelists and TCP Wrappers</li>
+<li>Configuring automatic logouts and security banners</li>
+<li>Other miscellaneous security settings</li>
+<li>Setting up different configurations for different hosts</li>
+<li>Setting up different configurations for different users and groups</li>
+<li>Scanning an SSH server</li>
+<li>Setting up a chroot environment for SFTP users</li>
+<li>Setting up shared directories with SSHFS</li>
+<li>Remotely connecting from Windows desktops</li>
+</ul>
+<p>So, if you're ready, let's get started.</p>
+</section>
+<section id="ensuring-that-ssh-protocol-1-is-disabled" class="level2" data-number="8.2">
+<h2 data-number="8.2">Ensuring that SSH protocol 1 is disabled</h2>
+<p>In the two previous editions of this book, I told you about how Version 1 of the SSH protocol is severely flawed, and how you should always ensure that it’s not enabled in the <code>/etc/ssh/sshd_config</code> file. Nowadays you don’t have to worry about that, because SSH protocol 1 is now gone, and is nothing but a thing of the past. So, yee-haw! It’s time to celebrate.</p>
+</section>
+<section id="creating-and-managing-keys-for-passwordless-logins" class="level2" data-number="8.3">
+<h2 data-number="8.3">Creating and managing keys for passwordless logins</h2>
+<p>The Secure Shell suite is a great set of tools for communications with remote servers. You can use the <code>ssh</code> component to remotely log into the command line of a remote machine, and you can use either <code>scp</code> or <code>sftp</code> to securely transfer files. The default way to use any of these SSH components is to use the username of a person's normal Linux user account. So, logging into a remote machine from the terminal of my OpenSUSE workstation would look something like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; ssh donnie@192.168.0.8
+donnie@192.168.0.8&#39;s password:</code></pre>
+</div>
+<p>While it's true that the username and password go across the network in an encrypted format, making it hard for malicious actors to intercept, it's still not the most secure way of doing business. The problem is that attackers have access to automated tools that can perform brute-force password attacks against an SSH server. Botnets, such as the Hail Mary Cloud, perform continuous scans across the Internet to find Internet-facing servers with SSH enabled.</p>
+<p>If a botnet finds that the servers allow SSH access via username and password, it will launch a brute-force password attack. Sadly, such attacks have been successful quite a few times, especially when the server operators allow the root user to log in via SSH.</p>
+<blockquote>
+<p>This older article provides more details about the Hail Mary Cloud botnet: <a href="http://futurismic.com/2009/11/16/the-hail-mary-cloud-slow-but-steady-brute-force-password-guessing-botnet/">http://futurismic.com/2009/11/16/the-hail-mary-cloud-slow-but-steady-brute-force-password-guessing-botnet/</a>.</p>
+</blockquote>
+<p>In the next section, we'll look at two ways to help prevent these types of attacks:</p>
+<ul>
+<li>Enabling SSH logins through an exchange of public keys</li>
+<li>Disabling the root user login through SSH</li>
+</ul>
+<p>Now, let's create some keys.</p>
+<section id="creating-a-users-ssh-key-set" class="level3" data-number="8.3.1">
+<h3 data-number="8.3.1">Creating a user's SSH key set</h3>
+<p>Each user has the ability to create his or her own set of private and public keys. It doesn't matter whether the user's client machine is running Linux, macOS, Cygwin on Windows, or Bash Shell for Windows. In all cases, the procedure is exactly the same.</p>
+<p>There are several different types of keys that you can create, and 3072-bit RSA keys are normally the default. Until very recently, 2,048-bit RSA keys were considered strong enough for the foreseeable future. But now, the most recent guidance from the US <strong>National Institute of Standards and Technology</strong> (<strong>NIST</strong>) says to use either an RSA key of at least 3,072 bits or an <strong>Elliptic Curve Digital Signature Algorithm</strong> (<strong>ECDSA</strong>) key of at least 384 bits. (You'll sometimes see these ECDSA keys referred to as <em>P-384.</em>) Their reasoning is that they want to get us ready for quantum computing, which will be so powerful that it will render any weaker encryption algorithms obsolete. Of course, quantum computing isn't practical yet, and so far, it seems to be one of those things that's always just ten years off in the future, regardless of what year it is. But even if we discount the whole quantum thing, we still have to acknowledge that even our current, non-quantum computers keep getting more and more powerful. So, it's still not a bad idea to start going with stronger encryption standards.</p>
+<blockquote>
+<p>To see the NIST list of recommended encryption algorithms and the recommended key lengths, go to <a href="https://cryptome.org/2016/01/CNSA-Suite-and-Quantum-Computing-FAQ.pdf">https://cryptome.org/2016/01/CNSA-Suite-and-Quantum-Computing-FAQ.pdf</a>.</p>
+</blockquote>
+<p>For these next few demos, let's switch over to an Ubuntu 22.04 client. To create a 3072 RSA key pair, just do this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ssh-keygen</code></pre>
+</div>
+<p>We didn’t have to use any option switches, because the command will already create a 3072-bit RSA pair by default. When prompted for the location and name of the keys, I'll just hit the <strong>Enter</strong> key to accept the defaults. You could just leave the private key with a blank passphrase, but that's not a recommended practice.</p>
+<p>Note that if you choose an alternative name for your key files, you'll need to type in the entire path to make things work properly. For example, in my case, I could specify the path for <code>donnie_rsa</code> keys as <code>/home/donnie/.ssh/donnie_rsa</code>.</p>
+<p>You'll see your new keys in the <code>.ssh</code> directory:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ls -l .ssh
+total 16
+-rw------- 1 donnie donnie    0 Oct  6 22:09 authorized_keys
+-rw------- 1 donnie donnie 2655 Nov  1 19:49 id_rsa
+-rw-r--r-- 1 donnie donnie  577 Nov  1 19:49 id_rsa.pub
+-rw------- 1 donnie donnie  978 Oct 26 20:41 known_hosts
+-rw-r--r-- 1 donnie donnie  142 Oct 26 20:41 known_hosts.old
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<p>The <code>id_rsa</code> key is the private key, with read and write permissions only for me. The <code>id_rsa.pub</code> public key has to be world-readable. For ECDSA keys, the default length is 256 bits. If you choose to use ECDSA instead of RSA, do the following to create a strong 384-bit key:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ssh-keygen -t ecdsa -b 384</code></pre>
+</div>
+<p>Either way, when you look in the <code>.ssh</code> directory, you'll see that the ECDSA keys are named differently from the RSA keys:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ls -l .ssh/id*
+-rw------- 1 donnie donnie  667 Nov  1 19:55 .ssh/id_ecdsa
+-rw-r--r-- 1 donnie donnie  229 Nov  1 19:55 .ssh/id_ecdsa.pub
+-rw------- 1 donnie donnie 2655 Nov  1 19:49 .ssh/id_rsa
+-rw-r--r-- 1 donnie donnie  577 Nov  1 19:49 .ssh/id_rsa.pub
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<p>The beauty of elliptic curve algorithms is that their seemingly short key lengths are just as secure as RSA keys with longer key lengths. And, even the largest ECDSA keys require less computing power than RSA keys. The maximum key length you can do with ECDSA is 521 bits. (Yes, you read that correctly. It's 521 bits, not 524 bits.) So, you may be thinking, <em>Why don't we just go for the gusto with 521-bit keys?</em> Well, it's mainly because 521-bit keys aren't recommended by NIST. There's some fear that they may be subject to <strong>padding attacks</strong>, which could allow the bad guys to break your encryption and steal your data.</p>
+<p>If you take a gander at the man page for <code>ssh-keygen</code>, you'll see that you can also create an <code>Ed25519</code> type of key, which you'll sometimes see referred to as <code>curve25519</code>. This one isn't included in the NIST list of recommended algorithms and also isn’t allowed by the FIPS regulations, but there are a couple of reasons why some people like to use it.</p>
+<p>RSA and DSA can leak private key data when creating signatures if the random number generator of the operating system is flawed. <code>Ed25519</code> doesn't require a random number generator when creating signatures, so it's immune to this problem. Also, <code>Ed25519</code> is coded in a way that makes it much less vulnerable to side-channel attacks. (A side-channel attack is when someone tries to exploit weaknesses in the underlying operating system, rather than in the encryption algorithm.)</p>
+<p>The second reason why some folk like <code>Ed25519</code> is precisely because it's <em>not</em> on the NIST list. These are the folk who, rightly or wrongly, don't trust the recommendations of government agencies.</p>
+<blockquote>
+<p>Quite a few years ago, in the early part of this century, there was a bit of a scandal that involved the <strong>Dual Elliptic Curve Deterministic Random Bit Generator</strong> (<strong>Dual_EC_DRBG</strong>). This was a random number generator that was meant for use in elliptic curve cryptography. The problem was that, early on, some independent researchers found that it had the capability to have <em>back doors</em> inserted by anyone who knew about this capability. And, it just so happened that the only people who were supposed to know about this capability were the folk who work at the U.S. <strong>National Security Agency</strong> (<strong>NSA</strong>). At the NSA's insistence, NIST included Dual_EC_DRBG in their NIST list of recommended algorithms, and it stayed there until they finally removed it in April 2014. You can get more details about this at the following links:</p>
+<blockquote>
+<p><a href="https://www.pcworld.com/article/2454380/overreliance-on-the-nsa-led-to-weak-crypto-standard-nist-advisers-find.html">https://www.pcworld.com/article/2454380/overreliance-on-the-nsa-led-to-weak-crypto-standard-nist-advisers-find.html</a></p>
+</blockquote>
+<blockquote>
+<p><a href="http://www.math.columbia.edu/~woit/wordpress/?p=7045">http://www.math.columbia.edu/~woit/wordpress/?p=7045</a></p>
+</blockquote>
+<blockquote>
+<p>You can read the details about Ed25519 here: <a href="https://ed25519.cr.yp.to/">https://ed25519.cr.yp.to/</a>.</p>
+</blockquote>
+</blockquote>
+<p>There's only one key size for <code>Ed25519</code>, which is 256 bits. So, to create a <code>curve25519</code> key, just do this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ssh-keygen -t ed25519</code></pre>
+</div>
+<p>Here are the keys that I've created:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ls -l .ssh/*25519*
+-rw------- 1 donnie donnie 464 Nov  1 20:35 .ssh/id_ed25519
+-rw-r--r-- 1 donnie donnie 105 Nov  1 20:35 .ssh/id_ed25519.pub
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<p>There are, however, some potential downsides to <code>ed25519</code>:</p>
+<ul>
+<li>First, it isn't supported by older SSH clients. However, if everyone on your team is using current operating systems that use current SSH clients, this shouldn't be a problem.</li>
+<li>The second is that it only supports one certain set key length, which is the equivalent of either 256-bit elliptic curve algorithms or 3,000-bit RSA algorithms. So, it might not be quite as future-proof as the other algorithms that we've covered.</li>
+<li>Lastly, you can't use it if your organization is required to remain compliant with either NIST recommendations or FIPS requirements.</li>
+</ul>
+<p>Okay, there is one other type of key that we haven't covered. That's the old-fashioned DSA key, which <code>ssh-keygen</code> will still create if you tell it to. But, don't do it. The DSA algorithm is old, creaky, and very insecure by modern standards. So, when it comes to DSA, just say <em>No</em>.</p>
+</section>
+<section id="transferring-the-public-key-to-the-remote-server" class="level3" data-number="8.3.2">
+<h3 data-number="8.3.2">Transferring the public key to the remote server</h3>
+<p>Transferring my public key to a remote server allows the server to readily identify both me and my client machine. Before I can transfer the public key to the remote server, I need to add the private key to my session keyring. This requires two commands. (One command invokes <code>ssh-agent</code>, while the other actually adds the private key to the keyring):</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ exec /usr/bin/ssh-agent $SHELL
+donnie@ubuntu2204-packt:~$ ssh-add
+Enter passphrase for /home/donnie/.ssh/id_rsa: 
+Identity added: /home/donnie/.ssh/id_rsa (donnie@ubuntu2204-packt)
+Identity added: /home/donnie/.ssh/id_ecdsa (donnie@ubuntu2204-packt)
+Identity added: /home/donnie/.ssh/id_ed25519 (donnie@ubuntu2204-packt)
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<p>Finally, I can transfer my public key(s) to my AlmaLinux 9 server, which is at address <code>192.168.0.17</code>:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ssh-copy-id donnie@192.168.0.17
+The authenticity of host &#39;192.168.0.17 (192.168.0.17)&#39; can&#39;t be established.
+ED25519 key fingerprint is SHA256:GkpFwJdpWRQ5GawgFEz9bgDSny//E1I5aLGkjU9DWWY.
+This key is not known by any other names
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 3 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+donnie@192.168.0.17&#39;s password: 
+Number of key(s) added: 3
+Now try logging into the machine, with:   &quot;ssh &#39;donnie@192.168.0.17&#39;&quot;
+and check to make sure that only the key(s) you wanted were added.
+donnie@ubuntu2204-packt:~$</code></pre>
+</div>
+<p>Normally, you would only create one pair of keys of whichever type you choose. As you can see here, I've created three key pairs, one pair of each type. All three private keys were added to my session keyring, and all three public keys were transferred to the remote server.</p>
+<p>The next time that I log in, I'll use the key exchange, and I won't have to enter a password:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ssh donnie@192.168.0.17
+Last login: Tue Nov  1 16:52:27 2022
+[donnie@donnie-ca ~]$ </code></pre>
+</div>
+<p>As I mentioned previously, you would normally only create one key pair per machine. However, there are exceptions to this rule. Some administrators prefer to use a different key pair for each server that they administer, rather than using the same key pair for all servers. A handy way to do this is to create keys with filenames that match the hostnames of the respective servers. Then, you can use the <code>-i</code> option to specify which key pair that you want to use.</p>
+<p>In this example, I only have one server, but I have multiple keys for it. Let's say that I prefer to use the <code>Ed25519</code> keys:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ssh -i ~/.ssh/id_ed25519 donnie@192.168.0.17
+Last login: Tue Nov  1 16:56:43 2022 from 192.168.0.14
+[donnie@donnie-ca ~]$ </code></pre>
+</div>
+<p>So, now you're wondering, <em>How is that secure if I can log in without entering my password?</em> The answer is that once you close the client machine's terminal window that you used for logging in, the private key will be removed from your session keyring. When you open a new terminal and try to log in to the remote server, you'll see this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ ssh donnie@192.168.0.17
+Enter passphrase for key &#39;/home/donnie/.ssh/id_rsa&#39;: 
+Last login: Tue Nov  1 16:58:22 2022 from 192.168.0.14
+[donnie@donnie-ca ~]$</code></pre>
+</div>
+<p>Now, every time I log into this server, I'll need to enter the passphrase for my private key, until I add it back to the session keyring with the two commands that I showed you in the preceding section.</p>
+<section id="hands-on-lab-creating-and-transferring-ssh-keys" class="level4" data-number="8.3.2.1">
+<h4 data-number="8.3.2.1">Hands-on lab – Creating and transferring SSH keys</h4>
+<p>In this lab, you'll use one virtual machine (VM) as your client, and one VM as the server. Alternatively, if you're using a Windows host machine, you can use Cygwin, PowerShell, or the built-in Windows Bash shell for the client. (Be aware, though, that PowerShell and the Windows Bash shell store the key files in alternate locations.) If you're on either a Mac or a Linux host machine, you can use the host machine's native command-line terminal as the client. In any case, the procedure will be the same.</p>
+<p>For the server VM, use either Ubuntu 22.04 or CentOS 7.</p>
+<blockquote>
+<p>This procedure does work the same on AlmaLinux 8 and 9. However, we'll be using this same VM for the next few labs, and AlmaLinux has some special considerations that we'll look at later.</p>
+</blockquote>
+<p>Let's get started:</p>
+<ol>
+<li>On the client machine, create a pair of 384-bit elliptic curve keys. Accept the default filename and location and create a passphrase:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>ssh-keygen -t ecdsa -b 384</code></pre>
+</div>
+<ol>
+<li>Observe the keys, taking note of the permissions settings:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>ls -l ./ssh</code></pre>
+</div>
+<ol>
+<li>Add your private key to your session keyring. Enter your passphrase when prompted:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>exec /usr/bin/ssh-agent $SHELL
+ssh-add</code></pre>
+</div>
+<ol>
+<li>Transfer the public key to the server VM. When prompted, enter the password for your user account on the server VM. (Substitute your own username and IP address in the following command.):</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>ssh-copy-id donnie@192.168.0.7</code></pre>
+</div>
+<ol>
+<li>Log into the server VM as you normally would:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>ssh donnie@192.168.0.7</code></pre>
+</div>
+<ol>
+<li>Observe the <code>authorized_keys</code> file that was created on the server VM:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>ls -l .ssh
+cat .ssh/authorized_keys</code></pre>
+</div>
+<ol>
+<li>Log out of the server VM and close the terminal window on the client. Open another terminal window and try to log into the server again. This time, you should be prompted to enter the passphrase for your private key.</li>
+<li>Log back out of the server VM and add your private key back to the session keyring of your client. Enter the passphrase for your private key when prompted:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>exec /usr/bin/ssh-agent $SHELL
+ssh-add</code></pre>
+</div>
+<p>As long as you keep this terminal window open on your client, you'll be able to log into the server VM as many times as you want without having to enter a password. However, when you close the terminal window, your private key will be removed from your session keyring.</p>
+<ol>
+<li>Keep your server VM, because we'll do more with it in a bit.</li>
+</ol>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>What we've done here is good, but it's still not quite enough. One flaw is that if you go to another client machine, you'll still be able to use the normal username/password authentication to log in. That's okay; we'll fix that in a few moments.</p>
+</section>
+</section>
+<section id="disabling-root-user-login" class="level3" data-number="8.3.3">
+<h3 data-number="8.3.3">Disabling root user login</h3>
+<p>A few years ago, there was a somewhat celebrated case where malicious actors had managed to plant malware on quite a few Linux servers somewhere in southeast Asia. There were three reasons that the bad guys found this so easy to do:</p>
+<ul>
+<li>The Internet-facing servers involved were set up to use username/password authentication for SSH.</li>
+<li>The root user was allowed to log in through SSH.</li>
+<li>User passwords, including the root user's password, were incredibly weak.</li>
+</ul>
+<p>All this meant that it was easy for the Hail Mary botnet to brute-force its way in.</p>
+<p>Different distros have different default settings for root user login. In the <code>/etc/ssh/sshd_config</code> file of your CentOS 7 or AlmaLinux 8 machine, you'll see this line:</p>
+<div class="C0-SHConPACKT">
+<pre><code>#PermitRootLogin yes</code></pre>
+</div>
+<p>Unlike what you have in most configuration files, the commented-out lines in <code>sshd_config</code> define the default settings for the Secure Shell daemon. So, this line indicates that the root user is indeed allowed to log in through SSH. To change that, I'll remove the comment symbol and change the setting to <code>no</code>:</p>
+<div class="C0-SHConPACKT">
+<pre><code>PermitRootLogin no</code></pre>
+</div>
+<p>To make the new setting take effect, I'll reload the SSH daemon, which is named <code>sshd</code> on CentOS and AlmaLinux, and is named <code>ssh</code> on Ubuntu:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo systemctl reload sshd</code></pre>
+</div>
+<p>On the Ubuntu machine, the default setting looks a bit different:</p>
+<div class="C0-SHConPACKT">
+<pre><code>PermitRootLogin prohibit-password</code></pre>
+</div>
+<p>This means that the root user is allowed to log in, but only via a public key exchange. This is probably secure enough if you really need to allow the root user to log in. But in most cases, you'll want to force admin users to log in with their normal user accounts and use <code>sudo</code> for their admin needs. So, in most cases, you still want to change this setting to <code>no</code>.</p>
+<p>On your AlmaLinux 9 machine, you’ll see that it also has <code>PermitRootLogin</code> set to <code>prohibit-password</code> by default.</p>
+<blockquote>
+<p>Be aware that if you deploy a Linux instance on a cloud service, such as Rackspace or Vultr, the service owners will have you log into the VM with the root user account. The first thing you'll want to do is create your own normal user account, log back in with that account, disable the root user account, and disable the root user login in <code>sshd_config</code>. Microsoft Azure is one exception to this rule because it automatically creates a non-privileged user account for you.</p>
+</blockquote>
+<p>You'll be able to practice this in just a few moments, in the next section.</p>
+</section>
+<section id="disabling-usernamepassword-logins" class="level3" data-number="8.3.4">
+<h3 data-number="8.3.4">Disabling username/password logins</h3>
+<p>This is something that you'll only want to do after you've set up the key exchange with your clients. Otherwise, clients will be locked out of doing remote logins.</p>
+<section id="hands-on-lab-disabling-root-login-and-password-authentication" class="level4" data-number="8.3.4.1">
+<h4 data-number="8.3.4.1">Hands-on lab – disabling root login and password authentication</h4>
+<p>For this lab, use the same server VM that you used for the previous lab. Let's get started:</p>
+<ol>
+<li>On either an Ubuntu, CentOS, or AlmaLinux 8 server VM, look for this line in the <code>sshd_config</code> file:</li>
+</ol>
+<div class="C1-CodePACKT">
+<pre><code>#PasswordAuthentication yes</code></pre>
+</div>
+<ol>
+<li>Remove the comment symbol, change the parameter value to <code>no</code>, and reload the SSH daemon. The line should now look like this:</li>
+</ol>
+<div class="C1-CodePACKT">
+<pre><code>PasswordAuthentication no</code></pre>
+</div>
+<p>Now, when the botnets scan your system, they'll see that doing a brute-force password attack would be useless. They'll then just go away and leave you alone.</p>
+<ol>
+<li>Look for either of these two lines, depending on whether the server is an Ubuntu or a CentOS 7/AlmaLinux 8 VM:</li>
+</ol>
+<div class="C1-CodePACKT">
+<pre><code>#PermitRootLogin yes
+#PermitRootLogin prohibit-password</code></pre>
+</div>
+<ol>
+<li>Uncomment the line and change it to the following:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>PermitRootLogin no</code></pre>
+</div>
+<ol>
+<li>Reload the SSH daemon so that it will read in the new changes. On Ubuntu, do this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl reload ssh</code></pre>
+</div>
+<p>On CentOS/AlmaLinux, do this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl reload sshd</code></pre>
+</div>
+<ol>
+<li>Attempt to log into the server VM from the client that you used in the previous lab.</li>
+<li>Attempt to log into the server VM from another client on which you haven't created a key pair. (You shouldn't be able to.)</li>
+<li>As before, keep the server VM, because we'll do more with it in a bit.</li>
+</ol>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>Now that we've covered how to create a private/public key pair on the client side and how to transfer the public key to the server, let’s talk about setting up two-factor authentication.</p>
+</section>
+</section>
+<section id="enabling-two-factor-authentication" class="level3" data-number="8.3.5">
+<h3 data-number="8.3.5">Enabling two-factor authentication</h3>
+<p>Two-factor authentication can give an extra layer of protection. If you own a smart phone, you can set this up with <strong>Google Authenticator</strong>, which will present you with a <strong>one-time password</strong> for logging in at the local terminal, invoking a <code>sudo</code> command, or logging in remotely via SSH. Before we get started though, there are a few caveats that you need to understand:</p>
+<ul>
+<li>To make this work on a Linux machine, you’ll need to install a PAM module that isn’t supplied by Google. It’s in the repositories for some, but not all, Linux distros. (Of course, you could download the source code from the Github repository and compile it yourself, but that’s beyond the scope of this book.)</li>
+<li>The creator of this PAM module has created some semblance of documentation, but it’s not very useful. If you search for documentation, you’ll find some blog posts with procedures that are worse than useless, because they <em>will</em> break your system if you follow them.</li>
+<li>You can set up your machine to require Google Authentication for either global usage, or for just logging in via SSH. (Global usage means that an Authenticator code will be needed for logging in at the local terminal, using <code>sudo</code>, <em>and</em> logging in remotely via SSH.)</li>
+<li>If you’re dealing with multiple users, each user will need to set up Google Authenticator for his or her own user account, with his or her own smart phone.</li>
+</ul>
+<p>Now, with that out of the way, let’s set up our Ubuntu 22.04 server with Google Authenticator for local log-ins and sudo:</p>
+<blockquote>
+<p>Note that this PAM module is in the normal Ubuntu repository and in the EPEL repository for RHEL 8-type distros. It’s not available at all for RHEL 9-type distros.</p>
+</blockquote>
+<section id="hands-on-lab--setting-up-two-factor-authentication-on-ubuntu-22.04" class="level4" data-number="8.3.5.1">
+<h4 data-number="8.3.5.1">Hands-on lab--Setting up two-factor authentication on Ubuntu 22.04</h4>
+<p>For this lab, start with a fresh Ubuntu 22.04 virtual machine that’s not set up for public key authentication. (That will save a lot of confusion when going through this procedure.)</p>
+<ol>
+<li>Install Google Authenticator on your smart phone. (It’s in the normal app stores for both Android and iPhone.)</li>
+<li>On your Ubuntu VM, install the <code>libpam-google-authenticator</code> package, like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo apt install libpam-google-authenticator</code></pre>
+</div>
+<ol>
+<li>For this step, if you haven’t already, use SSH to remotely log into the Ubuntu VM from the GUI-type terminal of your host machine. (That’s because you might need to resize things to make the next step work.) Now, from this GUI-type terminal, run the <code>google-authenticator</code> app, like so:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>google-authenticator</code></pre>
+</div>
+<ol>
+<li>A big QR code will now show up on your screen. If the whole code graphic isn’t visible, use your GUI terminal controls to zoom out until the whole graphic is visible.</li>
+<li>Bring up the Google Authenticator app on your smart phone, and touch the <code>+</code> sign in the lower right-hand corner of the screen. Choose the <strong>Scan a QR code</strong> option, and then take a picture of your QR code.</li>
+<li>On your smart phone, note that a new entry for your Ubuntu VM has been added to the list. On the Ubuntu VM, enter the verification code that shows up with that entry.</li>
+<li>The next thing you’ll see on the Ubuntu terminal is your emergency scratch codes. Copy them down and store them in a safe location. (If you lose your mobile phone, you’ll use these scratch codes to log in.)</li>
+<li>Next, you’ll be asked series of questions. Just enter <code>y</code> for everything.</li>
+<li>In this step, you’ll set up two-factor authentication for logging in at the local terminal and for using <code>sudo</code>. Open the <code>/etc/pam.d/common-auth</code> file in your favorite text editor. Add the <code>auth required pam_google_authenticator.so</code> line as the first parameter. The top portion of the file should now look something like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>#
+# /etc/pam.d/common-auth - authentication settings common to all services
+#
+# This file is included from other service-specific PAM config files,
+. . .
+. . .
+auth required pam_google_authenticator.so
+# here are the per-package modules (the &quot;Primary&quot; block)
+. . .
+. . .</code></pre>
+</div>
+<blockquote>
+<p>Certain blog posts that you’ll find tell you to add this line to the <em>end</em> of the file. Be aware that if you do that, you <em>will</em> get locked out of your machine, and you’ll need to perform an emergency procedure to get back in to fix it. Any time you edit a PAM file, it’s vitally important that you place the directives in the proper order. (In case you’re wondering, I’ll show you the emergency procedure in <em>Chapter 16</em>, <em>Security Tips &amp; Tricks for the Busy Bee</em>.)</p>
+</blockquote>
+<ol>
+<li>At the local terminal of the Ubuntu VM, log out and then log back in. When prompted, enter the verification code from your smart phone app.</li>
+<li>Perform a command that requires <code>sudo</code> privileges. You should see something like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu2204-packt:~$ sudo nft list ruleset
+Verification code: 
+[sudo] password for donnie:
+. . .
+. . .
+Enter the verification code at the prompt.</code></pre>
+</div>
+<blockquote>
+<p>Note that you won’t be required to enter a verification code again until the <code>sudo</code> timer times out.</p>
+</blockquote>
+<ol>
+<li>From either your host machine or another virtual machine, remotely log into the Ubuntu VM via SSH. You should still be able to do that, because we haven’t yet configured the <code>/etc/ssh/sshd_config</code> file. Open the <code>sshd_config </code>file in your text editor, and change the <code>KbdInteractiveAuthentication no</code> line to <code>KbdInteractiveAuthentication yes</code>.</li>
+<li>Reload the Secure Shell configuration:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl reload ssh</code></pre>
+</div>
+<ol>
+<li>Try logging in again from either your host machine or another virtual machine. This time, you should be prompted to enter your verification code.</li>
+<li>Now, let’s say that your organization needs two-factor authentication for remote SSH logins, but doesn’t need it for either local logins or <code>sudo</code> operations. Let’s change the configuration so that only remote users will need to enter a code. Open the <code>/etc/pam.d/common-auth </code>file in your text editor, and remove the line that you inserted in Step 9.</li>
+<li>Open the <code>/etc/pam.d/sshd </code>file in your text editor, and add that line just under the <code>@include common-auth</code> line at the top of the file. The top portion of the file should now look like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>PAM configuration for the Secure Shell service
+      # Standard Un*x authentication.
+     @include common-auth
+     auth required pam_google_authenticator.so</code></pre>
+</div>
+<p>You should now be able to log in to the local terminal and perform <code>sudo</code> actions without having to enter a verification code. Instead, you should only have to enter a verification code when logging in remotely.</p>
+<ol>
+<li>End of lab.</li>
+</ol>
+<p>Next, let’s look at using Google Authenticator together with key exchange on our Ubuntu machine.</p>
+</section>
+<section id="hands-on-lab--using-google-authenticator-with-key-exchange-on-ubuntu" class="level4" data-number="8.3.5.2">
+<h4 data-number="8.3.5.2">Hands-on lab--Using Google Authenticator with key exchange on Ubuntu</h4>
+<p>For this lab, use the same Ubuntu virtual machine that you used for the previous lab.</p>
+<ol>
+<li>On either your host machine or another virtual machine, create a pair of keys and transfer them to the Ubuntu virtual machine, as you did in the <em>Creating and transferring SSH keys</em> lab. This time, you should be prompted to enter a verification code when you execute the <code>ssh-copy-id</code> command.</li>
+<li>On the Ubuntu virtual machine, open the <code>/etc/ssh/sshd_config</code> file in your text editor. This time, instead of changing the <code>#PasswordAuthentication yes</code> line, add this line below the <code>KbdInteractiveAuthentication yes</code> line:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>AuthenticationMethods publickey keyboard-interactive:pam</code></pre>
+</div>
+<p>After reloading the SSH configuration, you’ll see that you’ll be able to remotely log in by using key exchange if you’re logging in from a machine that has that set up. If you’re logging in from a machine that doesn’t have key exchange set up, you’ll still be able to log in with a password and a verification code. So, we don’t have true two-factor authentication just yet.</p>
+<ol>
+<li>To require both key-based authentication and Google Authenticator verification, change the above line to look like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>AuthenticationMethods publickey,keyboard-interactive:pam</code></pre>
+</div>
+<ol>
+<li>After reloading the SSH configuration, you’ll only be allowed to log in from machines for which you’ve set up key exchange. You now effectively have three-factor authentication, because you’ll still be prompted to enter your normal login password.</li>
+<li>To disable the password login so that you’ll only be using key exchange and a verification code, open the <code>/etc/pam.d/sshd</code> file in your text editor. At the very top of the file, find the <code>@include common-auth</code> line and change it to <code>#@include common-auth</code>.</li>
+<li>Verify that the key exchange works by trying to log in from a virtual machine on which you haven’t performed the key exchange setup. (You shouldn’t be allowed to.)</li>
+<li>That’s it. End of lab.</li>
+</ol>
+<p>Now, let’s see what we can do with AlmaLinux 8.</p>
+</section>
+<section id="hands-on-lab--setting-up-two-factor-authentication-on-almalinux-8" class="level4" data-number="8.3.5.3">
+<h4 data-number="8.3.5.3">Hands-on lab--Setting up two-factor authentication on AlmaLinux 8</h4>
+<p>For this lab, I assume that you’ve already installed the Google Authenticator app on your smart phone.</p>
+<p>The Authenticator PAM module isn’t in any of the repositories for the RHEL 9 distros, but it is in the EPEL repository for the RHEL 8 distros. (That might change by the time you read this, so it won’t hurt to check if you want to try this on AlmaLinux 9.) So, fire up a fresh AlmaLinux 8 VM, and let’s get started.</p>
+<ol>
+<li>Install the PAM module like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo dnf install epel-release
+sudo dnf install google-authenticator qrencode-libs</code></pre>
+</div>
+<p>Note that you need the <code>qrencode-libs</code> package in order to produce a QR code.</p>
+<ol>
+<li>From the GUI terminal of your host machine, use SSH to remotely log into the AlmaLinux 8 VM. This will allow you to resize the QR code image so that you can take a picture of it with your smart phone. Then, run the <code>google-authenticator</code> app, like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>google-authenticator -s ~/.ssh/google_authenticator</code></pre>
+</div>
+<ol>
+<li>This time, we’re creating the <code>google_authenticator</code> file within the <code>.ssh</code> directory, because AlmaLinux is set up to use SELinux. When you try to log in remotely with Authenticator enabled, the SSH daemon will try to write to the <code>google_authenticator</code> file. SELinux prevents SSH from writing to files that are outside of the <code>.ssh</code> directory. (We’ll talk more about SELinux in <em>Chapter 10</em>, <em>Implementing Mandatory Access Control with SELinux and AppArmor</em>.)</li>
+<li>Follow through on the Authenticator setup, the same as you did in Steps 4 through 8 of the <em>Setting up two-factor authentication on Ubuntu 22.04</em> lab.</li>
+<li>Open the <code>/etc/pam.d/sshd</code> file in your text editor. Add this line to the very bottom of the file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>auth required pam_google_authenticator.so secret=/home/${USER}/.ssh/google_authenticator</code></pre>
+</div>
+<p>(Note that the line wraps around on the printed page.)</p>
+<ol>
+<li>Open the <code>/etc/ssh/sshd_config </code>file in your text editor. Find the line that says <code>#ChallengeResponseAuthentication no</code> and change it to <code>ChallengeResponseAuthentication yes</code>.</li>
+<li>Reload or restart the <code>sshd</code> service:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl reload sshd</code></pre>
+</div>
+<ol>
+<li>Set the proper SELinux security context on the google_authenticator file that you created:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>cd
+sudo restorecon .ssh/google_authenticator</code></pre>
+</div>
+<ol>
+<li>Log out of the remote session, and try logging back in. This time, you should be prompted to enter a verification code.</li>
+</ol>
+<p>Next, let’s set AlmaLinux up for using key exchange.</p>
+</section>
+<section id="hand-on-lab--using-google-authenticator-with-key-exchange-on-almalinux-8" class="level4" data-number="8.3.5.4">
+<h4 data-number="8.3.5.4">Hand-on lab--Using Google Authenticator with key exchange on AlmaLinux 8</h4>
+<p>This will mostly be the same as it was for Ubuntu, with only a few differences.</p>
+<ol>
+<li>Transfer the public key from your host machine to the AlmaLinux 8 machine as you did in the <em>Creating and transferring SSH keys</em> lab.</li>
+<li>In the <code>/etc/ssh/sshd_config</code> file, change the <code>#PasswordAuthentication yes </code>line to <code>PasswordAuthentication no</code>, and reload the SSH configuration. Now, you’ll only be using key exchange to log in, which will completely bypass the Authenticator. Let’s fix things so that you’ll be using both.</li>
+<li>In the <code>/etc/ssh/sshd_config</code> file, add the following line just beneath the <code>PasswordAuthentication no</code> line:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>AuthenticationMethods publickey,password publickey,keyboard-interactive</code></pre>
+</div>
+<ol>
+<li>After reloading the SSH configuration, you’ll have three-factor authentication, because you’ll need to enter both your password and a verification code along with the key exchange.</li>
+<li>If desired, you can easily disable the password prompt and just use the key exchange and verification code. In the <code>/etc/pam.d/sshd</code> file, find the <code>auth    substack     password-auth</code> line at the top of the file, and change it to <code>#auth    substack     password-auth</code>.</li>
+<li>That’s all there is to Google Authenticator.</li>
+</ol>
+<p>In the next section, let’s make sure that we’re only using the strongest encryption algorithms.</p>
+</section>
+</section>
+<section id="configuring-secure-shell-with-strong-encryption-algorithms" class="level3" data-number="8.3.6">
+<h3 data-number="8.3.6">Configuring Secure Shell with strong encryption algorithms</h3>
+<p>As I mentioned previously, the current set of NIST recommendations, the <strong>Commercial National Security Algorithm Suite</strong> (<strong>CNSA Suite</strong>), involves using stronger algorithms and longer keys than what we needed to use previously. I'll summarize the new recommendations here in this table:</p>
+<table>
+<tbody>
+<tr class="odd">
+<td><strong>Algorithm</strong></td>
+<td><strong>Usage</strong></td>
+</tr>
+<tr class="even">
+<td>RSA, 3,072 bits or larger</td>
+<td>Key establishment and digital signatures</td>
+</tr>
+<tr class="odd">
+<td>Diffie-Hellman (DH), 3,072 bits or larger</td>
+<td>Key establishment</td>
+</tr>
+<tr class="even">
+<td>ECDH with NIST P-384</td>
+<td>Key establishment</td>
+</tr>
+<tr class="odd">
+<td>ECDSA with NIST P-384</td>
+<td>Digital signatures</td>
+</tr>
+<tr class="even">
+<td>SHA-384</td>
+<td>Integrity</td>
+</tr>
+<tr class="odd">
+<td>AES-256</td>
+<td>Confidentiality</td>
+</tr>
+</tbody>
+</table>
+<p>In other publications, you might see that NIST Suite B is the recommended standard for encryption algorithms. Suite B is an older standard that has been replaced by the CNSA Suite.</p>
+<p>Another cryptographic standard that you might have to work with is the <strong>Federal Information Processing Standard</strong> (<strong>FIPS</strong>), which is also promulgated by the U.S. government. The current version is FIPS 140-3, which gained its final approval on September 22, 2019.</p>
+<section id="understanding-ssh-encryption-algorithms" class="level4" data-number="8.3.6.1">
+<h4 data-number="8.3.6.1">Understanding SSH encryption algorithms</h4>
+<p>SSH works with a combination of symmetric and asymmetric cryptography, similar to how Transport Layer Security works. The SSH client starts the process by using the public key method to set up an asymmetric session with an SSH server. Once this session has been set up, the two machines can agree on and exchange a secret code, which they'll use to set up a symmetric session. (As we saw previously with TLS, we want to use symmetric cryptography for performance reasons, but we need an asymmetric session to perform the secret key exchange.) To perform this magic, we need four classes of encryption algorithms, which we'll configure on the server side. These are:</p>
+<ul>
+<li><strong>Ciphers</strong>: These are the symmetric algorithms that encrypt the data that the client and server exchange with each other.</li>
+<li><strong>HostKeyAlgorithms</strong>: This is the list of host key types that the server can use.</li>
+<li><strong>KexAlgorithms</strong>: These are the algorithms that the server can use to perform the symmetric key exchange.</li>
+<li><strong>MAC</strong>: Message Authentication Codes are hashing algorithms that cryptographically sign the encrypted data in transit. This ensures data integrity and will let you know if someone has tampered with your data.</li>
+</ul>
+<p>The best way to get a feel for this is to look at the <code>sshd_config</code> man page, like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>man sshd_conf</code></pre>
+</div>
+<p>I could use any VM to demo this. For now, though, I'm going with CentOS 7, unless I state otherwise. (The lists of default and available algorithms will be different for different Linux distributions and versions.) Also, note that to demo this, we want to look at in the <code>sshd_config</code> man page to see the lists of algorithms that are <strong>available</strong> and <strong>enabled</strong>. The <strong>enabled</strong> list is in the man pages for CentOS 7 and AlmaLinux 8, but not in the man page for AlmaLinux 9.</p>
+<p>First, let's look at the list of supported ciphers. Scroll down the man page until you see them:</p>
+<div class="C0-SHConPACKT">
+<pre><code>3des-cbc
+aes128-cbc
+aes192-cbc
+aes256-cbc
+aes128-ctr
+aes192-ctr
+aes256-ctr
+aes128-gcm@openssh.com
+aes256-gcm@openssh.com
+arcfour
+arcfour128
+arcfour256
+blowfish-cbc
+cast128-cbc
+chacha20-poly1305@openssh.com</code></pre>
+</div>
+<p>However, not all of these supported ciphers are enabled. Just below this list, we can see the list of ciphers that are enabled by default:</p>
+<div class="C0-SHConPACKT">
+<pre><code>chacha20-poly1305@openssh.com,
+aes128-ctr,aes192-ctr,aes256-ctr,
+aes128-gcm@openssh.com,aes256-gcm@openssh.com,
+aes128-cbc,aes192-cbc,aes256-cbc,
+blowfish-cbc,cast128-cbc,3des-cbc</code></pre>
+</div>
+<p>Next, in alphabetical order, are the <strong>HostKeyAlgorithms</strong>. The list on CentOS 7 looks like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>ecdsa-sha2-nistp256-cert-v01@openssh.com,
+ecdsa-sha2-nistp384-cert-v01@openssh.com,
+ecdsa-sha2-nistp521-cert-v01@openssh.com,
+ssh-ed25519-cert-v01@openssh.com,
+ssh-rsa-cert-v01@openssh.com,
+ssh-dss-cert-v01@openssh.com,
+ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,
+ssh-ed25519,ssh-rsa,ssh-dss</code></pre>
+</div>
+<p>Next, scroll down to the <strong>KexAlgorithms</strong> (short for <strong>Key Exchange Algorithms</strong>) section. You'll see a list of supported algorithms, which looks like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>curve25519-sha256
+curve25519-sha256@libssh.org
+diffie-hellman-group1-sha1
+diffie-hellman-group14-sha1
+diffie-hellman-group-exchange-sha1
+diffie-hellman-group-exchange-sha256
+ecdh-sha2-nistp256
+ecdh-sha2-nistp384
+ecdh-sha2-nistp521</code></pre>
+</div>
+<p>Be aware that this list can vary from one distribution to the next. For example, RHEL 8/AlmaLinux 8 supports three additional algorithms that are newer and stronger. Its list looks like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>curve25519-sha256
+curve25519-sha256@libssh.org
+diffie-hellman-group1-sha1
+diffie-hellman-group14-sha1
+diffie-hellman-group14-sha256
+diffie-hellman-group16-sha512
+diffie-hellman-group18-sha512
+diffie-hellman-group-exchange-sha1
+diffie-hellman-group-exchange-sha256
+ecdh-sha2-nistp256
+ecdh-sha2-nistp384
+ecdh-sha2-nistp521</code></pre>
+</div>
+<p>You’ll see the same list on an AlmaLinux 9 machine, except that the <code>sntrup761x25519-sha512@openssh.com</code> algorithm has been added.</p>
+<p>Next, you'll see the list of algorithms that are enabled by default:</p>
+<div class="C0-SHConPACKT">
+<pre><code>curve25519-sha256,curve25519-sha256@libssh.org,
+ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,
+diffie-hellman-group-exchange-sha256,
+diffie-hellman-group14-sha1,
+diffie-hellman-group1-sha1</code></pre>
+</div>
+<p>This list can also vary from one Linux distribution to another. (In this case, though, there's no difference between CentOS 7 and AlmaLinux 8.)</p>
+<p>Finally, we have the MAC algorithms. The default list of enabled algorithms looks like this on CentOS 7:</p>
+<div class="C0-SHConPACKT">
+<pre><code>umac-64-etm@openssh.com,umac-128-etm@openssh.com,
+hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,
+hmac-sha1-etm@openssh.com,
+umac-64@openssh.com,umac-128@openssh.com,
+hmac-sha2-256,hmac-sha2-512,hmac-sha1,
+hmac-sha1-etm@openssh.com</code></pre>
+</div>
+<p>To see the list of algorithms that your particular system supports, either look at the <code>sshd_config</code> man page for that machine or perform the following <code>ssh -Q</code> commands:</p>
+<div class="C0-SHConPACKT">
+<pre><code>ssh -Q cipher
+ssh -Q key
+ssh -Q kex
+ssh -Q mac</code></pre>
+</div>
+<p>When you look in the <code>/etc/ssh/sshd_config</code> file, you won't see any lines that configure any of these algorithms. That's because the default list of algorithms is hard coded into the SSH daemon. The only time you'll configure any of these is if you want to either enable an algorithm that isn't enabled or disable one that is. Before we do that, let's scan our system to see what is enabled and see if the scanner can make any recommendations.</p>
+</section>
+</section>
+<section id="scanning-for-enabled-ssh-algorithms" class="level3" data-number="8.3.7">
+<h3 data-number="8.3.7">Scanning for enabled SSH algorithms</h3>
+<p>We have two good ways to scan an SSH server. If your server is accessible via the Internet, you can go to the SSHCheck site at <a href="https://sshcheck.com/">https://sshcheck.com/</a>.</p>
+<p>Then, just type in either the IP address or hostname of your server. If you've changed the port from the default port <code>22</code>, enter the port number as well. When the scan completes, you'll see the list of enabled algorithms, along with recommendations on which ones to either enable or disable.</p>
+<p>If the machine that you want to scan isn't accessible from the Internet, or even if it is, you can use a local scanning tool. In the previous edition of this book, we used the <strong>ssh_scan</strong> tool. Sadly, this tool is no longer supported, and it doesn’t work on newer Linux distros that come with OpenSSL version 3. So instead, let’s try this with the Nmap scripting engine.</p>
+<section id="hands-on-lab-scanning-with-nmap" class="level4" data-number="8.3.7.1">
+<h4 data-number="8.3.7.1">Hands-on lab – Scanning with Nmap</h4>
+<p>For this lab, you can use any of your virtual machines. Let's get started:</p>
+<ol>
+<li>First, install the <code>nmap</code> package from your normal distro repository. On Ubuntu do:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo apt update
+sudo apt install nmap</code></pre>
+</div>
+<p>On CentOS 7, do this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo yum install nmap</code></pre>
+</div>
+<p>On AlmaLinux 8 or 9, do this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo dnf install nmap</code></pre>
+</div>
+<ol>
+<li>Use <code>nmap</code> with the <code>ssh2-enum-algos.nse</code> script to scan the server VM that you created and configured in the previous labs. Substitute your own IP address for the one I'm using here. Note that even if you haven't created a key pair on the scanner machine, the scan still works against machines that have had username/password authentication disabled. (But, of course, you won't be able to log in from the scanner machine):</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap --script=ssh2-enum-algos.nse 192.168.0.14</code></pre>
+</div>
+<p>Note that if you’re scanning a machine with an enabled firewall, you might get an error message about how the scan has been blocked. If that happens, try adding the <code>-Pn</code> switch, so that the command will look like this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>nmap -Pn --script=ssh2-enum-algos.nse 192.168.0.14</code></pre>
+</div>
+<ol>
+<li>Repeat the scan, but this time, save the output to a normal text file, like so:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap --script=ssh2-enum-algos.nse 192.168.0.14 -oN ubuntuscan.txt</code></pre>
+</div>
+<ol>
+<li>Open the text file in a normal text editor or pager. You'll see a complete list of all of the algorithms that are enabled. Compare your results with the standards that are applicable to your circumstances, such as NIST's CNSA standard, to be sure you enable or disable the right things.</li>
+<li>On either your host machine or a VM with a desktop interface, visit the Shodan website at <a href="https://www.shodan.io">https://www.shodan.io</a>. Type <code>ssh</code> into the search window and observe the list of Internet-facing SSH servers that comes up. Click on different IP addresses until you find an SSH server that's <em>not</em> running on the default port <code>22</code>. Observe the list of enabled algorithms for that device.</li>
+<li>Scan the device, using the <code>-p</code> switch to scan the different port, like so:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap -p 2222 --script=ssh2-enum-algos.nse 192.168.0.14</code></pre>
+</div>
+<ol>
+<li>Note that in addition to the list of enabled algorithms that you saw on Shodan, you now have a list of weak ones that the owner of this device needs to disable.</li>
+<li>Keep both this scanner and this server VM handy, because we'll use them again after we disable some algorithms.</li>
+</ol>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>Okay, let's disable some of the creaky, old, and weak stuff.</p>
+</section>
+</section>
+<section id="disabling-weak-ssh-encryption-algorithms" class="level3" data-number="8.3.8">
+<h3 data-number="8.3.8">Disabling weak SSH encryption algorithms</h3>
+<p>As I said before, we want to compare our scan results against the NIST recommendations, and configure things accordingly. Understand though, that the list of available algorithms differs from one Linux distro to the next. To make things less confusing, I'll present two hands-on procedures in this section. One is for Ubuntu 22.04, while the other is for CentOS 7. AlmaLinux 8 and 9 have their own unique way of doing business, so I'm saving that for the next section.</p>
+<section id="hands-on-lab-disabling-weak-ssh-encryption-algorithms-ubuntu-22.04" class="level4" data-number="8.3.8.1">
+<h4 data-number="8.3.8.1">Hands-on lab – disabling weak SSH encryption algorithms – Ubuntu 22.04</h4>
+<p>For this lab, you'll need the VM that you've been using as a scanner, and another Ubuntu 22.04 VM to scan and configure. Let's get started:</p>
+<ol>
+<li>If you haven't done so already, scan the Ubuntu 22.04 VM and save the output to a file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap --script=ssh2-enum-algos.nse 192.168.0.14 -oN ubuntuscan.txt</code></pre>
+</div>
+<ol>
+<li>Count the number of lines in the file by doing:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>wc -l ubuntuscan.txt</code></pre>
+</div>
+<ol>
+<li>On the target Ubuntu 22.04 VM, open the <code>/etc/ssh/sshd_config</code> file in your preferred text editor. Toward the top of the file, find these two lines:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code># Ciphers and keying
+#RekeyLimit default none</code></pre>
+</div>
+<ol>
+<li>Beneath those two lines, insert these three lines:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>Ciphers -aes128-ctr,aes192-ctr,aes128-gcm@openssh.com
+KexAlgorithms ecdh-sha2-nistp384
+MACs -hmac-sha1-etm@openssh.com,hmac-sha1,umac-64-etm@openssh.com,umac-64@openssh.com,umac-128-etm@openssh.com,umac-128@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-256</code></pre>
+</div>
+<ol>
+<li>In the <code>Ciphers</code> and <code>MACs</code> lines, you see a comma-separated list of algorithms that were disabled by the preceding <code>-</code> sign. (You only need one <code>-</code> to disable all the algorithms in the list.) In the <code>KexAlgorithms</code> line, there's no <code>-</code> sign. This means that the algorithm that's listed on that line is the only one that is enabled.</li>
+<li>Save the file and restart the SSH daemon. Verify that it started correctly:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl restart ssh
+sudo systemctl status ssh</code></pre>
+</div>
+<ol>
+<li>Scan the Ubuntu 22.04 VM again, saving the output to a different file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap --script=ssh2-enum-algos.nse 192.168.0.14 -oN ubuntuscan_modified.txt</code></pre>
+</div>
+<ol>
+<li>Count the number of lines in the new file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>wc -l ubuntuscan_modified.txt</code></pre>
+</div>
+<ol>
+<li>On the scanner VM, use <code>diff</code> to compare the two files. You should see fewer algorithms than you saw previously:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>diff -y ubuntuscan.txt ubuntuscan_modified.txt</code></pre>
+</div>
+<blockquote>
+<p>The sharp-eyed among you will notice that we left one Cipher that isn't on the NIST CNSA list. <code>chacha20-poly1305@openssh.com</code> is a lightweight algorithm that's good for use with low-powered, hand-held devices. It's a good, strong algorithm that can replace the venerable <strong>Advanced Encryption Standard</strong> (<strong>AES</strong>) algorithm, but with higher performance. However, if you have to remain 100% compliant with the NIST CNSA standard, then you might have to disable it.</p>
+</blockquote>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>Next, let's work with CentOS 7.</p>
+</section>
+<section id="hands-on-lab-disabling-weak-ssh-encryption-algorithms-centos-7" class="level4" data-number="8.3.8.2">
+<h4 data-number="8.3.8.2">Hands-on lab – disabling weak SSH encryption algorithms – CentOS 7</h4>
+<p>You'll notice two things when you start working with CentOS 7:</p>
+<ul>
+<li><strong>More algorithms enabled</strong>: A default SSH configuration on CentOS 7 has a lot more enabled algorithms than what Ubuntu 22.04 has. This includes some really ancient stuff that you really don't want to see anymore. I'm talking about things such as Blowfish and 3DES, which should have been retired years ago.</li>
+<li><strong>A different configuration technique</strong>: On CentOS, placing a <code>- </code>sign in front of a list of algorithms that you want to disable doesn't work. Instead, you'll need to list all of the algorithms that you want to enable.</li>
+</ul>
+<p>For this lab, you'll need a CentOS 7 VM and the same scanner VM that you've been using. With that in mind, let's get to work:</p>
+<ol>
+<li>Scan the CentOS 7 VM and save the output to a file. Note that due to the CentOS 7 firewall, you’ll need to add the <code>-Pn</code> option:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap -Pn --script=ssh2-enum-algos.nse 192.168.0.12 -oN centos7scan.txt</code></pre>
+</div>
+<ol>
+<li>Count the number of lines in the output file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>wc -l centos7scan.txt</code></pre>
+</div>
+<ol>
+<li>On the target CentOS 7 VM, open the <code>/etc/ssh/sshd_config</code> file in your preferred text editor. Toward the top of the file, find these two lines:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code># Ciphers and keying
+#RekeyLimit default none</code></pre>
+</div>
+<ol>
+<li>Beneath those two lines, insert these three lines:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>Ciphers aes256-gcm@openssh.com,aes256-ctr,chacha20-poly1305@openssh.com
+KexAlgorithms ecdh-sha2-nistp384
+MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-256</code></pre>
+</div>
+<ol>
+<li>As I mentioned previously, with CentOS, using <code>-</code> to disable algorithms doesn't work. Instead, we have to list all of the algorithms that we do want to enable.</li>
+<li>Save the file and reload the SSH daemon. Verify that it started correctly:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl reload sshd
+sudo systemctl status sshd</code></pre>
+</div>
+<ol>
+<li>Scan the CentOS 7 VM again, saving the output to a different file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap -Pn --script=ssh2-enum-algos.nse 192.168.0.12 -oN centos7scan_modified.txt</code></pre>
+</div>
+<ol>
+<li>Count the number of lines in the new output file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>wc -l centos7scan_modified.txt</code></pre>
+</div>
+<ol>
+<li>On the scanner VM, use <code>diff</code> to compare the two files. You should see fewer algorithms than you saw previously:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>diff -y centos7scan.txt centos7scan_modified.txt</code></pre>
+</div>
+<blockquote>
+<p>As before, I left the <code>chacha20-poly1305@openssh.com</code> algorithm enabled. If you have to remain 100% compliant with the NIST CNSA standard, then you might have to disable it.</p>
+</blockquote>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>Next, let's look at a handy new feature that comes with the RHEL 8 and 9 families.</p>
+</section>
+</section>
+<section id="setting-system-wide-encryption-policies-on-rhel-89-and-almalinux-89" class="level3" data-number="8.3.9">
+<h3 data-number="8.3.9">Setting system-wide encryption policies on RHEL 8/9 and AlmaLinux 8/9</h3>
+<p>In <em>Chapter 6</em>, <em>Encryption Technologies</em>, we briefly looked at how to set system-wide encryption policies on AlmaLinux 8 and 9. With this cool feature, you no longer have to configure crypto policies for each individual daemon. Instead, you just run a couple of simple commands, and the policy is instantly changed for multiple daemons. To see which daemons are covered, look in the <code>/etc/crypto-policies/back-ends/</code> directory. Here's a partial view of what's there:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost back-ends]$ ls -l
+total 0
+. . .
+. . .
+lrwxrwxrwx. 1 root root 46 Sep 24 18:17 openssh.config -&gt; /usr/share/crypto-policies/DEFAULT/openssh.txt
+lrwxrwxrwx. 1 root root 52 Sep 24 18:17 opensshserver.config -&gt; /usr/share/crypto-policies/DEFAULT/opensshserver.txt
+lrwxrwxrwx. 1 root root 49 Sep 24 18:17 opensslcnf.config -&gt; /usr/share/crypto-policies/DEFAULT/opensslcnf.txt
+lrwxrwxrwx. 1 root root 46 Sep 24 18:17 openssl.config -&gt; /usr/share/crypto-policies/DEFAULT/openssl.txt
+[donnie@localhost back-ends]$</code></pre>
+</div>
+<p>As you see, this directory contains symbolic links to text files that contain directives about which algorithms to either enable or disable for the <code>DEFAULT</code> configuration. One level up, in the <code>/etc/crypto-policies/</code> directory, there's the <code>config</code> file. Open it, and you'll see that this is where the system-wide configuration is set:</p>
+<div class="C0-SHConPACKT">
+<pre><code>DEFAULT</code></pre>
+</div>
+<p>Scanning this VM with its <code>DEFAULT</code> configuration shows that quite a few older algorithms are still enabled. To get rid of them, we can change to either <code>FUTURE</code> mode or to <code>FIPS</code> mode.</p>
+<blockquote>
+<p><strong>Tip</strong></p>
+<blockquote>
+<p>At the time of this writing, the EPEL repository uses a security certificate that’s not compatible with <code>FUTURE</code> mode. This will prevent you from updating or installing any software packages from the EPEL repository. If you need to set your machine with both <code>FUTURE</code> mode and the EPEL repository, be aware that you’ll need to set the machine back to <code>DEFAULT</code> mode before you can either fully update your system or install packages from EPEL. (Of course, this problem could be fixed by the time you read this.)</p>
+</blockquote>
+</blockquote>
+<p>To show you how this works, let's get our hands dirty with another lab.</p>
+<section id="hands-on-lab-setting-encryption-policies-on-almalinux-9" class="level4" data-number="8.3.9.1">
+<h4 data-number="8.3.9.1">Hands-on lab – setting encryption policies on AlmaLinux 9</h4>
+<p>Start with a fresh AlmaLinux 9 VM and the scanner VM that you've been using. Now, follow these steps:</p>
+<ol>
+<li>On a AlmaLinux 9 VM, use the <code>update-crypto-policies</code> utility to verify that it's running in <code>DEFAULT</code> mode:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo update-crypto-policies --show</code></pre>
+</div>
+<ol>
+<li>Scan the AlmaLinux 9 VM in its <code>DEFAULT</code> configuration and save the output to a file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap -Pn --script=ssh2-enum-algos.nse 192.168.0.17 -oN alma9_default.txt</code></pre>
+</div>
+<ol>
+<li>On the AlmaLinux 9 VM, set the system-wide crypto policy to <code>FUTURE</code>:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo update-crypto-policies --set FUTURE</code></pre>
+</div>
+<ol>
+<li>In the <code>/etc/ssh/</code> directory, remove the current host machine keys:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo rm /etc/ssh/*key*</code></pre>
+</div>
+<ol>
+<li>(Don’t worry. New keys will get created when you reboot the machine.)</li>
+<li>Reboot the VM:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo shutdown -r now</code></pre>
+</div>
+<ol>
+<li>On the scanner VM, open the <code>~/.ssh/known_hosts</code> file in your text editor. Delete the entry that was previously made for the AlmaLinux VM and save the file. (We have to do this because the public key fingerprint on the AlmaLinux VM will have changed because of the new policy.)</li>
+<li>Scan the AlmaLinux VM again, saving the output to a different file:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>nmap -Pn --script=ssh2-enum-algos.nse 192.168.0.17 -oN alma9_future.txt</code></pre>
+</div>
+<ol>
+<li>Compare the two output files. You should now see fewer enabled algorithms than you did previously.</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>diff -y alma9_default.txt alma9_future.txt</code></pre>
+</div>
+<ol>
+<li>Look at the files in the <code>/etc/crypto-policies/back-ends/</code> directory:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>ls -l /etc/crypto-policies/back-ends/</code></pre>
+</div>
+<ol>
+<li>You'll now see that the symbolic links point to files in the <code>FUTURE</code> directories.</li>
+<li>Look at the host keys in the <code>/etc/ssh/</code> directory, and see if they differ from what you had before:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>ls -l /etc/ssh/*key*</code></pre>
+</div>
+<ol>
+<li>Scan the AlmaLinux 9 VM that you set up in <code>FIPS</code> mode for the lab in <em>Chapter 6</em>, <em>Encryption Technologies</em>. Compare the results with the <code>DEFAULT</code> and <code>FUTURE</code> mode scans.</li>
+<li>End of lab</li>
+</ol>
+<blockquote>
+<p><strong>Tip</strong></p>
+<blockquote>
+<p>If <code>FUTURE</code> mode hasn’t disabled enough algorithms for you, you can always just create your own custom policy. See the details here:</p>
+</blockquote>
+<blockquote>
+<p><a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/using-the-system-wide-cryptographic-policies_security-hardening#customizing-system-wide-cryptographic-policies-with-subpolicies_using-the-system-wide-cryptographic-policies">https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/using-the-system-wide-cryptographic-policies_security-hardening#customizing-system-wide-cryptographic-policies-with-subpolicies_using-the-system-wide-cryptographic-policies</a></p>
+</blockquote>
+</blockquote>
+<p>You now know how to configure SSH to use only the most modern, most secure algorithms. Next, let's look at logging.</p>
+</section>
+</section>
+<section id="configuring-more-detailed-logging" class="level3" data-number="8.3.10">
+<h3 data-number="8.3.10">Configuring more detailed logging</h3>
+<p>In its default configuration, SSH already creates log entries whenever someone logs in via SSH, SCP, or SFTP. On Debian/Ubuntu systems, the entry is made in the <code>/var/log/auth.log</code> file. On Red Hat/CentOS/AlmaLinux systems, the entry is made in the <code>/var/log/secure</code> file. Either way, the log entry looks something like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Oct  1 15:03:23 donnie-ca sshd[1141]: Accepted password for donnie from 192.168.0.225 port 54422 ssh2
+Oct  1 15:03:24 donnie-ca sshd[1141]: pam_unix(sshd:session): session opened for user donnie by (uid=0)</code></pre>
+</div>
+<p>Open the <code>sshd_config </code>man page and scroll down to the <code>LogLevel</code> item. There, you'll see the various settings that provide different levels of detail for logging SSH messages. The levels are as follows:</p>
+<ul>
+<li><strong>QUIET</strong></li>
+<li><strong>FATAL</strong></li>
+<li><strong>ERROR</strong></li>
+<li><strong>INFO</strong></li>
+<li><strong>VERBOSE</strong></li>
+<li><strong>DEBUG</strong> or <strong>DEBUG1</strong></li>
+<li><strong>DEBUG2</strong></li>
+<li><strong>DEBUG3</strong></li>
+</ul>
+<p>Normally, the only two of these we would care about are <code>INFO</code> and <code>VERBOSE</code>. <code>INFO</code> is the default setting, while <code>VERBOSE</code> is the only other one that we would use under normal circumstances. The various <code>DEBUG</code> levels might come in handy for troubleshooting, but the man page warns us that using <code>DEBUG</code> in production settings would violate users' privacy.</p>
+<p>Let's go ahead and get our hands dirty, just to get a feel for what gets logged with the various levels.</p>
+<section id="hands-on-lab-configuring-more-verbose-ssh-logging" class="level4" data-number="8.3.10.1">
+<h4 data-number="8.3.10.1">Hands-on lab – configuring more verbose SSH logging</h4>
+<p>For this lab, use the same VM that you've been using for the previous labs. That way, you'll get a better picture of what a complete <code>sshd_config</code> file should look like when it's fully locked down. Remotely log into the target VM via SSH and follow these steps:</p>
+<ol>
+<li>Open the main log file and scroll down to where you see the entry that was made due to your login and observe what it says. For Ubuntu, do:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo less /var/log/auth.log</code></pre>
+</div>
+<p>For CentOS or AlmaLinux, do:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo less /var/log/secure</code></pre>
+</div>
+<ol>
+<li>As I mentioned previously, you never want to run a production machine with the SSH log level set to any of the <code>DEBUG</code> levels. But, just so you can see what it does log, set your machine to <code>DEBUG</code> now. Open the <code>/etc/ssh/sshd_config</code> file in your favorite text editor. Find the line that says the following:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>#LogLevel INFO</code></pre>
+</div>
+<p>Change it to the following:</p>
+<div class="C1-SHConPACKT">
+<pre><code>LogLevel DEBUG3</code></pre>
+</div>
+<ol>
+<li>After saving the file, reload SSH. On Ubuntu, do:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl reload ssh</code></pre>
+</div>
+<p>On CentOS or AlmaLinux, do this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl reload sshd</code></pre>
+</div>
+<ol>
+<li>Log out of the SSH session, and then log back in. View the system log file to see the new entries from this new login.</li>
+<li>Open the <code>/etc/ssh/sshd_config</code> file for editing. Change the <code>LogLevel DEBUG3</code> line to the following:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>LogLevel VERBOSE</code></pre>
+</div>
+<ol>
+<li>After saving the file, reload or restart the SSH daemon. Log out of the SSH session, log back in, and look at the entries in the system log file.</li>
+</ol>
+<blockquote>
+<p><strong>Tip</strong></p>
+<blockquote>
+<p>The main benefit of <code>VERBOSE</code> mode is that it will log the fingerprints of any key that was used to log in. This can be a big help with key management.</p>
+</blockquote>
+</blockquote>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>So, you've just seen how to get more information about SSH logins in your system logs. Next, let's talk a bit about access control.</p>
+</section>
+</section>
+</section>
+<section id="configuring-access-control-with-whitelists-and-tcp-wrappers" class="level2" data-number="8.4">
+<h2 data-number="8.4">Configuring access control with whitelists and TCP Wrappers</h2>
+<p>We've already locked things down pretty well just by requiring that clients authenticate via key exchange, rather than by username and password. When we prohibit password authentication, the bad guys can do brute-force password attacks against us until the cows come home, and it won't do them any good. (Although, in truth, they'll just give up as soon as they find that password authentication has been disabled.) For an extra measure of security, we can also set up a couple of access control mechanisms that will allow only certain users, groups, or client machines to log in to an SSH server. These two mechanisms are:</p>
+<ul>
+<li>Whitelists within the <code>sshd_config</code> file</li>
+<li>TCP Wrappers, via the <code>/etc/hosts.allow</code> and <code>/etc/hosts.deny</code> files</li>
+</ul>
+<p>Okay, you're now saying, <em>But what about firewalls? Isn't that a third mechanism that we can use?</em> And yeah, you're right. But, we already covered firewalls in <em>Chapter 4</em>, <em>Securing Your Server with a Firewall - Part 1</em>, and <em>Chapter 5</em>, <em>Securing Your Server with a Firewall - Part 2</em>, so I won't repeat any of that here. You can also place access control directives in your systemd unit files for SSH. For our present discussion though, I’d rather avoid the complexities of explaining how to edit a systemd unit file. At any rate, these are the ways of controlling access to your SSH server. You can use all of them together if you really want to, or you can just use one of them at a time. (It really depends on just how paranoid you really are.)</p>
+<blockquote>
+<p>There are two competing philosophies about how to do access control. With blacklists, you specifically prohibit access by certain people or machines. That's difficult to do because the list could get very long, and you still won't block everybody that you need to block. The preferred and easier method is to use whitelists, which specifically allow access by certain people or machines.</p>
+</blockquote>
+<p>First, let's look at creating whitelists within <code>sshd_config</code> with a hands-on lab.</p>
+<section id="configuring-whitelists-within-sshd_config" class="level3" data-number="8.4.1">
+<h3 data-number="8.4.1">Configuring whitelists within sshd_config</h3>
+<p>The four access control directives that you can set within <code>sshd_config</code> are as follows:</p>
+<ul>
+<li><strong>DenyUsers</strong></li>
+<li><strong>AllowUsers</strong></li>
+<li><strong>DenyGroups</strong></li>
+<li><strong>AllowGroups</strong></li>
+</ul>
+<p>For each directive, you can specify more than one username or group name, separating them with a blank space. Also, these four directives are processed in the order that I've listed them here. In other words, if a user is listed with both the <code>DenyUsers</code> and the <code>AllowUsers</code> directives, <code>DenyUsers</code> takes precedence. If a user is listed with <code>DenyUsers</code> and is a member of a group that's listed with <code>AllowGroups</code>, <code>DenyUsers</code> again takes precedence. To demonstrate this, let's do a lab.</p>
+<section id="hands-on-lab-configuring-whitelists-within-sshd_config" class="level4" data-number="8.4.1.1">
+<h4 data-number="8.4.1.1">Hands-on lab – configuring whitelists within sshd_config</h4>
+<p>This lab will work on any of your VMs. Follow these steps:</p>
+<ol>
+<li>On the VM that you wish to configure, create user accounts for Frank, Charlie, and Maggie. On Ubuntu, do it like this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo adduser frank</code></pre>
+</div>
+<p>On CentOS or AlmaLinux, do it like this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo useradd frank
+sudo passwd frank</code></pre>
+</div>
+<ol>
+<li>Create the <code>webadmins</code> group and add Frank to it:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo groupadd webadmins
+sudo usermod -a -G webadmins frank</code></pre>
+</div>
+<ol>
+<li>From either your host machine or from another VM, have the three users log in. Then, log them back out.</li>
+<li>Open the <code>/etc/ssh/sshd_config</code> file in your favorite text editor. At the bottom of the file, add an <code>AllowUsers</code> line with your own username, like so:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>AllowUsers donnie</code></pre>
+</div>
+<ol>
+<li>Then, restart or reload the SSH service and verify that it has started correctly:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>For Ubuntu:
+sudo systemctl restart ssh
+sudo systemctl status ssh
+For CentOS:
+sudo systemctl restart sshd
+sudo systemctl status sshd</code></pre>
+</div>
+<ol>
+<li>Repeat <em>step 3</em>. This time, these three kitties shouldn't be able to log in. Open the <code>/etc/ssh/sshd_config</code> file in your text editor. This time, add an <code>AllowGroups</code> line to the bottom of the file for the <code>webadmins</code> group, like so:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>AllowGroups webadmins</code></pre>
+</div>
+<ol>
+<li>Restart the SSH service and verify that it started properly.</li>
+</ol>
+<p>From either your host machine or another VM, have Frank try to log in. You'll see that even though he's a member of the <code>webadmins</code> group, he'll still be denied. That's because the <code>AllowUsers</code> line with your own username takes precedence.</p>
+<ol>
+<li>Open <code>sshd_config</code> in your text editor and remove the <code>AllowUsers</code> line that you inserted in <em>step 4</em>. Restart the SSH service and verify that it started properly.</li>
+<li>Try to log into your own account, and then try to log into the accounts of all the other users. You should now see that Frank is the only one who is allowed to log in. The only way that any of the other users can now log into the VM is from the VM's local console.</li>
+<li>Log into your own account at the VM's local console. Delete the <code>AllowGroups</code> line from <code>sshd_config</code> and restart the SSH service.</li>
+</ol>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>You've just seen how to configure a whitelist on the daemon level, using the SSH daemon's own configuration file. Next, we'll look at configuring whitelists at the network level.</p>
+</section>
+</section>
+<section id="configuring-whitelists-with-tcp-wrappers" class="level3" data-number="8.4.2">
+<h3 data-number="8.4.2">Configuring whitelists with TCP Wrappers</h3>
+<p>It's a strange name, but a simple concept. TCP Wrappers – singular, not plural – listens to incoming network connections and either allows or denies connection requests. Whitelists and blacklists are configured in the <code>/etc/hosts.allow</code> file and the <code>/etc/hosts.deny</code> file. Both of these files work together. If you create a whitelist in <code>hosts.allow</code> without adding anything to <code>hosts.deny</code>, nothing will be blocked. That's because TCP Wrappers consults <code>hosts.allow</code> first, and if it finds a whitelisted item there, it will just skip over looking in <code>hosts.deny</code>. If a connection request comes in for something that isn't whitelisted, TCP Wrappers will consult <code>hosts.allow</code>, find that there's nothing there for the source of this connection request, and then will consult <code>hosts.deny</code>. If nothing is in <code>hosts.deny</code>, the connection request will still go through. So, after you configure <code>hosts.allow</code>, you have to also configure <code>hosts.deny</code> in order to block anything.</p>
+<blockquote>
+<p>You’ll want to note that the Red Hat folk have stripped TCP Wrappers from RHEL 8/9 and their offspring. So, if you decide to practice with the techniques that I present here, you can do so with either your Ubuntu or CentOS 7 VMs, but not on your AlmaLinux 8/9 VMs. (The Red Hat folk now recommend doing access control via firewalld, rather than TCP Wrappers.)</p>
+<blockquote>
+<p>You can read about it here: <a href="https://access.redhat.com/solutions/3906701">https://access.redhat.com/solutions/3906701</a>.</p>
+</blockquote>
+<blockquote>
+<p>(You'll need a Red Hat account to read the whole article. If you don't need to pay for Red Hat support, you can open a free-of-charge developers' account.)</p>
+</blockquote>
+</blockquote>
+<p>Now, here's something that's extremely important. Always, <em>always</em>, configure <code>hosts.allow</code> before you configure <code>hosts.deny</code>. That's because as soon as you save either one of these files, the new configuration immediately takes effect. So, if you configure the blocking rule in <code>hosts.deny</code> while logged in remotely, your SSH connection will break just as soon as you save the file. The only way to get back in will be to enter the server room and reconfigure things from the local console. Your best bet is to get used to the idea of always configuring <code>hosts.allow</code> first, even when you're working from the local console. That way, you'll always be sure. (Amazingly, though, there are other TCP Wrappers tutorials out there that tell you to configure <code>hosts.deny</code> first. What <em>are</em> these guys thinking?)</p>
+<p>You can do some rather fancy tricks with TCP Wrappers, but for now, I just want to keep things simple. So, let's look at some of the most-used configurations.</p>
+<p>To whitelist a single IP address, place a line like this into the <code>/etc/hosts.allow</code> file:</p>
+<div class="C0-SHConPACKT">
+<pre><code>SSHD: 192.168.0.225</code></pre>
+</div>
+<p>Then, place this line into the <code>/etc/hosts.deny</code> file:</p>
+<div class="C0-SHConPACKT">
+<pre><code>SSHD: ALL</code></pre>
+</div>
+<p>Now, if you try to log in from anywhere else besides the IP address that's listed in <code>hosts.allow</code>, you will be denied access.</p>
+<p>You can also list either multiple IP addresses or network addresses in <code>hosts.allow</code>. For details on how to do this, see the <code>hosts.allow</code> man page.</p>
+<p>As I mentioned previously, you can do some fancy things with TCP Wrappers. But, now that the Red Hat folk have deprecated it, you should probably get used to the idea of either setting up firewall rules or configuring the <code>sshd_config</code> file. On the other hand, TCP Wrappers could come in handy whenever you need to configure an access control rule very quickly, provided that you’re on a machine that supports it.</p>
+</section>
+</section>
+<section id="configuring-automatic-logouts-and-security-banners" class="level2" data-number="8.5">
+<h2 data-number="8.5">Configuring automatic logouts and security banners</h2>
+<p>Best security practice dictates that people log out of their computers before they walk away from their desks. This is especially important when an administrator uses his or her cubicle computer to remotely log into a sensitive server. By default, SSH allows a person to remain logged in forever without complaining. However, you can set it up to automatically log out idle users. We'll look at two quick methods for doing that.</p>
+<section id="configuring-automatic-logout-for-both-local-and-remote-users" class="level3" data-number="8.5.1">
+<h3 data-number="8.5.1">Configuring automatic logout for both local and remote users</h3>
+<p>This first method will automatically log out idle users who are logged on either at the local console or remotely via SSH. Go into the <code>/etc/profile.d/</code> directory and create the <code>autologout.sh</code> file with the following contents:</p>
+<div class="C0-SHConPACKT">
+<pre><code>TMOUT=100
+readonly TMOUT
+export TMOUT</code></pre>
+</div>
+<p>This sets a timeout value of 100 seconds. (<code>TMOUT</code> is a Linux environmental variable that sets timeout values.)</p>
+<p>Set the executable permission for everybody:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo chmod +x autologout.sh</code></pre>
+</div>
+<p>Log out and then log back in. Then, let the VM sit idle. After 100 seconds, you should see that the VM is back at the login prompt. Note, though, that if any users are already logged in at the time you create this file, the new configuration won't take effect for them until they log out and then log back in.</p>
+</section>
+<section id="configuring-automatic-logout-in-sshd_config" class="level3" data-number="8.5.2">
+<h3 data-number="8.5.2">Configuring automatic logout in sshd_config</h3>
+<p>The second method only logs out users who are logged in remotely via SSH. Instead of creating the <code>/etc/profile.d/autologout.sh</code> file, look for these two lines in the <code>/etc/ssh/sshd_config</code> file:</p>
+<div class="C0-SHConPACKT">
+<pre><code>#ClientAliveInterval 0
+#ClientAliveCountMax 3</code></pre>
+</div>
+<p>Change them to the following:</p>
+<div class="C0-SHConPACKT">
+<pre><code>ClientAliveInterval 100
+ClientAliveCountMax 0</code></pre>
+</div>
+<p>Then, restart or reload the SSH service to make the change take effect.</p>
+<blockquote>
+<p>I've been using 100 seconds for the timeout value in both of these examples. However, you can set the timeout value to suit your own needs.</p>
+</blockquote>
+<p>You now know how to automatically log out your users. Now, let's look at setting up security banners.</p>
+</section>
+<section id="creating-a-pre-login-security-banner" class="level3" data-number="8.5.3">
+<h3 data-number="8.5.3">Creating a pre-login security banner</h3>
+<p>In <em>Chapter 3</em>, <em>Securing Normal User Accounts</em>, I showed you how to create a security message that shows up <em>after</em> a user has logged in. You do this by inserting a message into the <code>/etc/motd</code> file. But, when you think about it, wouldn't it be better for people to see a security banner <em>before</em> they log in? You can do that with <code>sshd_config</code>.</p>
+<p>First, let's create the <code>/etc/ssh/sshd-banner</code> file, with the following contents:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Warning!!  Authorized users only.  All others will be prosecuted.</code></pre>
+</div>
+<p>In the <code>/etc/ssh/sshd_config</code> file, look for this line:</p>
+<div class="C0-SHConPACKT">
+<pre><code>#Banner none</code></pre>
+</div>
+<p>Change it to this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Banner /etc/ssh/sshd-banner</code></pre>
+</div>
+<p>As always, restart or reload the SSH service. Now, whoever logs in remotely will see something like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@fedora-teaching ~]$ ssh donnie@192.168.0.3
+Warning!!  Authorized users only.  All others will be prosecuted.
+donnie@192.168.0.3&#39;s password: 
+Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 4.15.0-64-generic x86_64)
+. . .
+. . .</code></pre>
+</div>
+<p>So, will this banner keep your system safe and secure from the bad guys? No, but it could be useful if you ever have to take a case to court. Sometimes, it's important to show a judge and jury that the intruders knew that they were going where they don't belong.</p>
+<p>Now that you know how to set up security banners and automatic logouts, let's look at a few miscellaneous settings that don't fit neatly into any one category.</p>
+</section>
+</section>
+<section id="configuring-other-miscellaneous-security-settings" class="level2" data-number="8.6">
+<h2 data-number="8.6">Configuring other miscellaneous security settings</h2>
+<p>Our SSH configuration is a lot more secure than it used to be, but we can still make it better. Here are a few little tricks that you might not have seen elsewhere.</p>
+<section id="disabling-x11-forwarding" class="level3" data-number="8.6.1">
+<h3 data-number="8.6.1">Disabling X11 forwarding</h3>
+<p>When you SSH into a server in the normal manner, as we've been doing, you can only run text-mode programs. If you try to remotely run any GUI-based program, such as Firefox, you'll get an error message. But, when you open the <code>sshd_config</code> file of pretty much any Linux distribution, you'll see this line:</p>
+<div class="C0-SHConPACKT">
+<pre><code>X11Forwarding yes</code></pre>
+</div>
+<p>This means that with the right option switch, you can remotely run GUI-based programs. Assuming that you're logging into a machine that has a graphical desktop environment installed, you can use either the <code>-Y</code> or the <code>-X</code> option when logging in, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>ssh -X donnie@192.168.0.12</code></pre>
+</div>
+<p>or</p>
+<div class="C0-SHConPACKT">
+<pre><code>ssh -Y donnie@192.168.0.12</code></pre>
+</div>
+<p>The problem here is that the X11 protocol, which powers graphical desktop environments on most Linux and Unix systems, has a few security weaknesses that make it somewhat dangerous to use remotely. The bad guys have ways of using it to compromise an entire system. Your best bet is to disable it by changing the <code>X11Forwarding</code> line to look like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>X11Forwarding no</code></pre>
+</div>
+<p>As usual, restart or reload the SSH service to make it read in the new configuration.</p>
+<p>Now that you know about X11 forwarding, let's dig some tunnels.</p>
+</section>
+<section id="disabling-ssh-tunneling" class="level3" data-number="8.6.2">
+<h3 data-number="8.6.2">Disabling SSH tunneling</h3>
+<p>SSH tunneling, or as it's sometimes called, SSH port forwarding, is a handy way to protect non-secure protocols. For example, by tunneling normal HTTP through an SSH tunnel, you can access a non-secure website in a secure fashion. Here’s what that looks like:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo ssh -L 80:localhost:80 donnie@192.168.0.12</code></pre>
+</div>
+<p>I had to use <code>sudo</code> here because all network ports below port <code>1024</code> are <strong>privileged ports</strong>. If I were to change the web server configuration to listen on a non-privileged high-number port, I wouldn't need <code>sudo</code>.</p>
+<p>Now, to connect to this site in a secure manner, I can just open the web browser on my local machine and type in the following URL:</p>
+<p><code>http://localhost</code></p>
+<p>Yeah, it seems strange to access a remote machine by typing in <code>localhost</code>, but that's the designator I used when I logged in with SSH. I could have used another name, but <code>localhost</code> is the name you traditionally see in SSH tutorials, so I'm following suit here. Now, as soon as I log out of the SSH session, my connection to the web server will break.</p>
+<p>Even though this sounds like a good idea, it actually creates a security problem. Let's say that your corporate firewalls are set up to prevent people from going home and remotely logging into their company workstations. That's a good thing, right? Now, let's say that the company firewall has to allow outbound SSH connections. A user could create an SSH tunnel from his or her company workstation to a computer at another location, then go to that location and create a reverse tunnel back to the company workstation. So, if it isn't possible to block outgoing SSH traffic at the firewall, then your best bet is to disable SSH tunneling. In your <code>sshd_config</code> file, ensure that you have lines that look like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>AllowTcpForwarding no
+AllowStreamLocalForwarding no
+GatewayPorts no
+PermitTunnel no</code></pre>
+</div>
+<p>Restart or reload the SSH service, as always. Now, port tunneling will be disabled.</p>
+<p>Now that you know how to disable SSH tunneling, let's talk about changing the default port.</p>
+</section>
+<section id="changing-the-default-ssh-port" class="level3" data-number="8.6.3">
+<h3 data-number="8.6.3">Changing the default SSH port</h3>
+<p>By default, SSH listens on port <code>22/TCP</code>. If you've been around for a while, you've surely seen plenty of documentation about how important it is to use some other port in order to make it harder for the bad guys to find your SSH server. But, I must say, this notion is a bit controversial.</p>
+<p>In the first place, if you enable key authentication and disable password authentication, then changing the port has limited value. When a scanner bot finds your server and sees that password authentication is disabled, it will just go away and won't bother you anymore. In the second place, if you were to change the port, the bad guys' scanning tools can still find it. If you don't believe me, just go to Shodan.io and search for <code>ssh</code>. In this example, someone thought they were smart by changing to port <code>2211</code>:</p>
+<figure>
+<img src="../media/file50.png" />
+</figure>
+<p><em>Yeah, smarty-pants. That didn't hide things so well, now, did it?</em></p>
+<p>On the other hand, security expert Daniel Miessler says that it's still useful to change the port, in case someone tries to leverage a zero-day exploit against SSH. He recently published the results of an informal experiment that he did, in which he set up a public server that listens for SSH connections to both port <code>22</code> and port <code>24</code>, and observed the number of connection attempts to each port. He said that over a single weekend, there were 18,000 connections to port <code>22</code> and only five to port <code>24</code>. But, although he doesn't explicitly say, it appears that he left password authentication enabled. To have truly scientifically accurate results, he needs to conduct the same study with password authentication disabled. He also needs to conduct the study on separate servers that have SSH enabled for either port <code>22</code> or port <code>24</code>, instead of having both ports enabled on a single machine. My hunch is that when the scanner bots found that port <code>22</code> was open, they didn't bother to scan for any other open SSH ports.</p>
+<blockquote>
+<p>You can read about his experiment here: <a href="https://danielmiessler.com/study/security-by-obscurity/">https://danielmiessler.com/study/security-by-obscurity/</a>.</p>
+</blockquote>
+<p>Anyway, if you do want to change ports, just uncomment the <code>#Port 22</code> line in <code>sshd_config</code>, and change the port number to whatever you want.</p>
+<p>Next, let's talk about key management.</p>
+</section>
+<section id="managing-ssh-keys" class="level3" data-number="8.6.4">
+<h3 data-number="8.6.4">Managing SSH keys</h3>
+<p>Earlier, I showed you how to create a pair of keys on your local workstation, and then transfer the public key to a remote server. This allows you to disable username/password authentication on the server, making it much harder for the bad guys to break in. The only problem with this that we didn't address is that the public key goes into an <code>authorized_keys</code> file that's in the user's own home directory. So, the user can manually add extra keys to the file, which would allow the user to log in from other locations besides the one that's been authorized. And, there's also the problem of having <code>authorized_keys</code> files all over the place, in every user's home directory. That makes it a bit hard to keep track of everyone's keys.</p>
+<p>One way to handle this is to move everyone's <code>authorized_keys</code> file to one central location. Let's take Vicky, my 15-year old solid gray kitty. The administrator created an account on the server that she needs to access and allowed her to create and transfer her key to it before disabling password authentication. So, Vicky now has her <code>authorized_keys</code> file in her home directory on that server, as we see here:</p>
+<div class="C0-SHConPACKT">
+<pre><code>vicky@ubuntu-nftables:~$ cd .ssh
+vicky@ubuntu-nftables:~/.ssh$ ls -l
+total 4
+-rw------- 1 vicky vicky 233 Oct  3 18:24 authorized_keys
+vicky@ubuntu-nftables:~/.ssh$</code></pre>
+</div>
+<p>Vicky owns the file, and she has both read and write permissions on it. So, even though she can't transfer other keys to it the normal way once the administrator has disabled password authentication, she can still transfer key files manually, and manually edit the <code>authorized_keys</code> file to include them. To thwart her efforts, our intrepid administrator will create a directory within the <code>/etc/ssh/</code> directory to hold everyone's <code>authorized_keys</code> files, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo mkdir /etc/ssh/authorized-keys</code></pre>
+</div>
+<p>Our intrepid administrator's full admin privileges allow him to log into the root user's shell, which allows him to go into the directories of all other users:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu-nftables:~$ sudo su -
+[sudo] password for donnie: 
+root@ubuntu-nftables:~# cd /home/vicky/.ssh
+root@ubuntu-nftables:/home/vicky/.ssh# ls -l
+total 4
+-rw------- 1 vicky vicky 233 Oct 3 18:24 authorized_keys
+root@ubuntu-nftables:/home/vicky/.ssh#</code></pre>
+</div>
+<p>The next step is to move Vicky's <code>authorized_keys</code> file to the new location, changing its name to <code>vicky</code>, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>root@ubuntu-nftables:/home/vicky/.ssh# mv authorized_keys /etc/ssh/authorized-keys/vicky
+root@ubuntu-nftables:/home/vicky/.ssh# exit
+donnie@ubuntu-nftables:~$</code></pre>
+</div>
+<p>Now, we have a bit of a conundrum. As you see here, the file still belongs to Vicky, and she has both read and write privileges. So, she can still edit the file without any administrator privileges. Removing the write privilege won't work, because since the file belongs to her, she could just add the write privilege back. Changing ownership to the root user is part of the answer, but that will prevent Vicky from being able to read the file, which will prevent her from logging in. To see the whole solution, let's see what I've already done with my own <code>authorized_keys</code> file:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu-nftables:~$ cd /etc/ssh/authorized-keys/
+donnie@ubuntu-nftables:/etc/ssh/authorized-keys$ ls -l
+total 8
+-rw------- 1 vicky vicky 233 Oct 3 18:24 vicky
+-rw-r-----+ 1 root root 406 Oct 3 16:24 donnie
+donnie@ubuntu-nftables:/etc/ssh/authorized-keys$</code></pre>
+</div>
+<p>The eagle-eyed among you have surely noticed what's going on with the <code>donnie</code> file. You have seen that I changed ownership to the root user and then added an access control list, as indicated by the <code>+</code> sign. Let's do the same for Vicky:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu-nftables:/etc/ssh/authorized-keys$ sudo chown root: vicky
+donnie@ubuntu-nftables:/etc/ssh/authorized-keys$ sudo setfacl -m u:vicky:r vicky 
+donnie@ubuntu-nftables:/etc/ssh/authorized-keys$</code></pre>
+</div>
+<p>Looking at the permissions settings, we see that Vicky has read access to the <code>vicky</code> file:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu-nftables:/etc/ssh/authorized-keys$ ls -l 
+total 8
+-rw-r-----+ 1 root root 406 Oct 3 16:24 donnie
+-rw-r-----+ 1 root root 233 Oct 3 18:53 vicky
+donnie@ubuntu-nftables:/etc/ssh/authorized-keys$</code></pre>
+</div>
+<p>While we're at it, let's look at her access control list:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu-nftables:/etc/ssh/authorized-keys$ getfacl vicky
+# file: vicky
+# owner: root
+# group: root
+user::rw-
+user:vicky:r--
+group::---
+mask::r--
+other::---
+donnie@ubuntu-nftables:/etc/ssh/authorized-keys$</code></pre>
+</div>
+<p>Vicky can now read the file so that she can log in, but she can't change it.</p>
+<p>The final step is to reconfigure the <code>sshd_config</code> file, and then restart or reload the SSH service. Open the file in your text editor and look for this line:</p>
+<div class="C0-SHConPACKT">
+<pre><code>#AuthorizedKeysFile     .ssh/authorized_keys .ssh/authorized_keys2</code></pre>
+</div>
+<p>Change it to this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>AuthorizedKeysFile      /etc/ssh/authorized-keys/%u</code></pre>
+</div>
+<p>The <code>%u</code> at the end of the line is a mini-macro that tells the SSH service to look for a keys file that has the same name as the user who's logging in. Now, even if the users were to manually create their own <code>authorized_keys</code> files in their own home directories, the SSH service would just ignore them. Another benefit is that having the keys all in one place makes it a bit easier for an administrator to revoke someone's access, should the need arise.</p>
+<p>Be aware that there's a lot more to managing SSH keys than what I've been able to present here. One problem is that while there are a few different free open source software solutions for managing public keys, there aren't any for managing private keys. A large corporation could have thousands or perhaps even millions of private and public keys in different places. Those keys never expire, so they'll be around forever unless they get deleted. If the wrong people get hold of a private key, your whole system could become compromised. As much as I hate to say it, your best bet for managing SSH keys is to go with a commercial solution, such as ones from SSH.com and CyberArk.</p>
+<blockquote>
+<p>Check out the key management solutions from SSH.com here: <a href="https://www.ssh.com/academy/iam/ssh-key-management">https://www.ssh.com/academy/iam/ssh-key-management</a>.</p>
+<blockquote>
+<p>Head here for CyberArk's key management solutions: <a href="https://www.cyberark.com/resources/blog/ssh-keys-the-powerful-unprotected-privileged-credentials">https://www.cyberark.com/resources/blog/ssh-keys-the-powerful-unprotected-privileged-credentials</a>.</p>
+</blockquote>
+<blockquote>
+<p>Full disclosure: I have no connection with either SSH.com or CyberArk, and receive no payment for telling you about them.</p>
+</blockquote>
+</blockquote>
+<p>You've learned several cool tricks here for beefing up your server security. Now, let's look at how to create different configurations for different users and groups.</p>
+</section>
+<section id="setting-different-configurations-for-different-users-and-groups" class="level3" data-number="8.6.5">
+<h3 data-number="8.6.5">Setting different configurations for different users and groups</h3>
+<p>On the server side, you can use the <code>Match User</code> or <code>Match Group</code> directive to set up custom configurations for certain users or groups. To see how it's done, look at the example at the very bottom of the <code>/etc/ssh/sshd_config</code> file. There, you'll see the following:</p>
+<div class="C0-SHConPACKT">
+<pre><code># Match User anoncvs
+# X11Forwarding no
+# AllowTcpForwarding no
+# PermitTTY no
+# ForceCommand cvs server</code></pre>
+</div>
+<p>Of course, this has no effect since it's commented out, but that's okay. Here's what we see for user <code>anoncvs</code>:</p>
+<ul>
+<li>He can't do <strong>X11 Forwarding</strong>.</li>
+<li>He can't do <strong>TCP Forwarding</strong>.</li>
+<li>He won't have the use of a command terminal.</li>
+</ul>
+<p>As soon as he logs in, he'll be starting the <strong>Concurrent Versioning Service</strong> (<strong>CVS</strong>) server. By not having use of the terminal, <code>anoncvs</code> can start the CVS server, but can't do anything else.</p>
+<p>You can set up different configurations for as many users as you need to. Anything that you put in the custom configurations will override the global settings. To set up a custom configuration for a group, just replace <code>Match User</code> with <code>Match Group</code>, and supply a group name instead of a user name.</p>
+</section>
+<section id="creating-different-configurations-for-different-hosts" class="level3" data-number="8.6.6">
+<h3 data-number="8.6.6">Creating different configurations for different hosts</h3>
+<p>For a change of pace, let's look at the client's end now. This time, we'll look at a handy trick to help ease the pain of logging into different servers that require different keys or SSH options. All you have to do is go into the <code>.ssh</code> directory in your own home directory and create a <code>config</code> file. To demonstrate this, let's say that we've created either a DNS record or an <code>/etc/hosts</code> file entry for our servers so that we don't have to remember so many IP addresses. Let's also say that we've created a separate pair of keys for each server that we need to access. In the <code>~/.ssh/config</code> file, we can add a stanza that looks something like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Host ubuntu-nftables
+ IdentityFile ~/.ssh/unft_id_rsa
+ IdentitiesOnly yes
+ ForwardX11 yes
+ Cipher aes256-gcm@openssh.com</code></pre>
+</div>
+<p>Here's the breakdown:</p>
+<ul>
+<li><strong>IdentityFile</strong>: This specifies the key that goes with this server.</li>
+<li><strong>IdentitiesOnly yes</strong>: If you happen to have more than one key loaded into your session keyring, this forces your client to only use the key that's specified here.</li>
+<li><strong>ForwardX11 yes</strong>: We want this client to use <em>X11</em> forwarding. (Of course, this will only be effective if the server has been configured to allow it.)</li>
+<li><strong>Cipher aes256-gcm@openssh.com</strong>: We want to use this algorithm, and <em>only</em> this algorithm, to perform our encryption.</li>
+</ul>
+<p>To create custom configurations for other hosts, just add a stanza for each one to this file.</p>
+<p>After you save the file, you have to change its permissions settings to a value of <code>600</code>. If you don't, you'll get an error when you try to log into any of the servers that are configured in the file.</p>
+<p>Now that you know about custom configurations, let's talk about SFTP, where we'll make good use of the <code>Match Group</code> directive that we just looked at.</p>
+</section>
+</section>
+<section id="setting-up-a-chroot-environment-for-sftp-users" class="level2" data-number="8.7">
+<h2 data-number="8.7">Setting up a chroot environment for SFTP users</h2>
+<p><strong>Secure File Transfer Protocol</strong> (<strong>SFTP</strong>) is a great tool for performing secure file transfers. There is a command-line client, but users will most likely use a graphical client, such as FileZilla. With a default SSH setup, anyone who has a user account on a Linux machine can log in through either SSH or SFTP and can navigate through the server's entire filesystem. What we really want for SFTP users is to prevent them from logging into a command prompt via SSH, and to confine them to their own designated directories.</p>
+<blockquote>
+<p><strong>Tip</strong></p>
+<blockquote>
+<p>One good use for this trick would be to set up SFTP configurations for web site creators. Instead of allowing these users to transfer files to and from only their own home directories, just allow them to transfer files to and from the web site content directories.</p>
+</blockquote>
+</blockquote>
+<section id="creating-a-group-and-configuring-the-sshd_config-file" class="level3" data-number="8.7.1">
+<h3 data-number="8.7.1">Creating a group and configuring the sshd_config file</h3>
+<p>With the exception of the slight difference in user-creation commands, this procedure works the same on any of your VMs.</p>
+<p>We'll begin by creating an <code>sftpusers</code> group:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo groupadd sftpusers</code></pre>
+</div>
+<p>Create the user accounts and add them to the <code>sftpusers</code> group. We'll do both operations in one step. On your CentOS or AlmaLinux machine, the commands for creating Max's account would look like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo useradd -G sftpusers max
+sudo passwd max</code></pre>
+</div>
+<p>On your Ubuntu machine, it would look like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo useradd -m -d /home/max -s /bin/bash -G sftpusers max</code></pre>
+</div>
+<p>Open the <code>/etc/ssh/sshd_config</code> file in your favorite text editor. Find the line that says this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Subsystem sftp /usr/lib/openssh/sftp-server</code></pre>
+</div>
+<p>Change it to this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Subsystem sftp internal-sftp</code></pre>
+</div>
+<p>This setting allows you to disable normal SSH login for certain users.</p>
+<p>At the bottom of the <code>sshd_config</code> file, add a <code>Match Group</code> stanza:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Match Group sftpusers
+        ChrootDirectory /home
+        AllowTCPForwarding no
+        AllowAgentForwarding no
+        X11Forwarding no
+        ForceCommand internal-sftp</code></pre>
+</div>
+<p>An important consideration here is that the <code>ChrootDirectory</code> has to be owned by the root user, and it can't be writable by anyone other than the root user. When Max logs in, he'll be in the <code>/home/</code> directory, and will then have to <code>cd</code> into his own directory. This also means that you want all your users' home directories to have the restrictive <code>700</code> permissions settings, in order to keep everyone out of everyone else's stuff.</p>
+<p>Save the file and restart the SSH daemon. Then, try to log on as Max through normal SSH, just to see what happens:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; ssh max@192.168.0.8
+max@192.168.0.8&#39;s password:
+This service allows sftp connections only.
+Connection to 192.168.0.8 closed.
+donnie@linux-0ro8:~&gt;</code></pre>
+</div>
+<p>Okay, so he can't do that. Now, let's have Max try to log in through SFTP and verify that he is in the <code>/home/</code> directory:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@linux-0ro8:~&gt; sftp max@192.168.0.8
+max@192.168.0.8&#39;s password:
+Connected to 192.168.0.8.
+drwx------    7 1000     1000         4096 Nov  4 22:53 donnie
+drwx------    5 1001     1001         4096 Oct 27 23:34 frank
+drwx------    3 1003     1004         4096 Nov  4 22:43 katelyn
+drwx------    2 1002     1003         4096 Nov  4 22:37 max
+sftp&gt;</code></pre>
+</div>
+<p>Now, let's see him try to <code>cd</code> out of the <code>/home/</code> directory:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sftp&gt; cd /etc
+Couldn&#39;t stat remote file: No such file or directory
+sftp&gt;</code></pre>
+</div>
+<p>So, our chroot jail does indeed work.</p>
+<section id="hands-on-lab-setting-up-a-chroot-directory-for-the-sftpusers-group" class="level4" data-number="8.7.1.1">
+<h4 data-number="8.7.1.1">Hands-on lab – setting up a chroot directory for the sftpusers group</h4>
+<p>For this lab, you can use either the CentOS VM or the Ubuntu VM. You'll add a group, then configure the <code>sshd_config</code> file to allow group members to only be able to log in via SFTP, and then confine them to their own directories. For the simulated client machine, you can use the terminal of your macOS or Linux desktop machine, or any of the available Bash shells from your Windows machine. Let's get started:</p>
+<ol>
+<li>Create the <code>sftpusers</code> group:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo groupadd sftpusers</code></pre>
+</div>
+<ol>
+<li>Create a user account for Max and add him to the <code>sftpusers</code> group. On CentOS or AlmaLinux, do this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo useradd -G sftpusers max
+sudo passwd max</code></pre>
+</div>
+<p>On Ubuntu, do this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo useradd -m -d /home/max -s /bin/bash -G sftpusers max</code></pre>
+</div>
+<ol>
+<li>For Ubuntu, ensure that the users' home directories are all set with read, write, and execute permissions for only the directory's user. If that's not the case, do this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo chmod 700 /home/*</code></pre>
+</div>
+<ol>
+<li>Open the <code>/etc/ssh/sshd_config</code> file in your preferred text editor. Find the line that says the following:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>Subsystem sftp /usr/lib/openssh/sftp-server</code></pre>
+</div>
+<p>Change it to the following:</p>
+<div class="C1-SHConPACKT">
+<pre><code>Subsystem sftp internal-sftp</code></pre>
+</div>
+<ol>
+<li>At the end of the <code>sshd_config</code> file, add this stanza:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>Match Group sftpusers
+     ChrootDirectory /home
+     AllowTCPForwarding no
+     AllowAgentForwarding no
+     X11Forwarding no
+     ForceCommand internal-sftp</code></pre>
+</div>
+<ol>
+<li>Reload the SSH configuration. On CentOS or AlmaLinux, do this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl reload sshd</code></pre>
+</div>
+<p>On Ubuntu, do this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo systemctl reload ssh</code></pre>
+</div>
+<ol>
+<li>Have Max try to log in through normal SSH, to see what happens:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>ssh max@IP_Address_of_your_vm</code></pre>
+</div>
+<ol>
+<li>Now, have Max log in through SFTP. Once he's in, have him try to <code>cd</code> out of the <code>/home/</code> directory:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sftp max@IP_Address_of_your_vm</code></pre>
+</div>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>Now that you know how to securely configure SFTP, let's look at how to securely share a directory.</p>
+</section>
+</section>
+</section>
+<section id="sharing-a-directory-with-sshfs" class="level2" data-number="8.8">
+<h2 data-number="8.8">Sharing a directory with SSHFS</h2>
+<p>There are several ways to share a directory across a network. In enterprise settings, you'll find the <strong>Network Filesystem</strong> (<strong>NFS</strong>), <strong>Samba</strong>, and various distributed filesystems. <strong>SSHFS</strong> isn't used in enterprises quite as much, but it can still come in handy. The beauty of it is that all of its network traffic is encrypted by default, unlike with NFS or Samba. And, other than installing the SSHFS client program and creating a local mount-point directory, it doesn't require any configuration beyond what you've already done. It's especially handy for accessing a directory on a cloud-based <strong>Virtual Private Server</strong> (<strong>VPS</strong>) because it allows you to just create files in the shared directory rather than using <code>scp</code> or <code>sftp</code> commands to transfer the files. So, if you're ready, let's jump in.</p>
+<section id="hands-on-lab-sharing-a-directory-with-sshfs" class="level3" data-number="8.8.1">
+<h3 data-number="8.8.1">Hands-on lab – sharing a directory with SSHFS</h3>
+<p>For this lab, we'll use two VMs. For the server, you can use any of your virtual machines. The same is true of the client, except that each distro has the the SSHFS client in a different repository. Here’s what I’m talking about:</p>
+<ul>
+<li>The client is in the normal Ubuntu repositories, so you don’t have to do anything special to get it.</li>
+<li>For CentOS 7 and AlmaLinux 9, you’ll need to install the <code>epel-release</code> package with the normal <code>yum install</code> or <code>dnf install </code>command.</li>
+<li>AlmaLinux 8 has the SSHFS client in its own PowerTools repository, which isn’t enabled by default. To enable it, open the <code>/etc/yum.repos.d/almalinux-powertools.repo</code> file in your favorite text editor. In the <code>[powertools]</code> section, find the line that says <code>enabled=0</code>, and change it to <code>enabled=1</code>.</li>
+</ul>
+<p>Now that we have all that straight, let's get started:</p>
+<ol>
+<li>Boot up one VM for a server. (That's all you need to do for the server end.)</li>
+<li>On the other VM that you'll use as a client, create a mount-point directory within your own home directory, like so:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>mkdir remote</code></pre>
+</div>
+<ol>
+<li>On the client VM, install the SSHFS client. On Ubuntu, do this:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo apt install sshfs</code></pre>
+</div>
+<p>On CentOS 7, do this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo yum install fuse-sshfs</code></pre>
+</div>
+<p>On AlmaLinux 8 or 9, do this:</p>
+<div class="C1-SHConPACKT">
+<pre><code>sudo dnf install fuse-sshfs</code></pre>
+</div>
+<ol>
+<li>From the client machine, mount your own home directory that's on the server:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sshfs donnie@192.168.0.10: /home/donnie/remote</code></pre>
+</div>
+<blockquote>
+<p>Note that if you don't specify a directory to share, the default is to share the home directory of the user account that's being used for logging in.</p>
+</blockquote>
+<ol>
+<li>Verify that the directory was mounted properly with the <code>mount</code> command. You should see your new shared mount at the bottom of the output:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>donnie@ubuntu-nftables:~$ mount
+. . .
+. . .
+donnie@192.168.0.10: on /home/donnie/remote type fuse.sshfs (rw,nosuid,nodev,relatime,user_id=1000,group_id=1004)</code></pre>
+</div>
+<ol>
+<li><code>cd</code> into the <code>remote</code> directory and create some files. Verify that they actually do show up on the server.</li>
+<li>At the local console of the server VM, create some files in your own home directory. Verify that they show up in the <code>remote/</code> directory of your client VM.</li>
+</ol>
+<p>You've reached the end of the lab – congratulations!</p>
+<p>With this lab, I just showed you how to mount your own home directory from a remote server. You can also mount other server directories by specifying them in the <code>sshfs</code> command. For example, let's say that I want to mount the <code>/maggie_files/ </code>directory, with the <code>~/remote3/</code> directory as my local mount-point. (I chose that name because Maggie cat is sitting here in front of me where my keyboard should be.) Just do it like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sshfs donnie@192.168.0.53:/maggie_files /home/donnie/remote3</code></pre>
+</div>
+<p>You can also make the remote directory automatically mount every time you boot your client machine by adding an entry to the <code>/etc/fstab</code> file. But, that's generally not a good idea. If the server isn't available when you boot the client machine, it could cause the boot process to hang up.</p>
+<p>Okay, so you've seen how to use SSHFS to create an encrypted connection with a shared remote directory. Let's now log into the server from a Windows desktop machine.</p>
+</section>
+</section>
+<section id="remotely-connecting-from-windows-desktops" class="level2" data-number="8.9">
+<h2 data-number="8.9">Remotely connecting from Windows desktops</h2>
+<p>I know, all of us Penguinistas would like to use Linux, and nothing but Linux. But, in an enterprise environment, things just don't always work that way. There, you'll most likely have to administer your Linux servers from a Windows 10/11 desktop machine that's sitting on your cubicle desk. In <em>Chapter 1</em>, <em>Running Linux in a Virtual Environment</em>, I showed you how to use either Cygwin or the new Windows 10/11 shell to remotely connect to your Linux VMs. You can also use these techniques to connect to actual Linux servers.</p>
+<p>But, some shops require that admins use a terminal program, rather than a full-blown Bash Shell such as Cygwin. Normally, these shops will require that you use <strong>PuTTY</strong> on your Windows machine.</p>
+<blockquote>
+<p>PuTTY is a free program that you can download from here: <a href="https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html">https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html</a>.</p>
+</blockquote>
+<p>Installation is simple. Just double-click the installer file and follow through the installer screens:</p>
+<figure>
+<img src="../media/file51.png" />
+</figure>
+<p>You can open the PuTTY user manual from your Windows 10/11 Start menu:</p>
+<figure>
+<img src="../media/file52.png" />
+</figure>
+<p>Connecting to a remote Linux machine is easy. Just enter the machine's IP address and click on <strong>Open</strong>:</p>
+<figure>
+<img src="../media/file53.png" />
+</figure>
+<p>Note that this also gives you the option to save your sessions. So, if you have to administer multiple servers, you can open PuTTY and just click on the name of the server that you want to connect to, and then click on <strong>Open</strong>:</p>
+<figure>
+<img src="../media/file54.png" />
+</figure>
+<p>As you can see, this is a lot handier than having to manually type in the <code>ssh</code> command every time you need to log into a server, and it prevents you from having to remember a whole list of IP addresses for multiple servers. (But of course, you can accomplish the same thing with either Cygwin or a Windows 10 shell by creating a login shell script for each Linux machine that you need to administer.)</p>
+<p>Either way, you'll end up at the remote machine's Bash Shell:</p>
+<figure>
+<img src="../media/file55.png" />
+</figure>
+<p>To set up key-exchange authentication, use PuTTYgen to create the key pair. The only slight catch is that you'll have to transfer the public key to the server by manually copying and pasting the key into the server's <code>authorized_keys</code> file:</p>
+<figure>
+<img src="../media/file56.png" />
+</figure>
+<p>I've given you the basics about PuTTY. You can read the PuTTY manual to get the nitty-gritty details.</p>
+<p>Okay, I think that that about wraps things up for our discussion of the Secure Shell suite.</p>
+</section>
+<section id="summary-6" class="level2" data-number="8.10">
+<h2 data-number="8.10">Summary</h2>
+<p>In this chapter, we've seen that a default configuration of Secure Shell isn't as secure as we'd like it to be, and we've seen what to do about it. We've looked at how to set up key-based authentication and two-factor authentication, and we've looked at lots of different options that can lock down the SSH server. We also looked at how to disable weak encryption algorithms, and at how the new system-wide crypto policies on RHEL 8/CentOS 8 and RHEL 9/AlmaLinux 9 make doing that really easy. Along the way, we looked at setting up access controls, and at creating different configurations for different users, groups, and hosts. After demoing how to confine SFTP users to their own home directories, we used SSHFS to share a remote directory. We wrapped up this chapter by presenting a handy way to log into our Linux servers from a Windows desktop machine.</p>
+<p>Conspicuous by their absence are a couple of technologies that you may have seen recommended elsewhere. Port knocking and Fail2Ban are two popular technologies that can help control access to an SSH server. However, they're only needed if you allow password-based authentication to your SSH server. If you set up key-based authentication, as I've shown you here, you won't need the added complexity of those other solutions.</p>
+<p>In the next chapter, we'll take an in-depth look at the subject of discretionary access control. I'll see you there.</p>
+</section>
+<section id="questions-6" class="level2" data-number="8.11">
+<h2 data-number="8.11">Questions</h2>
+<ol>
+<li>Which of the following statements is true?</li>
+</ol>
+<p>A. Secure Shell is completely secure in its default configuration.</p>
+<p>B. It's safe to allow the root user to use Secure Shell to log in across the Internet.</p>
+<p>C. Secure Shell is insecure in its default configuration.</p>
+<p>D. The most secure way to use Secure Shell is to log in with a username and password.</p>
+<ol>
+<li>Which three of the following things would you do to conform with the best security practices for Secure Shell?</li>
+</ol>
+<p>A. Make sure that all users are using strong passwords to log in via Secure Shell.</p>
+<p>B. Have all users create a public/private key pair, and transfer their public keys to the server to which they want to log in.</p>
+<p>C. Disable the ability to log in via username/password.</p>
+<p>D. Ensure that the root user is using a strong password.</p>
+<p>E. Disable the root user's ability to log in.</p>
+<ol>
+<li>Which one of the following lines in the <code>sshd_config</code> file will cause botnets to not scan your system for login vulnerabilities?</li>
+</ol>
+<p>A. <code>PasswordAuthentication no</code></p>
+<p>B. <code>PasswordAuthentication yes</code></p>
+<p>C. <code>PermitRootLogin yes</code></p>
+<p>D. <code>PermitRootLogin no</code></p>
+<ol>
+<li>How would you confine a user of SFTP to his or her own specified directory?</li>
+</ol>
+<p>A. Ensure that proper ownership and permissions are set on that user's directory.</p>
+<p>B. In the <code>sshd_config</code> file, disable that user's ability to log in via normal SSH and define a <code>chroot</code> directory for that user.</p>
+<p>C. Define the user's limitations with TCP Wrappers.</p>
+<p>D. Use whole-disk encryption on the server so that SFTP users will only be able to access their own directories.</p>
+<ol>
+<li>Which two of the following commands would you use to add your private SSH key to your session keyring?</li>
+</ol>
+<p>A. <code>ssh-copy-id</code></p>
+<p>B. <code>exec /usr/bin/ssh-agent</code></p>
+<p>C. <code>exec /usr/bin/ssh-agent $SHELL</code></p>
+<p>D. <code>ssh-agent</code></p>
+<p>E. <code>ssh-agent $SHELL</code></p>
+<p>F. <code>ssh-add</code></p>
+<ol>
+<li>Which of the following is <em>not</em> on NIST's list of recommended algorithms?</li>
+</ol>
+<p>A. <code>RSA</code></p>
+<p>B. <code>ECDSA</code></p>
+<p>C. <code>Ed25519</code></p>
+<ol>
+<li>Which of the following is the correct directive for creating a custom configuration for Katelyn?</li>
+</ol>
+<p>A. <code>User Match katelyn</code></p>
+<p>B. <code>Match katelyn</code></p>
+<p>C. <code>Match Account katelyn</code></p>
+<p>D. <code>Match User katelyn</code></p>
+<ol>
+<li>When creating a <code>~/.ssh/config</code> file, what should the permissions value on that file be?</li>
+</ol>
+<p>A. <code>600</code></p>
+<p>B. <code>640</code></p>
+<p>C. <code>644</code></p>
+<p>D. <code>700</code></p>
+<ol>
+<li>Which of the following crypto policies provides the strongest encryption on RHEL 8/9-type distros?</li>
+</ol>
+<p>A. <code>LEGACY</code></p>
+<p>B. <code>FIPS</code></p>
+<p>C. <code>DEFAULT</code></p>
+<p>D. <code>FUTURE</code></p>
+<ol>
+<li>Which of the following standards defines NIST's current recommendations for encryption algorithms?</li>
+</ol>
+<p>A. FIPS 140-2</p>
+<p>B. FIPS 140-3</p>
+<p>C. CNSA</p>
+<p>D. Suite B</p>
+</section>
+<section id="further-reading-6" class="level2" data-number="8.12">
+<h2 data-number="8.12">Further reading</h2>
+<ul>
+<li>How to set up SSH keys on Debian 10 Buster: <a href="https://devconnected.com/how-to-set-up-ssh-keys-on-debian-10-buster/">https://devconnected.com/how-to-set-up-ssh-keys-on-debian-10-buster/</a></li>
+<li>How to configure the OpenSSH Server: <a href="https://www.ssh.com/academy/ssh/sshd_config">https://www.ssh.com/academy/ssh/sshd_config</a></li>
+<li>Setting up passwordless SSH: <a href="https://www.redhat.com/sysadmin/passwordless-ssh">https://www.redhat.com/sysadmin/passwordless-ssh</a></li>
+<li>OpenSSH best practices for Unix, Linux, and BSD: <a href="https://www.cyberciti.biz/tips/linux-unix-bsd-openssh-server-best-practices.html">https://www.cyberciti.biz/tips/linux-unix-bsd-openssh-server-best-practices.html</a></li>
+<li>Different SSH configurations for different hosts: <a href="https://www.putorius.net/how-to-save-per-user-per-host-ssh-client-settings.html">https://www.putorius.net/how-to-save-per-user-per-host-ssh-client-settings.html</a></li>
+<li>SSH Query at Shodan: <a href="https://www.shodan.io/search?query=ssh">https://www.shodan.io/search?query=ssh</a></li>
+<li>Mozilla OpenSSH Security Guide: <a href="https://infosec.mozilla.org/guidelines/openssh">https://infosec.mozilla.org/guidelines/openssh</a></li>
+<li>Execute commands on a remote system over SSH: <a href="https://www.2daygeek.com/execute-run-linux-commands-remote-system-over-ssh/">https://www.2daygeek.com/execute-run-linux-commands-remote-system-over-ssh/</a></li>
+<li>CNSA Suite and Quantum Cryptography: <a href="https://cryptome.org/2016/01/CNSA-Suite-and-Quantum-Computing-FAQ.pdf">https://cryptome.org/2016/01/CNSA-Suite-and-Quantum-Computing-FAQ.pdf</a></li>
+<li>FIPS 140-3: <a href="https://csrc.nist.gov/projects/fips-140-3-transition-effort">https://csrc.nist.gov/projects/fips-140-3-transition-effort</a></li>
+<li>ChaCha20 and Poly1305: <a href="https://tools.ietf.org/html/rfc7539">https://tools.ietf.org/html/rfc7539</a></li>
+<li>System-wide cryptographic policies on Red Hat Enterprise Linux 8: <a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/security_hardening/using-the-system-wide-cryptographic-policies_security-hardening#system-wide-crypto-policies_using-the-system-wide-cryptographic-policies">https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/security_hardening/using-the-system-wide-cryptographic-policies_security-hardening#system-wide-crypto-policies_using-the-system-wide-cryptographic-policies</a></li>
+<li>How to log out inactive users in Linux: <a href="https://www.ostechnix.com/auto-logout-inactive-users-period-time-linux/">https://www.ostechnix.com/auto-logout-inactive-users-period-time-linux/</a></li>
+<li>Configure host-specific SSH settings: <a href="https://www.putorius.net/how-to-save-per-user-per-host-ssh-client-settings.html">https://www.putorius.net/how-to-save-per-user-per-host-ssh-client-settings.html</a></li>
+<li>How to use SSHFS to mount remote directories over SSH: <a href="https://linuxize.com/post/how-to-use-sshfs-to-mount-remote-directories-over-ssh/">https://linuxize.com/post/how-to-use-sshfs-to-mount-remote-directories-over-ssh/</a></li>
+</ul>
+</section>
+<section id="answers-4" class="level2" data-number="8.13">
+<h2 data-number="8.13">Answers</h2>
+<ol>
+<li>C</li>
+<li>B, C, E</li>
+<li>A</li>
+<li>B</li>
+<li>C, F</li>
+<li>C</li>
+<li>D</li>
+<li>A</li>
+<li>D</li>
+<li>C</li>
+</ol>
+</section>
+</section>
+</body>
+</html>

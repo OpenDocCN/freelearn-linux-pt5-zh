@@ -1,0 +1,1277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en-US">
+<head>
+<meta charset="utf-8"/>
+<meta name="generator" content="packt"/>
+<title>5 Securing Your Server with a Firewall - Part 2</title>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet1.css"/>
+<link rel="stylesheet" type="text/css" href="../styles/stylesheet2.css"/>
+
+</head>
+<body>
+<section id="securing-your-server-with-a-firewall---part-2" class="level1 pkt" data-number="6">
+<h1 data-number="6">5 Securing Your Server with a Firewall - Part 2</h1>
+<section id="join-our-book-community-on-discord-4" class="level2" data-number="6.1">
+<h2 data-number="6.1">Join our book community on Discord</h2>
+<p><a href="https://packt.link/SecNet">https://packt.link/SecNet</a></p>
+<figure>
+<img src="../media/file35.png" style="width:10em" />
+</figure>
+<p>In <em>Chapter 4</em>, <em>Securing Your Server with a Firewall - Part 1</em>, we covered iptables and nftables, which are management utilities that directly interface with netfilter. Although it’s helpful to be familiar with iptables and nftables commands in order to create advanced firewall configurations, having to use these commands all the time can become a bit unwieldy for performing normal day-to-day operations. In this chapter, we’ll look at ufw and firewalld, which are helper utilities that can simplify the process of working with either iptables or nftables.</p>
+<p>First, we'll look at ufw. We'll look at its structure, its commands, and its configuration. Then, we'll do the same for firewalld. In both cases, you'll get plenty of hands-on practice.</p>
+<p>We will cover the following topics in this chapter:</p>
+<ul>
+<li><strong>ufw</strong> for Ubuntu systems</li>
+<li><strong>firewalld</strong> for Red Hat systems</li>
+</ul>
+</section>
+<section id="technical-requirements-1" class="level2" data-number="6.2">
+<h2 data-number="6.2">Technical requirements</h2>
+<p>The code files for this chapter are available here: <a href="https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition.">https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition.</a></p>
+</section>
+<section id="uncomplicated-firewall-for-ubuntu-systems" class="level2" data-number="6.3">
+<h2 data-number="6.3">Uncomplicated firewall for Ubuntu systems</h2>
+<p>The ufw is already installed on Ubuntu 20.04 and Ubuntu 22.04. It still uses the iptables backend on Ubuntu 20.04, and the nftables backend on Ubuntu 22.04. For normal operations, it offers a vastly simplified set of commands. Perform just one simple command to open the desired ports and another simple command to activate it, and you have a good, basic firewall. Whenever you perform a <code>ufw</code> command, it will automatically configure both the IPv4 and the IPv6 rules. This alone is a huge time-saver, and much of what we've had to configure by hand with with either iptables or nftables is already there by default. Although our two versions of Ubuntu use different backends, ufw configuration is identical for both of them.</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>ufw is also available for Debian and other Debian-based distros, but it might not be installed. If that's the case, install it by issuing the <code>sudo apt install ufw</code> command.</p>
+</blockquote>
+</blockquote>
+<section id="configuring-ufw" class="level3" data-number="6.3.1">
+<h3 data-number="6.3.1">Configuring ufw</h3>
+<p>On both Ubuntu 20.04 and Ubuntu 22.04, the ufw service is already enabled by default, but the firewall itself isn't activated. In other words, the system's service is running, but it isn't enforcing any firewall rules yet. (I'll show you how to activate it in just a bit, after we go over how to open the ports that you need to open.) Check the ufw status with these two commands:</p>
+<div class="C0-SHConPACKT">
+<pre><code>systemctl status ufw
+sudo ufw status</code></pre>
+</div>
+<p>The systemctl command should show you that the service is enabled, and the ufw command should show you that the firewall is inactive.</p>
+<p>The first thing we want to do is open port <code>22</code> to allow it to connect to the machine via Secure Shell, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo ufw allow 22/tcp</code></pre>
+</div>
+<p>Okay, that looks good. Let’s now activate the firewall, like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo ufw enable</code></pre>
+</div>
+<p>By using <code>sudo iptables -L</code> on Ubuntu 20.04, you'll see that the new Secure Shell rule shows up in the <code>ufw-user-input</code> chain:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Chain ufw-user-input (1 references)
+ target prot opt source destination
+ ACCEPT tcp -- anywhere anywhere tcp dpt:ssh</code></pre>
+</div>
+<p>On Ubuntu 22.04, use the <code>sudo nft list ruleset</code> command to see the new rule in the <code>ufw-user-input</code> chain:</p>
+<div class="C0-SHConPACKT">
+<pre><code>chain ufw-user-input {
+        meta l4proto tcp tcp dport 22 counter packets 0 bytes 0 accept
+    }</code></pre>
+</div>
+<p>You'll also see that the total output of both of these commands is quite lengthy because so much of what we had to do with bare iptables or nftables has already been done for us with ufw. In fact, there's even more here than what we did with iptables and nftables. For example, with ufw, we already have rate limiting rules that help protect us against <strong>Denial-of-Service</strong> (<strong>DoS</strong>) attacks, and we also have rules that record log messages about packets that have been blocked. It's almost the no fuss, no muss way of setting up a firewall. (I'll get to that <em>almost</em> part in a bit.)</p>
+<p>In the preceding <code>sudo ufw allow 22/tcp</code> command, we had to specify the TCP protocol because TCP is all we need for Secure Shell. We can also open a port for both TCP and UDP just by not specifying a protocol. For example, if you're setting up a DNS server, you'll want to have port <code>53</code> open for both protocols. (You'll see the entries for port <code>53</code> listed as domain ports). On either version of Ubuntu, do:</p>
+<div class="C0-SHConPACKT">
+<pre><code> sudo ufw allow 53</code></pre>
+</div>
+<p>On Ubuntu 20.04, view the results by doing:</p>
+<div class="C0-SHConPACKT">
+<pre><code> sudo iptables -L
+. . .
+. . .
+    Chain ufw-user-input (1 references)
+    target prot opt source destination
+    ACCEPT tcp -- anywhere anywhere tcp dpt:ssh
+    ACCEPT tcp -- anywhere anywhere tcp dpt:domain
+    ACCEPT udp -- anywhere anywhere udp dpt:domain</code></pre>
+</div>
+<p>On Ubuntu 22.04, view the results by doing:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo nft list ruleset
+chain ufw-user-input {
+        meta l4proto tcp tcp dport 22 counter packets 0 bytes 0 accept
+        meta l4proto tcp tcp dport 53 counter packets 0 bytes 0 accept
+        meta l4proto udp udp dport 53 counter packets 0 bytes 0 accept
+    }</code></pre>
+</div>
+<p>If you do <code>sudo ip6tables -L</code> on the 20.04 machine,you'll see that a rule for IPv6 was also added for both of the two preceding examples. And, again, you'll see that most of what we had to do with the ip6tables commands has already been taken care of. (It's especially nice that we don't have to mess around with setting up all of those pesky ICMP rules.) On the 22.04 machine, the <code>sudo nft list ruleset</code> command that you did previously will show the IPv6 configuration in the <code>ufw6-user-input</code> stanza.</p>
+<p>To see just a quick summary of your firewall configuration, use the <code>status</code> option. The output should look something like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu-ufw:~$ sudo ufw status
+Status: active
+To                         Action      From
+--                         ------      ----
+22/tcp                     LIMIT       Anywhere                  
+53                         LIMIT       Anywhere                 
+22/tcp (v6)                LIMIT       Anywhere (v6)             
+53 (v6)                    LIMIT       Anywhere (v6)             
+          
+donnie@ubuntu-ufw:~$</code></pre>
+</div>
+<p>Next, we will look at the ufw configuration files.</p>
+</section>
+<section id="working-with-the-ufw-configuration-files" class="level3" data-number="6.3.2">
+<h3 data-number="6.3.2">Working with the ufw configuration files</h3>
+<p>You can find the ufw firewall rules in the <code>/etc/ufw/</code> directory. As you can see, the rules are stored in several different files:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@ubuntu-ufw:/etc/ufw$ ls -l
+total 48
+-rw-r----- 1 root root  915 Aug  7 15:23 after6.rules
+-rw-r----- 1 root root 1126 Jul 31 14:31 after.init
+-rw-r----- 1 root root 1004 Aug  7 15:23 after.rules
+drwxr-xr-x 3 root root 4096 Aug  7 16:45 applications.d
+-rw-r----- 1 root root 6700 Mar 25 17:14 before6.rules
+-rw-r----- 1 root root 1130 Jul 31 14:31 before.init
+-rw-r----- 1 root root 3467 Aug 11 11:36 before.rules
+-rw-r--r-- 1 root root 1391 Aug 15  2017 sysctl.conf
+-rw-r--r-- 1 root root  313 Aug 11 11:37 ufw.conf
+-rw-r----- 1 root root 3014 Aug 11 11:37 user6.rules
+-rw-r----- 1 root root 3012 Aug 11 11:37 user.rules
+donnie@ubuntu-ufw:/etc/ufw$</code></pre>
+</div>
+<p>At the bottom of the list, you'll see the <code>user6.rules</code> and <code>user.rules</code> files. You can't hand-edit either of these two files. You'll be able to save the files after you've made the edits, but when you use <code>sudo ufw reload</code> to load the new changes, you'll see that your edits have been deleted. Let's look into the <code>user.rules</code> file to see what we can see there.</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>As you’ll soon see, all of the files for both Ubuntu 20.04 and 22.04 contain firewall rules that are in the iptables format, even though 22.04 uses nftables as its backend. That’s because Ubuntu 22.04 can automatically translate iptables rules into nftables rules. So, the files for both 20.04 and 22.04 are identical, which makes things very easy for us.</p>
+</blockquote>
+</blockquote>
+<p>At the top of the file, you'll see the definition for the iptables filter table, as well as the list of its associated chains:</p>
+<div class="C0-SHConPACKT">
+<pre><code>*filter
+:ufw-user-input - [0:0]
+:ufw-user-output - [0:0]
+:ufw-user-forward - [0:0]
+. . .
+. . .</code></pre>
+</div>
+<p>Next, in the <code>### RULES ###</code> section, we have the list of rules that we created with the <code>ufw</code> command. Here's what our rules for opening the DNS ports look like:</p>
+<div class="C0-SHConPACKT">
+<pre><code>### tuple ### allow any 53 0.0.0.0/0 any 0.0.0.0/0 in
+-A ufw-user-input -p tcp --dport 53 -j ACCEPT
+-A ufw-user-input -p udp --dport 53 -j ACCEPT</code></pre>
+</div>
+<p>As you can see, ufw use iptables syntax for its configuration files, even on Ubuntu 22.04.</p>
+<p>Below the <code>### RULES ###</code> section, we see the rules for logging messages about any packets that the firewall has blocked:</p>
+<div class="C0-SHConPACKT">
+<pre><code>### LOGGING ###
+-A ufw-after-logging-input -j LOG --log-prefix &quot;[UFW BLOCK] &quot; -m limit --limit 3/min --limit-burst 10
+-A ufw-after-logging-forward -j LOG --log-prefix &quot;[UFW BLOCK] &quot; -m limit --limit 3/min --limit-burst 10
+-I ufw-logging-deny -m conntrack --ctstate INVALID -j RETURN -m limit --limit 3/min --limit-burst 10
+-A ufw-logging-deny -j LOG --log-prefix &quot;[UFW BLOCK] &quot; -m limit --limit 3/min --limit-burst 10
+-A ufw-logging-allow -j LOG --log-prefix &quot;[UFW ALLOW] &quot; -m limit --limit 3/min --limit-burst 10
+### END LOGGING ###</code></pre>
+</div>
+<p>These messages get sent to the <code>/var/log/kern.log</code> file. So that we don't overwhelm the logging system when lots of packets are getting blocked, we'll only send three messages per minute to the log file, with a burst rate of 10 messages per minute. Most of these rules will insert a <code>[UFW BLOCK]</code> tag in with the log message, which makes it easy for us to find them. The last rule creates messages with a <code>[UFW ALLOW]</code> tag, and curiously enough, the <code>INVALID</code> rule doesn't insert any kind of tag.</p>
+<p>Lastly, we have the rate-limiting rules, which allow only three connections per user, per minute:</p>
+<div class="C0-SHConPACKT">
+<pre><code>### RATE LIMITING ###
+-A ufw-user-limit -m limit --limit 3/minute -j LOG --log-prefix &quot;[UFW LIMIT BLOCK] &quot;
+-A ufw-user-limit -j REJECT
+-A ufw-user-limit-accept -j ACCEPT
+### END RATE LIMITING ###</code></pre>
+</div>
+<p>Any packets that exceed that limit will be recorded in the <code>/var/log/kern.log</code> file with the <code>[UFW LIMIT BLOCK]</code> tag.</p>
+<p>The <code>/etc/ufw user6.rules</code> file looks pretty much the same, except that it's for IPv6 rules. Any time you create or delete a rule with the <code>ufw</code> command, it will modify both the <code>user.rules</code> file and the <code>user6.rules</code> file.</p>
+<p>To store rules that will run before the rules in the <code>user.rules</code> and <code>user6.rules</code> files, we have the <code>before.rules</code> file and the <code>before6.rules</code> file. To store rules that will run after the rules in the <code>user.rules</code> and <code>user6.rules</code> files, we have – you guessed it – the <code>after.rules</code> file and the <code>after6.rules</code> file. If you need to add custom rules that you can't add with the <code>ufw</code> command, just hand-edit one of these pairs of files. (We'll get to that in a moment.)</p>
+<p>If you look at the <code>before</code> and <code>after</code> files, you'll see where so much has already been taken care of for us. This is all the stuff that we had to do by hand with either iptables/ip6tables or nftables.</p>
+<p>However, as you might know, there is one slight caveat to all this ufw goodness. You can perform simple tasks with the ufw utility, but anything more complex requires you to hand-edit a file. (This is what I meant when I said that ufw is <em>almost</em> no fuss, no muss.)</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>To see more examples of what you can do with the ufw command, view its man page by doing:</p>
+</blockquote>
+</blockquote>
+<div class="C0-SHConPACKT">
+<pre><code>man ufw</code></pre>
+</div>
+<p>For example, in the <code>before</code> files, you'll see that one of the rules for blocking invalid packets has already been implemented. Here's the code snippet from the <code>before.rules</code> file, which you'll find near the top of the file:</p>
+<div class="C0-SHConPACKT">
+<pre><code># drop INVALID packets (logs these in loglevel medium and higher)
+-A ufw-before-input -m conntrack --ctstate INVALID -j ufw-logging-deny
+-A ufw-before-input -m conntrack --ctstate INVALID -j DROP</code></pre>
+</div>
+<p>The second of these two rules actually drops the invalid packets, and the first rule logs them. But as we've already seen in the <em>An overview of iptables</em> section of <em>Chapter 4</em>, <em>Securing your server with a firewall-Part 1</em>, this one particular <code>DROP </code>rule doesn't block all of the invalid packets. And, for performance reasons, we'd rather have this rule in the mangle table, instead of in the filter table where it is now. To fix that, we'll edit both of the <code>before</code> files. Open the <code>/etc/ufw/before.rules</code> file in your favorite text editor and look for the following pair of lines at the very bottom of the file:</p>
+<div class="C0-SHConPACKT">
+<pre><code># don&#39;t delete the &#39;COMMIT&#39; line or these rules won&#39;t be processed
+COMMIT</code></pre>
+</div>
+<p>Just below the <code>COMMIT </code>line, add the following code snippet to create the mangle table rules:</p>
+<div class="C0-SHConPACKT">
+<pre><code># Mangle table added by Donnie
+*mangle
+:PREROUTING ACCEPT [0:0]
+-A PREROUTING -m conntrack --ctstate INVALID -j DROP
+-A PREROUTING -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m conntrack --ctstate NEW -j DROP
+COMMIT</code></pre>
+</div>
+<p>Now, we'll repeat this process for the <code>/etc/ufw/before6.rules</code> file. Then, we'll reload the rules by doing:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo ufw reload</code></pre>
+</div>
+<p>By using the <code>iptables -L </code>and <code>ip6tables -L</code> commands on Ubuntu 20.04 or the <code>nft list ruleset</code> command on Ubuntu 22.04, you'll see the new rules show up in the mangle table, just where we want them to be.</p>
+<section id="hands-on-lab-for-basic-ufw-usage" class="level4" data-number="6.3.2.1">
+<h4 data-number="6.3.2.1">Hands-on lab for basic ufw usage</h4>
+<p>You'll need to complete this lab on a clean snapshot of either an Ubuntu 20.04 or an Ubuntu 22.04 virtual machine. Let's get started:</p>
+<ol>
+<li>Shut down your Ubuntu virtual machine and restore the snapshot to get rid of all of the iptables or nftables stuff that you just did. (Or, if you prefer, just start with a fresh virtual machine.)</li>
+<li>When you've restarted the virtual machine, verify that the iptables rules are now gone. On Ubuntu 20.04 do:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo iptables -L
+On Ubuntu 22.04 do:
+sudo nft list ruleset</code></pre>
+</div>
+<ol>
+<li>View the status of <code>ufw</code>. Open port <code>22/TCP</code> and then enable <code>ufw</code>. Then, view the results:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo ufw status
+sudo ufw allow 22/tcp
+sudo ufw enable
+sudo ufw status
+On Ubuntu 20.04 do:
+sudo iptables -L
+sudo ip6tables -L
+On Ubuntu 22.04 do:
+sudo nft list ruleset</code></pre>
+</div>
+<ol>
+<li>This time, open port <code>53</code> for both TCP and UDP:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo ufw allow 53
+sudo ufw status
+On Ubuntu 20.04 do:
+sudo iptables -L
+sudo ip6tables -L
+On Ubuntu 22.04 do:
+sudo nft list ruleset</code></pre>
+</div>
+<ol>
+<li><code>cd</code> into the <code>/etc/ufw/</code> directory. Familiarize yourself with the contents of the files that are there.</li>
+<li>Open the <code>/etc/ufw/before.rules</code> file in your favorite text editor. At the bottom of the file, below the <code>COMMIT</code> line, add the following code snippet:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code># Mangle table added by Donnie
+*mangle
+:PREROUTING ACCEPT [0:0]
+-A PREROUTING -m conntrack --ctstate INVALID -j DROP
+-A PREROUTING -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m conntrack --ctstate NEW -j DROP
+COMMIT
+(Note that the second PREROUTING command wraps around on the printed page.)</code></pre>
+</div>
+<ol>
+<li>Repeat s<em>tep 6</em> for the <code>/etc/ufw/before6.rules</code> file.</li>
+<li>Reload the firewall with this command:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo ufw reload</code></pre>
+</div>
+<ol>
+<li>On Ubuntu 20.04, observe the rules by doing:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo iptables -L
+sudo iptables -t mangle -L
+sudo ip6tables -L
+sudo ip6tables -t mangle -L
+On Ubuntu 22.04, observe the rules by doing:
+sudo nft list ruleset</code></pre>
+</div>
+<ol>
+<li>Take a quick look at the <code>ufw</code> status:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo ufw status</code></pre>
+</div>
+<p>That's the end of the lab – congratulations!</p>
+<p>I think you’ll agree that <code>ufw</code> is pretty cool technology. Its commands for doing basic things are easier to remember than the equivalent iptables or nftables commands, and it takes care of both IPv4 and IPv6 with just a single command. On either of our Ubuntu versions, you can still do some fancy stuff just by hand-editing the ufw configuration files. But, ufw isn’t the only cool firewall manager that’s available. In the next section, we’ll take a look at what the Red Hat folk have given us.</p>
+</section>
+</section>
+</section>
+<section id="firewalld-for-red-hat-systems" class="level2" data-number="6.4">
+<h2 data-number="6.4">firewalld for Red Hat systems</h2>
+<p>For our next act, we turn our attention to <strong>firewalld</strong>, which is the default firewall manager on Red Hat Enterprise Linux 7 through 9 and all of their offspring.</p>
+<p>As we just saw with ufw on Ubuntu, firewalld can be a frontend for either iptables or nftables. On RHEL/CentOS 7, firewalld uses the iptables engine as its backend. On the RHEL 8 and 9-type distros, firewalld uses nftables as its backend. Either way, you can't create rules with normal iptables or nftables commands while firewalld is enabled because firewalld stores the rules in an incompatible format.</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>Until very recently, firewalld was only available for the newer RHEL versions and their offspring. Now, however, firewalld is also available in the Ubuntu repositories. So, if you want to run firewalld on Ubuntu, you finally have that choice. Also, the combination of firewalld and nftables now comes already installed and activated on the SUSE distros.</p>
+</blockquote>
+</blockquote>
+<p>If you're running Red Hat, CentOS, or AlmaLinux on a desktop machine, you'll see that there is a GUI frontend for firewalld in the applications menu. On a text-mode server, though, all you have is the firewalld commands. For some reason, the Red Hat folk haven't created an ncurses-type program for text-mode servers as they did for iptables configuration on older versions of Red Hat.</p>
+<p>A big advantage of firewalld is the fact that it's dynamically managed. That means that you can change the firewall configuration without restarting the firewall service, and without interrupting any existing connections to your server.</p>
+<p>Before we look at the differences between the RHEL 7/CentOS 7 and the RHEL/AlmaLinux 8 and 9 versions of firewalld, let's look at the stuff that's the same for both.</p>
+<section id="verifying-the-status-of-firewalld" class="level3" data-number="6.4.1">
+<h3 data-number="6.4.1">Verifying the status of firewalld</h3>
+<p>For this section, you can use a CentOS 7, AlmaLinux 8, or AlmaLinux 9 virtual machine. Let's start by verifying the status of firewalld. There are two ways to do this. The first way is to use the <code>--state</code> option of <code>firewall-cmd</code>:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --state
+ running
+ [donnie@localhost ~]$</code></pre>
+</div>
+<p>Alternatively, if we want a more detailed status, we can just check the daemon, the same as we would for any other daemon on a systemd machine:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo systemctl status firewalld
+ firewalld.service - firewalld - dynamic firewall daemon
+  Loaded: loaded (/usr/lib/systemd/system/firewalld.service; enabled;
+ vendor preset: enabled)
+  Active: active (running) since Fri 2017-10-13 13:42:54 EDT; 1h 56min ago
+  Docs: man:firewalld(1)
+  Main PID: 631 (firewalld)
+  CGroup: /system.slice/firewalld.service
+  └─631 /usr/bin/python -Es /usr/sbin/firewalld --nofork --nopid
+. . .
+ Oct 13 15:19:41 localhost.localdomain firewalld[631]: WARNING: reject-
+ route: INVALID_ICMPTYPE: No supported ICMP type., ignoring for run-time.
+ [donnie@localhost ~]$</code></pre>
+</div>
+<p>Next, let's have a look at firewalld zones.</p>
+</section>
+<section id="working-with-firewalld-zones" class="level3" data-number="6.4.2">
+<h3 data-number="6.4.2">Working with firewalld zones</h3>
+<p><code>firewalld</code> is a rather unique animal, in that it comes with several pre-configured zones and services. If you look in the <code>/usr/lib/firewalld/zones/</code> directory of any of your CentOS or AlmaLinux machines, you'll see the zones files, all in <code>.xml</code> format:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ cd /usr/lib/firewalld/zones
+[donnie@localhost zones]$ ls
+block.xml dmz.xml drop.xml external.xml home.xml internal.xml public.xml
+trusted.xml work.xml
+[donnie@localhost zones]$</code></pre>
+</div>
+<p>Each zone file specifies which ports are to be open and which ones are to be blocked for various given scenarios. Zones can also contain rules for ICMP messages, forwarded ports, masquerading information, and rich language rules. For example, the <code>.xml</code> file for the public zone, which is set as the default, looks like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt; 
+&lt;zone&gt; 
+ &lt;short&gt;Public&lt;/short&gt; 
+ &lt;description&gt;For use in public areas. You do not trust the other 
+computers on networks to not harm your computer. Only selected incoming 
+connections are accepted.&lt;/description&gt; 
+ &lt;service name=&quot;ssh&quot;/&gt; 
+ &lt;service name=&quot;dhcpv6-client&quot;/&gt; 
+&lt;/zone&gt; </code></pre>
+</div>
+<p>In the <code>service name</code> lines, you can see that the only open ports are for Secure Shell access and for DHCPv6 discovery. If you look at the <code>home.xml</code> file, you'll see that it also opens the ports for Multicast DNS, as well as the ports that allow this machine to access shared directories from either Samba servers or Windows servers:</p>
+<div class="C0-SHConPACKT">
+<pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt; 
+&lt;zone&gt; 
+ &lt;short&gt;Home&lt;/short&gt; 
+ &lt;description&gt;For use in home areas. You mostly trust the other computers 
+on networks to not harm your computer. Only selected incoming connections 
+are accepted.&lt;/description&gt; 
+ &lt;service name=&quot;ssh&quot;/&gt;
+ &lt;service name=&quot;mdns&quot;/&gt; 
+ &lt;service name=&quot;samba-client&quot;/&gt; 
+ &lt;service name=&quot;dhcpv6-client&quot;/&gt; 
+&lt;/zone&gt;</code></pre>
+</div>
+<p>The <code>firewall-cmd</code> utility is what you would use to configure <code>firewalld.</code> You can use it to view the list of zone files on your system, without having to <code>cd</code> into the zone file directory:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --get-zones
+[sudo] password for donnie:
+block dmz drop external home internal public trusted work
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>A quick way to see how each zone is configured is to use the <code>--list-all-zones</code> option:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --list-all-zones
+ block
+  target: %%REJECT%%
+  icmp-block-inversion: no
+  interfaces:
+  sources:
+  services:
+  ports:
+  protocols:
+  masquerade: no
+  forward-ports:
+. . .
+. . .</code></pre>
+</div>
+<p>Of course, this is only a portion of the output because the listing for all zones is more than we can display here. It's more likely that you'll only want to see information about one particular zone:</p>
+<div class="C0-SHConPACKT">
+<pre><code> [donnie@localhost ~]$ sudo firewall-cmd --info-zone=internal
+ internal
+  target: default
+  icmp-block-inversion: no
+  interfaces:
+  sources:
+  services: ssh mdns samba-client dhcpv6-client
+  ports:
+  protocols:
+  masquerade: no
+  forward-ports:
+ source-ports:
+  icmp-blocks:
+  rich rules:
+ [donnie@localhost ~]$</code></pre>
+</div>
+<p>So, the <code>internal</code> zone allows the <code>ssh</code>, <code>mdns</code>, <code>samba-client</code>, and <code>dhcpv6-client</code> services. This is handy for setting up client machines on your internal LAN.</p>
+<p>Any given server or client will have one or more installed network interface adapters. Each adapter in a machine can be assigned one, and only one, firewalld zone. To see the default zone, do this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --get-default-zone
+ public
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>This is great, except that it doesn't tell you anything about which network interface is associated with this zone. To see that information, do this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --get-active-zones
+ public
+  interfaces: enp0s3
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>When you install Red Hat, CentOS, or AlmaLinux for the first time, the firewall will already be active with the public zone as the default. Now, let's say that you're setting up your server in the DMZ and you want to make sure that its firewall is locked down for that. You can change the default zone to the <code>dmz</code> zone. Let's take a look at the <code>dmz.xml</code> file to see what that does for us:</p>
+<div class="C0-SHConPACKT">
+<pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt; 
+&lt;zone&gt; 
+ &lt;short&gt;DMZ&lt;/short&gt; 
+ &lt;description&gt;For computers in your demilitarized zone that are publicly- 
+accessible with limited access to your internal network. Only selected 
+incoming connections are accepted.&lt;/description&gt; 
+ &lt;service name=&quot;ssh&quot;/&gt; 
+&lt;/zone&gt; </code></pre>
+</div>
+<p>So, the only thing that the DMZ allows through is Secure Shell. Okay; that's good enough for now, so let's set the <code>dmz</code> zone as the default:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --set-default-zone=dmz
+ [sudo] password for donnie:
+ success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Let's verify it:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --get-default-zone
+ dmz
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>And we're all good. However, an Internet-facing server in the DMZ probably needs to allow more than just SSH connections. This is where we'll use the firewalld services. But before we look at that, let's consider one more important point.</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>You don’t need to use the <code>--permanent</code> option when setting the default zone. In fact, you’ll get an error message if you do.</p>
+</blockquote>
+</blockquote>
+<p>You never want to modify the files in the <code>/usr/lib/firewalld/</code> directory. Whenever you modify the firewalld configuration, you'll see the modified files show up in the <code>/etc/firewalld/</code> directory. So far, all we've modified is the default zone. So, we'll see the following files in <code>/etc/firewalld/</code>:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo ls -l /etc/firewalld
+ total 12
+ -rw-------. 1 root root 2003 Oct 11 17:37 firewalld.conf
+ -rw-r--r--. 1 root root 2006 Aug 4 17:14 firewalld.conf.old
+ . . .</code></pre>
+</div>
+<p>We can do a <code>diff</code> on those two files to see the difference between them:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo diff /etc/firewalld/firewalld.conf /etc/firewalld/firewalld.conf.old
+ 6c6
+ &lt; DefaultZone=dmz
+ ---
+ &gt; DefaultZone=public
+ [donnie@localhost ~]$</code></pre>
+</div>
+<p>So, the newer of the two files shows that the dmz zone is now the default.</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>To find out more about firewalld zones, enter the <code>man firewalld.zones</code> command.</p>
+</blockquote>
+</blockquote>
+</section>
+<section id="adding-services-to-a-firewalld-zone" class="level3" data-number="6.4.3">
+<h3 data-number="6.4.3">Adding services to a firewalld zone</h3>
+<p>Each service file contains a list of ports that need to be opened for a particular service. Optionally, the service files may contain one or more destination addresses, or call in any needed modules, such as for connection tracking. For some services, all you need to do is open just one port. Other services, such as the Samba service, require that multiple ports be opened. Either way, it's sometimes handier to remember the service name that goes with each service, rather than the port numbers.</p>
+<p>The services files are in the <code>/usr/lib/firewalld/services/</code> directory. You can look at them by using the <code>firewall-cmd</code> command, just as you could with the list of zones:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --get-services
+ RH-Satellite-6 amanda-client amanda-k5-client bacula bacula-client bitcoin bitcoin-rpc bitcoin-testnet bitcoin-testnet-rpc ceph ceph-mon cfengine condor-collector ctdb dhcp dhcpv6 dhcpv6-client dns docker-registry dropbox-lansync elasticsearch freeipa-ldap freeipa-ldaps freeipa-replication freeipa-trust ftp ganglia-client ganglia-master high-availability http https imap imaps ipp ipp-client ipsec iscsi-target kadmin kerberos kibana klogin kpasswd kshell ldap ldaps libvirt libvirt-tls managesieve mdns mosh mountd ms-wbt mssql mysql nfs nrpe ntp openvpn ovirt-imageio ovirt-storageconsole ovirt-vmconsole pmcd pmproxy pmwebapi pmwebapis pop3 pop3s postgresql privoxy proxy-dhcp ptp pulseaudio puppetmaster quassel radius rpc-bind rsh rsyncd samba samba-client sane sip sips smtp smtp-submission smtps snmp snmptrap spideroak-lansync squid ssh synergy syslog syslog-tls telnet tftp tftp-client tinc tor-socks transmission-client vdsm vnc-server wbem-https xmpp-bosh xmpp-client xmpp-local xmpp-server
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Before we add any more services, let's check which ones are already enabled:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --list-services
+[sudo] password for donnie: 
+ssh dhcpv6-client
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Here, ssh and dhcpv6-client are all we have.</p>
+<p>The <code>dropbox-lansync</code> service would be very handy for us Dropbox users. Let's see which ports this opens:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --info-service=dropbox-lansync
+ [sudo] password for donnie:
+ dropbox-lansync
+  ports: 17500/udp 17500/tcp
+  protocols:
+  source-ports:
+  modules:
+  destination:
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>It looks like Dropbox uses port <code>17500</code> on UDP and TCP.</p>
+<p>Now, let's say that we have our web server set up in the DMZ, with the <code>dmz</code> zone set as its default:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --info-zone=dmz
+ dmz (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3
+  sources:
+  services: ssh
+  ports:
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>As we saw previously, the Secure Shell port is the only one that's open. Let's fix that so that users can actually access our website:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --add-service=http
+ success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>When we look at the information for the <code>dmz</code> zone once more, we'll see the following:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --info-zone=dmz
+ dmz (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3
+  sources:
+  services: ssh http
+  ports:
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Here, we can see that the <code>http</code> service is now allowed through. But look what happens when we add the <code>--permanent</code> option to this <code>info </code>command:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --permanent --info-zone=dmz
+ dmz
+  target: default
+  icmp-block-inversion: no
+  interfaces:
+  sources:
+  services: ssh
+  ports:
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Oops! The <code>http</code> service isn't here. What's going on?</p>
+<p>For pretty much every command-line alteration of either zones or services, you need to add the <code>--permanent</code> option to make the change persistent across reboots. But without the <code>--permanent</code> option, the change takes effect immediately. With the <code>--permanent</code> option, you'll have to reload the firewall configuration for the change to take effect. To demonstrate this, I'm going to reboot the virtual machine to get rid of the <code>http</code> service.</p>
+<p>Okay, I've rebooted, and the <code>http</code> service is now gone:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --info-zone=dmz
+ dmz (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3
+  sources:
+  services: ssh
+  ports:
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>This time, I'll add two services with just one command and specify that the change will be permanent:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --permanent --add-service={http,https}
+ [sudo] password for donnie:
+ success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>You can add as many services as you need to with a single command, but you have to separate them with commas and enclose the whole list within a pair of curly brackets. Also, unlike what we just saw with nftables, we can't have blank spaces within the curly brackets. Let's look at the results:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --info-zone=dmz
+ dmz (active)
+ target: default
+ icmp-block-inversion: no
+ interfaces: enp0s3
+ sources:
+ services: ssh
+ ports:
+ protocols:
+ masquerade: no
+ forward-ports:
+ source-ports:
+ icmp-blocks:
+ rich rules:
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Since we decided to make this configuration permanent, it hasn't taken effect yet. However, if we add the <code>--permanent</code> option to the <code>--info-zone</code> command, we'll see that the configuration files have indeed been changed:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --permanent --info-zone=dmz
+ dmz
+  target: default
+  icmp-block-inversion: no
+  interfaces:
+  sources:
+  services: ssh http https
+  ports:
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Now, we need to reload the configuration so that it will take effect:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --reload
+ success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Now, if you run the <code>sudo firewall-cmd --info-zone=dmz</code> command again, you'll see that the new configuration is in effect.</p>
+<p>To remove a service from a zone, just replace <code>--add-service</code> with <code>--remove-service</code>.</p>
+<blockquote>
+<p>Tip:</p>
+<blockquote>
+<p>Note that we never specified which zone we're working with in any of these service commands. That's because if we don't specify a zone, firewalld just assumes that we're working with the default zone. If you want to add a service to something other than the default zone, just add the <code>--zone=</code> option to your commands.</p>
+</blockquote>
+</blockquote>
+</section>
+<section id="adding-ports-to-a-firewalld-zone" class="level3" data-number="6.4.4">
+<h3 data-number="6.4.4">Adding ports to a firewalld zone</h3>
+<p>Having the service files is handy, except that not every service that you'll need to run has its own predefined service file. Let's say that you've installed Webmin on your server, which requires port <code>10000/tcp</code> to be open. A quick grep operation will show that port <code>10000</code> isn't in any of our predefined services:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@localhost services]$ pwd
+ /usr/lib/firewalld/services
+[donnie@localhost services]$ grep &#39;10000&#39; *
+[donnie@localhost services]$</code></pre>
+</div>
+<p>So, let's just add that port to our default zone, which is still the <code>dmz</code> zone:</p>
+<div class="C0-SHConPACKT">
+<pre><code>donnie@localhost ~]$ sudo firewall-cmd --add-port=10000/tcp
+ [sudo] password for donnie:
+ success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Again, this isn't permanent, because we didn't include the <code>--permanent</code> option. Let's do this again and reload:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --permanent --add-port=10000/tcp
+ success
+[donnie@localhost ~]$ sudo firewall-cmd --reload
+ success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>You can also add multiple ports at once by enclosing the comma-separated list within a pair of curly brackets, just as we did with the services. (I purposely left out the <code>--permanent</code> option. You'll see why in a moment):</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --add-port={636/tcp,637/tcp,638/udp}
+ success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>And of course, you can remove ports from a zone by substituting <code>--remove-port</code> for <code>--add-port</code>.</p>
+<p>If you don't want to type <code>--permanent</code> every time you create a new permanent rule, just leave it out. Then, when you're done creating rules, make them all permanent at once by typing:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo firewall-cmd --runtime-to-permanent</code></pre>
+</div>
+<p>Now's, let's turn our attention to controlling ICMP.</p>
+</section>
+<section id="blocking-icmp" class="level3" data-number="6.4.5">
+<h3 data-number="6.4.5">Blocking ICMP</h3>
+<p>Let's take another look at the status of the default public zone:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --info-zone=public
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3
+  sources: 
+  services: ssh dhcpv6-client
+  ports: 53/tcp 53/udp
+  protocols: 
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Toward the bottom, we can see the <code>icmp-block</code> line, with nothing beside it. This means that our public zone allows all ICMP packets to come through. This isn't ideal, of course, because there are certain types of ICMP packets that we want to block. Before we block anything, let's look at all of the ICMP types that are available to us:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --get-icmptypes
+[sudo] password for donnie: 
+address-unreachable bad-header communication-prohibited destination-unreachable echo-reply echo-request fragmentation-needed host-precedence-violation host-prohibited host-redirect host-unknown host-unreachable ip-header-bad neighbour-advertisement neighbour-solicitation network-prohibited network-redirect network-unknown network-unreachable no-route packet-too-big parameter-problem port-unreachable precedence-cutoff protocol-unreachable redirect required-option-missing router-advertisement router-solicitation source-quench source-route-failed time-exceeded timestamp-reply timestamp-request tos-host-redirect tos-host-unreachable tos-network-redirect tos-network-unreachable ttl-zero-during-reassembly ttl-zero-during-transit unknown-header-type unknown-option
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>As we did with zones and services, we can view information about the different ICMP types. In this example, we'll look at one ICMPv4 type and one ICMPv6 type:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --info-icmptype=network-redirectnetwork-redirect  destination: ipv4
+[donnie@localhost ~]$ sudo firewall-cmd --info-icmptype=neighbour-advertisementneighbour-advertisement  
+destination: ipv6
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>We've already seen that we're not blocking any ICMP packets. We can also see if we're blocking any specific ICMP packets:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --query-icmp-block=host-redirect
+no
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>We've already established that redirects can be a bad thing since they can be exploited. So, let's block host-redirect packets:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --add-icmp-block=host-redirect
+success
+[donnie@localhost ~]$ sudo firewall-cmd --query-icmp-block=host-redirect
+yes
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Now, let's check the status:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --info-zone=public
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3
+  sources: 
+  services: ssh dhcpv6-client
+  ports: 53/tcp 53/udp
+  protocols: 
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: host-redirect
+  rich rules: 
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Cool – it worked. Now, let's see if we can block two ICMP types with just one command:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --add-icmp-block={host-redirect,network-redirect}
+success
+[donnie@localhost ~]$ </code></pre>
+</div>
+<p>As before, we'll check the status:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --info-zone=public
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3
+  sources: 
+  services: cockpit dhcpv6-client ssh
+  ports: 
+  protocols: 
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: host-redirect network-redirect
+  rich rules: 
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>This also worked, which means that we have achieved coolness. However, since we didn't include <code>--permanent</code> with these commands, these ICMP types will only be blocked until we reboot the computer. So, let's make them permanent:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --runtime-to-permanent
+success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>And with this, we've achieved even more coolness. (Of course, all of my cats already think that I'm pretty cool.)</p>
+</section>
+<section id="using-panic-mode" class="level3" data-number="6.4.6">
+<h3 data-number="6.4.6">Using panic mode</h3>
+<p>You've just seen evidence that bad people are trying to break into your system. What do you do? Well, one option is to activate <code>panic</code> mode, which cuts off all network communications.</p>
+<blockquote>
+<p>I can just see this now in the Saturday morning cartoons when some cartoon character yells, <em>Panic mode, activate!</em></p>
+</blockquote>
+<p>To activate <code>panic</code> mode, use this command:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --panic-on
+[sudo] password for donnie: 
+success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Of course, your access will be cut off if you're logged in remotely, and you'll have to go to the local terminal to get back in. To turn <code>panic</code> mode off, use this command:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --panic-off
+[sudo] password for donnie: 
+success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>If you're logged in remotely, there's no need to check the status of <code>panic </code>mode. If it's on, you're not accessing the machine. But if you're sitting at the local console, you might want to check it. Just do:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --query-panic
+[sudo] password for donnie: 
+no
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>That's all there is to <code>panic</code> mode.</p>
+</section>
+<section id="logging-dropped-packets" class="level3" data-number="6.4.7">
+<h3 data-number="6.4.7">Logging dropped packets</h3>
+<p>Here's another time-saver that you're sure to like. If you want to create log entries whenever packets get blocked, just use the <code>--set-log-denied</code> option. Before we do that, let's see if it's already enabled:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --get-log-denied
+[sudo] password for donnie: 
+off
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>It's not, so let's turn it on and check the status again:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --set-log-denied=all
+success
+[donnie@localhost ~]$ sudo firewall-cmd --get-log-denied
+all
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>We've set it up to log all denied packets. However, you might not always want that. Your other choices are <code>unicast</code>,<code> broadcast</code>, and <code>multicast</code>.</p>
+<p>So, for example, if all you want is to log blocked packets that are going to multicast addresses, do this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --set-log-denied=multicast
+[sudo] password for donnie: 
+success
+[donnie@localhost ~]$ sudo firewall-cmd --get-log-denied
+multicast
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>So far, we've just set the runtime configuration, which will disappear once we reboot the machine. To make this permanent, we can use any of the methods that we've already used. For now, let's just do this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --runtime-to-permanent
+success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Unlike what we saw with the Debian/Ubuntu distros, there's no separate <code>kern.log</code> file for our packet-denied messages. Instead, the RHEL-type distros log the packet-denied messages in the <code>/var/log/messages</code> file, which is the main log file in the RHEL world. Several different message tags are already defined, which will make it easier to audit the logs for dropped packets. For example, here's a message that tells us about blocked broadcast packets:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Aug 20 14:57:21 localhost kernel: FINAL_REJECT: IN=enp0s3 OUT= MAC=ff:ff:ff:ff:ff:ff:00:1f:29:02:0d:5f:08:00 SRC=192.168.0.225 DST=255.255.255.255 LEN=140 TOS=0x00 PREC=0x00
+ TTL=64 ID=62867 DF PROTO=UDP SPT=21327 DPT=21327 LEN=120</code></pre>
+</div>
+<p>The tag is <code>FINAL_REJECT</code>, which tells us that this message was created by the catch-all, final <code>REJECT</code> rule that's at the end of our input chain. The <code>DST=255.255.255.255</code> part tells us that this was a broadcast message.</p>
+<p>Here's another example, where I did an Nmap NULL scan against this machine:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo nmap -sN 192.168.0.8
+Aug 20 15:06:15 localhost kernel: STATE_INVALID_DROP: IN=enp0s3 OUT= MAC=08:00:27:10:66:1c:00:1f:29:02:0d:5f:08:00 SRC=192.168.0.225 DST=192.168.0.8 LEN=40 TOS=0x00 PREC=0x00 TTL=42 ID=27451 PROTO=TCP SPT=46294 DPT=23 WINDOW=1024 RES=0x00 URGP=0</code></pre>
+</div>
+<p>In this case, I triggered the rule that blocks <code>INVALID</code> packets, as indicated by the <code>STATE_INVALID_DROP</code> tag.</p>
+<p>So, now you're saying, <em>But wait. These two rules that we just tested aren't anywhere to be found in the firewalld configuration files that we've looked at so far. What gives?</em> And you're right. The location of these default, pre-configured rules is something that the Red Hat folk apparently want to keep hidden from us. However, in the following sections that are specific to RHEL/CentOS 7 and RHEL/AlmaLinux 8 and 9, we'll spoil their fun, because I can show you where these rules are.</p>
+</section>
+<section id="using-firewalld-rich-language-rules" class="level3" data-number="6.4.8">
+<h3 data-number="6.4.8">Using firewalld rich language rules</h3>
+<p>What we've looked at so far might be all you'll ever need for general use scenarios, but for more granular control, you'll want to know about <strong>rich language rules</strong>. (Yes, that really is what they're called.)</p>
+<p>Compared to iptables rules, rich language rules are a bit less cryptic and are closer to plain English. So, if you're new to the business of writing firewall rules, you might find rich language a bit easier to learn. On the other hand, if you're already used to writing iptables rules, you might find some elements of the rich language a bit quirky. Let's look at one example:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo firewall-cmd --permanent --add-rich-rule=&#39;rule family=&quot;ipv4&quot; source address=&quot;200.192.0.0/24&quot; service name=&quot;http&quot; drop&#39;</code></pre>
+</div>
+<p>Here, we're adding a rich rule that blocks website access from an entire geographic block of IPv4 addresses. Note that the entire rule is surrounded by a pair of single quotes, and the assigned value for each parameter is surrounded by a pair of double quotes. With this rule, we're saying that we're working with IPv4 and that we want to silently block the <code>http </code>port from accepting packets from the <code>200.192.0.0/24</code> network. I used the <code>--permanent </code>option here, because AlmaLinux 9 is a bit quirky if I don’t use it. Let's see what our zone looks like with this new rule:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --permanent --info-zone=dmz
+  dmz (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3
+  sources:
+  services: ssh http https
+  ports: 10000/tcp 636/tcp 637/tcp 638/udp
+. . .
+. . .
+  rich rules:
+  rule family=&quot;ipv4&quot; source address=&quot;200.192.0.0/24&quot; service name=&quot;http&quot;
+ drop
+ [donnie@localhost ~]$</code></pre>
+</div>
+<p>The rich rule shows up at the bottom.</p>
+<p>You could just as easily write a rule for IPv6 by replacing <code>family="ipv4"</code> with <code>family="ipv6"</code> and supplying the appropriate IPv6 address range.</p>
+<p>Some rules are generic and apply to either IPv4 or IPv6. Let's say that we want to log messages about <strong>Network Time Protocol</strong> (<strong>NTP</strong>) packets for both IPv4 and IPv6 and that we want to log no more than one message per minute. The command to create that rule would look like this:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo firewall-cmd --add-rich-rule=&#39;rule service name=&quot;ntp&quot; audit limit value=&quot;1/m&quot; accept&#39;</code></pre>
+</div>
+<p>There is, of course, a lot more to firewalld rich language rules than we can present here. But for now, you know the basics. For more information, consult the man page:</p>
+<div class="C0-SHConPACKT">
+<pre><code>man firewalld.richlanguage</code></pre>
+</div>
+<blockquote>
+<p>If you go to the official documentation page for Red Hat Enterprise Linux 8, you'll see no mention of rich rules. However, I've just tested them on an RHEL 8-type machine and a RHEL 9-type machine, and they work fine.</p>
+<blockquote>
+<p>To read about rich rules, you'll need to go to the documentation page for Red Hat Enterprise Linux 7. What's there also applies to RHEL 8/9. But even there, there's not much detail. To find out more, see the man page on either RHEL/CentOS 7 or RHEL/CentOS 8, or RHEL/AlmaLinux 9.</p>
+</blockquote>
+</blockquote>
+<p>To make the rule permanent, just use any of the methods that we've already discussed. When you do, the rule will show up in the <code>.xml</code> file for the default zone. In my case, the default zone is still set to public. So, let's look in the <code>/etc/firewalld/zones/public.xml</code> file:</p>
+<div class="C0-SHConPACKT">
+<pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;zone&gt;
+  &lt;short&gt;Public&lt;/short&gt;
+  &lt;description&gt;For use in public areas. You do not trust the other computers on networks to not harm your computer. Only selected incoming connections are accepted.&lt;/description&gt;
+  &lt;service name=&quot;ssh&quot;/&gt;
+  &lt;service name=&quot;dhcpv6-client&quot;/&gt;
+  &lt;service name=&quot;cockpit&quot;/&gt;
+  &lt;rule family=&quot;ipv4&quot;&gt;
+    &lt;source address=&quot;192.168.0.225&quot;/&gt;
+    &lt;service name=&quot;http&quot;/&gt;
+    &lt;drop/&gt;
+  &lt;/rule&gt;
+&lt;/zone&gt;</code></pre>
+</div>
+<p>Our rich rule shows up in the <code>rule family</code> block at the bottom of the file.</p>
+<p>Now that we've covered what's common between the RHEL/CentOS 7 and the RHEL/CentOS/AlmaLinux 8/9 versions of firewalld, let's look at what's particular to each different version.</p>
+</section>
+<section id="looking-at-iptables-rules-in-rhelcentos-7-firewalld" class="level3" data-number="6.4.9">
+<h3 data-number="6.4.9">Looking at iptables rules in RHEL/CentOS 7 firewalld</h3>
+<p>RHEL 7 and its offspring use the iptables engine as the firewalld backend. You can't create rules with the normal iptables commands as long as firewalld is enabled. However, every time you create a rule with a <code>firewall-cmd</code> command, the iptables backend creates the appropriate iptables rule and inserts it into its proper place. You can view the active rules with <code>iptables -L</code>. Here's the first part of a very long output:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo iptables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     all  --  anywhere             anywhere             ctstate RELATED,ESTABLISHED
+ACCEPT     all  --  anywhere             anywhere            
+INPUT_direct  all  --  anywhere             anywhere            
+INPUT_ZONES_SOURCE  all  --  anywhere             anywhere            
+INPUT_ZONES  all  --  anywhere             anywhere            
+DROP       all  --  anywhere             anywhere             ctstate INVALID
+REJECT     all  --  anywhere             anywhere             reject-with icmp-host-prohibited</code></pre>
+</div>
+<p>As was the case with ufw on Ubuntu, a lot has already been configured for us. At the top, in the <code>INPUT </code>chain, we see that the connection state rule and the rule to block invalid packets are already there. The default policy for the chain is <code>ACCEPT</code>, but the final rule of the chain is set to <code>REJECT</code> what isn't specifically allowed. In between these, we can see rules that direct other packets to other chains for processing. Now, let's look at the next portion:</p>
+<div class="C0-SHConPACKT">
+<pre><code>Chain IN_public_allow (1 references)
+target     prot opt source               destination         
+ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:ssh ctstate NEW
+ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:domain ctstate NEW
+ACCEPT     udp  --  anywhere             anywhere             udp dpt:domain ctstate NEW
+Chain IN_public_deny (1 references)
+target     prot opt source               destination         
+REJECT     icmp --  anywhere             anywhere             icmp host-redirect reject-with icmp-host-prohibited</code></pre>
+</div>
+<p>Toward the bottom of the very long output, we can see the <code>IN_public_allow</code> chain, which contains the rules that we created for opening firewall ports. Just below that is the <code>IN_public_deny</code> chain, which contains the <code>REJECT</code> rule for blocking unwanted ICMP types. In both the <code>INPUT</code> chain and the <code>IN_public_deny</code> chain, the <code>REJECT</code> rules return an ICMP message to inform the sender that the packets were blocked.</p>
+<p>Now, keep in mind that there's a lot of this <code>IPTABLES -L</code> output that we haven't shown. So, look at it for yourself to see what's there. When you do, you may ask yourself, <em>Where are these default rules stored? Why am I not seeing them in the</em> <code>/etc/firewalld/</code> <em>directory?</em></p>
+<p>To answer that question, I had to do some rather extensive investigation. For some truly bizarre reason, the Red Hat folk have left this completely undocumented. I finally found the answer in the <code>/usr/lib/python2.7/site-packages/firewall/core/</code> directory. Here, there's a set of Python scripts that set up the initial default firewall:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost core]$ ls
+base.py fw_config.pyc fw_helper.pyo fw_ipset.py fw_policies.pyc fw_service.pyo fw_zone.py icmp.pyc ipset.pyc logger.pyo rich.py base.pyc fw_config.pyo fw_icmptype.py fw_ipset.pyc fw_policies.pyo fw_test.py fw_zone.pyc icmp.pyo ipset.pyo modules.py rich.pyc base.pyo fw_direct.py fw_icmptype.pyc fw_ipset.pyo fw.py fw_test.pyc fw_zone.pyo __init__.py ipXtables.py modules.pyc rich.pyo ebtables.py fw_direct.pyc fw_icmptype.pyo fw_nm.py fw.pyc fw_test.pyo helper.py __init__.pyc ipXtables.pyc modules.pyo watcher.py ebtables.pyc fw_direct.pyo fw_ifcfg.py fw_nm.pyc fw.pyo fw_transaction.py helper.pyc __init__.pyo ipXtables.pyo prog.py watcher.pyc ebtables.pyo fw_helper.py fw_ifcfg.pyc fw_nm.pyo fw_service.py fw_transaction.pyc helper.pyo io logger.py prog.pyc watcher.pyo fw_config.py fw_helper.pyc fw_ifcfg.pyo fw_policies.py fw_service.pyc fw_transaction.pyo icmp.py ipset.py logger.pyc prog.pyo
+[donnie@localhost core]$</code></pre>
+</div>
+<p>The script that does most of the work is the <code>ipXtables.py </code>script. If you look in it, you'll see that its list of iptables commands matches up with the <code>iptables -L</code> output.</p>
+</section>
+<section id="creating-direct-rules-in-rhelcentos-7-firewalld" class="level3" data-number="6.4.10">
+<h3 data-number="6.4.10">Creating direct rules in RHEL/CentOS 7 firewalld</h3>
+<p>As we've seen, any time we do anything with the normal <code>firewall-cmd</code> commands on RHEL/CentOS 7, firewalld automatically translates those commands into iptables rules and inserts them into the proper place. (Or, it deletes the rules, if you've issued some sort of delete command.) However, there are some things that we can't do with the normal <code>firewalld-cmd</code> commands. For example, we can't use normal <code>firewall-cmd</code> commands to place rules in a specific iptables chain or table. To do things like that, we need to use the direct configuration commands.</p>
+<p>The <code>firewalld.direct</code> man page and the documentation at the Red Hat site both warn you to only use direct configuration as an absolute last resort when nothing else will work. That's because, unlike the normal <code>firewall-cmd</code> commands, the direct commands won't automatically place your new rules into the proper places so that everything works correctly. With the direct commands, you can break the whole firewall by placing a rule into the wrong spot.</p>
+<p>In the example output of the previous section, in the default ruleset, you saw that there's a rule in the filter table's <code>INPUT</code> chain that blocks invalid packets. In the <em>Blocking invalid packets with iptables</em> section of <em>Chapter 4</em>, <em>Securing your server with a firewall-Part 1</em>, you saw that this rule misses certain types of invalid packets. So, we'd like to add a second rule to block what the first rule misses. We'd also like to place these rules into the <code>PREROUTING</code> chain of the mangle table in order to enhance firewall performance. To do this, we need to create a couple of direct rules. (This isn't hard if you're familiar with normal iptables syntax.) So, let's get to it.</p>
+<p>First, let's verify that we don't have any effective direct rules, like so:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo firewall-cmd --direct --get-rules ipv4 mangle PREROUTING
+sudo firewall-cmd --direct --get-rules ipv6 mangle PREROUTING</code></pre>
+</div>
+<p>You should get no output for either command. Now, let's add our two new rules, for both IPv4 and IPv6, with the following four commands:</p>
+<div class="C0-SHConPACKT">
+<pre><code>sudo firewall-cmd --direct --add-rule ipv4 mangle PREROUTING 0 -m conntrack --ctstate INVALID -j DROP
+sudo firewall-cmd --direct --add-rule ipv4 mangle PREROUTING 1 -p tcp ! --syn -m conntrack --ctstate NEW -j DROP
+sudo firewall-cmd --direct --add-rule ipv6 mangle PREROUTING 0 -m conntrack --ctstate INVALID -j DROP
+sudo firewall-cmd --direct --add-rule ipv6 mangle PREROUTING 1 -p tcp ! --syn -m conntrack --ctstate NEW -j DROP</code></pre>
+</div>
+<p>The <code>direct</code> command syntax is very similar to that of normal iptables commands. So, I won't repeat the explanations that I've already presented in the iptables section. However, I do want to point out the <code>0</code> and the <code>1</code> that come after <code>PREROUTING</code> in each of the commands. Those represent the priority of the rule. The lower the number, the higher the priority, and the higher up the rule is in the chain. So, the rules with the <code>0</code> priority are the first rules in their respective chains, while the rules with the <code>1</code> priority are the second rules in their respective chains. If you give the same priority to each rule you create, there's no guarantee that the order will remain the same upon each reboot. So, be sure to assign a different priority to each rule.</p>
+<p>Now, let's verify that our rules are in effect:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --direct --get-rules ipv4 mangle PREROUTING
+0 -m conntrack --ctstate INVALID -j DROP
+1 -p tcp &#39;!&#39; --syn -m conntrack --ctstate NEW -j DROP
+[donnie@localhost ~]$ sudo firewall-cmd --direct --get-rules ipv6 mangle PREROUTING
+0 -m conntrack --ctstate INVALID -j DROP
+1 -p tcp &#39;!&#39; --syn -m conntrack --ctstate NEW -j DROP
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>We can see that they are. When you use the <code>iptables -t mangle -L</code> command and the <code>ip6tables -t mangle -L</code> command, you'll see that the rules show up in the <code>PREROUTING_direct</code> chain. (I'm only showing the output once since it's the same for both commands.):</p>
+<div class="C0-SHConPACKT">
+<pre><code>. . .
+. . .
+Chain PREROUTING_direct (1 references)
+target prot opt source destination 
+DROP all -- anywhere anywhere ctstate INVALID
+DROP tcp -- anywhere anywhere tcp flags:!FIN,SYN,RST,ACK/SYN ctstate NEW
+. . .
+. . .</code></pre>
+</div>
+<p>To show that it works, we can perform some Nmap scans against the virtual machine, just like how I showed you to in the <em>Blocking invalid packets with iptables</em> section of <em>Chapter 4</em>, <em>Securing your server with a firewall-Part 1</em>. (Don't fret if you don't remember how to do it. You'll see the procedure in the upcoming hands-on lab.) Then, we can use <code>sudo iptables -t mangle -L -v</code> and <code>sudo ip6tables -t mangle -L -v </code>to see the packets and bytes that these two rules blocked.</p>
+<p>We didn't use the <code>--permanent</code> option with these commands, so they're not permanent yet. Let's make them permanent now:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo firewall-cmd --runtime-to-permanent
+[sudo] password for donnie: 
+success
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Now, let's take a look in the <code>/etc/firewalld/</code> directory. Here, you'll see a <code>direct.xml</code> file that wasn't there before:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo ls -l /etc/firewalld
+total 20
+-rw-r--r--. 1 root root  532 Aug 26 13:17 direct.xml
+. . .
+. . .
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Look inside the file; you'll see the new rules:</p>
+<div class="C0-SHConPACKT">
+<pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;direct&gt;
+  &lt;rule priority=&quot;0&quot; table=&quot;mangle&quot; ipv=&quot;ipv4&quot; chain=&quot;PREROUTING&quot;&gt;-m conntrack --ctstate INVALID -j DROP&lt;/rule&gt;
+  &lt;rule priority=&quot;1&quot; table=&quot;mangle&quot; ipv=&quot;ipv4&quot; chain=&quot;PREROUTING&quot;&gt;-p tcp &#39;!&#39; --syn -m conntrack --ctstate NEW -j DROP&lt;/rule&gt;
+  &lt;rule priority=&quot;0&quot; table=&quot;mangle&quot; ipv=&quot;ipv6&quot; chain=&quot;PREROUTING&quot;&gt;-m conntrack --ctstate INVALID -j DROP&lt;/rule&gt;
+  &lt;rule priority=&quot;1&quot; table=&quot;mangle&quot; ipv=&quot;ipv6&quot; chain=&quot;PREROUTING&quot;&gt;-p tcp &#39;!&#39; --syn -m conntrack --ctstate NEW -j DROP&lt;/rule&gt;
+&lt;/direct&gt;</code></pre>
+</div>
+<p>The official Red Hat 7 documentation page does cover direct rules, but only briefly. For more detailed information, see the <code>firewalld.direct</code> man page.</p>
+</section>
+<section id="looking-at-nftables-rules-in-rhelalmalinux-8-and-9-firewalld" class="level3" data-number="6.4.11">
+<h3 data-number="6.4.11">Looking at nftables rules in RHEL/AlmaLinux 8 and 9 firewalld</h3>
+<p>RHEL 8/9 and their offspring use nftables as the default firewalld backend. Every time you create a rule with a <code>firewall-cmd</code> command, the appropriate nftables rule is created and inserted into its proper place. To look at the ruleset that's currently in effect, we'll use the same nft command that we used with nftables on Ubuntu:</p>
+<div class="C0-SHConPACKT">
+<pre><code>[donnie@localhost ~]$ sudo nft list ruleset
+. . .
+. . .
+table ip firewalld {
+    chain nat_PREROUTING {
+        type nat hook prerouting priority -90; policy accept;
+        jump nat_PREROUTING_ZONES_SOURCE
+        jump nat_PREROUTING_ZONES
+    }
+    chain nat_PREROUTING_ZONES_SOURCE {
+    }
+. . .
+. . .
+[donnie@localhost ~]$</code></pre>
+</div>
+<p>Again, we can see a very lengthy list of default, pre-configured firewall rules. (To see the whole list, run the command for yourself.) You'll find these default rules in the <code>/usr/lib/python3.6/site-packages/firewall/core/nftables.py</code> script on RHEL 8-type machines, and in the <code>/usr/lib/python3.9/site-packages/firewall/core/nftables.py</code> script on RHEL 9-type machines. This script runs every time you boot up the machine.</p>
+</section>
+<section id="creating-direct-rules-in-rhelalmalinux-firewalld" class="level3" data-number="6.4.12">
+<h3 data-number="6.4.12">Creating direct rules in RHEL/AlmaLinux firewalld</h3>
+<p>Okay, here's where things get downright weird. Even though the direct rule commands create iptables rules and the RHEL 8/9 distros use nftables for the firewalld backend, you can still create direct rules. Just create and verify them the same way that you did in the <em>Creating direct rules in RHEL/CentOS 7 firewalld</em> section. Apparently, firewalld allows these iptables rules to peacefully coexist with the nftables rules. However, if you need to do this on a production system, be sure to thoroughly test your setup before putting it into production.</p>
+<p>There's nothing about this in the Red Hat 8/9 documentation, but there is the <code>firewalld.direct</code> man page if you want to find out more.</p>
+<section id="hands-on-lab-for-firewalld-commands" class="level4" data-number="6.4.12.1">
+<h4 data-number="6.4.12.1">Hands-on lab for firewalld commands</h4>
+<p>By completing this lab, you'll get some practice with basic firewalld commands:</p>
+<ol>
+<li>Log into your CentOS 7 virtual machine or either of the AlmaLinux virtual machines and run the following commands. Observe the output after each one:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code> sudo firewall-cmd --get-zones
+ sudo firewall-cmd --get-default-zone
+ sudo firewall-cmd --get-active-zones</code></pre>
+</div>
+<ol>
+<li>Briefly view the man pages that deal with <code>firewalld.zones</code>:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code> man firewalld.zones
+ man firewalld.zone</code></pre>
+</div>
+<p>(Yes, there are two of them. One explains the zone configuration files, while the other explains the zones themselves.)</p>
+<ol>
+<li>Look at the configuration information for all of the available zones:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo firewall-cmd --list-all-zones</code></pre>
+</div>
+<ol>
+<li>Look at the list of predefined services. Then, look at the information about the <code>dropbox-lansync</code> service:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code> sudo firewall-cmd --get-services
+ sudo firewall-cmd --info-service=dropbox-lansync</code></pre>
+</div>
+<ol>
+<li>Set the default zone to <code>dmz</code>. Look at the information concerning the <code>zone</code>, add the <code>http</code> and <code>https</code> services, and then look at the <code>zone</code> information again:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code> sudo firewall-cmd --set-default-zone=dmz
+ sudo firewall-cmd --permanent --add-service={http,https}
+ sudo firewall-cmd --info-zone=dmz
+ sudo firewall-cmd --permanent --info-zone=dmz</code></pre>
+</div>
+<ol>
+<li>Reload the <strong>firewall</strong> configuration and look at <code>zone</code> information again. Also, look at the list of services that are being allowed:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code> sudo firewall-cmd --reload
+ sudo firewall-cmd --info-zone=dmz
+ sudo firewall-cmd --list-services</code></pre>
+</div>
+<ol>
+<li>Permanently open port <code>10000/tcp</code> and view the results:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code> sudo firewall-cmd --permanent --add-port=10000/tcp
+ sudo firewall-cmd --list-ports
+ sudo firewall-cmd --reload
+ sudo firewall-cmd --list-ports
+ sudo firewall-cmd --info-zone=dmz</code></pre>
+</div>
+<ol>
+<li>Remove the port that you just added:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code> sudo firewall-cmd --permanent --remove-port=10000/tcp
+ sudo firewall-cmd --reload
+ sudo firewall-cmd --list-ports
+ sudo firewall-cmd --info-zone=dmz</code></pre>
+</div>
+<ol>
+<li>Add a rich language rule to block a geographic range of IPv4 addresses:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo firewall-cmd --permanent --add-rich-rule=&#39;rule family=&quot;ipv4&quot; source address=&quot;200.192.0.0/24&quot; service name=&quot;http&quot; drop&#39;</code></pre>
+</div>
+<ol>
+<li>Block the <code>host-redirect</code> and <code>network-redirect</code> ICMP types:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo firewall-cmd --permanent --add-icmp-block={host-redirect,network-redirect}</code></pre>
+</div>
+<ol>
+<li>Add the directive to log all dropped packets:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo firewall-cmd --set-log-denied=all</code></pre>
+</div>
+<ol>
+<li>View both the <code>runtime</code> and <code>permanent</code> configurations and note the differences between them:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo firewall-cmd --info-zone=dmz
+sudo firewall-cmd --info-zone=dmz --permanent</code></pre>
+</div>
+<ol>
+<li>Make the <code>runtime</code> configuration <code>permanent</code> and verify that it took effect:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo firewall-cmd --runtime-to-permanent
+sudo firewall-cmd --info-zone=dmz --permanent</code></pre>
+</div>
+<ol>
+<li>On CentOS 7, view the complete list of effective firewall rules by doing:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo iptables -L</code></pre>
+</div>
+<ol>
+<li>On AlmaLinux 8 or 9, view the complete list of effective firewall rules by doing:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo nft list ruleset</code></pre>
+</div>
+<ol>
+<li>Create the <code>direct</code> rules in order to block invalid packets from the mangle table's <code>PREROUTING</code> chain:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo firewall-cmd --direct --add-rule ipv4 mangle PREROUTING 0 -m conntrack --ctstate INVALID -j DROP
+sudo firewall-cmd --direct --add-rule ipv4 mangle PREROUTING 1 -p tcp ! --syn -m conntrack --ctstate NEW -j DROP
+sudo firewall-cmd --direct --add-rule ipv6 mangle PREROUTING 0 -m conntrack --ctstate INVALID -j DROP
+sudo firewall-cmd --direct --add-rule ipv6 mangle PREROUTING 1 -p tcp ! --syn -m conntrack --ctstate NEW -j DROP</code></pre>
+</div>
+<ol>
+<li>Verify that the <strong>rules</strong> took effect and make them <strong>permanent</strong>:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo firewall-cmd --direct --get-rules ipv4 mangle PREROUTING
+sudo firewall-cmd --direct --get-rules ipv6 mangle PREROUTING
+sudo firewall-cmd --runtime-to-permanent</code></pre>
+</div>
+<ol>
+<li>View the contents of the <code>direct.xml</code> file that you've just created:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo less /etc/firewalld/direct.xml</code></pre>
+</div>
+<ol>
+<li>Perform XMAS Nmap scans for both IPv4 and IPv6 against the virtual machine. Then, observe which rule was triggered by the scan:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo nmap -sX ipv4_address_of_Test-VM
+sudo nmap -6 -sX ipv6_address_of_Test-VM
+sudo iptables -t mangle -L -v
+sudo ip6tables -t mangle -L -v</code></pre>
+</div>
+<ol>
+<li>Repeat <em>step 19</em>, but this time with a Windows scan:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>sudo nmap -sW ipv4_address_of_Test-VM
+sudo nmap -6 -sW ipv6_address_of_Test-VM
+sudo iptables -t mangle -L -v
+sudo ip6tables -t mangle -L -v</code></pre>
+</div>
+<ol>
+<li>View the list of main pages for firewalld:</li>
+</ol>
+<div class="C1-SHConPACKT">
+<pre><code>apropos firewall</code></pre>
+</div>
+<p>That's the end of the lab – congratulations!</p>
+</section>
+</section>
+</section>
+<section id="summary-4" class="level2" data-number="6.5">
+<h2 data-number="6.5">Summary</h2>
+<p>In this chapter, we looked at two helper utilities that can simplify using either iptables or nftables. We started with ufw, which is available for the Debian and Ubuntu families. Then, we looked at firewalld, which used to be specific to Red Hat-type distros, but is now also available in Ubuntu repositories and comes already installed and activated on the SUSE distros.</p>
+<p>In the space that I've been allotted, I've presented the basics of using these technologies to set up single-host protection. I've also presented some details about the innards of firewalld that you won't find documented anywhere else, including in the official Red Hat documentation.</p>
+<p>In the next chapter, we'll look at the various encryption technologies that can help keep your data private. I'll see you there.</p>
+</section>
+<section id="questions-4" class="level2" data-number="6.6">
+<h2 data-number="6.6">Questions</h2>
+<ol>
+<li>What is the major difference between firewalld on RHEL 7-type distros and firewalld on RHEL 8/9-type distros?</li>
+<li>In which of the following formats does firewalld store its rules?
+<ol type="A">
+<li><code>.txt</code></li>
+<li><code>.config</code></li>
+<li><code>.html</code></li>
+<li><code>.xml</code></li>
+</ol></li>
+<li>Which of the following commands would you use to list all of the firewalld zones on your system?
+<ol type="A">
+<li>sudo firewalld --get-zones</li>
+<li>sudo firewall-cmd --list-zones</li>
+<li>sudo firewall-cmd --get-zones</li>
+<li>sudo firewalld --list-zones</li>
+</ol></li>
+<li>With ufw, everything you'll ever need to do can be done with the ufw utility.
+<ol type="A">
+<li>True</li>
+<li>False</li>
+</ol></li>
+<li>Your system is set up with firewalld and you need to open port <code>10000/tcp</code>. Which of the following commands would you use?
+<ol type="A">
+<li>sudo firewall-cmd --add-port=10000/tcp</li>
+<li>sudo firewall-cmd --add-port=10000</li>
+<li>sudo firewalld --add-port=10000</li>
+<li>sudo firewalld --add-port=10000/tcp</li>
+</ol></li>
+<li>Which of the following ufw commands would you use to open the default Secure Shell port?
+<ol type="A">
+<li>sudo ufw allow 22</li>
+<li>sudo ufw permit 22</li>
+<li>sudo ufw allow 22/tcp</li>
+<li>sudo ufw permit 22/tcp</li>
+</ol></li>
+</ol>
+</section>
+<section id="further-reading-4" class="level2" data-number="6.7">
+<h2 data-number="6.7">Further reading</h2>
+<ul>
+<li>Rate-limiting with ufw: <a href="https://45squared.com/rate-limiting-with-ufw/">https://45squared.com/rate-limiting-with-ufw/</a></li>
+<li>firewalld documentation for RHEL 7: <a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/security_guide/sec-using_firewalls">https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/security_guide/sec-using_firewalls</a></li>
+<li>firewalld documentation for RHEL 8: <a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/securing_networks/using-and-configuring-firewalls_securing-networks">https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/securing_networks/using-and-configuring-firewalls_securing-networks</a></li>
+<li>The firewalld home page: <a href="https://firewalld.org/">https://firewalld.org/</a></li>
+<li>UFW Community Help Wiki: <a href="https://help.ubuntu.com/community/UFW">https://help.ubuntu.com/community/UFW</a></li>
+<li>How to set up a Linux firewall with UFW on Ubuntu 18.04: <a href="https://linuxize.com/post/how-to-setup-a-firewall-with-ufw-on-ubuntu-18-04/">https://linuxize.com/post/how-to-setup-a-firewall-with-ufw-on-ubuntu-18-04/</a></li>
+</ul>
+</section>
+<section id="answers-2" class="level2" data-number="6.8">
+<h2 data-number="6.8">Answers</h2>
+<ol>
+<li>RHEL 7 distros use iptables as the firewalld backend, and RHEL 8/9 distros use nftables as the firewalld backend.</li>
+<li>D</li>
+<li>C</li>
+<li>B</li>
+<li>A</li>
+<li>C</li>
+</ol>
+</section>
+</section>
+</body>
+</html>

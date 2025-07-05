@@ -1,0 +1,614 @@
+<html><head></head><body>
+<div id="page" style="height:0pt"/><div class="book" title="Chapter&#xA0;9.&#xA0;Configuring the Syslog and Monitoring Performance"><div class="book"><div class="book"><div class="book"><h1 class="title" id="calibre_pb_0"><a id="ch09" class="calibre1"/>Chapter 9. Configuring the Syslog and Monitoring Performance</h1></div></div></div><p class="calibre7">In this chapter, we will cover the following topics:</p><div class="book"><ul class="itemizedlist"><li class="listitem">Configuring the syslog</li><li class="listitem">Monitoring the performance on Oracle Solaris 11</li></ul></div></div>
+
+<div class="book" title="Chapter&#xA0;9.&#xA0;Configuring the Syslog and Monitoring Performance">
+<div class="book" title="Introduction"><div class="book"><div class="book"><div class="book"><h1 class="title" id="calibre_pb_1"><a id="ch09lvl1sec82" class="calibre1"/>Introduction</h1></div></div></div><p class="calibre7">In this chapter, we will learn about two important topics: syslog and performance monitoring. The former is an essential task for daily administration and is very appropriate for resolving the following possible events and problems that occur in Oracle Solaris 11. Configuring syslog is very similar to other UNIX flavors, but there will be particular details that are exclusively related to Oracle Solaris.</p><p class="calibre7">Talking about the syslog framework means discussing a very important part of the system that is responsible for event messages. Any security problem, hardware change and problem, kernel event, or general issues will be recorded in logfiles. Additionally, applications will log their messages in logfiles. The syslog framework plays a special role if we are working with forensic analysis. Syslog framework has a central role. Logs are also important when we investigate a <a id="id1057" class="calibre1"/>malware's attack. If we have to create a troubleshooting process, once more, the records saved and managed by the syslog framework are vital. This is the real importance of the syslog framework because its responsibility is to forward any kind of message to the logfiles, according to the category and severity of the message.</p><p class="calibre7">The latter topic, performance monitoring, introduces us to a complete and new world where it would be possible to write a whole book on the subject. The idea here is to learn about the main fundamentals and commands to help find out performance problems in the system. The gathered metrics can be used for a tuning task where the main goal is to improve the performance and try to keep the same hardware. This is useful because managers do not want to spend money buying an unnecessary and expensive hardware when eventually, only some modifications in the system will be enough.</p></div></div>
+
+<div id="page" style="height:0pt"/><div class="book" title="Configuring the syslog"><div class="book"><div class="book"><div class="book"><h1 class="title" id="calibre_pb_0"><a id="ch09lvl1sec83" class="calibre1"/>Configuring the syslog</h1></div></div></div><p class="calibre7">The syslog <a id="id1058" class="calibre1"/>framework is one of the most important features of Oracle Solaris 11, because its goal is to log all the events that occur in each second. These records can be used to investigate any suspicious behavior on the system. Like most books, we will not delve into unnecessary details and theory about syslog. The main idea here is to show how the syslog can be configured, monitored, and used.</p></div>
+
+<div class="book" title="Configuring the syslog">
+<div class="book" title="Getting ready"><div class="book"><div class="book"><div class="book"><h2 class="title1" id="calibre_pb_1"><a id="ch09lvl2sec118" class="calibre1"/>Getting ready</h2></div></div></div><p class="calibre7">This recipe requires two virtual machines (VirtualBox or VMware) named <code class="email">solaris11-1</code> and <code class="email">solaris11-2</code>, both running Oracle Solaris 11 with at least 2 GB RAM, and a network interface.</p></div></div>
+
+<div class="book" title="Configuring the syslog">
+<div class="book" title="How to do it…"><div class="book"><div class="book"><div class="book"><h2 class="title1" id="calibre_pb_2"><a id="ch09lvl2sec119" class="calibre1"/>How to do it…</h2></div></div></div><p class="calibre7">The syslog framework is composed of a main daemon (<code class="email">syslogd</code>) and its respective configuration file (<code class="email">/etc/syslog.conf</code>). To gather details about the associated syslog service, we have to execute the following SMF administration commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -l svc:/system/system-log:default</strong></span>
+fmri         svc:/system/system-log:default
+name         system log
+enabled      true
+state        online
+next_state   none
+state_time   May 19, 2014 01:29:14 AM BRT
+logfile      /var/svc/log/system-system-log:default.log
+restarter    svc:/system/svc/restarter:default
+contract_id  117 
+manifest     /root/chapter5/myprofile.xml
+manifest     /etc/svc/profile/generic.xml
+manifest     /lib/svc/manifest/system/system-log.xml
+dependency   require_all/none svc:/milestone/self-assembly-complete (online)
+dependency   require_all/none svc:/system/filesystem/local (online)
+dependency   optional_all/none svc:/system/filesystem/autofs (online)
+dependency   require_all/none svc:/milestone/name-services (online)
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -x svc:/system/system-log:default</strong></span>
+svc:/system/system-log:default (system log)
+ State: online since May 19, 2014 01:29:14 AM BRT
+   See: <span class="strong"><strong class="calibre8">syslogd(1M)</strong></span>
+   See: /var/svc/log/system-system-log:default.log
+Impact: None.</pre></div><p class="calibre7">As we mentioned <a id="id1059" class="calibre1"/>about the syslog service, there's a configuration file named <code class="email">/etc/syslog.conf</code>, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~#<span class="strong"><strong class="calibre8"> more /etc/syslog.conf </strong></span>
+#
+#ident  "%Z%%M%  %I%  %E% SMI"  /* SunOS 5.0 */
+#
+# Copyright (c) 1991-1998 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+# syslog configuration file.
+#
+# This file is processed by m4 so be careful to quote (`') names
+# that match m4 reserved words.  Also, within ifdef's, arguments
+# containing commas must be quoted.
+#
+*.err;kern.notice;auth.notice      /dev/sysmsg
+*.err;kern.debug;daemon.notice;mail.crit  /var/adm/messages
+
+*.alert;kern.err;daemon.err      alexandre
+*.alert            root
+
+*.emerg            *
+
+# if a non-loghost machine chooses to have authentication messages
+# sent to the loghost machine, un-comment out the following line:
+#auth.notice      ifdef(`LOGHOST', /var/log/authlog, @loghost)
+
+mail.debug      ifdef(`LOGHOST', /var/log/syslog, @loghost)
+
+#
+# non-loghost machines will use the following lines to cause "user"
+# log messages to be logged locally.
+#
+ifdef(`LOGHOST', ,
+user.err          /dev/sysmsg
+user.err          /var/adm/messages
+user.alert          `root, operator'
+user.emerg          *
+)</pre></div><p class="calibre7">This configuration file is straight and has only two columns, selector and target, both separated by <span class="strong"><strong class="calibre8">tabs</strong></span> (not spaces).</p><p class="calibre7">The selector column is composed of two components in the <code class="email">facility.level</code> format, and the syntax is defined as follows:</p><div class="informalexample"><pre class="programlisting">&lt;facility&gt;.&lt;level&gt;        &lt;target&gt;</pre></div><p class="calibre7">The <code class="email">facility</code> component determines the class or category of message (KERN, USER, MAIL, DAEMON, AUTH, NEWS, UUCP, CRON, AUDIT, LOCAL 0-7, and *), and the <code class="email">level</code> component means the priority (EMERG, ALERT, CRIT, ERROR, WARNING, NOTICE, INFO, and DEBUG, in the descending order). Additionally, the target column is the destination of the message, where the destination can be a device file, file, user, or host.</p><p class="calibre7">We will now see some <a id="id1060" class="calibre1"/>practical examples of the <code class="email">/etc/syslog.conf</code> configuration file with its respective syntax:</p><div class="book"><ul class="itemizedlist"><li class="listitem"><code class="email">*.err;kern.notice;auth.notice      /dev/sysmsg</code>: All messages with an error (<code class="email">err</code>) priority (the facility doesn't matter), any kernel facility messages with a priority equal to or higher than <code class="email">notice</code> (<code class="email">notice</code>, <code class="email">warning</code>, <code class="email">error</code>, <code class="email">critical</code>, <code class="email">alert</code>, and <code class="email">emergency</code>), and any authentication (<code class="email">auth</code>) facility message with a priority equal to or higher than <code class="email">notice</code> are sent to <code class="email">/devsysmsg</code></li><li class="listitem"><code class="email">*.err;kern.debug;daemon.notice;mail.crit  /var/adm/messages</code>: All messages with a <code class="email">debug</code> priority (the facility doesn't matter), any kernel facility message with a <code class="email">debug</code> level or higher, any <code class="email">daemon</code> facility message with <code class="email">notice</code> priority or higher, and all mail facility messages with <code class="email">critical</code> priority or higher are sent to the <code class="email">/var/adm/messages</code> file</li><li class="listitem"><code class="email">*.alert;kern.err;daemon.err      alexandre</code>: In this example, all messages with priority equal to or higher than <code class="email">alert</code>, messages with facility equal to <code class="email">kernel</code> and priority error (<code class="email">err</code>) or higher, and messages with facility equal to <code class="email">daemon</code> and priority error (<code class="email">err</code>) or higher are sent to the <code class="email">alexandre</code> user</li><li class="listitem"><code class="email">*.emerg            *</code>: In this line, all messages with priority level equal to or higher than <code class="email">emerg</code> are sent to every user that is logged on</li><li class="listitem"><code class="email">local7.alert            @solaris11-2</code>: Any message with the <code class="email">local7</code> facility and priority level equal to or higher than <code class="email">alert</code> is sent to another host (<code class="email">solaris11-2</code>)</li><li class="listitem"><code class="email">mail.debug    ifdef(`LOGHOST', /var/log/syslog, @loghost)</code>: This is a nice example because any message with the facility equal to <code class="email">mail</code> and priority level equal to <code class="email">debug</code> or higher can be sent to two different destinations specified in the <code class="email">/etc/hosts</code> file</li></ul></div><p class="calibre7">If the <code class="email">LOGHOST</code> variable (as shown earlier) is set (defined in the same line) to the localhost, the <code class="email">mail.debug</code> messages are sent to the <code class="email">/var/log/syslog</code> file. However, if the <code class="email">LOGHOST</code> keyword is set to another host (for example, <code class="email">solaris11-2 machine</code>), then the <code class="email">mail.debug</code> message is sent to the <code class="email">solaris11-2</code> machine.</p><p class="calibre7">As the <code class="email">/etc/hosts</code> file is used to specify these special hostnames, we can verify an example as follows:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">more /etc/hosts</strong></span>
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# Internet host table
+#
+::1 solaris11-1 localhost 
+127.0.0.1 solaris11-1 localhost <span class="strong"><strong class="calibre8">loghost</strong></span> 
+192.168.1.144  solaris11-1  solaris11-1.example.com
+192.168.1.155  solaris11-2  solaris11-2.example.com</pre></div><p class="calibre7">In this case, <code class="email">loghost</code> is configured to the localhost (<code class="email">solaris11-1</code>), so any message with facility equal to <code class="email">mail</code> and priority level equal to <code class="email">debug</code> must be sent to the <code class="email">/var/adm/message</code> file.</p><p class="calibre7">From these examples, you can note some of the following points:</p><div class="book"><ul class="itemizedlist"><li class="listitem">A message can be <a id="id1061" class="calibre1"/>sent to two or more different places, as seen in the first two examples</li><li class="listitem">If a message is sent to another host, such as the last configuration line's example, the target host must have a similar line to handle the arriving message</li><li class="listitem">Any change in the <code class="email">/etc/syslog.conf</code> file requires restarting the syslog service (<code class="email">svcadm restart svc:/system/system-log:default</code> and <code class="email">svcadm restart svc:/system/system-log:default</code>)</li></ul></div><p class="calibre7">Let's create a real test. In the <code class="email">solaris11-1</code> system, edit the <code class="email">/etc/syslog.conf</code> file and add the following line:</p><div class="informalexample"><pre class="programlisting">local7.emerg          @solaris11-2</pre></div><p class="calibre7">Add the <code class="email">solaris11-2</code> system in the <code class="email">/etc/hosts</code> file on the <code class="email">solaris11-1</code> machine, and make sure that it's accessible from the <code class="email">solaris11-1</code> system, as shown in the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">ping solaris11-2</strong></span>
+solaris11-2 is alive
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">more /etc/syslog.conf </strong></span>
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+# non-loghost machines will use the following lines to cause "user"
+# log messages to be logged locally.
+#
+ifdef(`LOGHOST', ,
+user.err          /dev/sysmsg
+user.err          /var/adm/messages
+user.alert          `root, operator'
+user.emerg          *
+)
+local7.emerg          @solaris11-2</pre></div><p class="calibre7">On the <code class="email">solaris11-1</code> system, refresh the syslog service by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm refresh svc:/system/system-log:default</strong></span>
+</pre></div><p class="calibre7">If the syslog configuration doesn't take effect for some reason, you can restart it by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm restart svc:/system/system-log:default</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs svc:/system/system-log:default</strong></span>
+STATE          STIME    FMRI
+online          4:58:45 svc:/system/system-log:default</pre></div><p class="calibre7">On another system (<code class="email">solaris11-2</code>), we <a id="id1062" class="calibre1"/>have to include the following line at end of the <code class="email">/etc/syslog.conf</code> file:</p><div class="informalexample"><pre class="programlisting">local7.emerg          /var/adm/new_messages</pre></div><p class="calibre7">As this file doesn't exist, we can create it as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-2:~# <span class="strong"><strong class="calibre8">touch /var/adm/new_messages</strong></span>
+</pre></div><p class="calibre7">There is a property from the <code class="email">system-log:default</code> service named <code class="email">log_from_remote</code>, and it should be set to <code class="email">true</code> to allow remote hosts (<code class="email">solaris11-1</code>) to log any message into the <code class="email">solaris11-2</code> system. Nonetheless, the big issue is that this parameter is usually configured to <code class="email">false</code>. Additionally, a configuration file (<code class="email">/etc/default /syslog</code>) also controls the remote logging behavior, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-2:~# <span class="strong"><strong class="calibre8">more /etc/default/syslogd </strong></span>
+#ident  "%Z%%M%  %I%  %E% SMI"
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# /etc/default/syslogd
+#
+# Legacy configuration file for syslogd(1M). See syslogd(1M).
+#
+# This file should no longer be directly used to configure syslogd. 
+# These settings are kept here for backwards compatibility only. 
+# Please use svccfg(1M) to modify the properties of syslogd(1M).
+#
+# The LOG_FROM_REMOTE setting used to affect the logging of remote
+# messages. Its definition here will override the svccfg(1M) settings
+# for log_from_remote.
+#
+<span class="strong"><strong class="calibre8">#LOG_FROM_REMOTE=YES</strong></span>
+</pre></div><p class="calibre7">Now, let's take a look at the details. If this <code class="email">LOG_FROM_REMOTE</code> variable (from the <code class="email">/etc/default/syslogd</code> file) is set to <code class="email">YES</code> or <code class="email">NO</code>, the <code class="email">log_from_remote </code>property (from the <code class="email">system-log:default</code> service) is enabled or disabled, respectively. However, if the <code class="email">LOG_FROM_REMOTE</code> variable is commented out (as shown in the previous file), the value of the <code class="email">log_from_remote</code> property (from the <code class="email">system-log:default</code> service) takes effect.</p><p class="calibre7">Therefore, to make our lives <a id="id1063" class="calibre1"/>easier, we are going to enable the <code class="email">log_from_remote</code> property, without touching the <code class="email">/etc/default/syslogd</code> configuration file, and restart the service, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-2:~# <span class="strong"><strong class="calibre8">svccfg -s svc:/system/system-log setprop config/log_from_remote = true</strong></span>
+root@solaris11-2:~# <span class="strong"><strong class="calibre8">svcadm restart svc:/system/system-log:default</strong></span>
+root@solaris11-2:~# <span class="strong"><strong class="calibre8">svcs svc:/system/system-log:default</strong></span>
+STATE          STIME    FMRI
+online         13:38:17 svc:/system/system-log:default</pre></div><p class="calibre7">On the same <code class="email">solaris11-2</code> system, we have to follow <code class="email">/var/adm/new_messages</code> to confirm if the message from <code class="email">solaris11-1</code> arrives, using the next command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-2:~# <span class="strong"><strong class="calibre8">tail -f /var/adm/new_messages</strong></span>
+</pre></div><p class="calibre7">On the <code class="email">solaris11-1</code> system, it is time to test the configuration, and we can use the <code class="email">logger</code> command that generates a message with the facility and level specified, using the <code class="email">-p</code> option. In this case, we are going to generate the <code class="email">Alexandre Borges</code> message that will be classified as <code class="email">local7</code> and with priority level <code class="email">emerg</code>. According to the <code class="email">/etc/syslog.conf</code> configuration file, the message will be sent to the <code class="email">solaris11-2</code> host. Once it is there, the message will be sent to the <code class="email">/var/adm/new_messages</code> file, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">logger -p local7.emerg Alexandre Borges</strong></span>
+</pre></div><p class="calibre7">And we're done! Returning to the <code class="email">solaris11-2</code> host, we are able to confirm that the message has arrived by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-2:~# <span class="strong"><strong class="calibre8">tail -f /var/adm/new_messages</strong></span>
+May 19 13:41:44 <span class="strong"><strong class="calibre8">solaris11-1.example.com</strong></span> root: [ID 702911 <span class="strong"><strong class="calibre8">local7.emerg] Alexandre Borges</strong></span>
+</pre></div><p class="calibre7">This is perfect! Everything <a id="id1064" class="calibre1"/>worked as expected!</p><p class="calibre7">Proceeding with the explanation about logging, some network services have their own log configuration, and the best way to understand this is by taking a look at another practical example. For example, pick the telnet service and examine its configuration using the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">inetadm -l telnet</strong></span>
+SCOPE    NAME=VALUE
+         name="telnet"
+         endpoint_type="stream"
+         proto="tcp6"
+         isrpc=FALSE
+         wait=FALSE
+         exec="/usr/sbin/in.telnetd"
+         user="root"
+default  bind_addr=""
+default  bind_fail_max=-1
+default  bind_fail_interval=-1
+default  max_con_rate=-1
+default  max_copies=-1
+default  con_rate_offline=-1
+default  failrate_cnt=40
+default  failrate_interval=60
+default  inherit_env=TRUE
+         <span class="strong"><strong class="calibre8">tcp_trace=FALSE</strong></span>
+default  tcp_wrappers=FALSE
+default  connection_backlog=10
+default  tcp_keepalive=FALSE</pre></div><p class="calibre7">As we are able to see in the previous output, the <code class="email">tcp_trace</code> property is set to <code class="email">false</code>, and this way, no telnet message is sent to the syslog service. It is possible to change this default behavior by running the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">inetadm -m telnet tcp_trace=true </strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">inetadm -l telnet | grep tcp_trace</strong></span>
+tcp_trace=TRUE
+
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">inetadm | grep telnet</strong></span>
+enabled   online         svc:/network/telnet:default</pre></div><p class="calibre7">To verify the telnet events, we must execute a telnet operation from the <code class="email">solaris11-2</code> system and check the <code class="email">/var/adm/messages</code> file in the <code class="email">solaris11-1</code> host, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-2:~# <span class="strong"><strong class="calibre8">telnet solaris11-1</strong></span>
+Trying 192.168.1.144...
+Connected to solaris11-1.example.com.
+Escape character is '^]'.
+login: <span class="strong"><strong class="calibre8">borges</strong></span>
+Password: <span class="strong"><strong class="calibre8">hacker123!</strong></span>
+Oracle Corporation      SunOS 5.11      11.1    September 2012
+-bash-4.1$</pre></div><p class="calibre7">On the solaris11-1 host, verify <a id="id1065" class="calibre1"/>the <code class="email">/var/adm/</code>message's file log content by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">tail -3 /var/adm/messages</strong></span>
+May 19 15:03:44 solaris11-1 mDNSResponder: [ID 702911 daemon.warning] SendResponses: No active interface to send:   33 _OSInstall._tcp.local. PTR borges_ai._OSInstall._tcp.local.
+
+May 19 15:03:44 solaris11-1 mDNSResponder: [ID 702911 daemon.warning] SendResponses: No active interface to send:   36 _OSInstall._tcp.local. PTR default-i386._OSInstall._tcp.local.
+
+<span class="strong"><strong class="calibre8">May 19 15:15:02 solaris11-1 inetd[829]: [ID 317013 daemon.notice] telnet[2677] from 192.168.1.155 40498</strong></span>
+</pre></div><p class="calibre7">It worked! However, why do messages from services that were configured using <code class="email">tcp_trace=true</code> go to the <code class="email">/var/adm/message</code> file? Because all the messages that originated from this attribute are classified as <code class="email">daemon.notice</code> (remember the <code class="email">facility.severity</code> syntax), and according to the <code class="email">/etc/syslog.conf</code> file, we have the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">cat /etc/syslog.conf | grep /var/adm/messages</strong></span>
+*.err;kern.debug;daemon.notice;mail.crit  /var/adm/messages
+user.err          /var/adm/messages</pre></div><p class="calibre7">Instead of configuring the logging capacity in each network service, we can configure the logging feature for all network services, using a simple command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">inetadm -M tcp_trace=true</strong></span>
+</pre></div><p class="calibre7">Now, all the network services <a id="id1066" class="calibre1"/>that are controlled by the <code class="email">inetadm</code> framework are configured to log to the <code class="email">system-log:default</code> service according to the <code class="email">/etc/syslog.conf</code> configuration file.</p><div class="book" title="An overview of the recipe"><div class="book"><div class="book"><div class="book"><h3 class="title2"><a id="ch09lvl3sec58" class="calibre1"/>An overview of the recipe</h3></div></div></div><p class="calibre7">We learned how to configure the logging service in Oracle Solaris 11 using the <code class="email">system-log:default</code> service (the <code class="email">syslogd</code> daemon) and its respective configuration file (<code class="email">/etc/syslog.conf</code>). Additionally, we saw how to configure the logging feature for network services that are controlled by the <code class="email">inetadm</code> framework.</p></div></div></div>
+
+<div id="page" style="height:0pt"/><div class="book" title="Monitoring the performance on Oracle Solaris 11"><div class="book"><div class="book"><div class="book"><h1 class="title" id="calibre_pb_0"><a id="ch09lvl1sec84" class="calibre1"/>Monitoring the performance on Oracle Solaris 11</h1></div></div></div><p class="calibre7">When we are working <a id="id1067" class="calibre1"/>in an environment <a id="id1068" class="calibre1"/>with many available resources, without doubt, it is easier to administer all systems. However, how can we handle critical systems that run Oracle Solaris 11 with few free resources? How can we find and monitor these rare resources on Oracle Solaris 11?</p><p class="calibre7">The performance and tuning subject on Oracle Solaris is a very long and dense topic to be explained in a complete way; it deserves an entire book dedicated to all its details. However, we will learn enough monitor details and commands that will motivate you to study this topic deeply.</p></div>
+
+<div class="book" title="Monitoring the performance on Oracle Solaris 11">
+<div class="book" title="Getting ready"><div class="book"><div class="book"><div class="book"><h2 class="title1" id="calibre_pb_1"><a id="ch09lvl2sec120" class="calibre1"/>Getting ready</h2></div></div></div><p class="calibre7">This recipe requires a virtual machine (VirtualBox or VMware) that runs Oracle Solaris 11 with 2 GB RAM at least. It is recommended that the system has two or more processors or cores.</p></div></div>
+
+<div class="book" title="Monitoring the performance on Oracle Solaris 11">
+<div class="book" title="How to do it…"><div class="book"><div class="book"><div class="book"><h2 class="title1" id="calibre_pb_2"><a id="ch09lvl2sec121" class="calibre1"/>How to do it…</h2></div></div></div><p class="calibre7">Fundamentally, Oracle Solaris 11 is composed of CPU, RAM, and I/O devices, and there are many ways to monitor the system. Furthermore, there are some parameters that are very important, so it's appropriate to start our studies by examining the memory subsystem.</p><p class="calibre7">The first step is to enable the system to collect the <code class="email">sar</code> statistics, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -a | grep sar</strong></span>
+disabled        0:37:02 svc:/system/sar:default
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm enable svc:/system/sar:default</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -a | grep sar</strong></span>
+online          4:34:57 svc:/system/sar:default</pre></div><p class="calibre7">Using either the <code class="email">prtconf</code> or the <code class="email">lgrpinfo</code> command, we can find out the total installed memory. In addition, by executing the <code class="email">pagesize</code> command, we can find the page size of a page in <a id="id1069" class="calibre1"/>memory, and finally, we can use <code class="email">sar –r</code> to get the free memory and swap space, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">prtconf | grep -i memory</strong></span>
+Memory size: 4096 Megabytes
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">lgrpinfo</strong></span> 
+lgroup 0 (root):
+  Children: none
+  CPU: 0
+  Memory: installed 4.0G, allocated 1.3G, free 2.7G
+  Lgroup resources: 0 (CPU); 0 (memory)
+  Load: 0.297
+  Latency: 0
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">pagesize</strong></span>
+4096
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">sar -r 1 3</strong></span>
+SunOS solaris11-1 5.11 11.1 i86pc    05/21/2014
+01:45:09 freemem freeswap
+01:45:10  632394  5876128
+01:45:11  632439  5877184
+01:45:12  632476  5876128
+
+Average   632436  5876480</pre></div><p class="calibre7">In the preceding command, the <code class="email">freemem</code> column is the average number of available pages (4K in this case), and the <code class="email">freeswap</code> column means the average number of disk blocks designed for page swapping.</p><p class="calibre7">The free memory (in pages of 4 KB) can also be obtained using a very smart command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">kstat -p unix:0:system_pages:freemem</strong></span>
+unix:0:system_pages:freemem  632476</pre></div><p class="calibre7">A typical way to get the free swap space is using the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">swap –l</strong></span>
+swapfile                 dev    swaplo   blocks     free
+/dev/zvol/dsk/rpool/swap 285,2     8    2097144  <span class="strong"><strong class="calibre8">2097144</strong></span>
+</pre></div><p class="calibre7">In this case, we <a id="id1070" class="calibre1"/>should remember that free space is shown in sectors (512 bytes).</p><p class="calibre7">Taking a different <a id="id1071" class="calibre1"/>way, free swap information can be obtained from <a id="id1072" class="calibre1"/>
+<span class="strong"><strong class="calibre8">Modular Debugger</strong></span> (<span class="strong"><strong class="calibre8">MDB</strong></span>):</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">echo ::swapinfo | mdb –k</strong></span>
+            ADDR            VNODE     PAGES      FREE NAME
+ffffc1000743e378 ffffc10007df3d00    262143    262143 /dev/zvol/dsk/rpool/swap</pre></div><p class="calibre7">Furthermore, the same MDB can provide us with lots of information about the memory status by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">echo ::memstat | mdb –k</strong></span>
+Page Summary                Pages                MB  %Tot
+------------     ----------------  ----------------  ----
+Kernel                     215458               841   21%
+ZFS File Data              132510               517   13%
+Anon                       101485               396   10%
+Exec and libs                4105                16    0%
+Page cache                  17361                67    2%
+Free (cachelist)            14411                56    1%
+Free (freelist)            563133              2199   54%
+Total                     1048463              4095</pre></div><p class="calibre7">This output shows the amount of memory used by kernel (<code class="email">Kernel</code>), amount of memory used by data from <span class="strong"><strong class="calibre8">ZFS </strong></span>
+<a id="id1073" class="calibre1"/>
+<span class="strong"><strong class="calibre8">File Data</strong></span> (<span class="strong"><strong class="calibre8">ZFS</strong></span>), and the number of anonymous pages (a sum of heap, stack, shared memory, and copy on write pages) in memory.</p><p class="calibre7">The page cache (stored on virtual memory) is made by all the recently read and written regular filesystem data (file and directory data) other than ZFS (the ZFS data is on <span class="strong"><strong class="calibre8">Adaptive Replacement </strong></span>
+<a id="id1074" class="calibre1"/>
+<span class="strong"><strong class="calibre8">Cache</strong></span> (<span class="strong"><strong class="calibre8">ARC</strong></span>)). As we mentioned earlier, regular ZFS filesystem data is stored on the page cache because mmap ZFS data also stays there.</p><p class="calibre7">Free (<code class="email">freelist</code>) is the real amount of free memory without any connection to the processes and files. The cache list is the number of unmapped file pages on the free list.</p><p class="calibre7">The basic and rough working of page cache is that any necessary filesystem data is fetched on the <code class="email">segmap</code> cache.</p><p class="calibre7">The <code class="email">Segmap</code> cache is a kind of first-level cache or staging area, where recent pages that were read from the filesystem (<code class="email">UFS</code>, <code class="email">VxFS</code>, <code class="email">NFS</code>, and <code class="email">QFS</code>) are kept into pages of kernel's virtual memory to be copied to user space buffers. Nevertheless, if the information is not found on the <code class="email">segmap</code> cache, the kernel tries to find the requested data on <code class="email">cachelist</code> (unmapped filesystem pages). Additionally, the <code class="email">segmap</code> cache is not used by the ZFS filesytem. An interesting concept is that <code class="email">freelist</code> is linked to <code class="email">cachelist</code>, showing that when some free page <a id="id1075" class="calibre1"/>of memory is necessary, first, the kernel tries to take pages from <code class="email">freelist</code>, but if it isn't possible, the kernel takes a page of memory from <code class="email">cachelist</code>.</p><p class="calibre7">By the way, only for <a id="id1076" class="calibre1"/>completeness, the <code class="email">segmap</code> cache statistics could be found by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">kstat -n segmap</strong></span>
+module: unix                            instance: 0     
+name:   segmap                          class:    vm
+  crtime                          0
+  fault                           69
+  faulta                          0
+  free                            0
+  free_dirty                      0
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+</pre></div><p class="calibre7">The <code class="email">kstat</code> command is also appropriate to show complementary page system information. Remember that a page size in memory is 4 KB, and it can be found by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">kstat -n system_pages</strong></span>
+module: unix                            instance: 0     
+name:   system_pages                    class:    pages
+  availrmem                       696041
+  crtime                          0
+  desfree                         8159
+  desscan                         25
+  econtig                         4229439488
+  fastscan                        473831
+  freemem                         585862
+  kernelbase                      0
+  lotsfree                        16318
+  minfree                         4079
+  nalloc                          44993593
+  nalloc_calls                    19577
+  nfree                           42000307
+  nfree_calls                     13223
+  nscan                           0
+  pagesfree                       585862
+  pageslocked                     348325
+  pagestotal                      1044366
+  physmem                         1044366
+  pp_kernel                       362807
+  slowscan                        100
+  snaptime                        6181.186029253</pre></div><p class="calibre7">An additional and interesting note: <code class="email">availrmem</code> is the amount of unlocked memory available for <a id="id1077" class="calibre1"/>allocation. Furthermore, if we take the same <code class="email">kstat</code> command, it is possible to get system-wide page statistics, as shown in the <a id="id1078" class="calibre1"/>following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">kstat -n vm</strong></span>
+module: cpu                             instance: 0     
+name:   vm                              class:    misc
+  anonfree                        0
+  anonpgin                        0
+  anonpgout                       0
+  as_fault                        941681
+  cow_fault                       151186
+  crtime                          42.291984164
+  dfree                           0
+  execfree                        0
+  execpgin                        0
+  execpgout                       0
+  fsfree                          0
+  fspgin                          32
+  fspgout                         0
+  hat_fault                       0
+  kernel_asflt                    0
+  maj_fault                       5
+  pgfrec                          149071
+  pgin                            6
+  pgout                           0
+  pgpgin                          32
+  pgpgout                         0
+  pgrec                           149071
+  pgrrun                          4
+  pgswapin                        0
+  pgswapout                       0
+  prot_fault                      162132
+  rev                             0
+  scan                            97276
+  snaptime                        6715.331061273
+  softlock                        17396
+  swapin                          0
+  swapout                         0
+  zfod                            399824</pre></div><p class="calibre7">From this huge output, some parameters stand out:</p><div class="book"><ul class="itemizedlist"><li class="listitem"><code class="email">anonfree</code>: This defines heap and stack pages that were released after these pages have been paged out to the disk</li><li class="listitem"><code class="email">anopgin</code>: This defines heap and stack pages paged in from the disk</li><li class="listitem"><code class="email">anonpgout</code>: This defines heap and stack pages paged out from the swap</li><li class="listitem"><code class="email">maj_fault</code>: This defines the number of operations where the page has been found on the disk because it wasn't on memory</li><li class="listitem"><code class="email">pgswapin</code>: This defines the number of pages swapped in</li><li class="listitem"><code class="email">pgswapout</code>: This defines the number of pages swapped out</li></ul></div><p class="calibre7">Returning to general <a id="id1079" class="calibre1"/>memory statistics, there is a known command named <code class="email">vmstat</code> (which uses the <code class="email">–p</code> option to report paging activity) that <a id="id1080" class="calibre1"/>can disclose useful details, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">vmstat -p 1 5</strong></span>
+     memory           page          executable      anonymous      filesystem 
+   swap  free  re  mf  fr  de  sr  epi  epo  epf  api  apo  apf  fpi  fpo  fpf
+ 3243004 2845352 237 1317 0 0 266    0    0    0    0    0    0    0    0    0
+ 2844188 2438808 14 57  0   0   0    0    0    0    0    0    0    0    0    0
+ 2843132 2438060 0  2   0   0   0    0    0    0    0    0    0    0    0    0
+ 2843132 2437664 0  2   0   0   0    0    0    0    0    0    0    0    0    0
+ 2842604 2437128 0 25   0   0   0    0    0    0    0    0    0    0    0    0</pre></div><p class="calibre7">This output brings to us some interesting information about <code class="email">swap</code> (the available swap space in KB) and <code class="email">free</code> (amount of free memory). There are other critical parameters such as <code class="email">sr</code> (number of pages scanned per second during an operation to find enough free memory), <code class="email">api</code> (anonymous page-ins), and <code class="email">apo</code> (anonymous page-outs). Usually, an <code class="email">sr</code> value (scan rate) above zero indicates problems with lack of memory, and a high value of either the <code class="email">api</code> or <code class="email">apo</code> value indicates low memory and a high number of operations to and from the swap. Additionally, as anonymous page-in operations have a bad impact on the system's performance, we could use the <a id="id1081" class="calibre1"/>DTrace tool to find all the executables that make many page-in operations by running either of the following commands:</p><div class="book"><ul class="itemizedlist"><li class="listitem">root@solaris11-1:~# <span class="strong"><strong class="calibre8">dtrace -n 'vminfo:::anonpgin { @[pid, execname] = count(); }' </strong></span></li><li class="listitem">root@solaris11-1:~# <span class="strong"><strong class="calibre8">dtrace -n 'vminfo:::pgpgin { @pg[execname] = sum(arg0); }'</strong></span></li></ul></div><p class="calibre7">After we find what <a id="id1082" class="calibre1"/>executable is causing a performance impact, it is time to decide what we can do. Eventually, it could be necessary to move the offending application to another system.</p><p class="calibre7">There is an interesting <a id="id1083" class="calibre1"/>way to verify that a process is facing problems with memory, using the <code class="email">prstat</code> command as shown:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">prstat -mLc 1 1</strong></span>
+</pre></div><p class="calibre7">The previous command gives the following output:</p><div class="mediaobject"><img src="../images/00029.jpeg" alt="How to do it…" class="calibre12"/></div><p class="calibre13"> </p><p class="calibre7">First, the options we used here were as follows:</p><div class="book"><ul class="itemizedlist"><li class="listitem"><code class="email">-m</code>: This reports microstate process accounting information.</li><li class="listitem"><code class="email">-c</code>: This prints new reports below previous reports instead of overprinting them.</li><li class="listitem"><code class="email">-L</code>: This reports statistics for each <a id="id1084" class="calibre1"/><span class="strong"><strong class="calibre8">light-weight process</strong></span> (<span class="strong"><strong class="calibre8">LWP</strong></span>). By default, the <code class="email">prstat</code> command reports only the number of LWPs for each process.</li></ul></div><p class="calibre7">The DFL column represents the percentage of time the process has spent processing data page faults, in other <a id="id1085" class="calibre1"/>words, lack of enough memory. Ideally, this value should be zero.</p><p class="calibre7">For daily <a id="id1086" class="calibre1"/>administration, we are used to executing the <code class="email">vmstat</code> command to gather information about virtual memory, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">vmstat 1 5</strong></span>
+ kthr      memory            page            disk          faults      cpu
+ r b w   swap  free  re  mf pi po fr de sr s0 s1 s2 --   in   sy   cs us sy id
+ 0 0 0 2855860 2439648 28 159 0 0  0  0 19 12  0  0  0  568 2519  741  2  4 94
+ 0 0 0 2773564 2364844 14 57 0  0  0  0  0  0  0  0  0  552  793  587  1  3 96
+ 1 0 0 2773564 2364764 0  0  0  0  0  0  0  0  0  0  0  583  677  590  1  2 97
+ 0 0 0 2773564 2364764 0  0  0  0  0  0  0  0  0  0  0  548  662  567  1  4 95
+ 0 0 0 2773564 2364764 0  0  0  0  0  0  0  0  0  0  0  566  655  574  2  2 96</pre></div><p class="calibre7">Some cool columns are <code class="email">w</code> (number of swapped-out threads), <code class="email">swap</code> (free swap space in KBs), <code class="email">free</code> (free memory, including page cache and free lists in KB), <code class="email">re</code> (number of reclaimed pages from page cache), <code class="email">pi</code> and <code class="email">po</code> (KB of page paged in and out, respectively), and <code class="email">sr</code> (pages scanned in memory for available pages).</p><p class="calibre7">A nice variation from the preceding command is <code class="email">vmstat –s</code> (displays the total number of various system events since boot), as shown in the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">vmstat –s</strong></span>
+        <span class="strong"><strong class="calibre8">0 swap ins</strong></span>
+        <span class="strong"><strong class="calibre8">0 swap outs</strong></span>
+        0 pages swapped in
+        0 pages swapped out
+   762167 total address trans. faults taken
+        7 page ins
+        0 page outs
+        7 pages paged in
+        0 pages paged out
+   <span class="strong"><strong class="calibre8">135490 total reclaims</strong></span>
+   <span class="strong"><strong class="calibre8">135490 reclaims from free list</strong></span>
+        0 micro (hat) faults
+   762167 minor (as) faults
+        <span class="strong"><strong class="calibre8">7 major faults</strong></span>
+   148638 copy-on-write faults
+   257547 zero fill page faults
+   148476 pages examined by the clock daemon
+        0 revolutions of the clock hand
+        0 pages freed by the clock daemon
+      967 forks
+     1670 vforks
+     2876 execs
+  2840211 cpu context switches
+  1877292 device interrupts
+   925020 traps
+  8412869 system calls
+  2901338 total name lookups (cache hits 86%)
+     9114 user   cpu
+    16207 system cpu
+   298592 idle   cpu
+        0 wait   cpu</pre></div><p class="calibre7">I have highlighted the main statistics from this <code class="email">vmstat –s</code> output as follows:</p><div class="book"><ul class="itemizedlist"><li class="listitem"><code class="email">pages swapped in</code>: This refers to the number of pages swapped in (from swap to memory). The ideal value is zero.</li><li class="listitem"><code class="email">pages swapped out</code>: This refers to the number of pages swapped out (from memory to swap). The ideal value is zero.</li><li class="listitem"><code class="email">reclaims from free list</code>: This refers to the total of the reclaimed pages from the free page cache inside the free list. Reclaimed pages are pages of memory that were released because of space shortage, but they still were not used for other processes nor paged out to swap. A high value can evince lack of memory.</li><li class="listitem"><code class="email">major faults</code>: This refers to the number of pages not found on physical memory; these <a id="id1087" class="calibre1"/>pages were fetched on disk. The ideal value is close to zero.</li><li class="listitem"><code class="email">total name lookups</code>: Every time a file is opened, its pathname is stored in a special place <a id="id1088" class="calibre1"/>named <span class="strong"><strong class="calibre8">Directory Name Lookup Cache</strong></span> (<span class="strong"><strong class="calibre8">DNLC</strong></span>). These statistics show us how many times the kernel found the directory path in cache (DNLC), and it does not have to fetch this information on disk. Values above 90 percent are great! Another way to get information about DNLC is using <code class="email">kstat</code>.</li></ul></div><p class="calibre7">It is possible to gather <a id="id1089" class="calibre1"/>specialized DNLC cache information by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">kstat -n dnlcstats</strong></span>
+module: unix                            instance: 0     
+name:   dnlcstats                       class:    misc
+  crtime                          38.737278004
+  dir_add_abort                   0
+  dir_add_max                     0
+  dir_add_no_memory               0
+  dir_cached_current              0
+  dir_cached_total                0
+  dir_entries_cached_current      0
+  dir_fini_purge                  0
+  dir_hits                        0
+  dir_misses                      0
+  dir_reclaim_any                 0
+  dir_reclaim_last                0
+  dir_remove_entry_fail           0
+  dir_remove_space_fail           0
+  dir_start_no_memory             0
+  dir_update_fail                 0
+  double_enters                   40
+  enters                          112579
+  <span class="strong"><strong class="calibre8">hits</strong></span>                            <span class="strong"><strong class="calibre8">2439710</strong></span>
+  <span class="strong"><strong class="calibre8">misses</strong></span>                          <span class="strong"><strong class="calibre8">408555</strong></span>
+  negative_cache_hits             89113
+  pick_free                       0
+  pick_heuristic                  0
+  pick_last                       0
+  purge_all                       0
+  purge_fs1                       0
+  purge_total_entries             60
+  purge_vfs                       10
+  purge_vp                        40
+  snaptime                        1136.042407346</pre></div><p class="calibre7">It is possible to calculate the efficiency of DNLC, which is (<span class="strong"><em class="calibre11">hits/(hits + misses)) * 100</em></span>. Therefore, according to the previous output, we have the following:</p><p class="calibre7">DNLC's efficiency = (2439710/ (2439710 + 408555) * 100 = 85,67 percent</p><p class="calibre7">As an interesting interpretation from the previous output, every hundred times we start searching for directory path information on disk, 85 times, this information is found in a DNLC cache.</p><p class="calibre7">Another clever method <a id="id1090" class="calibre1"/>to get DNLC statistics is using the <code class="email">sar</code> command as follows:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">sar -a 1 5</strong></span>
+SunOS solaris11-1 5.11 11.1 i86pc    05/21/2014
+04:37:12  iget/s namei/s dirbk/s
+04:37:13       19       14       6
+04:37:14       5       14       4
+04:37:15       10       18       9
+04:37:16       13       10       11
+04:37:17       8       13       12
+
+Average        11       14       8</pre></div><p class="calibre7">The <code class="email">iget/s</code> column shows us how many requests for the <code class="email">inode</code> directory path were not found on <code class="email">DNLC</code>. Zero <a id="id1091" class="calibre1"/>is an ideal value for this column. Nonetheless, if the <code class="email">iget/s</code> value is not equal to zero, we can change the <code class="email">ncsize</code> parameter to improve this statistic by changing the <code class="email">/etc/system</code> file, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">set ncsize = value</pre></div><p class="calibre7">The <code class="email">ncsize</code> parameter defines <a id="id1092" class="calibre1"/>the number of entries in the directory name look-up cache (DNLC), and this parameter is used by UFS, NFS, and ZFS to cache elements of path names that have been resolved.</p><p class="calibre7">By default, the value is dynamically calculated using the formula <span class="strong"><em class="calibre11">(4 * (v.v_proc + maxusers) + 320) + (4 * (v.v_proc + maxusers) + 320) / 100</em></span>. Additionally, the current value is found by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">echo ncsize/D | mdb -k</strong></span>
+ncsize:
+ncsize:         129797</pre></div><p class="calibre7">When talking about DNLC, another hot topic arises; this is the buffer cache. The buffer cache holds the metadata for inodes, which have directory path information on DNLC. The buffer <a id="id1093" class="calibre1"/>cache statistics are obtained by running a command, as shown in the following screenshot:</p><div class="mediaobject"><img src="../images/00030.jpeg" alt="How to do it…" class="calibre12"/></div><p class="calibre13"> </p><p class="calibre7">The <code class="email">%rcache</code> and <code class="email">%wcache</code> columns tell us about the percentage of times metadata information was found in the buffer cache for the read/write operations, respectively. Very good values are <code class="email">%rcache</code>, which should be more than 90 percent, and <code class="email">%wcache</code>, which should be more than 70 percent.</p><p class="calibre7">While managing memory performance, a final critical issue is to know if a physical error occurred, such as fault memory or an ECC error. In this case, we can verify that the memory and all other <a id="id1094" class="calibre1"/>hardware components in system are working well by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">fmadm faulty</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">fmstat -s -m cpumem-retire</strong></span>
+NAME                                  &gt;N     T CNT                    DELTA STAT</pre></div><p class="calibre7">Fortunately, there are no errors on my machine.</p><p class="calibre7">A huge concern when trying to tune the performance on Oracle Solaris 11 is the CPU. Eventually, the potential performance problem in the system is that the CPU is not able to attend all requests on time. For example, the <code class="email">vmstat</code> command helps us identify if the operating system shows a CPU bottleneck by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">vmstat 1 5 </strong></span>
+ kthr      memory            page            disk          faults      cpu
+ r b w   swap  free  re  mf pi po fr de sr s0 s1 s2 --   in   sy   cs us sy id
+ 5 3 0 2876068 2470716 77 324 0 0  0  0 89 21  0  1  0  580 2862  904  3  5 92
+ 3 3 0 2764212 2357504 14 58 0  0  0  0  56  14  0  0  0  547  758  582  2  3 95
+ 7 4 0 2763576 2357380 67  88  0  0  0  0  72  13  0  0  0  601 1445  691  4  4 92
+ 2 4 0 2763576 2357380 34  65  0  0  0  0  72  16  0  0  0  586 1595  700  4  5 91
+ 5 2 0 2763576 2357380 25  64  0  0  0  68  65  11  0  0  0  614 1904  752  5  5 90</pre></div><p class="calibre7">The <code class="email">kthr:r</code> column means the total number of ready threads on the run queue (sum of the dispatches queues) that wait for CPUs. A constant value above the sum of the core processors or CPUs can represent a processor bottleneck, and dividing the <code class="email">kthr:r</code>/number of CPUs or cores is a good way to compare CPU performance among servers.</p><p class="calibre7">Using the DTraceToolkit, we have the <code class="email">dispqlen.d</code> script that shows each CPU or core dispatch queue that <a id="id1095" class="calibre1"/>indicates any case of CPU <a id="id1096" class="calibre1"/>saturation. Fortunately, it is not the case in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~/DTraceToolkit-0.99/Bin# <span class="strong"><strong class="calibre8">./dispqlen.d </strong></span>
+Sampling... Hit Ctrl-C to end.
+^C^C
+ CPU 2
+           value  ------------- Distribution ------------- count    
+             &lt; 0 |                                         0        
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  75201    
+               1 |@                                        2380     
+               2 |                                         59       
+               3 |                                         0        
+
+ CPU 0
+           value  ------------- Distribution ------------- count    
+             &lt; 0 |                                         0        
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  75157    
+               1 |@                                        2431     
+               2 |                                         52       
+               3 |                                         0        
+
+ CPU 1
+           value  ------------- Distribution ------------- count    
+             &lt; 0 |                                         0        
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  75097    
+               1 |@                                        2467     
+               2 |                                         67       
+               3 |                                         8        
+               4 |                                         1        
+               5 |                                         0        
+
+ CPU 3
+           value  ------------- Distribution ------------- count    
+             &lt; 0 |                                         0        
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  75051    
+               1 |@                                        2540     
+               2 |                                         49       
+               3 |                                         0   </pre></div><p class="calibre7">A similar command that shows a similar output to the <code class="email">kthr:r</code> column from <code class="email">vmstat</code> is the <code class="email">runq-sz</code> column from <code class="email">sar –q</code>:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">sar -q 1 4</strong></span>
+SunOS solaris11-1 5.11 11.1 i86pc    05/21/2014
+21:52:45 <span class="strong"><strong class="calibre8">runq-sz</strong></span> %runocc swpq-sz %swpocc
+21:52:46     0.0       0     0.0       0
+21:52:47     2.0     100     0.0       0
+21:52:48     1.0     100     0.0       0
+21:52:49     1.0     100     0.0       0
+Average      1.3      75     0.0       0</pre></div><p class="calibre7">The <code class="email">%runocc</code> file explains the average run queue occupancy that helps us identify the eventual burst in the run queue.</p><p class="calibre7">Returning to the <code class="email">vmstat</code> output, other useful fields are <code class="email">cpu: us</code> (user time—how much time the CPU spends processing user threads), <code class="email">cpu:sy</code> (system time—how much time the CPU spends processing kernel threads and system calls), and <code class="email">cpu:id</code> (idle time—percentage of time that CPUs are waiting for runnable threads). A practical way to evaluate potential <a id="id1097" class="calibre1"/>CPU problems is by considering that a good balance between user time (<code class="email">cpu:us</code>) and system time (<code class="email">cpu:sy</code>) is about 90/10 (depending on applications running on the system). Additionally, an upper limit is 70/30, at maximum (limit). Any system showing values different from these ranges deserves an investigation.</p><p class="calibre7">Most of the previous <a id="id1098" class="calibre1"/>columns can be viewed in a similar way by executing commands such as the following one:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">sar 1 3</strong></span>
+SunOS solaris11-1 5.11 11.1 i86pc    05/21/2014
+20:39:05    %usr    %sys    %wio   %idle
+20:39:06       3       5       0      92
+20:39:07       2       2       0      96
+20:39:08       3       3       0      94
+
+Average        3       3       0      94</pre></div><p class="calibre7">Keeping the focus on system time and user time, the next command traces what processes are on the CPU, what user <a id="id1099" class="calibre1"/>code they are running, and what kernel functions are running on the CPU (system time). Therefore, if we need to know what processes are running on the CPU, execute the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">dtrace -n 'profile-993Hz {@[pid,execname] = count (); }'</strong></span>
+dtrace: description 'profile-993Hz ' matched 1 probe
+^C
+
+       13  svc.configd                                  1
+      928  fmd                                          1
+     1817  gnome-settings-d                             1
+     1824  nautilus                                     1
+     1847  updatemanagernot                             1
+     1854  xscreensaver                                 1
+     1858  nwam-manager                                 1
+     1839  gnome-power-mana                             2
+      849  VBoxService                                  3
+     1899  dtrace                                       3
+     1820  metacity                                     4
+     1829  wnck-applet                                  4
+     1821  gnome-panel                                  5
+        6  kmem_task                                    7
+     1873  clock-applet                                 7
+        3  fsflush                                     12
+     1896  gnome-terminal                              25
+     1162  Xorg                                        27
+     1840  java                                        94
+        0  sched                                    14985</pre></div><p class="calibre7">In this case, the <code class="email">sched</code> process (the Oracle Solaris scheduler) is taking most of the CPU's time. Additionally, the <code class="email">Java</code> and <code class="email">Xorg</code> processes also take a considerable amount of the CPU's time.</p><p class="calibre7">To find which processes are taking more user time (to run the user code) from the CPU, execute the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">dtrace -n 'profile-993hz /arg1/ { @[pid,execname] = count(); }'</strong></span>
+dtrace: description 'profile-993hz ' matched 1 probe
+^C
+     1919  dtrace                                      1
+     1152  Xorg                                        6
+     1892  gnome-terminal                              9
+     1830  java                                       34
+     1901  firefox                                    49</pre></div><p class="calibre7">According to the output, the <code class="email">firefox</code> process takes more of the CPU's time.</p><p class="calibre7">Following the <a id="id1100" class="calibre1"/>same line, it is feasible to obtain the top kernel functions that are on the CPU (the <code class="email">%sys</code> time) by executing <a id="id1101" class="calibre1"/>the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">dtrace -n 'profile-993hz /arg0/ { @[func(arg0)] = count() ;}'</strong></span>
+dtrace: description 'profile-993hz ' matched 1 probe
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+genunix`fsflush_do_pages                        14
+  unix`ddi_get32                                31
+  unix`i86_monito                               76
+  unix`cpu_idle_enter                          125
+  unix`tsc_read                                152
+  unix`dispatch_softint                        263
+  unix`i86_mwait                             24424</pre></div><p class="calibre7">The CPU saturation is also examined when managing processing through the <code class="email">prstat</code> command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">prstat -mLc 1 1</strong></span>
+Please wait...
+   PID USERNAME USR SYS TRP TFL DFL LCK SLP LAT VCX ICX SCL SIG PROCESS/LWPID 
+  2618 root      15  84 0.0 0.0 0.0 0.0 0.0 0.3   0  13  8K   0 prstat/1
+  1953 pkg5srv  0.2 1.4 0.0 0.0 0.0 0.0  98 0.4  19   0 147   0 htcacheclean/1
+  2530 root     0.6 0.6 0.0 0.0 0.0  98 0.0 0.7  39   0  60   0 java/22
+  2530 root     0.4 0.4 0.0 0.0 0.0  99 0.0 0.6  20   0  40   0 java/21
+  2563 root     0.2 0.5 0.0 0.0 0.0 0.0  99 0.4  38   0  76   0 
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+</pre></div><p class="calibre7">In the preceding command, we can see a total of 120 processes; 830 lwps; and 0.12, 0.11, 0.13 load averages. The <code class="email">LAT</code> (latency) column means the amount of time that processes are waiting for the CPU, and a constant value above 1 deserves a detailed investigation. If some process or thread has an inappropriate value, Oracle Solaris offers ways to delve into the details of the problem. For example, the <code class="email">java</code> process presents a latency (<code class="email">LAT</code>) value equal to 0.7 (this is a very low value, and it would not be worth investigating in a real case), but if we <a id="id1102" class="calibre1"/>want to gather details about all its threads, execute the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">prstat -mL -p 2530</strong></span>
+PID USERNAME USR SYS TRP TFL DFL LCK SLP LAT VCX ICX SCL SIG PROCESS/LWPID 
+  2530 root     0.5 0.5 0.0 0.0 0.0  98 0.0 0.9 201   0 300   0 java/22
+  2530 root     0.4 0.4 0.0 0.0 0.0  99 0.0 0.5 100   0 201   0 java/21
+  2530 root     0.2 0.2 0.0 0.0 0.0 100 0.0 0.1  99   0  99   0 java/14
+  2530 root     0.0 0.0 0.0 0.0 0.0 0.0 100 0.0  10   0  30   0 java/17
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+</pre></div><p class="calibre7">It would be possible to verify the stack for a particular thread by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">pstack 2530/22</strong></span>
+2530:  java -Djava.security.policy=/usr/share/vpanels/java.policy com.oracle.
+-----------------  lwp# 22 / thread# 22  --------------------
+ fe6893a5 lwp_cond_wait (8966640, 8966628, f527e9d8, 0)
+ fe65e2a4 _lwp_cond_timedwait (8966640, 8966628, f527ea20, fe10f9f1) + 37
+ fe10fd2d __1cGParkerEpark6Mbx_v_ (8966628) + 34d
+ fe272980 Unsafe_Park (8965d28, f527eab4, 0, 2e95966, 0, af8a18f0) + 208
+ fa2ce072 * *sun/misc/Unsafe.park(ZJ)V [compiled] 
+ fa330790 * *java/util/concurrent/locks/LockSupport.parkNanos(Ljava/lang/Object;J)V [compiled] +21 (line 449)
+ fa330790 * *java/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject.awaitNanos(J)J+69 (line 4153)
+ fa330790 * *java/util/concurrent/DelayQueue.take()Ljava/util/concurrent/Delayed;+133 (line 484)
+ 00000000 ???????? (da647c20, da647c20, af8ac070, 0, 2d, ab5463b8) + ffffffff01d8d888
+ ab7a4350 ???????? () + ffffffffad531bd8</pre></div><p class="calibre7">The <code class="email">lwp_cond_wait</code> and <code class="email">_lwp_cond_timedwait</code> functions usually wait for the occurrence of a condition represented by an LWP condition variable. In this case, both are looking for a CPU.</p><p class="calibre7">Eventually, the <code class="email">mpstat</code> command can help us distinguish the load among CPUs, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">mpstat 1 1</strong></span>
+ CPU minf mjf xcal  intr ithr  csw icsw migr smtx  srw syscl  usr sys  wt idl
+   0  331   0   21   490  127  714   10   66   39    1  2286    5  12   0  84
+   1  386   0   17   236   36  609    9   60   38    1  1988    4   9   0  86
+   2  264   0   22   281  114  566    9   58   35    1  1817    4  11   0  85
+   3  299   0   16   227   37  669    9   65   37    1  1930    4   9   0  87</pre></div><p class="calibre7">Here, <code class="email">minf</code> (minor fault—pages that were not found on cache and were fetched on memory), <code class="email">mjf</code> (major fault—pages that were not found on memory and were fetched on disk), <code class="email">xcal</code> (cross call), and <code class="email">intr</code> (number of interrupts received by the CPU). It is appropriate to say that <code class="email">cross-calls</code> are calls between CPUs or cores that execute a specific low-level <a id="id1103" class="calibre1"/>function. Additionally, <code class="email">cross-calls</code> are also necessary to keep the cache coherent due to a stale entry in a cache from a CPU. Usually, <code class="email">cross-calls</code> are originated from a requirement of releasing memory as performed by functions such as <code class="email">kmen_free ()</code>. An interrupt (the <code class="email">intr</code> column) is used by the kernel when it needs another processor to <a id="id1104" class="calibre1"/>perform work on its behalf, such as preempting a dispatcher (a thread signal, a thread that runs on another processor to enter the kernel mode) to deliver a signal to interrupt a thread on another processor and to start/stop a <code class="email">/proc</code> thread on a different processor. The <code class="email">mpstat</code> command itself doesn't show us the performance bottleneck, but it helps us have a general understanding of a system, as shown earlier. For example, continuing the preceding example, it's possible to list how many cross calls a process executed by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">dtrace -n 'sysinfo:::xcalls { @[execname] = count(); }'</strong></span>
+dtrace: description 'sysinfo:::xcalls ' matched 1 probe
+^C
+  pargs                                                            36
+  sched                                                          2156
+  dtrace                                                         2607</pre></div><p class="calibre7">The procedure of running common monitor commands such as <code class="email">mpstat</code>, <code class="email">sar</code>, <code class="email">vmstat</code>, and <code class="email">iostat</code> followed by a detailed DTrace investigation is a typical approach to finding what is the offending application or process.</p><p class="calibre7">Now, we will change the focus to I/O performance. Perhaps the most fundamental command to analyze potential problems with the I/O is the <code class="email">iostat</code> command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">iostat -xnze 1</strong></span>
+                            extended device statistics       ---- errors --- 
+    r/s    w/s   kr/s   kw/s wait actv wsvc_t asvc_t  %w  %b s/w h/w trn tot device
+    1.7    0.4   18.2    5.1  0.0  0.0   12.7   11.7   1   2   0   0   0   0 c7t0d0
+    0.0    0.0    0.1    0.0  0.0  0.0    0.1    9.2   0   0   0   0   0   0 c7t1d0
+    0.1    0.0    0.4    0.1  0.0  0.0    7.1   14.9   0   0   0   0   0   0 c7t2d0
+<span class="strong"><strong class="calibre8"> (truncated output)</strong></span>
+</pre></div><p class="calibre7">The output shows statistics for each disk. The used options are <code class="email">–n</code> (uses logical names), <code class="email">-x</code> (shows extended statistics), <code class="email">-e</code> (shows error statistics), and <code class="email">–z</code> (does not show lines without activity). Furthermore, some columns are very important, such as <code class="email">wait</code> (average number of transactions <a id="id1105" class="calibre1"/>that are in queue and waiting for the disk), <code class="email">actv</code> (number of transactions being processed), <code class="email">wsvc_t</code> (average time that a transaction spends on the I/O wait queue), and <code class="email">%b</code> (percentage of time that the disk is active). From this explanation, the <code class="email">wait</code> column <a id="id1106" class="calibre1"/>deserves attention because it is a metric of disk saturation, and ideally, it should always be equal to zero.</p><p class="calibre7">A really good tool (from the DTraceToolkit) is the <code class="email">iotop.d</code> script that prints I/O details ordered by processes and shows I/O sizes (<code class="email">BYTES</code> column), as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">cd /usr/dtrace/DTT/Bin/</strong></span>
+root@solaris11-1:/usr/dtrace/DTT/Bin# <span class="strong"><strong class="calibre8">./iotop -PC</strong></span>
+2014 May 22 05:18:15,  load: 0.38,  disk_r:    559 KB,  disk_w:   4053 KB
+
+  UID    PID   PPID CMD              DEVICE  MAJ MIN D            BYTES
+    0   2768      1 firefox          sd0     217   1 R           572928
+    0      5      0 zpool-rpool      sd0     217   1 W          4282880
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+</pre></div><p class="calibre7">We could remove the <code class="email">–P</code> option to prevent the output from rolling and refreshing the screen.</p><p class="calibre7">Finally, we have to monitor network interfaces and look for network bottleneck, so there are good tools to accomplish this task. For example, the <code class="email">netstat</code> command is a simple and effective command to gather network information and analyze if collision is happening, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">netstat -i 1</strong></span>
+    input   net0      output     input  (Total)    output
+packets errs  packets errs  colls  packets errs  packets errs  colls 
+338712  0     180791  0     0      339832  0     181911  0     0     
+4       0     1       0     0      4       0     1       0     0     
+5       0     1       0     0      5       0     1       0     0     
+6       0     1       0     0      6       0     1       0     0     
+4       0     1       0     0      4       0     1       0     0     
+4       0     1       0     0      4       0     1       0     0     
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+</pre></div><p class="calibre7">There is another fantastic tool named <code class="email">nicstat</code> that can help us find potential bottleneck on network. However, it is an external tool, and to install it is a bit convoluted. However, it is necessary to download the <a id="id1107" class="calibre1"/>
+<code class="email">nicstat</code> tool from <a class="calibre1" href="http://sourceforge.net/projects/nicstat/files/">http://sourceforge.net/projects/nicstat/files/</a>. Moreover, it would be nice to download the latest version (with more features), but we will need to compile it.</p><p class="calibre7">During this demonstration, I used the version from <a class="calibre1" href="http://sourceforge.net/projects/nicstat/files/latest/download?source=files">http://sourceforge.net/projects/nicstat/files/latest/download?source=files</a> (nicstat-src-1.95.tar.gz).</p><p class="calibre7">Once we download the package, we have to open it by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~/Downloads# <span class="strong"><strong class="calibre8">tar zxvf nicstat-src-1.95.tar.gz</strong></span>
+</pre></div><p class="calibre7">Nonetheless, we have a problem this time; it is necessary for a compiler to create the <code class="email">nicstat</code> binary! Go to <a class="calibre1" href="http://www.oracle.com/technetwork/server-storage/solarisstudio/downloads/index-jsp-141149.html">http://www.oracle.com/technetwork/server-storage/solarisstudio/downloads/index-jsp-141149.html</a> to get Oracle Solaris Studio 12.3, and click on <a class="calibre1" href="http://pkg-register.oracle.com">http://pkg-register.oracle.com</a> to download the version for Oracle Solaris 11 x86. From there, we will be requested to create personal SSL certificates to gain access to restricted repositories with packages such as Oracle Solaris Studio and <a id="id1108" class="calibre1"/>Oracle Solaris Cluster. Therefore, click on the <span class="strong"><strong class="calibre8">Request Certificate</strong></span> link. You will be redirected to a page to download <a id="id1109" class="calibre1"/>both the key and certificate. It is suggested that you save both in the <code class="email">/root/Downloads</code> directory.</p><div class="informalexample" title="Note"><h3 class="title2"><a id="note11" class="calibre1"/>Note</h3><p class="calibre7">Oracle Solaris Studio installs a very interesting tool named <code class="email">er_kernel</code> to profile only the kernel or both the <a id="id1110" class="calibre1"/>kernel and the load we are running. There is more information (including examples) about the <code class="email">er_kernel</code> tool on <a class="calibre1" href="http://docs.oracle.com/cd/E18659_01/html/821-1379/afahw.html">http://docs.oracle.com/cd/E18659_01/html/821-1379/afahw.html</a>.</p></div><p class="calibre7">The following steps are required to install both the key and certificate to include the new publisher (<code class="email">solarisstudio</code>) in the system, to test if we're able to list the Oracle Solaris Studio files, and then, to install the Oracle Solaris Studio, as shown in the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">mkdir -m 0755 -p /var/pkg/ssl</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">cp ~/Downloads/Oracle_Solaris_Studio.key.pem /var/pkg/ssl</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">cp ~/Downloads/Oracle_Solaris_Studio.certificate.pem /var/pkg/ssl</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg set-publisher -k /var/pkg/ssl/Oracle_Solaris_Studio.key.pem -c /var/pkg/ssl/Oracle_Solaris_Studio.certificate.pem -G '*' -g https://pkg.oracle.com/solarisstudio/release solarisstudio</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg list -a pkg://solarisstudio/*</strong></span>
+NAME (PUBLISHER)                                  VERSION                    IFO
+developer/solarisstudio-122 (solarisstudio)       12.2-1.0.0.0               ---
+developer/solarisstudio-122/analyzer (solarisstudio) 12.2-1.0.0.0               ---
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg install solarisstudio-123</strong></span>
+           Packages to install: 24
+       Create boot environment: No
+Create backup boot environment: No
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+DOWNLOAD                                PKGS         FILES    XFER (MB)   SPEED
+Completed                              24/24     9913/9913  457.1/457.1  301k/s
+
+PHASE                                          ITEMS
+Installing new actions                   15563/15563
+Updating package state database                 Done 
+Updating image state                            Done 
+Creating fast lookup database                   Done </pre></div><p class="calibre7">This is nice! As the <a id="id1111" class="calibre1"/>Oracle Solaris Studio is installed <a id="id1112" class="calibre1"/>out of the system's executable path, we have to include it in the <code class="email">PATH</code> variable by running the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~/Downloads# <span class="strong"><strong class="calibre8">cd</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">echo PATH=$PATH:/opt/solarisstudio12.3/bin &gt;&gt; /root/.profile </strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">echo export PATH &gt;&gt; /root/.profile </strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">. ./.profile</strong></span>
+</pre></div><p class="calibre7">Return to the <code class="email">nicstat</code> directory and compile it by executing the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">cd /root/Downloads/nicstat-src-1.95</strong></span>
+root@solaris11-1:~/Downloads/nicstat-src-1.95# <span class="strong"><strong class="calibre8">cp Makefile.Solaris Makefile</strong></span>
+root@solaris11-1:~/Downloads/nicstat-src-1.95# <span class="strong"><strong class="calibre8">make</strong></span>
+root@solaris11-1:/tmp/nicstat-src-1.95# <span class="strong"><strong class="calibre8">cp .nicstat.Solaris_11_i386 nicstat</strong></span>
+root@solaris11-1:~/Downloads/nicstat-src-1.95# <span class="strong"><strong class="calibre8">file nicstat</strong></span>
+nicstat:  ELF 32-bit LSB executable 80386 Version 1 [FPU], dynamically linked, not stripped</pre></div><p class="calibre7">Finally, we can use the fantastic <code class="email">nicstat</code> tool! First, list the available interfaces using the <code class="email">nicstat</code> tool, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~/Downloads/nicstat-src-1.95# <span class="strong"><strong class="calibre8">./nicstat –l</strong></span>
+Int      Loopback   Mbit/s Duplex State
+lo0           Yes        -   unkn    up
+net0           No     1000   full    up
+vswitch1       No        0   unkn  down
+vnic0          No    40000   unkn    up
+vnic1          No    40000   unkn    up
+vnic2          No    40000   unkn    up</pre></div><p class="calibre7">The <code class="email">nicstat</code> tool has <a id="id1113" class="calibre1"/>several options, and they <a id="id1114" class="calibre1"/>are listed by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~/Downloads/nicstat-src-1.95# <span class="strong"><strong class="calibre8">./nicstat -h</strong></span>
+USAGE: nicstat [-hvnsxpztualMU] [-i int[,int...]]
+   [interval [count]]
+         -h                 # help
+         -v                 # show version (1.95)
+         -i interface       # track interface only
+         -n                 # show non-local interfaces only (exclude lo0)
+         -s                 # summary output
+         -x                 # extended output
+         -p                 # parseable output
+         -z                 # skip zero value lines
+         -t                 # show TCP statistics
+         -u                 # show UDP statistics
+         -a                 # equivalent to "-x -u -t"
+         -l                 # list interface(s)
+         -M                 # output in Mbits/sec
+         -U                 # separate %rUtil and %wUtil
+    eg,
+       nicstat              # print summary since boot only
+       nicstat 1            # print every 1 second
+       nicstat 1 5          # print 5 times only
+       nicstat -z 1         # print every 1 second, skip zero lines
+       nicstat -i hme0 1    # print hme0 only every 1 second</pre></div><p class="calibre7">Based on the available <a id="id1115" class="calibre1"/>options, the following command brings us an extended output, without zeroed lines and separate <code class="email">%rUtil</code> and <code class="email">%wUtil</code> columns:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~/Downloads/nicstat-src-1.95# <span class="strong"><strong class="calibre8">./nicstat -zUx 1</strong></span>
+14:41:16      RdKB    WrKB   RdPkt   WrPkt   IErr  OErr  Coll  NoCP Defer %rUtil %wUtil
+lo0           0.00    0.00    0.00    0.00   0.00  0.00  0.00  0.00  0.00   0.00   0.00
+net0          0.00    0.00    0.00    0.00   0.00  0.00  0.00  0.00  0.00   0.00   0.00
+14:41:17      RdKB    WrKB   RdPkt   WrPkt   IErr  OErr  Coll  NoCP Defer %rUtil %wUtil
+net0          0.22    0.10    3.00    1.00   0.00  0.00  0.00  0.00  0.00   0.00   0.00
+14:41:18      RdKB    WrKB   RdPkt   WrPkt   IErr  OErr  Coll  NoCP Defer %rUtil %wUtil
+net0          0.28    0.09    3.96    0.99   0.00  0.00  0.00  0.00  0.00   0.00   0.00
+^C</pre></div><p class="calibre7">The most important columns from the <code class="email">nicstat</code> tool are <code class="email">rAvs</code> (average size of packets received), <code class="email">wAvs</code> (average size of packets transmitted), <code class="email">%Util</code> (maximum utilization of the interface), and <code class="email">Sat</code> (errors per second seen for the interface, and this can be a clue that the interface might be approaching saturation).</p><p class="calibre7">At the end, administrators can gather statistics from a specific network interface by running the <a id="id1116" class="calibre1"/>following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">dladm show-link -s -i 1 net0</strong></span>
+LINK                IPACKETS  RBYTES  IERRORS   OPACKETS    OBYTES      OERRORS
+net0                365079    488320923 0       190053      16047649    0
+net0                9         1044    0         4           591         0
+net0                6         446     0         3           278         0
+net0                7         538     0         1           98          0
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+</pre></div><p class="calibre7">In the preceding <a id="id1117" class="calibre1"/>command, the columns have the following meaning:</p><div class="book"><ul class="itemizedlist"><li class="listitem"><code class="email">LINK</code>: This refers to the name of the data link</li><li class="listitem"><code class="email">IPACKETS</code>: Number of packets received on this link</li><li class="listitem"><code class="email">RBYTES</code>: Number of bytes received on this link</li><li class="listitem"><code class="email">IERRORS</code>: Number of input errors</li><li class="listitem"><code class="email">OPACKETS</code>: Number of packets sent on this link</li><li class="listitem"><code class="email">OBYTES</code>: Number of bytes sent on this link</li><li class="listitem"><code class="email">OERRORS</code>: Number of output errors</li></ul></div><div class="book" title="An overview of the recipe"><div class="book"><div class="book"><div class="book"><h3 class="title2"><a id="ch09lvl3sec59" class="calibre1"/>An overview of the recipe</h3></div></div></div><p class="calibre7">This chapter explained how to configure the syslog framework to record messages and events from the system. Additionally, we gave you a brief introduction to monitoring the performance of the Oracle Solaris 11 system using several commands such as <code class="email">vmstat</code>, <code class="email">sar</code>, <code class="email">prstat</code>, <code class="email">kstat</code>, <code class="email">mdb</code>, <code class="email">iostat</code>, and so on. We also used other tools such as DTrace and DTraceToolkit scripts to measure the performance on the Oracle Solaris 11 system.</p></div></div></div>
+<div class="book" title="References"><div class="book"><div class="book"><div class="book"><h1 class="title" id="calibre_pb_0"><a id="ch09lvl1sec85" class="calibre1"/>References</h1></div></div></div><div class="book"><ul class="itemizedlist"><li class="listitem"><span class="strong"><em class="calibre11">Solaris Performance and Tools: DTrace and MDB Techniques for Solaris 10 and OpenSolaris</em></span>; <span class="strong"><em class="calibre11">Richard McDougall</em></span>, <span class="strong"><em class="calibre11">Jim Mauro</em></span>, <span class="strong"><em class="calibre11">Brendan Gregg</em></span>; <span class="strong"><em class="calibre11">Prentice Hall</em></span></li><li class="listitem"><span class="strong"><em class="calibre11">Solaris </em></span><a id="id1118" class="calibre1"/><span class="strong"><em class="calibre11">Internals: Solaris 10 and OpenSolaris Kernel Architecture (2nd Edition)</em></span>; <span class="strong"><em class="calibre11">Richard McDougall</em></span>, <span class="strong"><em class="calibre11">Jim Mauro</em></span>; <span class="strong"><em class="calibre11">Prentice Hall</em></span></li><li class="listitem"><a class="calibre1" href="http://solarisinternals.com/wiki/index.php/Solaris_Internals_and_Performance_FAQ">http://solarisinternals.com/wiki/index.php/Solaris_Internals_and_Performance_FAQ</a></li><li class="listitem"><span class="strong"><em class="calibre11">Systems Performance: Enterprise and the Cloud</em></span>; <span class="strong"><em class="calibre11">Brendan Gregg</em></span>; <span class="strong"><em class="calibre11">Prentice Hall</em></span></li><li class="listitem"><a class="calibre1" href="http://www.brendangregg.com/sysperfbook.html">http://www.brendangregg.com/sysperfbook.html</a></li><li class="listitem">The DTraceToolkit <a id="id1119" class="calibre1"/>website at <a class="calibre1" href="http://www.brendangregg.com/dtracetoolkit.html">http://www.brendangregg.com/dtracetoolkit.html</a></li><li class="listitem">The Brendan <a id="id1120" class="calibre1"/>Gregg website at <a class="calibre1" href="http://www.brendangregg.com/">http://www.brendangregg.com/</a></li><li class="listitem">The Dtrace.org <a id="id1121" class="calibre1"/>website at <a class="calibre1" href="http://dtrace.org/blogs/">http://dtrace.org/blogs/</a></li></ul></div></div></body></html>

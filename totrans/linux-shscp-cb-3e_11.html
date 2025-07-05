@@ -1,0 +1,926 @@
+<html><head></head><body>
+        <section>
+
+            <header>
+                <h1 class="header-title">Tracing the Clues</h1>
+            </header>
+
+            <article>
+                
+<p>In this chapter, we will cover the following topics:</p>
+<ul>
+<li>Tracing packets with <kbd>tcpdump</kbd></li>
+<li>Finding packets with <kbd>ngrep</kbd></li>
+<li>Tracing network routes with <kbd>ip</kbd></li>
+<li>Tracing system calls with <kbd>strace</kbd></li>
+<li>Tracing dynamic library functions with <kbd>ltrace</kbd></li>
+</ul>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Introduction</h1>
+            </header>
+
+            <article>
+                
+<p>Nothing happens without a trace. On a Linux system, we can trace events via the log files discussed in <a href="39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml" target="_blank">Chapter 9</a>, <em>Put On The Monitor's Cap</em>. The <kbd>top</kbd> command shows which programs use the most CPU time, and <kbd>watch</kbd>, <kbd>df</kbd>, and <kbd>du</kbd> let us monitor disk usage.</p>
+<p>This chapter will describe ways to get more information about network packets, CPU usage, disk usage, and dynamic library calls.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Tracing packets with tcpdump</h1>
+            </header>
+
+            <article>
+                
+<p>Just knowing which applications are using a given port may not be sufficient information to trace down a problem. Sometimes you need to check the data that is being transferred as well.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Getting ready</h1>
+            </header>
+
+            <article>
+                
+<p>You need to be a root user to run <kbd>tcpdump</kbd>. The <kbd>tcpdump</kbd> application may not be installed in your system by default. So install it with your package manager:</p>
+<pre>
+<strong>$ sudo apt-get install tcpdump</strong>
+<strong>$ sudo yum install libpcap tcpdump</strong>
+</pre>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How to do it...</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>tcpdump</kbd> application is the frontend to Wireshark and other network sniffer programs. The GUI interface supports many of the options we'll describe shortly.</p>
+<p>This application's default behavior is to display every packet seen on the primary Ethernet link. The format of a packet report is as follows:</p>
+<pre>
+    <strong>TIMESTAMP SRC_IP:PORT &gt; DEST_IP:PORT: NAME1 VALUE1, NAME2 VALUE2,...</strong>
+</pre>
+<p>The name-value pairs include:</p>
+<ul>
+<li><kbd>Flags</kbd>: The flags associated with this packet are as follows:</li>
+<li style="list-style: none; display: inline">
+<ul>
+<li>The term <kbd>S</kbd> stands for <strong>SYN</strong> (<strong>Start Connection</strong>)</li>
+<li>The term <kbd>F</kbd> stands for <strong>FIN</strong> (<strong>Finish Connection</strong>)</li>
+<li>The term <kbd>P</kbd> stands for <strong>PUSH</strong> (<strong>Push data</strong>)</li>
+<li>The term <kbd>R</kbd> stands for <strong>RST</strong> (<strong>Reset Connection</strong>)</li>
+<li>The period <kbd>.</kbd> means there are no flags</li>
+</ul>
+</li>
+<li><kbd>seq</kbd>: This refers to the sequence number of the packet. It will be echoed in an ACK to identify the packet being acknowledged.</li>
+<li><kbd>ack</kbd>: This refers to the acknowledgement that indicates a packet is received. The value is the sequence number from a previous packet.</li>
+<li><kbd>win</kbd>: This indicates the size of the buffer at the destination.</li>
+<li><kbd>options</kbd>: This refers to the TCP options defined for this packet. It is reported as a comma-separated set of key-value pairs.</li>
+</ul>
+<p>The following output shows requests from a Windows computer to the SAMBA server intermingled with a DNS request. The intermingling of different packets from different sources and applications makes it difficult to track a specific application or traffic on a given host. However, the <kbd>tcpdump</kbd> command has flags that make our life easier:</p>
+<pre>
+<strong>$ tcpdump </strong>
+<strong>22:00:25.269277 IP 192.168.1.40.49182 &gt; 192.168.1.2.microsoft-ds: Flags [P.], seq 3265172834:3265172954, ack 850195805, win 257, length 120SMB PACKET: SMBtrans2 (REQUEST)
+</strong>
+<strong>22:00:25.269417 IP 192.168.1.44.33150 &gt; 192.168.1.7.domain: 13394+ PTR? 2.1.168.192.in-addr.arpa. (42)
+</strong>
+<strong>22:00:25.269917 IP 192.168.1.2.microsoft-ds &gt; 192.168.1.40.49182: Flags [.], ack 120, win 1298, length 0
+</strong>
+<strong>22:00:25.269927 IP 192.168.1.2.microsoft-ds &gt; 192.168.1.40.49182: Flags [P.], seq 1:105, ack 120, win 1298, length 104SMB PACKET: SMBtrans2 (REPLY)</strong>
+</pre>
+<p>The <kbd>-w</kbd> flag sends the <kbd>tcpdump</kbd> output to a file instead of the terminal. The output format is in binary form, which can be read with the <kbd>-r</kbd> flag. Sniffing packets must be done with root privileges, but displaying the results from a previously saved file can be done as a normal user.</p>
+<p>By default, <kbd>tcpdump</kbd> runs and collects data until it is killed using <span class="KeyPACKT">Ctrl</span>-<span class="KeyPACKT">C</span> or <strong>SIGTERM</strong>. The <kbd>-c</kbd> flag limits the number of packets:</p>
+<pre>
+<strong># tcpdump -w /tmp/tcpdump.raw -c 50</strong>
+<strong>tcpdump: listening on eth0, link-type EN10MB (Ethernet), capture size 65535 bytes</strong>
+<strong>50 packets captured</strong>
+<strong>50 packets received by filter</strong>
+<strong>0 packets dropped by kernel</strong>
+</pre>
+<p>As a rule, we want to examine the activity on a single host, perhaps a single application.</p>
+<p>The last values of the <kbd>tcpdump</kbd> command line form an expression that helps us filter packets. The expression is a set of key-value pairs with modifiers and Boolean operators. The next recipes demonstrate using filters.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Displaying only HTTP packets</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>port</kbd> key displays only the packets sent to or from a given port:</p>
+<pre>
+<strong>$ tcpdump -r /tmp/tcpdump.raw port http</strong>
+<strong>reading from file /tmp/tcpdump.raw, link-type EN10MB (Ethernet)</strong>
+<strong>10:36:50.586005 IP 192.168.1.44.59154 &gt; ord38s04-in-f3.1e100.net.http: Flags [.], ack 3779320903, win 431, options [nop,nop,TS val 2061350532 ecr 3014589802], length 0</strong>
+
+<strong>10:36:50.586007 IP ord38s04-in-f3.1e100.net.http &gt; 192.168.1.44.59152: Flags [.], ack 1, win 350, options [nop,nop,TS val 3010640112 ecr 2061270277], length 0</strong>
+</pre>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Displaying only HTTP packets generated by this host</h1>
+            </header>
+
+            <article>
+                
+<p>If you are trying to track web usage on your network, you may only need to see the packets generated on your site. The <kbd>src</kbd> modifier specifies only these packets, with given values, in the source file. The <kbd>dst</kbd> modifier specifies only the destination:</p>
+<pre>
+<strong>$ tcpdump -r /tmp/tcpdump.raw src port http</strong>
+<strong>reading from file /tmp/tcpdump.raw, link-type EN10MB (Ethernet)</strong>
+
+<strong>10:36:50.586007 IP ord38s04-in-f3.1e100.net.http &gt; 192.168.1.44.59152: Flags [.], ack 1, win 350, options [nop,nop,TS val 3010640112 ecr 2061270277], length 0</strong>
+<strong>10:36:50.586035 IP ord38s04-in-f3.1e100.net.http &gt; 192.168.1.44.59150: Flags [.], ack 1, win 350, options [nop,nop,TS val 3010385005 ecr 2061270277], length 0</strong>
+</pre>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Viewing the packet payload as well as headers</h1>
+            </header>
+
+            <article>
+                
+<p>If you need to track down the host that's swamping the network, all you need is headers. If you are trying to debug a web or database application, you probably need to see the contents of the packets as well as the headers.</p>
+<p>The <kbd>-X</kbd> flag will include the packet data in the output.</p>
+<p>The host keyword can be combined with port information to limit the report to data to and from a given host.</p>
+<p>The two tests are connected with <strong>and</strong> to perform the Boolean <strong>and</strong> operation, and they report only those packets that are to or from <span class="URLPACKT">noucorp.com</span> and/or the <kbd>HTTP</kbd> server. The sample output shows the start of a <kbd>GET</kbd> request and the server's reply:</p>
+<pre>
+<strong>$ tcpdump -X -r /tmp/tcpdump.raw host noucorp.com and port http</strong>
+<strong>reading from file /tmp/tcpdump.raw, link-type EN10MB (Ethernet)</strong>
+<strong>11:12:04.708905 IP 192.168.1.44.35652 &gt; noucorp.com.http: Flags [P.], seq 2939551893:2939552200, ack 1031497919, win 501, options [nop,nop,TS val 2063464654 ecr 28236429], length 307</strong>
+<strong> 0x0000:  4500 0167 1e54 4000 4006 70a5 c0a8 012c  E..g.T@.@.p....,</strong>
+<strong> 0x0010:  98a0 5023 8b44 0050 af36 0095 3d7b 68bf  ..P#.D.P.6..={h.</strong>
+<strong> 0x0020:  8018 01f5 abf1 0000 0101 080a 7afd f8ce  ............z...</strong>
+<strong> 0x0030:  01ae da8d 4745 5420 2f20 4854 5450 2f31  ....GET./.HTTP/1</strong>
+<strong> 0x0040:  2e31 0d0a 486f 7374 3a20 6e6f 7563 6f72  .1..Host:.noucor</strong>
+<strong> 0x0050:  702e 636f 6d0d 0a55 7365 722d 4167 656e  p.com..User-Agen</strong>
+<strong> 0x0060:  743a 204d 6f7a 696c 6c61 2f35 2e30 2028  t:.Mozilla/5.0.(</strong>
+<strong> 0x0070:  5831 313b 204c 696e 7578 2078 3836 5f36  X11;.Linux.x86_6</strong>
+<strong> 0x0080:  343b 2072 763a 3435 2e30 2920 4765 636b  4;.rv:45.0).Geck</strong>
+<strong> 0x0090:  6f2f 3230 3130 3031 3031 2046 6972 6566  o/20100101.Firef</strong>
+<strong> 0x00a0:  6f78 2f34 352e 300d 0a41 6363 6570 743a  ox/45.0..Accept:</strong>
+<strong>...</strong>
+<strong>11:12:04.731343 IP noucorp.com.http &gt; 192.168.1.44.35652: Flags [.], seq 1:1449, ack 307, win 79, options [nop,nop,TS val 28241838 ecr 2063464654], length 1448</strong>
+<strong> 0x0000:  4500 05dc 0491 4000 4006 85f3 98a0 5023  E.....@.@.....P#</strong>
+<strong> 0x0010:  c0a8 012c 0050 8b44 3d7b 68bf af36 01c8  ...,.P.D={h..6..</strong>
+<strong> 0x0020:  8010 004f a7b4 0000 0101 080a 01ae efae  ...O............</strong>
+<strong> 0x0030:  7afd f8ce 4854 5450 2f31 2e31 2032 3030  z...HTTP/1.1.200</strong>
+<strong> 0x0040:  2044 6174 6120 666f 6c6c 6f77 730d 0a44  .Data.follows..D</strong>
+<strong> 0x0050:  6174 653a 2054 6875 2c20 3039 2046 6562  ate:.Thu,.09.Feb</strong>
+<strong> 0x0060:  2032 3031 3720 3136 3a31 323a 3034 2047  .2017.16:12:04.G</strong>
+<strong> 0x0070:  4d54 0d0a 5365 7276 6572 3a20 5463 6c2d  MT..Server:.Tcl-</strong>
+<strong> 0x0080:  5765 6273 6572 7665 722f 332e 352e 3220  Webserver/3.5.2.</strong>
+</pre>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How it works...</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>tcpdump</kbd> application sets a promiscuous flag that causes the NIC to pass all the packets to the processor. It does this instead of filtering only the ones that pertain to this host. This flag allows the recording of any packet on the physical network that the host is connected to, not just the packets intended for this host.</p>
+<p>This application is used to trace issues with overloaded network segments, hosts that generate unexpected traffic, network looping, faulty NICs, malformed packets, and more.</p>
+<p>With the <kbd>-w</kbd> and <kbd>-r</kbd> option, <kbd>tcpdump</kbd> saves data in raw format, allowing you to examine it later as a regular user. For example, if there are excessive network packet collisions at 3:00 A.M., you can set up a <kbd>cron</kbd> job to run <kbd>tcpdump</kbd> at 3:00 A.M. and then examine the data during normal working hours.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Finding packets with ngrep</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>ngrep</kbd> application is a cross between <kbd>grep</kbd> and <kbd>tcpdump</kbd>. It watches network ports and displays packets that match a pattern. You must have root privileges to run <kbd>ngrep</kbd>.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Getting ready</h1>
+            </header>
+
+            <article>
+                
+<p>You may not have the <kbd>ngrep</kbd> package installed. However, it can be installed with most package managers:</p>
+<pre>
+<strong># apt-get install ngrep</strong>
+<strong># yum install ngrep</strong>
+</pre>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How to do it...</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>ngrep</kbd> application accepts a pattern to watch for (such as <kbd>grep</kbd>), a filter string (such as <kbd>tcpdump</kbd>), and many command-line flags to fine-tune its behavior.</p>
+<p>The following example watches the traffic on port <kbd>80</kbd> and reports any packets with the string <kbd>Linux</kbd> in them:</p>
+<pre>
+<strong>$&gt; ngrep -q -c 64 Linux port 80</strong>
+<strong>interface: eth0 (192.168.1.0/255.255.255.0)</strong>
+<strong>filter: ( port 80 ) and (ip or ip6)</strong>
+<strong>match: Linux</strong>
+
+<strong>T 192.168.1.44:36602 -&gt; 152.160.80.35:80 [AP]</strong>
+<strong>  GET /Training/linux_detail/ HTTP/1.1..Host: noucorp.com..Us</strong>
+<strong>  er-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20</strong>
+<strong>  100101 Firefox/45.0..Accept: text/html,application/xhtml+xm</strong>
+<strong>  l,application/xml;q=0.9,*/*;q=0.8..Accept-Language: en-US,e</strong>
+<strong>  n;q=0.5..Accept-Encoding: gzip, deflate..Referer: http://no</strong>
+<strong>  ucorp.com/Training/..Connection: keep-alive..Cache-Control:</strong>
+<strong>   max-age=0....                                             </strong>
+</pre>
+<p>The <kbd>-q</kbd> flag directs <kbd>ngrep</kbd> to only print the headers and payloads.</p>
+<p>The <kbd>-c</kbd> flag defines the number of columns to use for payload data. By default, the number is four, which is not useful for text-based packets.</p>
+<p>After the flags is the match string (Linux), followed by a filter expression using the same filter language as <kbd>tcpdump</kbd>.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How it works...</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>ngrep</kbd> application also sets the promiscuous flag, allowing it to sniff all the visible packets, whether they relate to the host or not.</p>
+<p>The previous example displayed all of the HTTP traffic. If the host system is on a wireless network or wired via a hub (instead of a switch), it will display all of the web traffic caused by all the active users.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">There's more...</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>-x</kbd> option in <kbd>ngrep</kbd> displays a hex dump as well as a printable form. Combining this with <kbd>-X</kbd> allows you to search for a binary string (perhaps a virus signature or some known pattern).</p>
+<p>This example watches for a binary stream from an HTTPS connection:</p>
+<pre>
+<strong># ngrep -xX '1703030034' port 443</strong>
+<strong>interface: eth0 (192.168.1.0/255.255.255.0)</strong>
+<strong>filter: ( port 443 ) and (ip or ip6)</strong>
+<strong>match: 0x1703030034</strong>
+<strong>#################################################</strong>
+<strong>T 172.217.6.1:443 -&gt; 192.168.1.44:40698 [AP]</strong>
+<strong>  17 03 03 00 34 00 00 00    00 00 00 00 07 dd b0 02    ....4...........</strong>
+<strong>  f5 38 07 e8 24 08 eb 92    3c c6 66 2f 07 94 8b 25    .8..$...&lt;.f/...%</strong>
+<strong>  37 b3 1c 8d f4 f0 64 c3    99 9e b3 45 44 14 64 23    7.....d....ED.d#</strong>
+<strong>  80 85 1b a1 81 a3 d2 7a    cd                         .......z.</strong>
+</pre>
+<p>The hash marks indicate the packets that were scanned; they do not include the target pattern. There are many more options to <kbd>ngrep</kbd>; read the <kbd>man</kbd> page for the complete list.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Tracing network routes with ip</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>ip</kbd> utility reports information about the state of your network. It can tell you how many packets are being sent and received, what types of packets are being sent, how the packets are being routed, and more.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Getting ready</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>netstat</kbd> utility described in <a href="5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml">Chapter 8</a>, <em>The Old-Boy Network</em> is standard in all Linux distributions; however, it is now being replaced by more efficient utilities, such as <kbd>ip</kbd>. These new utilities are included in the <kbd>iproute2</kbd> package, which is already installed on most modern distributions.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How to do it...</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>ip</kbd> utility has many features. This recipe will discuss a few that are useful for tracing network behavior.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Reporting routes with ip route</h1>
+            </header>
+
+            <article>
+                
+<p>When packets don't reach their destination (<kbd>ping</kbd> or <kbd>traceroute</kbd> fail), the first thing an experienced user checks is the cables. The next thing to check is the routing tables. If a system lacks a default gateway (<kbd>0.0.0.0</kbd>), it will only find machines on its physical network. If you have multiple networks running on the same wires, you'll need to add routes to allow machines attached to one network to send packets to another.</p>
+<p>The <kbd>ip route</kbd> command reports known routes:</p>
+<pre>
+<strong>$ ip route</strong>
+<strong>10.8.0.2 dev tun0  proto kernel  scope link  src 10.8.0.1 </strong>
+<strong>192.168.87.0/24 dev vmnet1  proto kernel  scope link  src 192.168.87.1 </strong>
+<strong>192.168.1.0/24 dev eth0  proto kernel  scope link  src 192.168.1.44 </strong>
+<strong>default via 192.168.1.1 dev eth0  proto static </strong>
+</pre>
+<p>The <kbd>ip route</kbd> report is space-delimited. After the first element, it consists of a set of keys and values.</p>
+<p>The first line in the preceding code describes the <kbd>10.8.0.2</kbd> address as a tunnel device that uses a kernel protocol, and this address is only valid on this tunnel device. The second line describes the <kbd>192.168.87.x</kbd> network used to communicate with virtual machines. The third line is the primary network of this system, which is connected to <kbd>/dev/eth0</kbd>. The last line defines the default route, which routes to <kbd>192.168.1.1</kbd> through <kbd>eth0</kbd>.</p>
+<p>The keys reported by <kbd>ip route</kbd> include the following:</p>
+<ul>
+<li><kbd>via</kbd>: This refers to the address of the next hop.</li>
+<li><kbd>proto</kbd>: This is the protocol identifier of the route. The kernel protocol is a route installed by the kernel, while static routes are defined by an administrator.</li>
+<li><kbd>scope</kbd>: This refers to the scope where the address is valid. A link scope is only valid on this device.</li>
+<li><kbd>dev</kbd>: This is the device associated with the address.</li>
+</ul>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Tracing recent IP connections and the ARP table</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>ip neighbor</kbd> command reports known relationships between the IP address, device, and hardware MAC address. It reports whether the relationship was reestablished recently or has gone stale:</p>
+<pre>
+<strong>$&gt; ip neighbor</strong>
+<strong>192.168.1.1 dev eth0 lladdr 2c:30:33:c9:af:3e STALE</strong>
+<strong>192.168.1.4 dev eth0 lladdr 00:0a:e6:11:c7:dd STALE</strong>
+<strong>172.16.183.138 dev vmnet8 lladdr 00:50:56:20:3d:6c STALE</strong>
+
+<strong>192.168.1.2 dev eth0 lladdr 6c:f0:49:cd:45:ff REACHABLE</strong>
+</pre>
+<p>The output of the <kbd>ip neighbor</kbd> command shows that there has been no recent activity between either this system and the default gateway, or this system and the host at <kbd>192.168.1.4</kbd>. It also shows that there has been no recent activity in the virtual machines and the host at <kbd>192.168.1.2</kbd> is connected recently.</p>
+<p>The current status of <kbd>REACHABLE</kbd> in the preceding output means that the <kbd>arp</kbd> table is up to date and the host thinks it knows the MAC address of the remote system. The value of <kbd>STALE</kbd> here does not indicate that the system is unreachable; it merely means the values in the <kbd>arp</kbd> table have expired. When your system tries to use one of these routes, it sends an ARP request first to verify the MAC address associated with the IP address.</p>
+<p>The relationship between the MAC address and the IP address should only change when the hardware is changed or devices are reassigned.</p>
+<p>If devices on a network show intermittent connectivity, it may mean that two devices have been assigned the same IP address. It could also be possible that two DHCP servers are running or someone has manually assigned an address that's already in use.</p>
+<p>In the case of two devices with the same IP address, the reported MAC address for a given IP address will change in intervals, and the <kbd>ip neighbor</kbd> command will help track down the misconfigured device.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Tracing a route</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>traceroute</kbd> command discussed in <a href="5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml">Chapter 8</a>, <em>The Old-Boy Network</em> traces a packet's entire path from the current host to its destination. The <kbd>route get</kbd> command reports the next hop from the current machine:</p>
+<pre>
+<strong>$ ip route get 172.16.183.138</strong>
+<strong>172.16.183.138 dev vmnet8 src 172.16.183.1</strong>
+<strong>cache mtu 1500 hoplimit 64</strong>
+</pre>
+<p>The preceding return shows that the route to the virtual machine is through the vmnet8 interface located at <kbd>172.16.183.1</kbd>. The packets sent to this site will be split if they are larger than 1,500 bytes and discarded after 64 hops:</p>
+<pre>
+<strong>$ in route get 148.59.87.90</strong>
+<strong>148.59.87.90 via 192.168.1.1 dev eth0 src 192.168.1.3</strong>
+<strong>cache mtu 1500 hoplimit 64</strong>
+</pre>
+<p>To reach an address on the Internet, a packet needs to leave the local network via the default gateway, and the link to this gateway is the host's <kbd>eth0</kbd> device at <kbd>192.168.1.3</kbd>.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How it works...</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>ip</kbd> command runs in the user space and interfaces in the kernel tables. Using this command, a normal user can examine the network configuration whereas a superuser can configure the network.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Tracing system calls with strace</h1>
+            </header>
+
+            <article>
+                
+<p>A GNU/Linux computer may have hundreds of tasks running at a time, but it will possess only one Network Interface, one disk drive, one keyboard, and so on. The Linux kernel allocates these limited resources and controls how tasks access them. This prevents two tasks from accidently intermingling data in a disk file, for example.</p>
+<p>When you run an application, it uses a combination of <strong>User-Space libraries</strong> (functions such as <kbd>printf</kbd> and <kbd>fopen</kbd>) and System-Space Libraries (functions such as <kbd>write</kbd> and <kbd>open</kbd>). When your program calls <kbd>printf</kbd> (or a script invokes the <kbd>echo</kbd> command), it invokes a user-space library call to <kbd>printf</kbd> to format the output string; this is followed by a system-space call to the <kbd>write</kbd> function. The system call makes sure only one task can access a resource at a time.</p>
+<p>In a perfect world, all computer programs would run with no problems. In an almost perfect world, you'd have the source code, the program would be compiled with debugging support, and it would fail consistently.</p>
+<p>In the real world, you sometimes have to cope with programs where you don't have the source, and it fails intermittently. Developers can't help you unless you give them some data to work with.</p>
+<p>The Linux <kbd>strace</kbd> command reports the system calls that an application makes; this can help us understand what it's doing even if we don't have the source code.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Getting ready</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>strace</kbd> command is installed as part of the Developer package; it can be installed separately as well:</p>
+<pre>
+<strong>$ sudo apt-get install strace</strong>
+<strong>$ sudo yum install strace</strong>
+</pre>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How to do it...</h1>
+            </header>
+
+            <article>
+                
+<p>One way to understand <kbd>strace</kbd> is to write a short C program and use <kbd>strace</kbd> to see what system calls it makes.</p>
+<p>This test program allocates memory, uses the memory, prints a short message, frees the memory, and exits.</p>
+<p>The <kbd>strace</kbd> output shows the system functions this program calls:</p>
+<pre>
+$ cat test.c  
+#include &lt;stdio.h&gt; 
+#include &lt;stdlib.h&gt; 
+#include &lt;string.h&gt; 
+
+
+main () { 
+  char *tmp; 
+  tmp=malloc(100); 
+  strcat(tmp, "testing"); 
+  printf("TMP: %s\n", tmp); 
+  free(tmp); 
+  exit(0); 
+} 
+$ gcc test.c 
+$ strace ./a.out 
+execve("./a.out", ["./a.out"], [/* 51 vars */]) = 0 
+brk(0)                                  = 0x9fc000 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7f5000 
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory) 
+open("/etc/ld.so.cache", O_RDONLY)      = 3 
+fstat(3, {st_mode=S_IFREG|0644, st_size=95195, ...}) = 0 
+mmap(NULL, 95195, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7fc85c7dd000 
+close(3)                                = 0 
+open("/lib64/libc.so.6", O_RDONLY)      = 3 
+read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0&gt;\0\1\0\0\0000\356\1\16;\0\0\0"..., 832) = 832 
+fstat(3, {st_mode=S_IFREG|0755, st_size=1928936, ...}) = 0 
+mmap(0x3b0e000000, 3750184, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x3b0e000000 
+mprotect(0x3b0e18a000, 2097152, PROT_NONE) = 0 
+mmap(0x3b0e38a000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x18a000) = 0x3b0e38a000 
+mmap(0x3b0e390000, 14632, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x3b0e390000 
+close(3)                                = 0 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7dc000 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7db000 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7da000 
+arch_prctl(ARCH_SET_FS, 0x7fc85c7db700) = 0 
+mprotect(0x3b0e38a000, 16384, PROT_READ) = 0 
+mprotect(0x3b0de1f000, 4096, PROT_READ) = 0 
+munmap(0x7fc85c7dd000, 95195)           = 0 
+brk(0)                                  = 0x9fc000 
+brk(0xa1d000)                           = 0xa1d000 
+fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 11), ...}) = 0 
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc85c7f4000 
+write(1, "TMP: testing\n", 13)          = 13 
+exit_group(0)                           = ? 
++++ exited with 0 +++ 
+</pre>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How it works...</h1>
+            </header>
+
+            <article>
+                
+<p>The first lines are standard start up commands for any application. The <kbd>execve</kbd> call is the system call to initialize a new executable. The <kbd>brk</kbd> call returns the current memory address, and the <kbd>mmap</kbd> call allocates 4,096 bytes of memory for dynamic libraries and other applications that load housekeeping.</p>
+<p>The attempt to access <kbd>ld.so.preload</kbd> fails because <kbd>ld.so.preload</kbd> is a hook to preload the libraries. It is not required on most production systems.</p>
+<p>The <kbd>ld.so.cache</kbd> file is the memory-resident copy of <kbd>/etc/ld.so,conf.d</kbd>, which contains the paths for loading dynamic libraries. These values are kept in memory to reduce the overhead in starting programs.</p>
+<p>The next lines with <kbd>mmap</kbd>, <kbd>mprotect</kbd>, <kbd>arch</kbd><kbd>_</kbd><kbd>prctl</kbd>, and <kbd>munmap</kbd> calls continue to load the libraries and mapping devices to memory.</p>
+<p>The two calls to <kbd>brk</kbd> are invoked by the program's <kbd>malloc</kbd> call. This allocates 100 bytes from the heap.</p>
+<p>The <kbd>strcat</kbd> call is a user-space function that doesn't generate any system calls.</p>
+<p>The <kbd>printf</kbd> call doesn't generate a system call to format the data, but it makes calls to send the formatted string to <kbd>stdout</kbd>.</p>
+<p>The <kbd>fstat</kbd> and <kbd>mmap</kbd> calls load and initialize the <kbd>stdout</kbd> device. These calls occur only once in a program that generates output to <kbd>stdout</kbd>.</p>
+<p>The <kbd>write</kbd> system call sends the string to <kbd>stdout</kbd>.</p>
+<p>Finally, the <kbd>exit_group</kbd> call exits the program, frees resources, and terminates all the threads associated with the executable.</p>
+<p>Note that there is no <kbd>brk</kbd> call associated with freeing memory. The <kbd>malloc</kbd> and <kbd>free</kbd> functions are user-space functions that manage a task's memory. They only invoke the <kbd>brk</kbd> function if the program's overall memory footprint changes. When your program allocates <em>N</em> bites, it needs to add that many bytes to its available memory. When it frees that block, the memory is marked available, but it remains a part of this program's memory pool. The next <kbd>malloc</kbd> uses memory from the pool of available memory space until it's exhausted. At this point, another <kbd>brk</kbd> call adds more memory to the program's memory pool.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Tracing dynamic library functions with ltrace</h1>
+            </header>
+
+            <article>
+                
+<p>Knowing the user-space library functions being called is as useful as knowing the system functions being invoked. The <kbd>ltrace</kbd> command provides a similar function to <kbd>strace</kbd>; however, it tracks user-space library calls instead of system calls.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">Getting ready</h1>
+            </header>
+
+            <article>
+                
+<p>Have the <kbd>ltrace</kbd> command installed using the Developer tools.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How to do it...</h1>
+            </header>
+
+            <article>
+                
+<p>To trace user-space dynamic library calls, invoke the <kbd>strace</kbd> command, followed by the command you want to trace:</p>
+<pre>
+<strong>$ ltrace myApplication</strong>
+</pre>
+<p>The next example is a program with a subroutine:</p>
+<pre>
+$ cat test.c 
+#include &lt;stdio.h&gt; 
+#include &lt;stdlib.h&gt; 
+#include &lt;string.h&gt; 
+
+int print (char *str) { 
+  printf("%s\n", str); 
+} 
+main () { 
+  char *tmp; 
+  tmp=malloc(100); 
+  strcat(tmp, "testing"); 
+  print(tmp); 
+  free(tmp); 
+  exit(0); 
+} 
+$ gcc test.c 
+$ ltrace ./a.out 
+(0, 0, 603904, -1, 0x1f25bc2)                            = 0x3b0de21160 
+__libc_start_main(0x4005fe, 1, 0x7ffd334a95f8, 0x400660, 0x400650 &lt;unfinished ...&gt; 
+malloc(100)                                              = 0x137b010 
+strcat("", "testing")                                    = "testing" 
+puts("testing")                                          = 8 
+free(0x137b010)                                          = &lt;void&gt; 
+exit(0 &lt;unfinished ...&gt; 
++++ exited (status 0) +++ 
+</pre>
+<p>In the <kbd>ltrace</kbd> output, we see the call to the dynamically linked <kbd>strcat</kbd>; however, we do not see the statically linked local function, namely <kbd>print</kbd>. The call to <kbd>printf</kbd> was simplified to a call to <kbd>puts</kbd>. The calls to <kbd>malloc</kbd> and <kbd>free</kbd> are shown since they are user-space function calls.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">How it works...</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>ltrace</kbd> and <kbd>strace</kbd> utilities use the <kbd>ptrace</kbd> function to rewrite the <strong>Procedure Linkage Table</strong> (<strong>PLT</strong>) which maps between dynamic library calls and the actual memory address of the called function. This means that <kbd>ltrace</kbd> can trap any dynamically linked function call but not a statically linked function.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    
+
+        <section>
+
+            <header>
+                <h1 class="header-title">There's more...</h1>
+            </header>
+
+            <article>
+                
+<p>The <kbd>ltrace</kbd> and <kbd>strace</kbd> commands are useful, but it would be really nice to trace both user-space and system-space function calls. The <kbd>-S</kbd> option to <kbd>ltrace</kbd> will do this. The next example shows the <kbd>ltrace -S</kbd> output from the previous executable:</p>
+<pre>
+<strong>$&gt; ltrace -S ./a.out</strong>
+<strong>SYS_brk(NULL)                                            = 0xa9f000</strong>
+<strong>SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4ce000</strong>
+<strong>SYS_access(0x3b0dc1d380, 4, 0x3b0dc00158, 0, 0)          = -2</strong>
+<strong>SYS_open("/etc/ld.so.cache", 0, 01)                      = 4</strong>
+<strong>SYS_fstat(4, 0x7ffd70342bc0, 0x7ffd70342bc0, 0, 0xfefefefefefefeff) = 0</strong>
+<strong>SYS_mmap(0, 95195, 1, 2, 4)                              = 0x7fcdce4b6000</strong>
+<strong>SYS_close(4)                                             = 0</strong>
+<strong>SYS_open("/lib64/libc.so.6", 0, 00)                      = 4</strong>
+<strong>SYS_read(4, "\177ELF\002\001\001\003", 832)              = 832</strong>
+<strong>SYS_fstat(4, 0x7ffd70342c20, 0x7ffd70342c20, 4, 0x7fcdce4ce640) = 0</strong>
+<strong>SYS_mmap(0x3b0e000000, 0x393928, 5, 2050, 4)             = 0x3b0e000000</strong>
+<strong>SYS_mprotect(0x3b0e18a000, 0x200000, 0, 1, 4)            = 0</strong>
+<strong>SYS_mmap(0x3b0e38a000, 24576, 3, 2066, 4)                = 0x3b0e38a000</strong>
+<strong>SYS_mmap(0x3b0e390000, 14632, 3, 50, 0xffffffff)         = 0x3b0e390000</strong>
+<strong>SYS_close(4)                                             = 0</strong>
+<strong>SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4b5000</strong>
+<strong>SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4b4000</strong>
+<strong>SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4b3000</strong>
+<strong>SYS_arch_prctl(4098, 0x7fcdce4b4700, 0x7fcdce4b3000, 34, 0xffffffff) = 0</strong>
+<strong>SYS_mprotect(0x3b0e38a000, 16384, 1, 0x3b0de20fd8, 0x1f25bc2) = 0</strong>
+<strong>SYS_mprotect(0x3b0de1f000, 4096, 1, 0x4003e0, 0x1f25bc2) = 0</strong>
+<strong>(0, 0, 987392, -1, 0x1f25bc2)                            = 0x3b0de21160</strong>
+<strong>SYS_munmap(0x7fcdce4b6000, 95195)                        = 0</strong>
+<strong>__libc_start_main(0x4005fe, 1, 0x7ffd703435c8, 0x400660, 0x400650 &lt;unfinished ...&gt;</strong>
+<strong>malloc(100 &lt;unfinished ...&gt;</strong>
+<strong>SYS_brk(NULL)                                            = 0xa9f000</strong>
+<strong>SYS_brk(0xac0000)                                        = 0xac0000</strong>
+<strong>&lt;... malloc resumed&gt; )                                   = 0xa9f010</strong>
+<strong>strcat("", "testing")                                    = "testing"</strong>
+<strong>puts("testing" &lt;unfinished ...&gt;</strong>
+<strong>SYS_fstat(1, 0x7ffd70343370, 0x7ffd70343370, 0x7ffd70343230, 0x3b0e38f040) = 0</strong>
+<strong>SYS_mmap(0, 4096, 3, 34, 0xffffffff)                     = 0x7fcdce4cd000</strong>
+<strong>SYS_write(1, "testing\n", 8)                             = 8</strong>
+<strong>&lt;... puts resumed&gt; )                                     = 8</strong>
+<strong>free(0xa9f010)                                           = &lt;void&gt;</strong>
+<strong>exit(0 &lt;unfinished ...&gt;</strong>
+<strong>SYS_exit_group(0 &lt;no return ...&gt;</strong>
+<strong>+++ exited (status 0) +++</strong>
+</pre>
+<p>This shows the same type of startup call (<kbd>sbrk</kbd>, <kbd>mmap</kbd>, and so on) as the <kbd>strace</kbd> example.</p>
+<p>When a user-space function invokes a system-space function (as with the <kbd>malloc</kbd> and puts calls), the display shows that the user-space function was interrupted (<kbd>malloc(100 &lt;unfinished...&gt;)</kbd> and then resumed <kbd>(&lt;... malloc resumed&gt;)</kbd> after the system call was completed.</p>
+<p>Note that the <kbd>malloc</kbd> call needed to pass control to <kbd>sbrk</kbd> to allocate more memory for the application. However, the <kbd>free</kbd> call does not shrink the application; it just frees the memory for future use by this application.</p>
+
+
+            </article>
+
+            <footer style="margin-top: 5em;">
+                
+            </footer>
+
+        </section>
+    </body></html>

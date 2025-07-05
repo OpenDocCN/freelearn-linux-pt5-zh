@@ -1,0 +1,509 @@
+<html><head></head><body>
+<div id="page" style="height:0pt"/><div class="book" title="Chapter&#xA0;6.&#xA0;Configuring and Using an Automated Installer (AI) Server"><div class="book"><div class="book"><div class="book"><h1 class="title" id="calibre_pb_0"><a id="ch06" class="calibre1"/>Chapter 6. Configuring and Using an Automated Installer (AI) Server</h1></div></div></div><p class="calibre7">In this chapter, we will cover the following topics:</p><div class="book"><ul class="itemizedlist"><li class="listitem">Configuring an AI server and installing a system from it</li></ul></div></div>
+
+<div class="book" title="Chapter&#xA0;6.&#xA0;Configuring and Using an Automated Installer (AI) Server">
+<div class="book" title="Introduction"><div class="book"><div class="book"><div class="book"><h1 class="title" id="calibre_pb_1"><a id="ch06lvl1sec70" class="calibre1"/>Introduction</h1></div></div></div><p class="calibre7">Installing Oracle Solaris 11 from a DVD is a simple and straight forward task, and usually, only a few screens and inputs are required to accomplish the operation. However, when there are many hosts to be installed, this approach might not be enough anymore. In previous versions of Oracle Solaris, there was a nice feature named JumpStart that made this installation process on multiple machines very easy. As we already know, time passed and Oracle introduced a new<a id="id831" class="calibre1"/> method that installs any machine (SPARC or x86 platforms) named <span class="strong"><strong class="calibre8">Automated Installer</strong></span> (<span class="strong"><strong class="calibre8">AI</strong></span>).</p><p class="calibre7">Concisely, the AI configuration requirement is composed of the following:</p><div class="book"><ul class="itemizedlist"><li class="listitem">Configuring<a id="id832" class="calibre1"/> the AI server that provides the install services; this is the system where all configurations are performed</li><li class="listitem">Configuring a<a id="id833" class="calibre1"/> <span class="strong"><strong class="calibre8">DHCP</strong></span> server that offers IP addresses and other network settings</li><li class="listitem">Configuring an <span class="strong"><strong class="calibre8">IPS</strong></span> repository<a id="id834" class="calibre1"/> that has all necessary packages that are required to install the Oracle Solaris 11 host</li><li class="listitem">Having a client where Oracle Solaris 11 will be installed after leasing a DHCP IP address from the DHCP server</li></ul></div><p class="calibre7">The installation of a client through AI is not complex. Initially, the client gets booted from the network and requires an IP address from the DHCP server. Then, it gets the boot archive from the AI server and loads its own kernel. With the kernel already loaded, the client downloads the installation program through the HTTP protocol, identifies the installation services, and downloads the installation manifest. Finally, the client is installed using the IPS repository, with the manifest as a guideline that configures the system in an appropriate way. When the installation is complete, the host gets rebooted and the <span class="strong"><strong class="calibre8">System Configuration</strong></span> (<span class="strong"><strong class="calibre8">SC)</strong></span> profile<a id="id835" class="calibre1"/> is applied in order to configure the entire machine identification, such as the time zone, DNS, keyboard, and so on.</p><p class="calibre7">If everything happens properly, Oracle Solaris 11 is installed and starts working.</p></div></div>
+
+<div id="page" style="height:0pt"/><div class="book" title="Configuring an AI server and installing a system from it"><div class="book"><div class="book"><div class="book"><h1 class="title" id="calibre_pb_0"><a id="ch06lvl1sec71" class="calibre1"/>Configuring an AI server and installing a system from it</h1></div></div></div><p class="calibre7">The procedure to install and configure an AI server is very interesting, a little complex, and long. Let's do this!</p></div>
+
+<div class="book" title="Configuring an AI server and installing a system from it">
+<div class="book" title="Getting ready"><div class="book"><div class="book"><div class="book"><h2 class="title1" id="calibre_pb_1"><a id="ch06lvl2sec106" class="calibre1"/>Getting ready</h2></div></div></div><p class="calibre7">This recipe requires a virtual machine (VirtualBox or VMware) that runs Oracle Solaris 11 with 4 GB RAM, a<a id="id836" class="calibre1"/> static IP address configuration, an IPS repository configured on the same machine server, and a DHCP server that can also be installed on the same host. Briefly, the AI, DHCP, and IPS servers will be installed on this virtual<a id="id837" class="calibre1"/> machine.</p><p class="calibre7">Additionally, a <a id="id838" class="calibre1"/>second virtual machine with 2 GB RAM, a network interface, and a disk with 20 GB space will be required because it will be used as the client where Oracle Solaris 11 will be installed.</p><p class="calibre7">Another important point is that we have to download the Oracle Solaris 11 Automated Installer (also known as the AI boot image) for x86 from the Oracle website at <a class="calibre1" href="http://www.oracle.com/technetwork/server-storage/solaris11/downloads/index.html?ssSourceSiteId=ocomen">http://www.oracle.com/technetwork/server-storage/solaris11/downloads/index.html?ssSourceSiteId=ocomen</a>. This ISO image will be saved on the <code class="email">/root</code> directory, and its version must be the same as the Oracle Solaris host that we<a id="id839" class="calibre1"/> want to install on the client (in this case, Version 11).</p><p class="calibre7">In this example, the AI server will be named <code class="email">solaris11-1</code>, and the client machine will be named <code class="email">solaris11-2ai</code>.</p><div class="informalexample" title="Note"><h3 class="title2"><a id="note09" class="calibre1"/>Note</h3><p class="calibre7">If you are using VirtualBox, I suggest that you download the latest version of VirtualBox and its respective <a id="id840" class="calibre1"/>
+<span class="strong"><strong class="calibre8">Extension Pack</strong></span>, which enables the PXE support for Intel network interfaces. If you do not install the extension pack, this procedure will not work!</p></div></div></div>
+
+<div class="book" title="Configuring an AI server and installing a system from it">
+<div class="book" title="How to do it…"><div class="book"><div class="book"><div class="book"><h2 class="title1" id="calibre_pb_2"><a id="ch06lvl2sec107" class="calibre1"/>How to do it…</h2></div></div></div><p class="calibre7">Configuring the AI service is a two-stage procedure: we have to check the prerequisites and create its step-by-step<a id="id841" class="calibre1"/> configuration. As we have seen previously, we<a id="id842" class="calibre1"/> have to ensure that a static IP address is configured on an AI server by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">ipadm show-addr</strong></span>
+ADDROBJ           TYPE     STATE        ADDR
+lo0/v4            static   ok           127.0.0.1/8
+lo0/zoneadmd.v4   static   ok           127.0.0.1/8
+net0/v4           static   ok           192.168.1.144/24
+net0/zoneadmd.v4  static   ok           192.168.1.125/24
+lo0/v6            static   ok           ::1/128
+lo0/zoneadmd.v6   static   ok           ::1/128</pre></div><p class="calibre7">As shown previously, the network interface (<code class="email">net0</code>) is configured with a static IP address (<code class="email">ipadm create-addr -T static -a 192.168.1.144/24 net0/v4</code>), and it is appropriate to verify that you have the Internet access and the DNS client configuration is working. By the way, the DNS client<a id="id843" class="calibre1"/> configuration will be changed in the next steps. So, to check the Internet access and current DNS client configuration, execute the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">ping www.oracle.com</strong></span>
+www.oracle.com is alive
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">nslookup</strong></span> 
+&gt; <span class="strong"><strong class="calibre8">server</strong></span>
+Default server: 8.8.8.8
+Address: 8.8.8.8#53
+Default server: 8.8.4.4
+Address: 8.8.4.4#53
+&gt; <span class="strong"><strong class="calibre8">exit</strong></span>
+</pre></div><p class="calibre7">A very important step is to edit the <code class="email">/etc/netmask</code> file and insert the network mask that will be used:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">vi /etc/netmasks </strong></span>
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+# Both the network-number and the netmasks are specified in
+# "decimal dot" notation, e.g:
+#
+#     128.32.0.0 255.255.255.0
+#
+<span class="strong"><strong class="calibre8">192.168.1.0  255.255.255.0</strong></span>
+</pre></div><p class="calibre7">To verify whether this configuration is being used and active, execute the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">getent netmasks 192.168.1.0</strong></span>
+192.168.1.0          255.255.255.0</pre></div><p class="calibre7">During the installation, the client will receive packages from an IPS repository installed on the same system, so <a id="id844" class="calibre1"/>we have to confirm whether this IPS repository<a id="id845" class="calibre1"/> is online and is working by executing the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg publisher</strong></span>
+PUBLISHER               TYPE     STATUS P LOCATION
+solaris                 origin   online F <span class="strong"><strong class="calibre8">http://solaris11-1.example.com/</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs application/pkg/server</strong></span>
+STATE          STIME    FMRI
+online          1:09:30 svc:/application/pkg/server:default
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">uname -a</strong></span>
+SunOS solaris11-1 5.11 11.1 i86pc i386 i86pc</pre></div><p class="calibre7">To test whether the IPS repository is really working, we can run a search for a package by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg search -p stunnel</strong></span>
+PACKAGE                                            PUBLISHER
+pkg:/service/security/stunnel@4.29-0.175.0.0.0.0.0 solaris</pre></div><p class="calibre7">The next step requires your attention because there cannot be any existing DHCP configuration in the <code class="email">/etc/inet</code> directory (<code class="email">dhcp4.conf</code>), and the DHCP server must be disabled, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -a | grep dhcp</strong></span>
+disabled       22:08:49 svc:/network/dhcp/server:ipv6
+disabled       22:08:49 svc:/network/dhcp/relay:ipv4
+disabled       22:08:49 svc:/network/dhcp/relay:ipv6
+disabled       1:09:34 <span class="strong"><strong class="calibre8">svc:/network/dhcp/server:ipv4</strong></span>
+</pre></div><p class="calibre7">Additionally, when we are preparing an AI server, a DNS server must be configured and should be able to resolve the AI-installed server IP addresses. Therefore, let's configure both the DNS server and DNS client, but we are not going to delve into too much detail about the DNS server and client configuration here.</p><p class="calibre7">First, the client follows the DNS server, and we have to install the DNS server package by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg install service/network/dns/bind</strong></span>
+</pre></div><p class="calibre7">In the next step, we have to configure the main DNS configuration file in order to make the DNS server resolve<a id="id846" class="calibre1"/> hostnames to the IP and vice versa:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">vi /etc/named.conf</strong></span>
+options {
+        directory       "/etc/dnsdb/config";
+        pid-file        "/var/run/named/pid";
+        dump-file       "/var/dump/dns_dump.db";
+        statistics-file "/var/stats/named.stats";
+        forwarders { 8.8.8.8; 8.8.4.4; };
+};
+zone "example.com" {
+        type master;
+        file "/etc/dnsdb/master/example.db";
+};
+zone "1.168.192.in-addr.arpa" {
+        type master;
+        file "/etc/dnsdb/master/1.168.192.db";
+};</pre></div><p class="calibre7">According to the used directories from the <code class="email">/etc/named.conf</code> file, it is time to create the same mentioned directories by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">mkdir /var/dump</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">mkdir /var/stats</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">mkdir -p /var/run/named</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">mkdir -p /etc/dnsdb/master</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">mkdir -p /etc/dnsdb/config</strong></span>
+</pre></div><p class="calibre7">One of the most important<a id="id847" class="calibre1"/> steps in order to set the DNS server up is to create a database file for the straight name resolution (the hostname to the IP address) and another<a id="id848" class="calibre1"/> database file for the reverse resolution (the IP address to the hostname). Therefore, the first step is to create the straight database by executing the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">vi /etc/dnsdb/master/example.db</strong></span>
+$TTL 3h
+@  IN      SOA     solaris11-1.example.com. root.solaris11-1.example.com. (
+        20140326 ;serial 
+        3600 ;refresh (1 hour)
+        3600 ;retry (1 hour)
+        604800 ;expire (1 week)
+        38400 ;minimum (1 day)
+)
+example.com.     IN      NS      solaris11-1.example.com.
+gateway        IN      A       192.168.1.1   ; Router
+solaris11-1            IN      A       192.168.1.144 ;</pre></div><p class="calibre7">Now, it's time to<a id="id849" class="calibre1"/> create the reverse database file (the IP address to the hostname) using the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">vi /etc/dnsdb/master/1.168.192.db</strong></span>
+$TTL 3h
+@       IN      SOA     solaris11-1.example.com. root.solaris11-1.example.com. (
+        20140326 ;serial
+        3600 ;refresh (1 hour)
+        3600 ;retry (1 hour)
+        604800 ;expire (1 week)
+        38400 ;minimum (1 day)
+)
+        IN      NS      solaris11-1.example.com.
+1       IN      PTR     gateway.example.com.   
+144     IN      PTR     solaris11-1.example.com</pre></div><p class="calibre7">Finally, the DNS server is ready<a id="id850" class="calibre1"/> and its service must be enabled by running the<a id="id851" class="calibre1"/> following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -a | grep dns/server</strong></span>
+disabled       18:46:05 svc:/network/dns/server:default
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm enable svc:/network/dns/server:default</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -a | grep dns/server</strong></span>
+online          7:09:05 svc:/network/dns/server:default</pre></div><p class="calibre7">The DNS client is a very important step for our recipe, and it can be configured by executing the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svccfg -s svc:/network/dns/client setprop config/nameserver = net_address: "(192.168.1.144)"</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svccfg -s svc:/network/dns/client setprop config/domain = astring: '("example.com")'</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svccfg -s svc:/network/dns/client setprop config/search = astring: '("example.com")'</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svccfg -s svc:/system/name-service/switch setprop config/ipnodes = astring: '("files dns")'</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svccfg -s svc:/system/name-service/switch setprop config/host = astring: '("files dns")'</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svccfg -s svc:/network/dns/client listprop config</strong></span>
+config                      application        
+config/value_authorization astring     solaris.smf.value.name-service.dns.client
+config/nameserver          net_address 192.168.1.144
+config/domain              astring     example.com
+config/search              astring     example.com
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svccfg -s svc:/system/name-service/switch listprop config</strong></span>
+config                      application        
+config/default             astring     files
+config/value_authorization astring     solaris.smf.value.name-service.switch
+config/printer             astring     "user files"
+config/ipnodes             astring     "files dns"
+config/host                astring     "files dns"
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm refresh svc:/network/dns/client</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm restart svc:/network/dns/client</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm refresh svc:/system/name-service/switch:default</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm restart svc:/system/name-service/switch:default</strong></span>
+</pre></div><p class="calibre7">To test<a id="id852" class="calibre1"/> whether our DNS server <a id="id853" class="calibre1"/>configuration and DNS client configuration<a id="id854" class="calibre1"/> are working, we can use the <code class="email">nslookup</code> tool to verify them, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">nslookup</strong></span> 
+&gt; <span class="strong"><strong class="calibre8">server</strong></span>
+Default server: 192.168.1.144
+Address: 192.168.1.144#53
+&gt; <span class="strong"><strong class="calibre8">solaris11-1.example.com</strong></span>
+Server:    192.168.1.144
+Address:  192.168.1.144#53
+Name:  <span class="strong"><strong class="calibre8">solaris11-1.example.com</strong></span>
+Address: 192.168.1.144
+&gt; <span class="strong"><strong class="calibre8">192.168.1.144</strong></span>
+Server:    192.168.1.144
+Address:  192.168.1.144#53
+144.1.168.192.in-addr.arpa  name = solaris11-1.example.com.
+&gt; <span class="strong"><strong class="calibre8">exit</strong></span>
+</pre></div><p class="calibre7">Perfect! Both the DNS server and the client are now configured on the AI install server.</p><p class="calibre7">From this point, we can<a id="id855" class="calibre1"/> start to configure the AI server itself, which<a id="id856" class="calibre1"/> requires the multicast service to be enabled, and this can be done by executing the following <a id="id857" class="calibre1"/>commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -a | grep  multicast</strong></span>
+disabled       22:08:43 svc:/network/dns/multicast:default
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm enable svc:/network/dns/multicast:default</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -a | grep  multicast</strong></span>
+online          2:38:35 svc:/network/dns/multicast:default</pre></div><p class="calibre7">Additionally, the AI server also requires a series of tools to be configured, and we have to install the associated package by running the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg install installadm</strong></span>
+</pre></div><p class="calibre7">Now the game begins! We have to configure an AI install service with a name that will be associated with an install image. Later, the install service name will be used by the client to access and deploy the install image. From this point, the install service name will be used as an index in order to find the correct install image. If we wanted to install both SPARC and x86 clients, we should have two install services: the first associated with a SPARC install image and a second one associated with an X86 install image.</p><p class="calibre7">To create an AI install service, execute the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm create-service -n borges_ai -s /root/sol-11_1-ai-x86.iso -i 192.168.1.20 -c 10 -d /export/borges_ai</strong></span>
+Creating service from: /root/sol-11_1-ai-x86.iso
+Setting up the image ...
+Creating i386 service: borges_ai
+Image path: /export/borges_ai
+Starting DHCP server...
+Adding IP range to local DHCP configuration
+Refreshing install services
+Creating default-i386 alias
+Setting the default PXE bootfile(s) in the local DHCP configuration
+to:
+bios clients (arch 00:00):  default-i386/boot/grub/pxegrub2
+uefi clients (arch 00:07):  default-i386/boot/grub/grub2netx64.efi
+Refreshing install services</pre></div><p class="calibre7">From the previous<a id="id858" class="calibre1"/> command, we have the following:</p><div class="book"><ul class="itemizedlist"><li class="listitem"><code class="email">-n</code>: This is the <a id="id859" class="calibre1"/>service name</li><li class="listitem"><code class="email">-s</code>: This is the path to the AI ISO image</li><li class="listitem"><code class="email">-i</code>: This will update the DHCP server starting from 192.168.1.20</li><li class="listitem"><code class="email">-c</code>: This install service will serve ten IP addresses</li><li class="listitem"><code class="email">-d</code>: This is the directory where the AI ISO image will be unpacked</li></ul></div><p class="calibre7">After creating the<a id="id860" class="calibre1"/> <code class="email">borges_ai</code> install service, the DHCP presents the following configuration file:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">more /etc/inet/dhcpd4.conf </strong></span>
+# dhcpd.conf
+#
+# Configuration file for ISC dhcpd
+# (created by installadm(1M))
+#
+default-lease-time 900;
+max-lease-time 86400;
+# If this DHCP server is the official DHCP server for the local
+# network, the authoritative directive should be uncommented.
+authoritative;
+
+# arch option for PXEClient
+option arch code 93 = unsigned integer 16;
+
+# Set logging facility (accompanies setting in syslog.conf)
+log-facility local7;
+
+# Global name services
+option domain-name-servers 8.8.8.8, 8.8.4.4;
+option domain-name "example.com";
+option domain-search "example.com";
+subnet 192.168.1.0 netmask 255.255.255.0 {
+  range 192.168.1.20 192.168.1.29;
+  option broadcast-address 192.168.1.255;
+  option routers 192.168.1.1;
+  next-server 192.168.1.144;
+}
+
+class "PXEBoot" {
+  match if (substring(option vendor-class-identifier, 0, 9) = "PXEClient");
+  if option arch = 00:00 {
+    filename "default-i386/boot/grub/pxegrub2";
+  } else if option arch = 00:07 {
+    filename "default-i386/boot/grub/grub2netx64.efi";
+  }
+}</pre></div><p class="calibre7">We<a id="id861" class="calibre1"/> can face problems several times, and it would be nice if we could start the entire procedure from scratch<a id="id862" class="calibre1"/> and start over again. Therefore, if something goes<a id="id863" class="calibre1"/> wrong, it's feasible to undo the previous step, executing the <code class="email">installadm install-service</code> command and executing the previous steps again:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm delete-service default-i386</strong></span>
+WARNING: The service you are deleting, or a dependent alias, is
+the alias for the default i386 service. Without the 'default-i386'
+service, i386 clients will fail to boot unless explicitly
+assigned to a service using the create-client command.
+Are you sure you want to delete this alias? [y/N]: <span class="strong"><strong class="calibre8">y</strong></span>
+Removing this service's bootfile(s) from local DHCP configuration
+Stopping the service default-i386
+
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm delete-service -r borges_ai</strong></span>
+WARNING: The service you are deleting, or a dependent alias, is
+the alias for the default i386 service. Without the 'default-i386'
+service, i386 clients will fail to boot unless explicitly
+assigned to a service using the create-client command.
+
+Are you sure you want to delete this alias? [y/N]: <span class="strong"><strong class="calibre8">Y</strong></span>
+Removing this service's bootfile(s) from local DHCP configuration
+Stopping the service default-i386
+Removing host entry '08:00:27:DF:15:A6' from local DHCP configuration.
+Stopping the service borges_ai
+The installadm SMF service is being taken offline.
+The installadm SMF service is no longer online because the last
+install service has been disabled or deleted.</pre></div><p class="calibre7">After deleting the AI server <a id="id864" class="calibre1"/>configuration, it is also recommended that you<a id="id865" class="calibre1"/> remove the <code class="email">/etc/inet/dhcpd4.conf</code> file and disable the DHCP server service by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcadm disable svc:/network/dhcp/server:ipv4</strong></span>
+</pre></div><p class="calibre7">Returning to the configuration<a id="id866" class="calibre1"/> steps, an AI install server and its install services are represented by a service from SMF, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -a | grep install/server</strong></span>
+online          4:53:41 svc:/system/install/server:default
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">svcs -l svc:/system/install/server:default</strong></span>
+fmri         svc:/system/install/server:default
+name         Installadm Utility
+enabled      true
+state        online
+next_state   none
+state_time   March 23, 2014 04:53:41 AM BRT
+logfile      /var/svc/log/system-install-server:default.log
+restarter    svc:/system/svc/restarter:default
+contract_id  472 
+manifest     /lib/svc/manifest/system/install/server.xml
+dependency   optional_all/restart svc:/network/dns/multicast:default (online)
+dependency   optional_all/none svc:/network/tftp/udp6:default (online)
+dependency   optional_all/none svc:/network/dhcp-server:default (uninitialized)</pre></div><p class="calibre7">To list the existing AI install services, execute the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm list</strong></span>
+Service Name Alias Of  Status  Arch   Image Path 
+------------ --------  ------  ----   ---------- 
+borges_ai    -         on      i386   /root/borges_ai
+default-i386 borges_ai on      i386   /root/borges_ai</pre></div><p class="calibre7">The command<a id="id867" class="calibre1"/> output shows us that Oracle Solaris 11 has created (by default) an AI install service named <code class="email">default-i386</code>, which is an alias for our AI install service named <code class="email">borges_ai</code>.</p><p class="calibre7">Until now, the system<a id="id868" class="calibre1"/> has created an AI install service (<code class="email">borges_ai</code>), and then, we have had to associate it with one or more clients that will be installed through the AI server. Before accomplishing this task, the MAC address information from these<a id="id869" class="calibre1"/> clients must be collected. So, as we are using another virtual machine as the client (<code class="email">solaris11-2ai</code>), it's easy to get the MAC information from the virtual machine properties (VirtualBox or VMware).</p><p class="calibre7">For example, when working with VirtualBox, you can select the Virtual Machine (Solaris11-1) by navigating to <span class="strong"><strong class="calibre8">Settings</strong></span> | <span class="strong"><strong class="calibre8">Network</strong></span> | <span class="strong"><strong class="calibre8">Advanced</strong></span>.</p><p class="calibre7">The MAC address property from VirtualBox is shown in the following screenshot:</p><div class="mediaobject"><img src="../images/00023.jpeg" alt="How to do it…" class="calibre12"/></div><p class="calibre13"> </p><p class="calibre7">If we are working<a id="id870" class="calibre1"/> with VMware Workstation, it's possible<a id="id871" class="calibre1"/> to get the MAC address from a virtual machine by navigating to <span class="strong"><strong class="calibre8">Virtual Machine (Solaris11-1)</strong></span> | <span class="strong"><strong class="calibre8">VM</strong></span> | <span class="strong"><strong class="calibre8">Settings</strong></span> | <span class="strong"><strong class="calibre8">Network Adapter</strong></span> | <span class="strong"><strong class="calibre8">Advanced</strong></span>, as shown in the following screenshot:</p><div class="mediaobject"><img src="../images/00024.jpeg" alt="How to do it…" class="calibre12"/></div><p class="calibre13"> </p><p class="calibre7">Once we have<a id="id872" class="calibre1"/> the MAC address, we use it to add the client (the host that will be installed using AI) by executing<a id="id873" class="calibre1"/> the<a id="id874" class="calibre1"/> following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm create-client -e 08:00:27:DF:15:A6 -n borges_ai</strong></span>
+Adding host entry for 08:00:27:DF:15:A6 to local DHCP configuration.
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm list -c </strong></span>
+Service Name Client Address     Arch   Image Path 
+------------ --------------     ----   ---------- 
+borges_ai    08:00:27:DF:15:A6  i386   /export/borges_ai</pre></div><p class="calibre7">The previous output shows us a client with the MAC address <code class="email">08:00:27:DF:15:A6</code>, which was bound to an AI install service named <code class="email">borges_ai</code>.</p><p class="calibre7">As the client (MAC <code class="email">08:00:27:DF:15:A6</code>) is already assigned to an AI install service, the next step will be to create an AI manifest. What is that? An AI manifest is a file that contains instructions to install and configure AI clients that will be installed using the AI service. As this manifest is an XML file, it would be very hard to create a manifest for each client that needs to use the AI install service, and so a default manifest is provided by each boot image<a id="id875" class="calibre1"/> in order to use it for any client of any install service<a id="id876" class="calibre1"/> that will use this boot image.</p><p class="calibre7">In the AI framework, there are two types of manifests, as follows:</p><div class="book"><ul class="itemizedlist"><li class="listitem"><span class="strong"><strong class="calibre8">Default</strong></span>: This is valid for all<a id="id877" class="calibre1"/> clients that do not have any customized manifests. The <a id="id878" class="calibre1"/>default manifest is named <code class="email">default.xml</code>.</li><li class="listitem"><span class="strong"><strong class="calibre8">Custom</strong></span>: This is a particular <a id="id879" class="calibre1"/>manifest that has an<a id="id880" class="calibre1"/> install image associated, and one or more clients can be assigned to it.</li></ul></div><p class="calibre7">What is the decision <a id="id881" class="calibre1"/>factor to choose either a customized manifest or a default one? This is the role of a file named the <code class="email">criteria</code> file, which associates clients to either a specific manifest or a default manifest using properties or attributes from these clients.</p><p class="calibre7">The following is an example of a default manifest (<code class="email">default.xml</code>) that was installed in the <code class="email">/export/borges_ai/auto_install</code> directory when we run the <code class="email">installadm</code> create-service command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">cat /export/borges_ai/auto_install/default.xml</strong></span>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!--
+
+ Copyright (c) 2008, 2012, Oracle and/or its affiliates. All rights reserved.
+
+--&gt;
+&lt;!DOCTYPE auto_install SYSTEM "file:///usr/share/install/ai.dtd.1"&gt;
+&lt;auto_install&gt;
+  &lt;ai_instance name="default"&gt;
+    &lt;target&gt;
+      &lt;logical&gt;
+        &lt;zpool name="rpool" is_root="true"&gt;
+          &lt;!--
+            Subsequent &lt;filesystem&gt; entries instruct an installer to create
+            following ZFS datasets:
+
+                &lt;root_pool&gt;/export         (mounted on /export)
+                &lt;root_pool&gt;/export/home    (mounted on /export/home)
+
+            Those datasets are part of standard environment and should be
+            always created.
+
+            In rare cases, if there is a need to deploy an installed system
+            without these datasets, either comment out or remove &lt;filesystem&gt;
+            entries. In such scenario, it has to be also assured that
+            in case of non-interactive post-install configuration, creation
+            of initial user account is disabled in related system
+            configuration profile. Otherwise the installed system would fail
+            to boot.
+          --&gt;
+          &lt;filesystem name="export" mountpoint="/export"/&gt;
+          &lt;filesystem name="export/home"/&gt;
+          &lt;be name="solaris"/&gt;
+        &lt;/zpool&gt;
+      &lt;/logical&gt;
+    &lt;/target&gt;
+    &lt;software type="IPS"&gt;
+      &lt;destination&gt;
+        &lt;image&gt;
+          &lt;!-- Specify locales to install --&gt;
+          &lt;facet set="false"&gt;facet.locale.*&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.de&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.de_DE&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.en&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.en_US&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.es&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.es_ES&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.fr&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.fr_FR&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.it&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.it_IT&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.ja&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.ja_*&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.ko&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.ko_*&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.pt&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.pt_BR&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.zh&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.zh_CN&lt;/facet&gt;
+          &lt;facet set="true"&gt;facet.locale.zh_TW&lt;/facet&gt;
+        &lt;/image&gt;       &lt;/destination&gt;
+      &lt;source&gt;
+        &lt;publisher name="solaris"&gt;
+          &lt;origin name="http://pkg.oracle.com/solaris/release"/&gt;
+        &lt;/publisher&gt;
+      &lt;/source&gt;
+      &lt;!--
+        The version specified by the "entire" package below, is
+        installed from the specified IPS repository.  If another build
+        is required, the build number should be appended to the
+        'entire' package in the following form:
+
+            &lt;name&gt;pkg:/entire@0.5.11-0.build#&lt;/name&gt;
+      --&gt;
+      &lt;software_data action="install"&gt;
+        &lt;name&gt;pkg:/entire@0.5.11-0.175.1&lt;/name&gt;
+        &lt;name&gt;pkg:/group/system/solaris-large-server&lt;/name&gt;
+      &lt;/software_data&gt;
+    &lt;/software&gt;
+  &lt;/ai_instance&gt;
+&lt;/auto_install&gt;</pre></div><p class="calibre7">The <code class="email">default.xml</code> file is very<a id="id882" class="calibre1"/> simple, and it has some good points that are <a id="id883" class="calibre1"/>worth mentioning, as shown:</p><div class="book"><ul class="itemizedlist"><li class="listitem"><code class="email">&lt;ai_instance name="default"&gt;</code>: This element shows us the name of the AI instance</li><li class="listitem"><code class="email">&lt;software type="IPS"&gt;</code>: All these<a id="id884" class="calibre1"/> packages come from an IPS server</li><li class="listitem"><code class="email">&lt;publisher name="solaris"&gt;</code>: This is the IPS publisher name</li><li class="listitem"><code class="email">&lt;origin name="http://pkg.oracle.com/solaris/release"/&gt;</code>: This is the origin URI <a id="id885" class="calibre1"/>assigned to the repository that was made available by the publisher (Solaris)</li><li class="listitem"><code class="email">&lt;name&gt;pkg:/entire@0.5.11-0.build#&lt;/name&gt;</code> and <code class="email">&lt;name&gt;pkg:/entire@0.5.11-0.175.1&lt;/name&gt;</code>: These are basically the entire IPS package and tell us about the version of the offered Oracle Solaris, and this information will be used to install patches or upgrades</li><li class="listitem"><code class="email">&lt;name&gt;pkg:/group/system/solaris-large-server&lt;/name&gt;</code>: This is a package group that contains several tools and important files such as libraries, drivers, and Python, and they<a id="id886" class="calibre1"/> should be installed</li></ul></div><p class="calibre7">It is<a id="id887" class="calibre1"/> interesting to realize<a id="id888" class="calibre1"/> that my own system does not have the <code class="email">solaris-large-server</code> package installed, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg search solaris-large-server</strong></span>
+INDEX      ACTION VALUE                                     PACKAGE
+pkg.fmri   set    solaris/group/system/solaris-large-server pkg:/group/system/solaris-large-server@0.5.11-0.175.1.0.0.24.3
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg info -r solaris pkg:/group/system/solaris-large-server@0.5.11-0.175.1.0.0.24.3</strong></span>
+<code class="email"> </code>
+          Name: group/system/solaris-large-server
+       Summary: Oracle Solaris Large Server
+   Description: Provides an Oracle Solaris large server environment
+      Category: Meta Packages/Group Packages
+         State: Not installed
+     Publisher: solaris
+       Version: 0.5.11
+ Build Release: 5.11
+        Branch: 0.175.1.0.0.24.3
+Packaging Date: September 19, 2012 06:53:18 PM 
+          Size: 5.46 kB
+          FMRI: pkg://solaris/group/system/solaris-large-server@0.5.11,5.11-0.175.1.0.0.24.3:20120919T185318Z
+
+          Name: system/zones/brand/solaris
+       Summary: 
+         State: Not installed (Renamed)
+    Renamed to: pkg:/system/zones/brand/brand-solaris@0.5.11,5.11-0.173.0.0.0.0.0
+                consolidation/osnet/osnet-incorporation
+     Publisher: solaris
+       Version: 0.5.11
+ Build Release: 5.11
+        Branch: 0.173.0.0.0.1.0
+Packaging Date: August 26, 2011 07:00:28 PM 
+          Size: 5.45 kB
+          FMRI: pkg://solaris/system/zones/brand/solaris@0.5.11,5.11-0.173.0.0.0.1.0:20110826T190028Z</pre></div><p class="calibre7">Therefore, according to the<a id="id889" class="calibre1"/> previous <code class="email">default.xml</code> file (although it is not usually necessary), we have to install the missing package by executing the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">pkg install pkg:/group/system/solaris-large-server@0.5.11-0.175.1.0.0.24.3</strong></span>
+</pre></div><p class="calibre7">Returning to the<a id="id890" class="calibre1"/> default manifest (<code class="email">default.xml</code>) explanation, we have to back up and modify it in order to adapting to our environment that<a id="id891" class="calibre1"/> has the following<a id="id892" class="calibre1"/> characteristics:</p><div class="book"><ul class="itemizedlist"><li class="listitem">The AI instance name (<code class="email">borges_ai</code>)</li><li class="listitem">The IPS origin URI—<code class="email">http://solaris11-1.example.com/</code>—(from the <code class="email">pkg publisher</code> command)</li><li class="listitem">Auto reboot (<code class="email">auto_reboot</code>) is set to true</li></ul></div><p class="calibre7">The code for the previous task is as follows:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">mkdir /backup</strong></span>
+root@solaris11-1:<span class="strong"><strong class="calibre8">~# cp /export/borges_ai/auto_install/manifest/default.xml /export/borges_ai/auto_install/borges_ai.xml</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">vi /export/borges_ai/auto_install/borges_ai.xml</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">grep borges_ai /export/borges_ai/auto_install/borges_ai.xml</strong></span>
+ &lt;ai_instance name="borges_ai" auto_reboot="true"&gt;
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">grep solaris11-1 /export/borges_ai/auto_install/borges_ai.xml</strong></span>
+&lt;origin name="http://solaris11-1.example.com"/&gt;</pre></div><p class="calibre7">We have created a new manifest named <code class="email">borges_ai.xml</code>, but we have to create a <code class="email">criteria</code> file in order to associate the client (solaris11-2ai) with this manifest. Usually, there are some good attributes that can be used in a <code class="email">criteria</code> file: MAC address, IPv4, platform, architecture (arch), memory (mem), hostname, and so on. Therefore, after a criteria file is created, the rule is that if the client matches any of these criteria files, the associated manifest will be used (in our case, the customized manifest is <code class="email">borges_ai.xml</code>). If it does not match, the <code class="email">default.xml</code> file manifest is used.</p><p class="calibre7">To create a criteria file with the MAC address of the client machine (solaris11-2ai), we can execute the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">vi /export/borges_ai/auto_install/borges_criteria_ai.xml</strong></span>
+&lt;ai_criteria_manifest&gt;
+  &lt;ai_criteria name="<span class="strong"><strong class="calibre8">mac</strong></span>"&gt; 
+    &lt;value&gt;<span class="strong"><strong class="calibre8">08:00:27:DF:15:A6</strong></span>&lt;/value&gt;
+  &lt;/ai_criteria&gt;
+&lt;/ai_criteria_manifest&gt;</pre></div><p class="calibre7">Finally, we're able to associate this criteria file (<code class="email">borges_criteria_ai.xml</code>) and the customized manifest file (<code class="email">borges_ai.xml</code>) with the AI install service (<code class="email">borges_ai</code>):</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~#<span class="strong"><strong class="calibre8"> installadm create-manifest -n borges_ai -f /export/borges_ai/auto_install/borges_ai.xml -C /export/borges_ai/auto_install/borges_criteria_ai.xml</strong></span>
+</pre></div><p class="calibre7">From the<a id="id893" class="calibre1"/> previous command, we note<a id="id894" class="calibre1"/> the following:</p><div class="book"><ul class="itemizedlist"><li class="listitem"><code class="email">-n</code>: This is the AI install service name</li><li class="listitem"><code class="email">-f</code>: This is the customized manifest file</li><li class="listitem"><code class="email">-C</code>: This is the criteria file</li></ul></div><p class="calibre7">An alternative and easier<a id="id895" class="calibre1"/> approach to creating a <code class="email">criteria</code> file is to associate the client with this <code class="email">criteria</code> file and make the necessary customization, specifying the client MAC address as the criteria by running the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~#<span class="strong"><strong class="calibre8"> installadm create-manifest -n borges_ai -f /export/borges_ai/auto_install/borges_ai.xml</strong></span>
+root@solaris11-1:~#  <span class="strong"><strong class="calibre8">installadm set-criteria –n borges_ai -m borges_ai –c mac="08:00:27:XX::YY:ZZ"</strong></span>
+</pre></div><p class="calibre7">To verify the AI configuration up to this point, execute the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:/backup# <span class="strong"><strong class="calibre8">installadm list </strong></span>
+Service Name Alias Of  Status  Arch   Image Path 
+------------ --------  ------  ----   ---------- 
+borges_ai    -         on      i386   /export/borges_ai
+default-i386 borges_ai on      i386   /export/borges_ai
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm list -m</strong></span>
+Service/Manifest Name  Status   Criteria
+---------------------  ------   --------
+borges_ai
+   borges_ai                    mac  = 08:00:27:DF:15:A6
+   orig_default        Default  None
+default-i386
+   orig_default        Default  None</pre></div><p class="calibre7">That is good! The next step is interesting because usually, during Oracle Solaris 11 installation, we are prompted to enter many inputs, such as the initial user account, root password, time zone, keyboard, and so on. To answer all these questions once is easy, but when installing<a id="id896" class="calibre1"/> 100 machines, this would be a serious problem.</p><p class="calibre7">To automate this <a id="id897" class="calibre1"/>process, there's a configuration file named <span class="strong"><strong class="calibre8">System Configuration profile</strong></span> (<span class="strong"><strong class="calibre8">SC</strong></span>)<a id="id898" class="calibre1"/> that provides any necessary answer during the first boot after the Oracle Solaris 11 installation.</p><p class="calibre7">To help us with SC<a id="id899" class="calibre1"/> profile creation, Oracle Solaris 11 provides some templates of this profile in the <code class="email">/export/borges_ai/auto_install/sc_profiles</code> directory. Before modifying it, we are going to copy a template from this directory and highlight some interesting lines, as shown in the following command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">cp /export/borges_ai/auto_install/sc_profiles/sc_sample.xml /export/borges_ai/auto_install/sc_borges_ai.xml</strong></span>
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">cat /export/borges_ai/auto_install/sc_borges_ai.xml</strong></span>
+&lt;?xml version="1.0"?&gt;
+&lt;!--
+Copyright (c) 2011, 2012, Oracle and/or its affiliates. All rights reserved.
+--&gt;
+&lt;!--
+Sample system configuration profile for use with Automated Installer
+
+<span class="strong"><strong class="calibre8">Configures the following:</strong></span>
+<span class="strong"><strong class="calibre8">* User account name 'jack', password 'jack', GID 10, UID 101, root role, bash shell</strong></span>
+<span class="strong"><strong class="calibre8">* 'root' role with password 'solaris'</strong></span>
+* Keyboard mappings set to US-English
+* Timezone set to UTC
+* Network configuration is automated with Network Auto-magic
+* DNS name service client is enabled
+
+See installadm(1M) for usage of 'create-profile' subcommand.
+--&gt;
+
+&lt;!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1"&gt;
+&lt;service_bundle type="profile" name="system configuration"&gt;
+    &lt;service name="system/config-user" version="1"&gt;
+      &lt;instance name="default" enabled="true"&gt;
+        &lt;property_group name="user_account"&gt;
+          <span class="strong"><strong class="calibre8">&lt;propval name="login" value="jack"/&gt;</strong></span>
+          <span class="strong"><strong class="calibre8">&lt;propval name="password" value="9Nd/cwBcNWFZg"/&gt;</strong></span>
+          &lt;propval name="description" value="default_user"/&gt;
+          &lt;propval name="shell" value="/usr/bin/bash"/&gt;
+          &lt;propval name="gid" value="10"/&gt;
+          &lt;propval name="uid" value="101"/&gt;
+          <span class="strong"><strong class="calibre8">&lt;propval name="type" value="normal"/&gt;</strong></span>
+          <span class="strong"><strong class="calibre8">&lt;propval name="roles" value="root"/&gt;</strong></span>
+          &lt;propval name="profiles" value="System Administrator"/&gt;
+        &lt;/property_group&gt;
+        <span class="strong"><strong class="calibre8">&lt;property_group name="root_account"&gt;</strong></span>
+            <span class="strong"><strong class="calibre8">&lt;propval name="password" value="$5$dnRfcZse$Hx4aBQ161Uvn9ZxJFKMdRiy8tCf4gMT2s2rtkFba2y4"/&gt;</strong></span>
+            <span class="strong"><strong class="calibre8">&lt;propval name="type" value="role"/&gt;</strong></span>
+        &lt;/property_group&gt;
+      &lt;/instance&gt;
+    &lt;/service&gt;
+
+    &lt;service version="1" name="system/identity"&gt;
+      &lt;instance enabled="true" name="node"&gt;
+        &lt;property_group name="config"&gt;
+           <span class="strong"><strong class="calibre8">&lt;propval name="nodename" value="solaris"/&gt;</strong></span>
+        &lt;/property_group&gt;
+      &lt;/instance&gt;
+    &lt;/service&gt;
+
+    &lt;service name="system/console-login" version="1"&gt;
+      &lt;instance name="default" enabled="true"&gt;
+        &lt;property_group name="ttymon"&gt;
+          &lt;propval name="terminal_type" value="sun"/&gt;
+        &lt;/property_group&gt;
+      &lt;/instance&gt;
+    &lt;/service&gt;
+
+    &lt;service name="system/keymap" version="1"&gt;
+      &lt;instance name="default" enabled="true"&gt;
+        &lt;property_group name="keymap"&gt;
+          &lt;propval name="layout" value="US-English"/&gt;
+        &lt;/property_group&gt;
+      &lt;/instance&gt;
+    &lt;/service&gt;
+
+    &lt;service name="system/timezone" version="1"&gt;
+      &lt;instance name="default" enabled="true"&gt;
+        &lt;property_group name="timezone"&gt;
+          &lt;propval name="localtime" value="UTC"/&gt;
+        &lt;/property_group&gt;
+      &lt;/instance&gt;
+    &lt;/service&gt;
+
+    &lt;service name="system/environment" version="1"&gt;
+      &lt;instance name="init" enabled="true"&gt;
+        &lt;property_group name="environment"&gt;
+          &lt;propval name="LANG" value="en_US.UTF-8"/&gt;
+        &lt;/property_group&gt;
+      &lt;/instance&gt;
+    &lt;/service&gt;
+
+    &lt;service name="network/physical" version="1"&gt;
+      &lt;instance name="default" enabled="true"&gt;
+          &lt;property_group name="netcfg" type="application"&gt;
+              <span class="strong"><strong class="calibre8">&lt;propval name="active_ncp" type="astring" value="Automatic"/&gt;</strong></span>
+          &lt;/property_group&gt;
+      &lt;/instance&gt;
+    &lt;/service&gt;
+&lt;/service_bundle&gt;</pre></div><p class="calibre7">After carefully<a id="id900" class="calibre1"/> reading this file, we have the following conclusions:</p><div class="book"><ul class="itemizedlist"><li class="listitem">The initial<a id="id901" class="calibre1"/> default username is <code class="email">jack</code>, with the password <code class="email">jack</code></li><li class="listitem">The root is a role (this is not a normal account), and its password is <code class="email">solaris</code></li><li class="listitem">The machine<a id="id902" class="calibre1"/> name is <code class="email">solaris</code></li><li class="listitem">The active NCP is <code class="email">Automatic</code></li></ul></div><p class="calibre7">To adapt this file for our purpose, change the initial default username to <code class="email">borges</code> and its password to <code class="email">oracle123!</code> (<code class="email">$5$VPcyGvgl$bt4cybd8cpZdHKWF2tvBn.SPFeJ8YdgvQUqHzWkNLl1</code>). Additionally, the hostname will be changed to <code class="email">solaris11-2ai</code>. Every change can be verified by running the following <a id="id903" class="calibre1"/>command:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:/export/borges_ai/auto_install# <span class="strong"><strong class="calibre8">cat sc_borges_ai.xml </strong></span>
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+See installadm(1M) for usage of 'create-profile' subcommand.
+--&gt;
+&lt;!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1"&gt;
+&lt;service_bundle type="profile" name="system configuration"&gt;
+    &lt;service name="system/config-user" version="1"&gt;
+      &lt;instance name="default" enabled="true"&gt;
+        &lt;property_group name="user_account"&gt;
+          &lt;propval name="login" value=<span class="strong"><strong class="calibre8">"borges"/&gt;</strong></span>
+          &lt;propval name="password" value=<span class="strong"><strong class="calibre8">"$5$VPcyGvgl$bt4cybd8cpZdHKWF2tvBn.SPFeJ8YdgvQUqHzWkNLl1"/&gt;</strong></span>
+          &lt;propval name="description" value="default_user"/&gt;
+          &lt;propval name="shell" value="/usr/bin/bash"/&gt;
+          &lt;propval name="gid" value="10"/&gt;
+          &lt;propval name="uid" value="101"/&gt;
+          &lt;propval name="type" value="normal"/&gt;
+          &lt;propval name="roles" value="root"/&gt;
+          &lt;propval name="profiles" value="System Administrator"/&gt;
+        &lt;/property_group&gt;
+        &lt;property_group name="root_account"&gt;
+            &lt;propval name="password" value=<span class="strong"><strong class="calibre8">"$5$dnRfcZse$Hx4aBQ161Uvn9ZxJFKMdRiy8tCf4gMT2s2rtkFba2y4"/&gt;</strong></span>
+            &lt;propval name="type" value="role"/&gt;
+        &lt;/property_group&gt;
+      &lt;/instance&gt;
+    &lt;/service&gt;
+
+    &lt;service version="1" name="system/identity"&gt;
+      &lt;instance enabled="true" name="node"&gt;
+        &lt;property_group name="config"&gt;
+           &lt;propval name="nodename" value="<span class="strong"><strong class="calibre8">solaris11-2ai"/&gt;</strong></span>
+        &lt;/property_group&gt;
+      &lt;/instance&gt;
+    &lt;/service&gt;
+
+<span class="strong"><strong class="calibre8">(truncated output)</strong></span>
+</pre></div><p class="calibre7">Now that the<a id="id904" class="calibre1"/> SC profile <code class="email">sc_borges_ai.xml</code> has been modified, it is time to create it in the AI service database, to validate its syntax, and to list the result, as done<a id="id905" class="calibre1"/> in the following commands:</p><div class="informalexample"><pre class="programlisting">root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm create-profile -n borges_ai -f /export/borges_ai/auto_install/sc_borges_ai.xml -c mac=08:00:27:DF:15:A6</strong></span>
+Profile sc_borges_ai.xml added to database.
+
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm validate -n borges_ai -p sc_borges_ai.xml </strong></span>
+Validating static profile sc_borges_ai.xml...
+ Passed
+root@solaris11-1:~# <span class="strong"><strong class="calibre8">installadm list -p </strong></span>
+Service/Profile Name  Criteria
+--------------------  --------
+borges_ai
+   sc_borges_ai.xml   mac = 08:00:27:DF:15:A6</pre></div><p class="calibre7">This is wonderful! We have configured the AI server. The <code class="email">sc_borges_ai.xml</code> SC profile will be used by our client (solaris11-2ai) according to the established criteria (MAC = <code class="email">08:00:27:DF:15:A6</code>).</p><p class="calibre7">Finally, it is show<a id="id906" class="calibre1"/> time! To test whether the entire AI server<a id="id907" class="calibre1"/> configuration is working, we have to turn on the client (the solaris11-2ai virtual machine) and just<a id="id908" class="calibre1"/> wait for the whole installation. If everything is working, we will see the following screenshot:</p><div class="mediaobject"><img src="../images/00025.jpeg" alt="How to do it…" class="calibre12"/></div><p class="calibre13"> </p><p class="calibre7">After selecting<a id="id909" class="calibre1"/> <span class="strong"><strong class="calibre8">Oracle Solaris 11.1 Automated Install</strong></span>, the Oracle Solaris 11 installation should begin.</p><div class="mediaobject"><img src="../images/00026.jpeg" alt="How to do it…" class="calibre12"/></div><p class="calibre13"> </p><p class="calibre7">This is simply outstanding!</p><div class="book" title="An overview of the recipe"><div class="book"><div class="book"><div class="book"><h3 class="title2"><a id="ch06lvl3sec52" class="calibre1"/>An overview of the recipe</h3></div></div></div><p class="calibre7">This section was impressive! We learned how to configure an AI install server in order to remotely install a client<a id="id910" class="calibre1"/> without any interaction. In the middle of the chapter, we also saw how to configure a DNS server and client.</p></div></div></div>
+<div class="book" title="References"><div class="book"><div class="book"><div class="book"><h1 class="title" id="calibre_pb_0"><a id="ch06lvl1sec72" class="calibre1"/>References</h1></div></div></div><div class="book"><ul class="itemizedlist"><li class="listitem"><span class="strong"><em class="calibre11">Installing Oracle Solaris 11 Systems</em></span> <a id="id911" class="calibre1"/>at <a class="calibre1" href="http://docs.oracle.com/cd/E23824_01/html/E21798/docinfo.html#scrolltoc">http://docs.oracle.com/cd/E23824_01/html/E21798/docinfo.html#scrolltoc</a></li><li class="listitem"><span class="strong"><em class="calibre11">Booting and Shutting Down </em></span><a id="id912" class="calibre1"/><span class="strong"><em class="calibre11">Oracle Solaris 11.1 Systems</em></span> at <a class="calibre1" href="http://docs.oracle.com/cd/E26502_01/html/E28983/docinfo.html#scrolltoc">http://docs.oracle.com/cd/E26502_01/html/E28983/docinfo.html#scrolltoc</a></li><li class="listitem"><span class="strong"><em class="calibre11">Configuring a Basic DNS Server + Client in Solaris 11</em></span>, <span class="strong"><em class="calibre11">Paul Johnson</em></span>, at <a class="calibre1" href="http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris11-net-svcs-ips-2086656.html">http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris11-net-svcs-ips-2086656.html</a></li><li class="listitem"><span class="strong"><em class="calibre11">Exploring Networking, Services, and the New Image Packaging System In Oracle Solaris 11</em></span>, <span class="strong"><em class="calibre11">Alexandre Borges</em></span>, at <a class="calibre1" href="http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris11-net-svcs-ips-2086656.html">http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris11-net-svcs-ips-2086656.html</a></li></ul></div></div></body></html>

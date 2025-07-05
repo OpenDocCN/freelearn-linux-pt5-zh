@@ -1,0 +1,684 @@
+<html><head></head><body>
+		<div id="_idContainer032">
+			<h1 id="_idParaDest-128"><em class="italic"><a id="_idTextAnchor130"/>Chapter 9</em>: Writing SPI Device Drivers</h1>
+			<p>The <strong class="bold">Serial Peripheral Interface</strong> (<strong class="bold">SPI</strong>) is (at least) a 4-wire bus – <strong class="bold">Master Input Slave Output</strong> (<strong class="bold">MISO</strong>), <strong class="bold">Master Output Slave Input</strong> (<strong class="bold">MOSI</strong>), <strong class="bold">Serial Clock</strong> (<strong class="bold">SCK</strong>), and <strong class="bold">Chip Select</strong> (<strong class="bold">CS</strong>) – which is used to connect serial flash and analog-to-digital/digital-to-analog converters. The master always generates the clock. Its speed can reach up to 80 MHz, though there is no real speed limitation (this is much faster than I2C as well). The same applies to the CS line, which is always managed by the master.</p>
+			<p>Each of these signal names has a synonym:</p>
+			<ul>
+				<li>Whenever you see <strong class="bold">Slave Input Master Output</strong> (<strong class="bold">SIMO</strong>), <strong class="bold">Slave Data Input</strong> (<strong class="bold">SDI</strong>), or <strong class="bold">Data Input</strong> (<strong class="bold">DI</strong>), they refer to MOSI.</li>
+				<li><strong class="bold">Slave Output Master Input</strong> (<strong class="bold">SOMI</strong>), <strong class="bold">Slave Data Output</strong> (<strong class="bold">SDO</strong>), and <strong class="bold">Data Output</strong> (<strong class="bold">DO</strong>) refer to MISO.</li>
+				<li><strong class="bold">Serial Clock</strong> (<strong class="bold">SCK</strong>), <strong class="bold">Clock</strong> (<strong class="bold">CLK</strong>), and <strong class="bold">Serial Clock</strong> (<strong class="bold">SCL</strong>) refer to SCK.</li>
+				<li>S̅ S̅ is the Slave Select line, also called CS. CSx can be used (where <em class="italic">x</em> is an index such as CS0, CS1), EN and ENB too, meaning enable. CS is usually an active low signal.</li>
+			</ul>
+			<p>The following diagram shows how SPI devices are connected to the controller via the bus it exposes:</p>
+			<div>
+				<div id="_idContainer028" class="IMG---Figure">
+					<img src="image/B17934_09_001.jpg" alt="Figure 9.1 – SPI slave devices and master interconnection&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 9.1 – SPI slave devices and master interconnection</p>
+			<p>From the preceding diagram, we can represent the Linux kernel SPI framework as follows:</p>
+			<p class="source-code">CPU &lt;--platform bus--&gt; SPI master &lt;---SPI bus---&gt; SPI slave</p>
+			<p>The CPU is the master hosting the SPI controller, also known as the SPI master, which manages the bus segment hosting the SPI slave devices. In the kernel SPI framework, the bus is managed by a platform driver while the slave is driven by an SPI device driver. However, both drivers use APIs provided by the SPI core. In this chapter, we will be focusing on SPI (slave) device drivers, though references to the controller will be mentioned if necessary.</p>
+			<p>This chapter will walk through SPI driver concepts such as the following:</p>
+			<ul>
+				<li>Understanding the SPI framework abstraction in the Linux kernel</li>
+				<li>Dealing with the SPI driver abstraction and architecture</li>
+				<li>Learning how not to write SPI device drivers</li>
+			</ul>
+			<h1 id="_idParaDest-129"><a id="_idTextAnchor131"/>Understanding the SPI framework abstractions in the Linux kernel</h1>
+			<p>The Linux kernel SPI <a id="_idIndexMarker607"/>framework is made up of a few data structures, the most important of which are the following:</p>
+			<ul>
+				<li><strong class="source-inline">spi_controller</strong>, used to abstract the SPI master device.</li>
+				<li><strong class="source-inline">spi_device</strong>, used to abstract a slave device sitting on the SPI bus.</li>
+				<li><strong class="source-inline">spi_driver</strong>, the driver of the slave device.</li>
+				<li><strong class="source-inline">spi_transfer</strong>, which is the low-level representation of one segment of a protocol. It represents a single operation between the master and slave. It expects Tx and/or Rx buffers as well as the length of the data to be exchanged and an optional CS behavior.</li>
+				<li><strong class="source-inline">spi_message</strong>, which is an atomic sequence of transfers.</li>
+			</ul>
+			<p>Let's now introduce each of these data structures, one after the other, starting with the most complex, which represents the SPI controller's data structure.</p>
+			<h2 id="_idParaDest-130">Brief introduction to struct spi_controller<a id="_idTextAnchor132"/></h2>
+			<p>Throughout this chapter, we will reference the controller because it is deeply coupled with the slaves and other <a id="_idIndexMarker608"/>data structures that the SPI framework is made up of. It is necessary therefore to introduce its data structure, represented by <strong class="source-inline">struct spi_controller</strong> and defined as follows:</p>
+			<p class="source-code">struct spi_controller {</p>
+			<p class="source-code">    struct device     dev;</p>
+			<p class="source-code">    u16               num_chipselect;</p>
+			<p class="source-code">    u32               min_speed_hz;</p>
+			<p class="source-code">    u32               max_speed_hz;</p>
+			<p class="source-code">    int               (*setup)(struct spi_device *spi);</p>
+			<p class="source-code">    int (*set_cs_timing)(struct spi_device *spi,</p>
+			<p class="source-code">                          struct spi_delay *setup,</p>
+			<p class="source-code">                          struct spi_delay *hold,</p>
+			<p class="source-code">                          struct spi_delay *inactive);</p>
+			<p class="source-code">    int    (*transfer)(struct spi_device *spi,</p>
+			<p class="source-code">                         struct spi_message *mesg);</p>
+			<p class="source-code">    bool    (*can_dma)(struct spi_controller *ctlr,</p>
+			<p class="source-code">                        struct spi_device *spi,</p>
+			<p class="source-code">                        struct spi_transfer *xfer);</p>
+			<p class="source-code">    struct kthread_worker  *kworker;</p>
+			<p class="source-code">    struct kthread_work    pump_messages;</p>
+			<p class="source-code">    spinlock_t             queue_lock;</p>
+			<p class="source-code">    struct list_head       queue;</p>
+			<p class="source-code">    struct spi_message     *cur_msg;</p>
+			<p class="source-code">    bool                   busy;</p>
+			<p class="source-code">    bool                   running;</p>
+			<p class="source-code">    bool                   rt;</p>
+			<p class="source-code">    int (*transfer_one_message)(</p>
+			<p class="source-code">                      struct spi_controller *ctlr,</p>
+			<p class="source-code">                      struct spi_message *mesg);</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">    int (*transfer_one_message)(</p>
+			<p class="source-code">            struct spi_controller *ctlr,</p>
+			<p class="source-code">            struct spi_message *mesg);</p>
+			<p class="source-code">    void (*set_cs)(struct spi_device *spi, bool enable);</p>
+			<p class="source-code">    int (*transfer_one)(struct spi_controller *ctlr,</p>
+			<p class="source-code">                    struct spi_device *spi,</p>
+			<p class="source-code">                    struct spi_transfer *transfer);</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">    /* DMA channels for use with core dmaengine helpers */</p>
+			<p class="source-code">    struct dma_chan    *dma_tx;</p>
+			<p class="source-code">    struct dma_chan    *dma_rx;</p>
+			<p class="source-code">    /* dummy data for full duplex devices */</p>
+			<p class="source-code">    Void              *dummy_rx;</p>
+			<p class="source-code">    Void              *dummy_tx;</p>
+			<p class="source-code">};</p>
+			<p>Only the important <a id="_idIndexMarker609"/>elements required for a better understanding of the data structure used in this chapter are listed in the preceding code. The following list explains their use:</p>
+			<ul>
+				<li><strong class="source-inline">num_chipselect</strong> indicates the number of CSs assigned to this controller. CSs are used to distinguish individual SPI slaves and are numbered from 0.</li>
+				<li><strong class="source-inline">min_speed_hz</strong> and <strong class="source-inline">max_speed_hz</strong> are the lowest and the highest transfer speeds supported by this controller, respectively.</li>
+				<li><strong class="source-inline">set_cs_timing</strong> is a method provided if the SPI controller supports CS timing configuration, in which case the client drivers would call <strong class="source-inline">spi_set_cs_timing()</strong> with the requested timings. It has been deprecated in recent kernel versions by this patch: <a href="https://lore.kernel.org/lkml/20210609071918.2852069-1-gregkh@linuxfoundation.org/">https://lore.kernel.org/lkml/20210609071918.2852069-1-gregkh@linuxfoundation.org/</a>).</li>
+				<li><strong class="source-inline">transfer</strong> adds a message to the transfer queue of the controller. On the controller registration path (thanks to <strong class="source-inline">spi_register_controller()</strong>), the SPI core checks whether this field is <strong class="source-inline">NULL</strong> or not:<ul><li>If <strong class="source-inline">NULL</strong>, the SPI core will check if either <strong class="source-inline">transfer_one</strong> or <strong class="source-inline">transfer_one_message</strong> is set, in which case it assumes this controller supports message queuing and invokes <strong class="source-inline">spi_controller_initialize_queue()</strong>, which will set this field with <strong class="source-inline">spi_queued_transfer</strong> (which is the SPI core helper to queue SPI messages to the <a id="_idIndexMarker610"/>controller's queue and to schedule the message pump <strong class="source-inline">kworker</strong> if it is not already running or busy).<ul><li>Moreover, <strong class="source-inline">spi_controller_initialize_queue()</strong> will create both a dedicated kthread worker (<strong class="source-inline">kworker</strong> element) and a work struct (<strong class="source-inline">pump_messages</strong> element) for this controller. This worker will be scheduled quite often in order to process the message queue in a FIFO order.</li><li>Next, the controller's <strong class="source-inline">queued</strong> element is set to true by the SPI core.</li><li>Finally, if the controller's <strong class="source-inline">rt</strong> element has been set to true by the driver prior to calling the registration API, the SPI core will set the scheduling policy of the worker thread to the real-time FIFO policy, with a priority of 50.</li></ul></li><li>If <strong class="source-inline">NULL</strong>, and both <strong class="source-inline">transfer_one</strong> and <strong class="source-inline">transfer_one_message</strong> are also <strong class="source-inline">NULL</strong>, this is an error, and the controller is not registered.</li><li>If not <strong class="source-inline">NULL</strong>, the SPI core assumes the controller does not support queuing and does not call <strong class="source-inline">spi_controller_initialize_queue()</strong>. </li></ul></li>
+				<li><strong class="source-inline">transfer_one</strong> and <strong class="source-inline">transfer_one_message</strong> are mutually exclusive. If both are set, the former won't be invoked by the SPI core. <strong class="source-inline">transfer_one</strong> transfers a single SPI transfer and has no notion of <strong class="source-inline">spi_message</strong>. <strong class="source-inline">transfer_one_message</strong>, if provided by the driver, must work on the basis of <strong class="source-inline">spi_message</strong> and will be responsible for all the transfers in the messages. Controller drivers that need not bother with message-handling algorithms just have to set the <strong class="source-inline">transfer_one</strong> callback, in which case the SPI core will set <strong class="source-inline">transfer_one_message</strong> to <strong class="source-inline">spi_transfer_one_message</strong>. <strong class="source-inline">spi_transfer_one_message</strong> will take care of all the message logic, timings, CS, and other hardware-related properties prior to calling the driver provided <strong class="source-inline">transfer_one</strong> callback for each transfer in the message. CS remains active throughout the <a id="_idIndexMarker611"/>message transfers unless it is modified by a transfer that has <strong class="source-inline">spi_transfer.cs_change = 1</strong>. The message transfers will be performed using the clock and SPI mode parameters previously applied by <strong class="source-inline">setup()</strong> for this device.</li>
+				<li><strong class="source-inline">kworker</strong>: This is the kernel thread dedicated to the message pump processing.</li>
+				<li><strong class="source-inline">pump_messages</strong>: This is an abstraction of a work struct data structure for scheduling the function that processes the SPI message queue. It is scheduled in <strong class="source-inline">kworker</strong>. This work struct is backed by the <strong class="source-inline">spi_pump_messages()</strong> method, which checks if there are any SPI messages in the queue that need to be processed, and if so, it calls the driver to initialize the hardware and transfer each message.</li>
+				<li><strong class="source-inline">queue_lock</strong>: The spinlock to synchronize access to the message queue.</li>
+				<li><strong class="source-inline">queue</strong>: The message queue for this controller.</li>
+				<li><strong class="source-inline">idling</strong>: This indicates whether the controller device is entering an idle state.</li>
+				<li><strong class="source-inline">cur_msg</strong>: The currently in-flight SPI message.</li>
+				<li><strong class="source-inline">busy</strong>: This indicates the busyness of the message pump.</li>
+				<li><strong class="source-inline">running</strong>: This indicates that the message pump is running.</li>
+				<li><strong class="source-inline">Rt</strong>: This indicates whether <strong class="source-inline">kworker</strong> will run the message pump with real-time priority. </li>
+				<li><strong class="source-inline">dma_tx</strong>: The DMA transmit channel (when supported by the controller).</li>
+				<li><strong class="source-inline">dma_rx</strong>: The DMA receiving channel (when supported by the controller).</li>
+			</ul>
+			<p>SPI transfers always read and write the same number of bytes, which means even when the client driver issues a half-duplex transfer, full duplex is emulated by the SPI core with <strong class="source-inline">dummy_rx</strong> and <strong class="source-inline">dummy_tx</strong> used to achieve this purpose:</p>
+			<ul>
+				<li><strong class="source-inline">dummy_rx</strong>: This is a dummy receive buffer used for full-duplex devices, such that if a transfer's receive buffer is <strong class="source-inline">NULL</strong>, received data will be shifted to this dummy receive buffer before being discarded. </li>
+				<li><strong class="source-inline">dummy_tx</strong>: This is a dummy transmit buffer used for full-duplex devices, such that if a transfer's <a id="_idIndexMarker612"/>transmit buffer is <strong class="source-inline">NULL</strong>, this dummy transmit buffer will be zero-filled and used as a transmit buffer for the transfer.</li>
+			</ul>
+			<p>Do note that the SPI core names the SPI message pump worker task with the controller device name (dev-&gt;name), set in <strong class="source-inline">spi_register_controller()</strong> as follows:</p>
+			<p class="source-code">dev_set_name(&amp;ctlr-&gt;dev, "spi%u", ctlr-&gt;bus_num);</p>
+			<p>Later, when the worker is created during the queue initialization (remember, <strong class="source-inline">spi_controller_initialize_queue()</strong>), it is given this name, as follows: </p>
+			<p class="source-code">ctlr-&gt;kworker = kthread_create_worker(0, dev_name(&amp;ctlr-&gt;dev));</p>
+			<p>To recognize the SPI message pump worker on your system, you can run the following command:</p>
+			<p class="source-code">root@yocto-imx6:~# ps | grep spi</p>
+			<p class="source-code">65 root         0 SW   [spi1]</p>
+			<p>In the preceding snippet, we can see the worker's name made up of the bus name along with the bus number.</p>
+			<p>In this section, we analyzed the concepts on the controller side to help get an understanding of the whole SPI slave implementation in the Linux kernel. The importance of this data structure is so great that I recommend you read this section whenever you feel you don't understand any mechanism in the coming sections. Now we can switch to SPI device data structures for real.</p>
+			<h2 id="_idParaDest-131"><a id="_idTextAnchor133"/>The struct spi_device structure</h2>
+			<p>The first and most <a id="_idIndexMarker613"/>obvious data structure, <strong class="source-inline">struct spi_device</strong> represents an SPI device and is defined in <strong class="source-inline">include/linux/spi/spi.h</strong>:</p>
+			<p class="source-code">struct spi_device {</p>
+			<p class="source-code">    struct device dev;</p>
+			<p class="source-code">    struct spi_controller  *controller;</p>
+			<p class="source-code">    struct spi_master *master;</p>
+			<p class="source-code">    u32         max_speed_hz;</p>
+			<p class="source-code">    u8          chip_select;</p>
+			<p class="source-code">    u8          bits_per_word;</p>
+			<p class="source-code">    bool        rt;</p>
+			<p class="source-code">    u16         mode;</p>
+			<p class="source-code">    int          irq;</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    int cs_gpio; /* LEGACY: chip select gpio */</p>
+			<p class="source-code">    struct gpio_desc *cs_gpiod; /* chip select gpio desc */</p>
+			<p class="source-code">    struct spi_delay word_delay; /* inter-word delay */</p>
+			<p class="source-code">    /* the statistics */</p>
+			<p class="source-code">    struct spi_statistics statistics;</p>
+			<p class="source-code">};</p>
+			<p>For the sake of readability, the number of fields listed is reduced to the strict minimum needed for the purpose of the book. The following list details the meaning of each element in this structure:</p>
+			<ul>
+				<li><strong class="source-inline">controller</strong> represents the SPI controller this slave device belongs to. In other words, it represents the SPI controller (bus) on which the device is connected.</li>
+				<li>The <strong class="source-inline">master</strong> element is still there for compatibility reasons and will be deprecated soon. It was the old name of the controller.</li>
+				<li><strong class="source-inline">max_speed_hz</strong> is the maximum clock rate to be used with this slave; this parameter can be changed <a id="_idIndexMarker614"/>from within the driver. We can override that parameter using <strong class="source-inline">spi_transfer.speed_hz</strong> for each transfer. We will discuss SPI transfer later.</li>
+				<li><strong class="source-inline">chip_select</strong> is the CS line assigned to this device. It is active low by default. This behavior can be changed in <strong class="source-inline">mode</strong> by adding the <strong class="source-inline">SPI_CS_HIGH</strong> flag.</li>
+				<li><strong class="source-inline">rt</strong>, if <strong class="source-inline">true</strong>, will make the message pump worker of the <strong class="source-inline">controller</strong> run as a real-time task</li>
+				<li><strong class="source-inline">mode</strong> defines how data should be clocked. The device driver may change this. The data clocking is MSB by default for each word in a transfer. This behavior can be overridden by specifying <strong class="source-inline">SPI_LSB_FIRST</strong>.</li>
+				<li><strong class="source-inline">irq</strong> represents the interrupt number (registered as a device resource in your board initialization file or through the device tree) you should pass to <strong class="source-inline">request_irq()</strong> to receive interrupts from this device.</li>
+				<li><strong class="source-inline">cs_gpio</strong> and <strong class="source-inline">cs_gpiod</strong> are both optional. The former is the legacy integer-based GPIO number of the CS line, while the latter is the new and recommended interface, based on the GPIO descriptor.</li>
+			</ul>
+			<p>A word about SPI modes – they are built using two characteristics:</p>
+			<ul>
+				<li>CPOL, which is the initial clock polarity:<ul><li><strong class="source-inline">0</strong>: The initial clock state is low, and the first edge is rising.</li><li><strong class="source-inline">1</strong>: The initial clock state is high, and the first state is falling.</li></ul></li>
+				<li>CPHA is the clock phase, determining at which edge the data will be sampled:<ul><li><strong class="source-inline">0</strong>: Data is latched at the falling edge (high to low transition), whereas the output changes at the rising edge.</li><li><strong class="source-inline">1</strong>: Data is latched at rising edge (low to high transition), and the output changes at the falling edge.</li></ul></li>
+			</ul>
+			<p>This allows us to <a id="_idIndexMarker615"/>distinguish four SPI modes, which are derived macros made up of a mix of two main macros, defined in <strong class="source-inline">include/linux/spi/spi.h</strong> as follows:</p>
+			<p class="source-code">#define    SPI_CPHA    0x01</p>
+			<p class="source-code">#define    SPI_CPOL    0x02</p>
+			<p>The combinations of these macros give the following SPI modes: </p>
+			<div>
+				<div id="_idContainer029" class="IMG---Figure">
+					<img src="image/Table_9.1.jpg" alt="Table 9.1 – SPI modes kernel definition&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Table 9.1 – SPI modes kernel definition</p>
+			<p>The following diagram is the representation of each SPI mode, in the same order as defined in the preceding array. That being said, only the MOSI line is represented, but the principle is the same for MISO.</p>
+			<div>
+				<div id="_idContainer030" class="IMG---Figure">
+					<img src="image/B17934_09_002.jpg" alt="Figure 9.2 – SPI operating modes&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 9.2 – SPI operating modes</p>
+			<p>Now that we are familiar with the SPI device data structure and the modes such a device can operate in, we can <a id="_idIndexMarker616"/>switch to the second-most important structure, the one representing the SPI device driver.</p>
+			<h2 id="_idParaDest-132"><a id="_idTextAnchor134"/>The spi_driver structure</h2>
+			<p>Also called the protocol driver, an SPI device driver is responsible for driving devices sitting on the SPI bus. It is <a id="_idIndexMarker617"/>abstracted in the kernel by <strong class="source-inline">struct spi_driver</strong>, declared as follows:</p>
+			<p class="source-code">struct spi_driver {</p>
+			<p class="source-code">   const struct spi_device_id *id_table;</p>
+			<p class="source-code">   int         (*probe)(struct spi_device *spi);</p>
+			<p class="source-code">   int         (*remove)(struct spi_device *spi);</p>
+			<p class="source-code">   void        (*shutdown)(struct spi_device *spi);</p>
+			<p class="source-code">   struct device_driver    driver;</p>
+			<p class="source-code">};</p>
+			<p>The following list outlines the meanings of the elements in this data structure:</p>
+			<ul>
+				<li><strong class="source-inline">id_table</strong>: This is the list of SPI devices supported by this driver.</li>
+				<li><strong class="source-inline">probe</strong>: This method binds this driver to the SPI device. This function will be invoked on any device <a id="_idIndexMarker618"/>claiming this driver and will decide whether this driver is in charge of that device or not. If yes, the binding process occurs. </li>
+				<li><strong class="source-inline">remove</strong>: Unbinds this driver from the SPI device.</li>
+				<li><strong class="source-inline">shutdown</strong>: This is invoked during system state changes such as powering down and halting.</li>
+				<li><strong class="source-inline">driver</strong>: This is the low-level driver structure for the device and driver model.</li>
+			</ul>
+			<p>This is all we can say for now on this data structure, except that each SPI device driver must fill and expose one instance of this type.</p>
+			<h2 id="_idParaDest-133"><a id="_idTextAnchor135"/>The message transfer data structures</h2>
+			<p>The SPI I/O model consists of a set of queued messages, each of which can be made up of one or <a id="_idIndexMarker619"/>more SPI transfers. While a single message consists of one or more <strong class="source-inline">struct spi_transfer</strong> objects, each transfer represents a full duplex SPI transaction. Messages are submitted and processed either synchronously or asynchronously. The following is a diagram explaining the concept of message and transfer:</p>
+			<div>
+				<div id="_idContainer031" class="IMG---Figure">
+					<img src="image/B17934_09_003.jpg" alt="Figure 9.3 – Example SPI message structure&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 9.3 – Example SPI message structure</p>
+			<p>Now that we <a id="_idIndexMarker620"/>are familiar with the theoretical aspects, we can introduce the SPI transfer data structure, declared as follows:</p>
+			<p class="source-code">struct spi_transfer {</p>
+			<p class="source-code">    const void    *tx_buf;</p>
+			<p class="source-code">    void          *rx_buf;</p>
+			<p class="source-code">    unsigned    len;</p>
+			<p class="source-code">    dma_addr_t    tx_dma;</p>
+			<p class="source-code">    dma_addr_t    rx_dma;</p>
+			<p class="source-code">    struct sg_table tx_sg;</p>
+			<p class="source-code">    struct sg_table rx_sg;</p>
+			<p class="source-code">    unsigned    cs_change:1;</p>
+			<p class="source-code">    unsigned    tx_nbits:3;</p>
+			<p class="source-code">    unsigned    rx_nbits:3;</p>
+			<p class="source-code">#define    SPI_NBITS_SINGLE 0x01 /* 1bit transfer */</p>
+			<p class="source-code">#define    SPI_NBITS_DUAL        0x02 /* 2bits transfer */</p>
+			<p class="source-code">#define    SPI_NBITS_QUAD        0x04 /* 4bits transfer */</p>
+			<p class="source-code">    u8        bits_per_word;</p>
+			<p class="source-code">    u16       delay_usecs;</p>
+			<p class="source-code">    struct    spi_delay    delay;</p>
+			<p class="source-code">    struct spi_delay  cs_change_delay;</p>
+			<p class="source-code">    struct spi_delay  word_delay;</p>
+			<p class="source-code">    u32        speed_hz;</p>
+			<p class="source-code">    u32        effective_speed_hz;</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">    struct list_head transfer_list;</p>
+			<p class="source-code">#define SPI_TRANS_FAIL_NO_START  BIT(0)</p>
+			<p class="source-code">    u16        error;</p>
+			<p class="source-code">};</p>
+			<p>The following are the meanings of each element in the data structure:</p>
+			<ul>
+				<li><strong class="source-inline">tx_buf</strong> is a pointer to the buffer that contains the data to be written. If set to <strong class="source-inline">NULL</strong>, this <a id="_idIndexMarker621"/>transfer will be considered as half duplex as a read-only transaction. It should be DMA-safe when you need to perform an SPI transaction through DMA.</li>
+				<li><strong class="source-inline">rx_buf</strong> is a buffer for data to be read (with the same properties as <strong class="source-inline">tx_buf</strong>), or <strong class="source-inline">NULL</strong> in a write-only transaction.</li>
+				<li><strong class="source-inline">tx_dma</strong> is the <strong class="bold">Direct Memory Access</strong> (<strong class="bold">DMA</strong>) address of <strong class="source-inline">tx_buf</strong>, in case <strong class="source-inline">spi_message.is_dma_mapped</strong> is set to <strong class="source-inline">1</strong>.</li>
+				<li><strong class="source-inline">rx_dma</strong> is the same as <strong class="source-inline">tx_dma</strong>, but for <strong class="source-inline">rx_buf</strong>. </li>
+				<li><strong class="source-inline">len</strong> represents the size of the <strong class="source-inline">rx</strong> and <strong class="source-inline">tx</strong> buffers in bytes. Only <strong class="source-inline">len</strong> bytes shift out (or in) and attempting to shift out a partial word would result in an error.</li>
+				<li><strong class="source-inline">speed_hz</strong> supersedes the default speed specified in <strong class="source-inline">spi_device.max_speed_hz</strong>, but only for the current transfer. If <strong class="source-inline">0</strong>, the default (from <strong class="source-inline">spi_device</strong>) is used.</li>
+				<li><strong class="source-inline">bits_per_word</strong>: A data transfer involves one or more words. A word is a unit of data whose <a id="_idIndexMarker622"/>size in bits varies according to the needs. Here, <strong class="source-inline">bits_per_word</strong> represents the size in bits of a word for this SPI transfer. This overrides the default value provided in <strong class="source-inline">spi_device.bits_per_word</strong>. If <strong class="source-inline">0</strong>, the default (from <strong class="source-inline">spi_device</strong>) is used.</li>
+				<li><strong class="source-inline">cs_change</strong> determines whether the CS becomes inactive after this transfer completes. All SPI transfers begin with the appropriate CS signal active. Normally, it remains selected until the last transfer in the message is completed. Using <strong class="source-inline">cs_change</strong>, drivers can change the CS signal.</li>
+			</ul>
+			<p>This flag is used to make the CS temporarily inactive in the middle of the message (that is, before processing the <strong class="source-inline">spi_transfer</strong> on which it is specified) if the transfer isn't the last one in the message. Toggling CS in this way may be required to complete a chip command, allowing a single SPI message to handle the entire set of chip transactions.</p>
+			<ul>
+				<li><strong class="source-inline">delay_usecs</strong> represents the delay (in microseconds) following this transfer before (optionally) changing the <strong class="source-inline">chip_select</strong> status, then starting the next transfer or completing this <strong class="source-inline">spi_message</strong>.<p class="callout-heading">Note</p><p class="callout">SPI transfers always write the same number of bytes as they read, even in half-duplex transactions. The SPI core achieves this thanks to the controller's <strong class="source-inline">dummy_rx</strong> and <strong class="source-inline">dummy_tx</strong> elements. When the transmit buffer is null, <strong class="source-inline">spi_transfer-&gt;tx_buf</strong> will be set with the controller's <strong class="source-inline">dummy_tx</strong>. Then, zeroes will be shifted out while filling <strong class="source-inline">rx_buf</strong> with the data coming from the slave. If the receive buffer is null, <strong class="source-inline">spi_transfer-&gt;rx_buf</strong> will be set with the controller's <strong class="source-inline">dummy_rx</strong> and the data shifted in will be discarded.</p></li>
+			</ul>
+			<h3>struct spi_message</h3>
+			<p><strong class="source-inline">spi_message</strong> is used to atomically issue a sequence of transfers, each represented by a <strong class="source-inline">struct spi_transfer</strong> instance. We say <em class="italic">atomically</em> because no other <strong class="source-inline">spi_message</strong> may use that SPI bus until the ongoing sequence completes. Do however note that there are platforms <a id="_idIndexMarker623"/>that can handle many such sequences with a single programmed DMA transfer. An SPI message structure has the following declaration:</p>
+			<p class="source-code">struct spi_message {</p>
+			<p class="source-code">       struct list_head     transfers;</p>
+			<p class="source-code">       struct spi_device    *spi;</p>
+			<p class="source-code">       unsigned       is_dma_mapped:1;</p>
+			<p class="source-code">       /* completion is reported through a callback */</p>
+			<p class="source-code">       void                 (*complete)(void *context);</p>
+			<p class="source-code">       void                 *context;</p>
+			<p class="source-code">       unsigned       frame_length;</p>
+			<p class="source-code">       unsigned       actual_length;</p>
+			<p class="source-code">       int                  status;</p>
+			<p class="source-code">    };</p>
+			<p>The following list outlines the meanings of elements in this data structure:</p>
+			<ul>
+				<li><strong class="source-inline">transfers</strong> is the list of transfers that constitute the message. We will see later how to add a transfer to this list. Using the <strong class="source-inline">spi_transfer.cs_change</strong> flag on the last transfer in that atomic group may potentially save costs for chip deselect and select operations.</li>
+				<li><strong class="source-inline">is_dma_mapped</strong> informs the controller whether to use DMA (or not) to perform the transaction. Your code is then responsible for providing DMA and CPU virtual addresses for each transfer buffer.</li>
+				<li><strong class="source-inline">complete</strong> is a callback called when the transaction is done, and <strong class="source-inline">context</strong> is the parameter to be given to the callback.</li>
+				<li><strong class="source-inline">frame_length</strong> will be set automatically with the total number of bytes in the message.</li>
+				<li><strong class="source-inline">actual_length</strong> is the number of bytes transferred in all successful segments.</li>
+				<li><strong class="source-inline">status</strong> reports the transfer's status. This is <strong class="source-inline">0</strong> on success; otherwise, it's <strong class="source-inline">-errno</strong>.</li>
+			</ul>
+			<p><strong class="source-inline">spi_transfer</strong> elements in a message are processed in FIFO order. Until the message is completed (that is, until the <a id="_idIndexMarker624"/>completion callback is executed), you must make sure not to use transfer buffers in order to avoid data corruption. The code that submits a <strong class="source-inline">spi_message</strong> (and its <strong class="source-inline">spi_transfers</strong>) to the lower layers is responsible for managing its memory. Drivers must ignore the message (and its transfers) once submitted at least until its completion callback is invoked.</p>
+			<h2 id="_idParaDest-134"><a id="_idTextAnchor136"/>Accessing the SPI device</h2>
+			<p>An SPI controller is able to communicate with one or more slaves, that is, one or more <strong class="source-inline">struct spi_device</strong>. They form a tiny bus that shares MOSI, MISO, and SCK signals but not CS. Because those shared signals are ignored unless the chip is selected, each device can be <a id="_idIndexMarker625"/>programmed to utilize a different clock rate. The SPI controller driver manages communication with those devices through a queue of <strong class="source-inline">spi_message</strong> transactions, moving data between CPU memory and an SPI slave device. For each message instance it queues, it calls the message's completion callback when the transaction completes.</p>
+			<p>Before a message can be submitted to the bus, it has to be initialized with <strong class="source-inline">spi_message_init()</strong>, which has the following prototype:</p>
+			<p class="source-code">void spi_message_init(struct spi_message *message)</p>
+			<p>This function will zero each element in the structure and initialize the transfers list. For each transfer to be added to the message, you should call <strong class="source-inline">spi_message_add_tail()</strong> on that transfer, which will result in enqueuing the transfer into the message's transfers list. It has the following declaration:</p>
+			<p class="source-code">spi_message_add_tail(struct spi_transfer *t, struct spi_message *m)</p>
+			<p>Once this is done, you have two choices to start the transaction:</p>
+			<ul>
+				<li><strong class="bold">Synchronously</strong>, using <strong class="source-inline">int spi_sync(struct spi_device *spi, struct spi_message *message)</strong>, which returns <strong class="source-inline">0</strong> on success, else a negative error code. This function may sleep and is not to be used in interrupt contexts. Do however note that this function may sleep in a non-interruptible manner, and does not allow specifying a timeout. A DMA-capable controller's driver may leverage this DMA feature to push/pull data directly into/from the message buffers. </li>
+			</ul>
+			<p>The SPI device's CS is activated by the core during an entire message (from the first transfer to the last), and is then normally disabled between messages. There are drivers which, in order to minimize the impacts of selecting a chip (to save power for example), leave it selected, anticipating that the next message will go to the same chip. </p>
+			<ul>
+				<li><strong class="bold">Asynchronously</strong>, using the <strong class="source-inline">spi_async()</strong> function, which can be used in an any context (atomic or not), and whose prototype is <strong class="source-inline">int spi_async(struct spi_device *spi, struct spi_message *message)</strong>. This function is context agnostic since only submission is done and the <a id="_idIndexMarker626"/>processing is asynchronous. However, the completion callback is invoked in a context that can't sleep. Before this callback is invoked, the value of <strong class="source-inline">message-&gt;status</strong> is undefined. At the time it is invoked, <strong class="source-inline">message-&gt;status</strong> holds the completion status, which is either <strong class="source-inline">0</strong> (to indicate complete success) or a negative error code. </li>
+			</ul>
+			<p>After that callback returns, the driver that initiated the transfer request may deallocate the associated memory since it's no longer in use by any SPI core or controller driver code. Until the completion callback of the currently processed message returns, no subsequent <strong class="source-inline">spi_message</strong> queued to that device will be processed. This rule applies to synchronous transfer calls as well, since they are wrappers around this core asynchronous primitive. This function returns <strong class="source-inline">0</strong> on success, else a negative error code.</p>
+			<p>The following is an excerpt from a driver demonstrating SPI message and transfer initialization and submission:</p>
+			<p class="source-code">Static int regmap_spi_gather_write(</p>
+			<p class="source-code">                    void *context, const void *reg,</p>
+			<p class="source-code">                    size_t reg_len, const void *val,</p>
+			<p class="source-code">                    size_t val_len)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    struct device *dev = context;</p>
+			<p class="source-code">    struct spi_device *spi = to_spi_device(dev);</p>
+			<p class="source-code">    struct spi_message m;</p>
+			<p class="source-code">    u32 addr;</p>
+			<p class="source-code">    struct spi_transfer t[2] = {</p>
+			<p class="source-code">      { .tx_buf = &amp;addr, .len = reg_len, .cs_change = 0,},</p>
+			<p class="source-code">      { .tx_buf = val, .len = val_len, },</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">    addr = TCAN4X5X_WRITE_CMD  |</p>
+			<p class="source-code">             (*((u16 *)reg) &lt;&lt; 8) | val_len &gt;&gt; 2;</p>
+			<p class="source-code">    spi_message_init(&amp;m);</p>
+			<p class="source-code">    spi_message_add_tail(&amp;t[0], &amp;m);</p>
+			<p class="source-code">    spi_message_add_tail(&amp;t[1], &amp;m);</p>
+			<p class="source-code">    return spi_sync(spi, &amp;m);</p>
+			<p class="source-code">}</p>
+			<p>The preceding excerpt however shows static initialization, on the fly, where both messages and <a id="_idIndexMarker627"/>transfers are discarded on the return path of the function. There may be cases where the driver would like to pre-allocate messages along with their transfers for the lifetime of the driver in order to avoid a frequent initialization overhead. In such cases, dynamic allocation can be used thanks to <strong class="source-inline">spi_message_alloc()</strong>, and freed using <strong class="source-inline">spi_message_free()</strong>. They have the following prototypes:</p>
+			<p class="source-code">struct spi_message *spi_message_alloc(unsigned ntrans,</p>
+			<p class="source-code">                                      gfp_t flags)</p>
+			<p class="source-code">void spi_message_free(struct spi_message *m)</p>
+			<p>In the preceding snippet, <strong class="source-inline">ntrans</strong> is the number of transfers to allocate for this new <strong class="source-inline">spi_message</strong>, and <strong class="source-inline">flags</strong> represents the flags for the freshly allocated memory, where using <strong class="source-inline">GFP_KERNEL</strong> is enough. On success, this function returns the new allocated <a id="_idIndexMarker628"/>message structure along with its transfers. You can access transfer elements using kernel list-related macros such as <strong class="source-inline">list_first_entry</strong>, <strong class="source-inline">list_next_entry</strong>, or even <strong class="source-inline">list_for_each_entry</strong>. The following is an example showing the usage of these macros:</p>
+			<p class="source-code">/* Completion handler for async SPI transfers */</p>
+			<p class="source-code">static void my_complete(void *context)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    struct spi_message *msg = context;</p>
+			<p class="source-code">    /* doing some other stuffs */</p>
+			<p class="source-code">    […]</p>
+			<p class="source-code">    spi_message_free(m);</p>
+			<p class="source-code">}</p>
+			<p class="source-code">static int example_spi_async(struct spi_device *spi,</p>
+			<p class="source-code">              struct my_fake_spi_reg *cmds, unsigned len)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    struct spi_transfer *xfer;</p>
+			<p class="source-code">    struct spi_message *msg;</p>
+			<p class="source-code">    msg = spi_message_alloc(len, GFP_KERNEL);</p>
+			<p class="source-code">    if (!msg)</p>
+			<p class="source-code">         return -ENOMEM;</p>
+			<p class="source-code">    msg-&gt;complete = my_complete;</p>
+			<p class="source-code">    msg-&gt;context = msg;</p>
+			<p class="source-code">    list_for_each_entry(xfer, &amp;msg-&gt;transfers,</p>
+			<p class="source-code">               transfer_list) {</p>
+			<p class="source-code">        xfer-&gt;tx_buf = (u8 *)cmds;</p>
+			<p class="source-code">        /* feel free to handle .rx_buf, and so on */</p>
+			<p class="source-code">        [...]</p>
+			<p class="source-code">        xfer-&gt;len = 2;</p>
+			<p class="source-code">        xfer-&gt;cs_change = true;</p>
+			<p class="source-code">         cmds++;</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    return spi_async(spi, msg);</p>
+			<p class="source-code">}</p>
+			<p>In the preceding excerpt, we have not only shown how to use dynamic message and transfer allocation. We have also seen how <strong class="source-inline">spi_async()</strong> is used. This example is quite useless <a id="_idIndexMarker629"/>since the allocated message and transfers are immediately freed upon completion. A best practice with dynamic allocation is to allocate Tx and Rx buffers dynamically as well, and keep them within arm's reach for the lifetime of the driver.</p>
+			<p>Note however that the device driver is responsible for organizing the messages and transfer in the most appropriate way for the device, as follows:</p>
+			<ul>
+				<li>When bidirectional reads and writes start and how its sequence of <strong class="source-inline">spi_transfer</strong> requests are arranged</li>
+				<li>I/O buffer preparation, knowing that each <strong class="source-inline">spi_transfer</strong> wraps a buffer for each transfer direction, supporting full duplex transfers (even if one pointer is <strong class="source-inline">NULL</strong>, in which case the controller will use one of its dummy buffers)</li>
+				<li>Optionally using <strong class="source-inline">spi_transfer.delay_usecs</strong> to define short delays after transfers </li>
+				<li>Whether CS should change (becoming inactive) after a transfer and any delay by using the <strong class="source-inline">spi_transfer.cs_change</strong> flag</li>
+			</ul>
+			<p>With <strong class="source-inline">spi_async</strong>, the device driver queues the messages, registers a completion callback, wakes the message pump, and immediately returns. The completion callback will be invoked <a id="_idIndexMarker630"/>when the transfers are complete. Because neither message queuing nor message pump scheduling can block, the <strong class="source-inline">spi_async</strong> function is considered context agnostic. However, it requires that you wait for the completion callback before you can access the buffers in the <strong class="source-inline">spi_transfer</strong> pointers you submitted. On the other hand, <strong class="source-inline">spi_sync</strong> queues the messages and blocks until they are complete. It does not require completion callback. When <strong class="source-inline">spi_sync</strong> returns, it is safe to access your data buffers. If you look at its implementation in <strong class="source-inline">drivers/spi/spi.c</strong>, you'll see it uses <strong class="source-inline">spi_async</strong> to put the calling thread to sleep until the completion callback is called. Since the 4.0 kernel there has been an improvement for <strong class="source-inline">spi_sync</strong> where, when there is nothing in the queue, the message pump will get executed in the context of the caller instead of the message pump thread, which avoids the cost of a context switch.</p>
+			<p>After the most important data structures and APIs of the SPI framework have been introduced, we can discuss the real driver implementation.</p>
+			<h1 id="_idParaDest-135"><a id="_idTextAnchor137"/>Dealing with the SPI driver abstraction and architecture</h1>
+			<p>This is where the driver logic takes place. It consists of filling <strong class="source-inline">struct spi_driver</strong> with a set of driving functions that allow probing and controlling the underlying device.</p>
+			<h2 id="_idParaDest-136"><a id="_idTextAnchor138"/>Probing the device</h2>
+			<p>The SPI device is probed by the <strong class="source-inline">spi_driver.probe</strong> callback. The probe callback is responsible for <a id="_idIndexMarker631"/>making sure the driver recognizes the given device before they can be bound together. This callback has the following prototype:</p>
+			<p class="source-code">int probe(struct spi_device *spi)</p>
+			<p>This method must return <strong class="source-inline">0</strong> on success, or a negative error number otherwise. The only argument is the SPI device to be probed, whose structure has been pre-initialized by the core according to its description in the device tree. </p>
+			<p>However, most (if not all) of the properties of the SPI device can be overridden, as we have seen while describing its data structure. SPI protocol drivers may need to update the transfer mode if the device doesn't work with its default. They may likewise need to update clock rates or word sizes from their initial values. This is possible thanks to the <strong class="source-inline">spi_setup()</strong> helper, which has the following prototype:</p>
+			<p class="source-code">int spi_setup(struct spi_device * spi)</p>
+			<p>This function must be called from a context that can sleep exclusively. It expects as a parameter an SPI device structure whose properties to override must have been set in their respective fields. Changes will be effective at the next device access (either for a read or write operation after it has been selected) except for <strong class="source-inline">SPI_CS_HIGH</strong>, which takes effect immediately. The SPI device is deselected on the return path of this function. This function returns <strong class="source-inline">0</strong> on success or a negative error on failure. It is worth paying attention to its return value because this call won't succeed if the driver provides an option that is not supported by the underlying controller or its driver. For instance, some hardware handles wire transfers using nine-bit words, <strong class="bold">least significant bit</strong> (<strong class="bold">LSB</strong>)-first wire encoding, or active-high CS, and others do not.</p>
+			<p>You likely want to call <strong class="source-inline">spi_setup()</strong>from <strong class="source-inline">probe()</strong> before submitting any I/O request to the device. However, it can be called anywhere in the code provided no message is pending for that device. </p>
+			<p>The following is a probing example that sets up the SPI device, checks its family ID, and returns <strong class="source-inline">0</strong> (device recognized) on success:</p>
+			<p class="source-code">#define FAMILY_ID 0x57</p>
+			<p class="source-code">static int fake_probe(struct spi_device *spi)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    int err;</p>
+			<p class="source-code">    u8 id;</p>
+			<p class="source-code">    spi-&gt;max_speed_hz =</p>
+			<p class="source-code">               min(spi-&gt;max_speed_hz, DEFAULT_FREQ);</p>
+			<p class="source-code">    spi-&gt;bits_per_word = 8;</p>
+			<p class="source-code">    spi-&gt;mode = SPI_MODE_0;</p>
+			<p class="source-code">    spi-&gt;rt = true;</p>
+			<p class="source-code">    err = spi_setup(spi);</p>
+			<p class="source-code">    if (err)</p>
+			<p class="source-code">        return err;</p>
+			<p class="source-code">    /* read family id */</p>
+			<p class="source-code">    err = get_chip_version(spi, &amp;id);</p>
+			<p class="source-code">    if (err)</p>
+			<p class="source-code">         return -EIO;</p>
+			<p class="source-code">    /* verify family id */</p>
+			<p class="source-code">    if (id != FAMILY_ID) {</p>
+			<p class="source-code">        dev_err(&amp;spi-&gt;dev"</p>
+			<p class="source-code">    "chip family: expected 0x%02x but 0x%02x rea"\n",</p>
+			<p class="source-code">               FAMILY_ID, id);</p>
+			<p class="source-code">          return -ENODEV;</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    /* register with other frameworks */</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    return 0;</p>
+			<p class="source-code">}</p>
+			<p>A real probing method would also probably deal with some driver state data structures or other per-device <a id="_idIndexMarker632"/>data structures. Regarding the <strong class="source-inline">get_chip_version()</strong> function, it may have the following body:</p>
+			<p class="source-code">#define REG_FAMILY_ID 0x2445</p>
+			<p class="source-code">#define DEFAULT_FREQ 10000000</p>
+			<p class="source-code">static int get_chip_version(spi_device *spi, u8 *id)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    struct spi_transfer t[2];</p>
+			<p class="source-code">    struct spi_message m;</p>
+			<p class="source-code">    u16 cmd;</p>
+			<p class="source-code">    int err;</p>
+			<p class="source-code">    cmd = REG_FAMILY_ID;</p>
+			<p class="source-code">    spi_message_init(&amp;m);</p>
+			<p class="source-code">    memset(&amp;t, 0, sizeof(t));</p>
+			<p class="source-code">    t[0].tx_buf = &amp;cmd;</p>
+			<p class="source-code">    t[0].len = sizeof(cmd);</p>
+			<p class="source-code">    spi_message_add_tail(&amp;t[0], &amp;m);</p>
+			<p class="source-code">    t[1].rx_buf = id;</p>
+			<p class="source-code">    t[1].len = 1;</p>
+			<p class="source-code">    spi_message_add_tail(&amp;t[1], &amp;m);</p>
+			<p class="source-code">    return spi_sync(spi, &amp;m);</p>
+			<p class="source-code">}</p>
+			<p>Now that we have <a id="_idIndexMarker633"/>seen how to probe an SPI device, it will be useful to discuss how to tell the SPI core which devices the driver can support.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The SPI core allows setting/getting driver state data using <strong class="source-inline">spi_get_drvdata()</strong> and <strong class="source-inline">spi_set_drvdata()</strong> in the same way as we did while discussing I2C device drivers in <a href="B17934_08_Epub.xhtml#_idTextAnchor117"><em class="italic">Chapter 8</em></a><em class="italic">, Writing I2C Device Drivers</em>.</p>
+			<h2 id="_idParaDest-137"><a id="_idTextAnchor139"/>Provisioning devices in the driver</h2>
+			<p>As we need a list of i<strong class="source-inline">2c_device_id</strong> to tell I2C core what devices an I2C driver can support, we must <a id="_idIndexMarker634"/>provide an array of <strong class="source-inline">spi_device_id</strong> to inform the SPI core what devices our SPI driver supports. After that array has been filled, it must be assigned to the <strong class="source-inline">spi_driver.id_table</strong> field. Additionally, for device matching and module loading purposes, this same array needs to be given to the <strong class="source-inline">MODULE_DEVICE_TABLE</strong> macro. <strong class="source-inline">struct spi_device_id</strong> has the following declaration in <strong class="source-inline">include/linux/mod_devicetable.h</strong>:</p>
+			<p class="source-code">struct spi_device_id {</p>
+			<p class="source-code">   char name[SPI_NAME_SIZE];</p>
+			<p class="source-code">   kernel_ulong_t driver_data;</p>
+			<p class="source-code">};</p>
+			<p>In the preceding data structure, <strong class="source-inline">name</strong> is a descriptive name for the device, and <strong class="source-inline">driver_data</strong> is the driver state value. It can be set with a pointer to a per-device data structure. The following is an example:</p>
+			<p class="source-code">#define ID_FOR_FOO_DEVICE   0</p>
+			<p class="source-code">#define ID_FOR_BAR_DEVICE   1 </p>
+			<p class="source-code">static struct spi_device_id foo_idtable[] = {</p>
+			<p class="source-code">  "{ ""oo", ID_FOR_FOO_DEVICE },</p>
+			<p class="source-code">  "{ ""ar", ID_FOR_BAR_DEVICE },</p>
+			<p class="source-code">   { },</p>
+			<p class="source-code">};</p>
+			<p class="source-code">MODULE_DEVICE_TABLE(spi, foo_idtable);</p>
+			<p>To be able to <a id="_idIndexMarker635"/>match the devices declared in the device tree, we need to define an array of <strong class="source-inline">struct of_device_id</strong> elements and both assign it to <strong class="source-inline">spi_driver.of_match_table</strong> and call the <strong class="source-inline">MODULE_DEVICE_TABLE</strong> macro on it. The following is an example, which also shows what the final <strong class="source-inline">spi_driver</strong> structure would look like when it is set up:</p>
+			<p class="source-code">static const struct of_device_id foobar_of_match[] = {</p>
+			<p class="source-code">        { .compatible"= "packtpub,foobar-dev"ce" },</p>
+			<p class="source-code">        { .compatible"= "packtpub,barfoo-dev"ce" },</p>
+			<p class="source-code">        {},</p>
+			<p class="source-code">};</p>
+			<p class="source-code">MODULE_DEVICE_TABLE(of, foobar_of_match);</p>
+			<p>The following excerpt shows the final <strong class="source-inline">spi_driver</strong> content:</p>
+			<p class="source-code">static struct spi_driver foo_driver = {</p>
+			<p class="source-code">    .driver         = {</p>
+			<p class="source-code">        .name  "= ""oo",</p>
+			<p class="source-code">        /* The below line adds Device Tree support */</p>
+			<p class="source-code">        .of_match_table = of_match_ptr(foobar_of_match),</p>
+			<p class="source-code">    },</p>
+			<p class="source-code">    .probe          = my_spi_probe,</p>
+			<p class="source-code">    .id_table       = foo_idtable,</p>
+			<p class="source-code">};</p>
+			<p>In the preceding, we <a id="_idIndexMarker636"/>can see what an SPI driver structure looks like after it has been set up. There is however a missing element, the <strong class="source-inline">spi_driver.remove</strong> callback, which is used to undo what was done in the probing function.</p>
+			<h2 id="_idParaDest-138"><a id="_idTextAnchor140"/>Implementing the spi_driver.remove method</h2>
+			<p>The <strong class="source-inline">remove</strong> callback must be used to release every resource grabbed and undo what was done at probing. This <a id="_idIndexMarker637"/>callback has the following prototype:</p>
+			<p class="source-code">static int remove(struct spi_device *spi)</p>
+			<p>In the preceding snippet, <strong class="source-inline">spi</strong> is the SPI device data structure, the same given to the <strong class="source-inline">probe</strong> callback, which simplifies device state data structure tracking between the probing and the removal of the device. This method returns <strong class="source-inline">0</strong> on success or a negative error code on failure. You must make sure that the device is left in a coherent and stable state as well. The following is an example implementation:</p>
+			<p class="source-code">static int mc33880_remove(struct spi_device *spi)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    struct mc33880 *mc;</p>
+			<p class="source-code">    mc = spi_get_drvdata(spi); /* Get our data back */</p>
+			<p class="source-code">    if (!mc)</p>
+			<p class="source-code">        return -ENODEV;</p>
+			<p class="source-code">    /*</p>
+			<p class="source-code">     * unregister from frameworks with which we</p>
+			<p class="source-code">     * registered in the probe function</p>
+			<p class="source-code">     */</p>
+			<p class="source-code">    gpiochip_remove(&amp;mc-&gt;chip);</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">    /* releasing any resource */</p>
+			<p class="source-code">    mutex_destroy(&amp;mc-&gt;lock);</p>
+			<p class="source-code">    return 0;</p>
+			<p class="source-code">}</p>
+			<p>In the preceding <a id="_idIndexMarker638"/>example, the code dealt with unregistering from the frameworks and releasing the resources. This is the classic case that you will face in 90% of cases.</p>
+			<h2 id="_idParaDest-139"><a id="_idTextAnchor141"/>Driver initialization and registration</h2>
+			<p>At this step of implementation, your <a id="_idIndexMarker639"/>code is almost ready, and you would like to inform the <a id="_idIndexMarker640"/>SPI core of your SPI driver. This is driver registration. For SPI device drivers, the SPI core provides <strong class="source-inline">spi_register_driver()</strong> and <strong class="source-inline">spi_unregister_driver()</strong> both to register and unregister and SPI device driver with the SPI core. Those methods have the following prototypes:</p>
+			<p class="source-code">int spi_register_driver(struct spi_driver *sdrv);</p>
+			<p class="source-code">void spi_unregister_driver(struct spi_driver *sdrv);</p>
+			<p>In both functions, <strong class="source-inline">sdrv</strong> is the SPI driver structure that has been previously set up. The registration API returns zero on success or a negative error code on failure.</p>
+			<p>Driver registration and unregistering usually take place in the module initialization and module exit method. The following is a typical demonstration of SPI driver registration:</p>
+			<p class="source-code">static int __init foo_init(void)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">   [...] /*My init code */</p>
+			<p class="source-code">   return spi_register_driver(&amp;foo_driver);</p>
+			<p class="source-code">}</p>
+			<p class="source-code">module_init(foo_init);</p>
+			<p class="source-code">static void __exit foo_cleanup(void)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">   [...] /* My clean up code */</p>
+			<p class="source-code">   spi_unregister_driver(&amp;foo_driver);</p>
+			<p class="source-code">}</p>
+			<p class="source-code">module_exit(foo_cleanup);</p>
+			<p>If you do nothing at <a id="_idIndexMarker641"/>module initialization other than registering/unregistering the <a id="_idIndexMarker642"/>driver, you can use <strong class="source-inline">module_spi_driver()</strong> to factor your code as follows:</p>
+			<p class="source-code">module_spi_driver(foo_driver);</p>
+			<p>This macro will populate module initialization and cleanup functions and will call <strong class="source-inline">spi_register_driver</strong> and <strong class="source-inline">spi_unregister_driver</strong> inside.</p>
+			<h2 id="_idParaDest-140"><a id="_idTextAnchor142"/>Instantiating SPI devices</h2>
+			<p>SPI slave nodes must <a id="_idIndexMarker643"/>be children of the SPI controller node. In master mode, one or more slave nodes (up to the number of CSs) can be present.</p>
+			<p>The required properties are the following:</p>
+			<ul>
+				<li><strong class="source-inline">compatible</strong>: The compatible string as defined in the driver for matching</li>
+				<li><strong class="source-inline">reg</strong>: The CS index of the device relative to the controller</li>
+				<li><strong class="source-inline">spi-max-frequency</strong>: The maximum SPI clocking speed of the device in Hz</li>
+			</ul>
+			<p>All slave nodes can contain the following optional properties:</p>
+			<ul>
+				<li><strong class="source-inline">spi-cpol</strong>: Boolean <a id="_idIndexMarker644"/>property which, if present, indicates that the device requires inverse <strong class="bold">clock polarity</strong> (<strong class="bold">CPOL</strong>) mode.</li>
+				<li><strong class="source-inline">spi-cpha</strong>: Boolean property <a id="_idIndexMarker645"/>indicating that this device requires shifted <strong class="bold">clock phase</strong> (<strong class="bold">CPHA</strong>) mode.</li>
+				<li><strong class="source-inline">spi-cs-hi–h</strong>: Empty property indicating that the device requires CS active high.</li>
+				<li><strong class="source-inline">spi-3wire</strong>: This is a <a id="_idIndexMarker646"/>Boolean property that indicates that this device requires 3-wire mode to work properly.</li>
+				<li><strong class="source-inline">spi-lsb-first</strong>: This is a Boolean property that indicates that this device requires LSB first mode.</li>
+				<li><strong class="source-inline">spi-tx-bus-width</strong>: This property indicates the bus width used for MOSI. If not present, it defaults to <strong class="source-inline">1</strong>.</li>
+				<li><strong class="source-inline">spi-rx-bus-width</strong>: This property is used to indicate the bus width used for MISO. If not present, it defaults to <strong class="source-inline">1</strong>.</li>
+				<li><strong class="source-inline">spi-rx-delay-–s</strong>: This is used to specify a delay in microseconds after a read transfer.</li>
+				<li><strong class="source-inline">spi-tx-delay-us</strong>: This is used to specify a delay in microseconds after a write transfer.</li>
+			</ul>
+			<p>The following is a real device tree listing for SPI devices:</p>
+			<p class="source-code">ecspi1 {</p>
+			<p class="source-code">    fsl,spi-num-CSs = &lt;3&gt;;</p>
+			<p class="source-code">    cs-gpios = &lt;&amp;gpio5 17 0&gt;, &lt;&amp;gpio5 17 0&gt;, &lt;&amp;gpio5 17 0&gt;;</p>
+			<p class="source-code">    pinctrl-0 = &lt;&amp;pinctrl_ecspi1 &amp;pinctrl_ecspi1_cs&gt;;</p>
+			<p class="source-code">    #address-cells = &lt;1&gt;;</p>
+			<p class="source-code">    #size-cells = &lt;0&gt;;</p>
+			<p class="source-code">    compatible"= "fsl,imx6q-ec"pi", "fsl,imx51-ec"pi";</p>
+			<p class="source-code">    reg = &lt;0x02008000 0x4000&gt;;</p>
+			<p class="source-code">    status"= "o"ay";</p>
+			<p class="source-code">    ad7606r8_0: ad7606r8@0 {</p>
+			<p class="source-code">        compatible"= "ad760"-8";</p>
+			<p class="source-code">        reg = &lt;0&gt;;</p>
+			<p class="source-code">        spi-max-frequency = &lt;1000000&gt;;</p>
+			<p class="source-code">        interrupt-parent = &lt;&amp;gpio4&gt;;</p>
+			<p class="source-code">        interrupts = &lt;30 0x0&gt;;</p>
+			<p class="source-code">   };</p>
+			<p class="source-code">   label: fake_spi_device@1 {</p>
+			<p class="source-code">        compatible"= "packtpub,foobar-dev"ce";</p>
+			<p class="source-code">        reg = &lt;1&gt;;</p>
+			<p class="source-code">        a-string-param"= "stringva"ue";</p>
+			<p class="source-code">        spi-cs-high;</p>
+			<p class="source-code">   };</p>
+			<p class="source-code">   mcp2515can: can@2 {</p>
+			<p class="source-code">        compatible"= "microchip,mcp2"15";</p>
+			<p class="source-code">        reg = &lt;2&gt;;</p>
+			<p class="source-code">        spi-max-frequency = &lt;1000000&gt;;</p>
+			<p class="source-code">        clocks = &lt;&amp;clk8m&gt;;</p>
+			<p class="source-code">        interrupt-parent = &lt;&amp;gpio4&gt;;</p>
+			<p class="source-code">        interrupts = &lt;29 IRQ_TYPE_LEVEL_LOW&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p>In the preceding <a id="_idIndexMarker647"/>device tree excerpt, <strong class="source-inline">ecspi1</strong> represents the master SPI controller. <strong class="source-inline">fake_spi_device</strong> and <strong class="source-inline">mcp2515can</strong> represent SPI slave devices, and their <strong class="source-inline">reg</strong> properties <a id="_idIndexMarker648"/>represents their respective CS indices relative to the master.</p>
+			<p>Now that we are familiar with all the kernel aspects of the SPI slave-oriented framework, let's see how we might avoid dealing with the kernel and try to implement everything in the user space.</p>
+			<h1 id="_idParaDest-141"><a id="_idTextAnchor143"/>Learning how not to write SPI device drivers</h1>
+			<p>The usual way to deal with SPI devices is to write kernel code to drive this device. Nowadays the <strong class="source-inline">spidev</strong> interface <a id="_idIndexMarker649"/>makes it possible to deal with such devices without even writing a line of kernel code. The use of this interface should be limited, however, to simple use cases such as talking to a slave microcontroller or for prototyping. Using this interface, you will not be able to deal with various <strong class="bold">interrupts</strong> (<strong class="bold">IRQs</strong>) the device may support nor leverage other kernel frameworks.</p>
+			<p>The <strong class="source-inline">spidev</strong> interface exposes a character device node in the form <strong class="source-inline">/dev/spidevX.Y</strong> where <strong class="source-inline">X</strong> represents the bus our device sits on, and <strong class="source-inline">Y</strong> represents the CS index (relative to the controller) assigned to the device node in the device tree. For example, <strong class="source-inline">/dev/spidev1.0</strong> means device <strong class="source-inline">0</strong> on SPI bus <strong class="source-inline">1</strong>. The same applies to the sysfs directory entry, which would be in the form <strong class="source-inline">/sys/class/spidev/spidevX.Y</strong>.</p>
+			<p>Prior to the character device appearing in the user space, the device node must be declared in the device tree as a child of the SPI controller node. The following is an example:</p>
+			<p class="source-code">&amp;ecspi2 {</p>
+			<p class="source-code">    pinctrl-names"= "defa"lt";</p>
+			<p class="source-code">    pinctrl-0 = &lt;&amp;pinctrl_teoulora_ecspi2&gt;;</p>
+			<p class="source-code">    cs-gpios = &lt;&amp;gpio2 26 1</p>
+			<p class="source-code">                &amp;gpio2 27 1&gt;;</p>
+			<p class="source-code">    num-cs = &lt;2&gt;;</p>
+			<p class="source-code">    status"= "o"ay";</p>
+			<p class="source-code">    spidev@0 {</p>
+			<p class="source-code">        reg = &lt;0&gt;;</p>
+			<p class="source-code">        compatib"e="semtech,sx1"01";</p>
+			<p class="source-code">        spi-max-frequency = &lt;20000000&gt;;</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">};</p>
+			<p>In the preceding snippet, <strong class="source-inline">spidev@0</strong> corresponds to our SPI device node. <strong class="source-inline">reg = &lt;0&gt;</strong> tells the controller that this device is using the first CS line (index starting from 0). The <strong class="source-inline">compatible="semtech,sx1301"</strong> property is used to match an entry in the <strong class="source-inline">spidev</strong> driver. It is no longer <a id="_idIndexMarker650"/>recommended to use <strong class="source-inline">"spidev"</strong> as a compatible string – you'll get a warning if you try. Finally, <strong class="source-inline">spi-max-frequency = &lt;20000000&gt;</strong> sets the default clock speed (20 MHz in this case) that our device will operate at, unless it is changed using the appropriate API.</p>
+			<p>From the user space, the required header files to deal with the <strong class="source-inline">spidev</strong> interface are as follows:</p>
+			<p class="source-code">#include &lt;fcntl.h&gt;</p>
+			<p class="source-code">#include &lt;unistd.h&gt;</p>
+			<p class="source-code">#include &lt;sys/ioctl.h&gt;</p>
+			<p class="source-code">#include &lt;linux/types.h&gt;</p>
+			<p class="source-code">#include &lt;linux/spi/spidev.h&gt;</p>
+			<p>Because it is a character device, it is allowed (this is the only option, in fact) to use basic system calls such as <strong class="source-inline">open()</strong>,  <strong class="source-inline">read()</strong>, <strong class="source-inline">write()</strong>, <strong class="source-inline">ioctl()</strong>, and <strong class="source-inline">close()</strong>. The following example shows some basic usage, with <strong class="source-inline">read()</strong> and <strong class="source-inline">write()</strong> operations only:</p>
+			<p class="source-code">#include &lt;stdio.h&gt;</p>
+			<p class="source-code">#include &lt;stdlib.h&gt;</p>
+			<p class="source-code">int main(int argc, char **argv) </p>
+			<p class="source-code">{</p>
+			<p class="source-code">   int i,fd;</p>
+			<p class="source-code">   char *device = "/dev/spidev0.0";</p>
+			<p class="source-code">   char wr_buf[]={0xff,0x00,0x1f,0x0f};</p>
+			<p class="source-code">   char rd_buf[10]; </p>
+			<p class="source-code">   </p>
+			<p class="source-code">   fd = open(device, O_RDWR);</p>
+			<p class="source-code">   if (fd &lt;= 0) { </p>
+			<p class="source-code">         printf("Failed to open SPI device %s\n", device);</p>
+			<p class="source-code">         exit(1);</p>
+			<p class="source-code">   }</p>
+			<p class="source-code">   </p>
+			<p class="source-code">   if (write(fd, wr_buf, sizeof(wr_buf)) != sizeof(wr_buf))</p>
+			<p class="source-code">         perror("Write Error");</p>
+			<p class="source-code">   if (read(fd, rd_buf, sizeof(rd_buf)) != sizeof(rd_buf))</p>
+			<p class="source-code">         perror("Read Error");</p>
+			<p class="source-code">   else</p>
+			<p class="source-code">         for (i = 0; i &lt; sizeof(rd_buf); i++)</p>
+			<p class="source-code">             printf("0x%02X ", rd_buf[i]);</p>
+			<p class="source-code">   close(fd);</p>
+			<p class="source-code">   return 0;</p>
+			<p class="source-code">}</p>
+			<p>In the preceding code, you <a id="_idIndexMarker651"/>should note that the standard <strong class="source-inline">read()</strong> and <strong class="source-inline">write()</strong> operations are half-duplex only, and that the CS is deactivated between each operation. To be able to work in full duplex, you have no choice but to use the <strong class="source-inline">ioctl()</strong> interface, where you can pass both input and output buffers at your convenience. Moreover, with the <strong class="source-inline">ioctl()</strong> interface, you can use a set of <strong class="source-inline">SPI_IOC_RD_*</strong> and <strong class="source-inline">SPI_IOC_WR_*</strong> commands to get <strong class="source-inline">RD</strong> and set <strong class="source-inline">WR</strong> to override the device's current setting. The complete list and documentation for this can be found in <strong class="source-inline">Documentation/spi/spidev</strong> in the kernel sources.</p>
+			<p>The <strong class="source-inline">ioctl()</strong> <a id="_idIndexMarker652"/>interface allows composite operations without CS deactivation and is available using the <strong class="source-inline">SPI_IOC_MESSAGE(N)</strong> request. A new data structure takes place, the <strong class="source-inline">struct spi_ioc_transfer</strong>, which is the user space equivalent of <strong class="source-inline">struct spi_transfer</strong>. The following is an example of the ioctl commands:</p>
+			<p class="source-code">#include &lt;stdint.h&gt;</p>
+			<p class="source-code">#include &lt;stdio.h&gt;</p>
+			<p class="source-code">#include &lt;stdlib.h&gt;</p>
+			<p class="source-code">#include &lt;string.h&gt;</p>
+			<p class="source-code">/* include required headers, listed early in the section */</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">static int pabort(const char *s)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    perror(s);</p>
+			<p class="source-code">    return -1;</p>
+			<p class="source-code">}</p>
+			<p class="source-code">static int spi_device_setup(int fd)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    int mode, speed, a, b, i;</p>
+			<p class="source-code">    int bits = 8;</p>
+			<p class="source-code">    /* spi mode: mode 0 */</p>
+			<p class="source-code">    mode = SPI_MODE_0;</p>
+			<p class="source-code">    a = ioctl(fd, SPI_IOC_WR_MODE, &amp;mode); /* set mode */</p>
+			<p class="source-code">    b = ioctl(fd, SPI_IOC_RD_MODE, &amp;mode); /* get mode */</p>
+			<p class="source-code">    if ((a &lt; 0) || (b &lt; 0)) {</p>
+			<p class="source-code">        return pabort("can't set spi mode");</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    /* Clock max speed in Hz */</p>
+			<p class="source-code">    speed = 8000000; /* 8 MHz */</p>
+			<p class="source-code">    a = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &amp;speed); /* set */</p>
+			<p class="source-code">    b = ioctl(fd, SPI_IOC_RD_MAX_SPEED_HZ, &amp;speed); /* get */</p>
+			<p class="source-code">    if ((a &lt; 0) || (b &lt; 0))</p>
+			<p class="source-code">        return pabort("fail to set max speed hz");</p>
+			<p class="source-code">    /*</p>
+			<p class="source-code">     * Set SPI to MSB first.</p>
+			<p class="source-code">     * Here, 0 means "not to use LSB first".</p>
+			<p class="source-code">     * To use LSB first, argument should be &gt; 0</p>
+			<p class="source-code">     */</p>
+			<p class="source-code">    i = 0;</p>
+			<p class="source-code">    a = ioctl(dev, SPI_IOC_WR_LSB_FIRST, &amp;i);</p>
+			<p class="source-code">    b = ioctl(dev, SPI_IOC_RD_LSB_FIRST, &amp;i);</p>
+			<p class="source-code">    if ((a &lt; 0) || (b &lt; 0))</p>
+			<p class="source-code">        pabort("Fail to set MSB first\n");</p>
+			<p class="source-code"> </p>
+			<p class="source-code">    /* setting SPI to 8 bits per word */</p>
+			<p class="source-code">    bits = 8;</p>
+			<p class="source-code">    a = ioctl(dev, SPI_IOC_WR_BITS_PER_WORD, &amp;bits); /* set */</p>
+			<p class="source-code">    b = ioctl(dev, SPI_IOC_RD_BITS_PER_WORD, &amp;bits); /* get */</p>
+			<p class="source-code">    if ((a &lt; 0) || (b &lt; 0))</p>
+			<p class="source-code">        pabort("Fail to set bits per word\n");</p>
+			<p class="source-code">    </p>
+			<p class="source-code">    return 0;</p>
+			<p class="source-code">}</p>
+			<p>In the preceding example, getters are used for demonstration purposes only. It is not mandatory to issue <a id="_idIndexMarker653"/>the <strong class="source-inline">SPI_IOC_RD_*</strong> command after you have executed its <strong class="source-inline">SPI_IOC_WR_*</strong> equivalent. Now that we have seen most of those ioctl commands, let's see how to start transfers:</p>
+			<p class="source-code">static void do_transfer(int fd)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    int ret;</p>
+			<p class="source-code">    char txbuf[] = {0x0B, 0x02, 0xB5};</p>
+			<p class="source-code">    char rxbuf[3] = {0, };</p>
+			<p class="source-code">    char cmd_buff = 0x9f;</p>
+			<p class="source-code">    struct spi_ioc_transfer tr[2] = {</p>
+			<p class="source-code">        0 = {</p>
+			<p class="source-code">          .tx_buf = (unsigned long)&amp;cmd_buff,</p>
+			<p class="source-code">          .len = 1,</p>
+			<p class="source-code">          .cs_change = 1;    /* We need CS to change */</p>
+			<p class="source-code">          .delay_usecs = 50, /* wait after this transfer */</p>
+			<p class="source-code">          .bits_per_word = 8,</p>
+			<p class="source-code">        },</p>
+			<p class="source-code">        [1] = {</p>
+			<p class="source-code">          .tx_buf = (unsigned long)tx,</p>
+			<p class="source-code">          .rx_buf = (unsigned long)rx,</p>
+			<p class="source-code">          .len = txbuf(tx),</p>
+			<p class="source-code">          .bits_per_word = 8,</p>
+			<p class="source-code">        },</p>
+			<p class="source-code">    };</p>
+			<p class="source-code">    ret = ioctl(fd, SPI_IOC_MESSAGE(2), &amp;tr);</p>
+			<p class="source-code">    if (ret == 1){</p>
+			<p class="source-code">        perror("can't send spi message");</p>
+			<p class="source-code">        exit(1);</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    for (ret = 0; ret &lt; sizeof(tx); ret++)</p>
+			<p class="source-code">        printf("%.2X ", rx[ret]);</p>
+			<p class="source-code">    printf("\n");</p>
+			<p class="source-code">}</p>
+			<p>The preceding shows the concept of message and transfer transactions in the user space. Now that our <a id="_idIndexMarker654"/>helpers have been defined, we can write the main code to use them as follows:</p>
+			<p class="source-code">int main(int argc, char **argv)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    char *device = "/dev/spidev0.0";</p>
+			<p class="source-code">    int fd;</p>
+			<p class="source-code">    int error;</p>
+			<p class="source-code">    fd = open(device, O_RDWR);</p>
+			<p class="source-code">    if (fd &lt; 0)</p>
+			<p class="source-code">        return pabort("Can't open device ");</p>
+			<p class="source-code">    error = spi_device_setup(fd);</p>
+			<p class="source-code">    if (error)</p>
+			<p class="source-code">        exit (1);</p>
+			<p class="source-code"> </p>
+			<p class="source-code">    do_transfer(fd);</p>
+			<p class="source-code"> </p>
+			<p class="source-code">    close(fd);</p>
+			<p class="source-code">    return 0;</p>
+			<p class="source-code">}</p>
+			<p>We are now done with <a id="_idIndexMarker655"/>the main function. This section taught us to use the user space SPI APIs and commands to interact with the device. We are limited, however, in that we can't take advantage of device interrupt lines or other kernel frameworks.</p>
+			<h1 id="_idParaDest-142"><a id="_idTextAnchor144"/>Summary</h1>
+			<p>In this chapter, we tackled SPI drivers and can now take the advantage of this serial (and full duplex) bus, which is way faster than I2C. We walked through all the data structures in this framework and discussed transferring over SPI, which is the most important section we covered. That said, the memory we accessed over those buses was off-chip – we may need more abstraction in order to avoid the SPI and I2C APIs. </p>
+			<p>This is where the next chapter comes in, dealing with the regmap API, which offers a higher and more unified level of abstraction so that SPI (and I2C) commands will become transparent to you.</p>
+		</div>
+	</body></html>

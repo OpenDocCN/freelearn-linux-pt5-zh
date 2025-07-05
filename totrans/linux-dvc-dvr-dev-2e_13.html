@@ -1,0 +1,675 @@
+<html><head></head><body>
+		<div id="_idContainer051">
+			<h1 id="_idParaDest-144"><em class="italic"><a id="_idTextAnchor146"/>Chapter 10</em>: Understanding the Linux Kernel Memory Allocation</h1>
+			<p>Linux systems use an illusion referred to as "virtual memory." This mechanism makes every memory address virtual, which means they do not point to any address in the RAM directly. This way, whenever we access a memory location, a translation mechanism is performed in order to match the corresponding physical memory.</p>
+			<p>In this chapter, we will deal with the whole Linux memory allocation and management system, covering the following topics:</p>
+			<ul>
+				<li>An introduction to Linux kernel memory-related terms</li>
+				<li>Demystifying address translation and MMU</li>
+				<li>Dealing with memory allocation mechanisms</li>
+				<li>Working with I/O memory to talk with hardware</li>
+				<li>Memory remapping</li>
+			</ul>
+			<h1 id="_idParaDest-145"><a id="_idTextAnchor147"/>An introduction to Linux kernel memory-related terms</h1>
+			<p>Though system memory (also known as RAM) can be extended<a id="_idIndexMarker656"/> in some computers that allow it, physical memory is a limited resource in computer systems.</p>
+			<p>Virtual memory is a concept, an illusion given to each process so that it thinks it has large and almost infinite memory, and sometimes more than the system really has. To set up everything, we will introduce the address space, virtual or logical address, physical address, and bus address terms:</p>
+			<ul>
+				<li>A physical address<a id="_idIndexMarker657"/> identifies a physical (RAM) location. Because<a id="_idIndexMarker658"/> of the virtual memory mechanism, the user or the kernel never directly deals with the physical address but can access it by its corresponding logical address.</li>
+				<li>A virtual address<a id="_idIndexMarker659"/> does not necessarily<a id="_idIndexMarker660"/> exist physically. This address is used as a reference to access the physical memory<a id="_idIndexMarker661"/> location by CPU on behalf of the <strong class="bold">Memory Management Unit</strong> (<strong class="bold">MMU</strong>). The MMU sits between the CPU core and memory and is most often part of the physical CPU itself. That said, on ARM architectures, it's part of the licensed core. It is then responsible for converting virtual addresses into physical addresses every time memory locations<a id="_idIndexMarker662"/> are accessed. This mechanism is called <strong class="bold">address translation</strong>.</li>
+				<li>A logical address is an address resulting<a id="_idIndexMarker663"/> from a linear mapping. It results<a id="_idIndexMarker664"/> from a mapping above <strong class="source-inline">PAGE_OFFSET</strong>. Such addresses are virtual addresses with a fixed offset from their physical addresses. Thus, a logical address is always a virtual address, and the reverse is not true.</li>
+				<li>In computer systems, an address space<a id="_idIndexMarker665"/> is the amount of memory<a id="_idIndexMarker666"/> allocated for all possible addresses for a computational entity (in our case, the CPU). This address space may be virtual or physical. While physical address space can go up to the amount of RAM installed on the system (theoretically limited by the width of the CPU address bus and registers), the range of virtual addresses can extend to the highest address permitted by the RAM or by the operating system architecture (such as addressing up to 4 GB of virtual memory on a 1 GB RAM system).</li>
+			</ul>
+			<p>As the MMU is the centerpiece of memory management, it organizes memory into logical units<a id="_idIndexMarker667"/> of fixed size called <strong class="bold">pages</strong>. The size of a page is a power of 2 in bytes and varies among systems. A page is backed by a page frame, and the size of the page matches a page frame. Before going further in our learning of memory management, let's introduce the other terms:</p>
+			<ul>
+				<li>A memory page, virtual page, or simply<a id="_idIndexMarker668"/> a page are terms<a id="_idIndexMarker669"/> used to refer<a id="_idIndexMarker670"/> to a fixed-length (<strong class="source-inline">PAGE_SIZE</strong>) block of virtual memory. The same term page is used as a kernel data structure to represent a memory page.</li>
+				<li>On the other<a id="_idIndexMarker671"/> hand, a frame (or page frame) refers<a id="_idIndexMarker672"/> to a fixed-length block of physical memory (RAM) on top of which the operating system maps a page. The size of the page matches a page frame. Each page<a id="_idIndexMarker673"/> frame is given a number, called the <strong class="bold">Page Frame Number</strong> (<strong class="bold">PFN</strong>). </li>
+				<li>Then comes the term <strong class="bold">page table</strong>, which is a kernel<a id="_idIndexMarker674"/> and architecture data structure used to store the mappings between virtual addresses and physical addresses. The key pair page/frame describes<a id="_idIndexMarker675"/> a single entry in the page table and represents a mapping.</li>
+			</ul>
+			<p>Finally, the term "page-aligned" is used to qualify an address<a id="_idIndexMarker676"/> that starts exactly at the beginning of a page. It goes without saying that any memory whose address is a multiple of the system page size is said to be page-aligned. For example, on a 4 KB page size system, <strong class="source-inline">4.096</strong>, <strong class="source-inline">20.480</strong>, and <strong class="source-inline">409.600</strong> are instances of page-aligned memory addresses.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The page size is fixed<a id="_idIndexMarker677"/> by the MMU, and the operating system can't modify it. Some processors allow for multiple page sizes (for example, ARMv8-A supports three different granule sizes: 4 KB, 16 KB, and 64 KB), and the OS can decide which one to use. 4 KB is a widely popular page granularity though.</p>
+			<p>Now that the terms frequently used while dealing with memory have been introduced, let's focus on memory management and organization by the kernel.</p>
+			<p>Linux is a virtual memory operating system. On a Linux running system, each process and even the kernel itself (and some devices) is allocated address space, which is some portion<a id="_idIndexMarker678"/> of the processor's virtual address space (note that neither the kernel nor processes deal with physical addresses – only MMU does). While this virtual address space is split between the kernel and user space, the upper part is used for the kernel and the lower part is used for user space.</p>
+			<p>The split varies between architectures and is held by the <strong class="source-inline">CONFIG_PAGE_OFFSET</strong> kernel configuration option. For 32-bit systems, the split is at <strong class="source-inline">0xC0000000</strong> by default. This is called the 3 GB/1 GB split, where the user <a id="_idIndexMarker679"/>space is given the lower 3 GB of virtual address space. The kernel can, however, be given a different amount of address space as desired by playing with the <strong class="source-inline">CONFIG_VMSPLIT_1G</strong>, <strong class="source-inline">CONFIG_VMSPLIT_2G</strong>, and <strong class="source-inline">CONFIG_VMSPLIT_3G_OPT</strong> kernel configuration options (see <strong class="source-inline">arch/x86/Kconfig</strong> and <strong class="source-inline">arch/arm/Kconfig</strong>). For 64-bit, the split varies by architecture, but it's high enough: <strong class="source-inline">0x8000000000000000</strong> for 64-bit ARM, and <strong class="source-inline">0xffff880000000000</strong> for x86_64.</p>
+			<p>A typical process's virtual address space layout looks like the following on a 32-bit system<a id="_idIndexMarker680"/> with the default splitting scheme:</p>
+			<div>
+				<div id="_idContainer035" class="IMG---Figure">
+					<img src="image/B17934_10_001.jpg" alt="Figure 10.1 – 32-bit system memory splitting&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.1 – 32-bit system memory splitting</p>
+			<p>While this layout is transparent on 64-bit systems, there are particularities on 32-bit machines that need to be introduced. In the next sections, we will study in detail the reason for this memory splitting, its usage, and where it applies.</p>
+			<h2 id="_idParaDest-146"><a id="_idTextAnchor148"/>Kernel address space layout on 32-bit systems – the concept of low and high memory</h2>
+			<p>In an ideal world, all memory is permanently mappable. There are, however, some restrictions on 32-bit systems. This results in only a portion of RAM being permanently mapped. This part of memory<a id="_idIndexMarker681"/> can be accessed directly (by simple dereference) by the kernel and is called <strong class="bold">low memory</strong>, while the part of (physical) memory<a id="_idIndexMarker682"/> not covered by a permanent mapping is referred to as <strong class="bold">high memory</strong>. There are various architecture-dependent<a id="_idIndexMarker683"/> constraints on where exactly that border lies. For example, Intel cores can permanently map only up to the first 1 GB of RAM. This is a little bit less, 896 MiB of RAM, because part of this low memory is used to dynamically map high memory:</p>
+			<div>
+				<div id="_idContainer036" class="IMG---Figure">
+					<img src="image/B17934_10_002.jpg" alt="Figure 10.2 – High and low memory splitting&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.2 – High and low memory splitting</p>
+			<p>In the preceding diagram, we can see that 128 MB of the kernel address space is used to map a high memory of RAM on the fly when needed. On the other hand, 896 MB of kernel address space is permanently and linearly mapped to a low 896 MB of RAM.</p>
+			<p>The high-memory<a id="_idIndexMarker684"/> mechanism can also be used on a 1 GB RAM system to dynamically map user memory<a id="_idIndexMarker685"/> whenever the kernel needs access. The fact that the kernel can map the whole RAM into its address space does not mean the user space can't access it. More than one mapping to a RAM page frame can exist; it can be both permanently mapped to the kernel memory space and mapped to some address in the user space when the process is chosen for execution.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Given a virtual address, you can distinguish whether<a id="_idIndexMarker686"/> it is a kernel space or a user space address by using the process<a id="_idIndexMarker687"/> layout shown previously. Every address below <strong class="source-inline">PAGE_OFFSET</strong> comes from the user space; otherwise, it is from the kernel. </p>
+			<h3>Low memory in detail</h3>
+			<p>The first 896 MB of kernel address space constitutes the low memory region. Early in the boot process, the kernel permanently maps<a id="_idIndexMarker688"/> that 896 MB onto physical RAM. Addresses that result from<a id="_idIndexMarker689"/> that mapping are called <strong class="bold">logical addresses</strong>. These are virtual addresses but can be translated into physical<a id="_idIndexMarker690"/> addresses by subtracting a fixed offset, since the mapping is permanent and known in advance. Low memory matches with the lower bound of physical addresses. You can define low memory as being the memory for which logical addresses exist in the kernel space. The core of the kernel stays in low memory. Therefore, most of the kernel memory functions return low memory. In fact, to serve different purposes, kernel memory is divided into zones. Actually, the first 16 MB of <strong class="source-inline">LOWMEM</strong> is reserved for <strong class="bold">Direct Memory Access</strong> (<strong class="bold">DMA</strong>) usage. Hardware does not<a id="_idIndexMarker691"/> always allow you to treat all pages as identical because of limitations. We can then identify three different memory zones in the kernel space:</p>
+			<ul>
+				<li><strong class="source-inline">ZONE_DMA</strong>: This contains page frames<a id="_idIndexMarker692"/> of memory below 16 MB, reserved for DMA.</li>
+				<li><strong class="source-inline">ZONE_NORMAL</strong>: This contains page<a id="_idIndexMarker693"/> frames of memory above 16 MB and below 896 MB, for normal use. </li>
+				<li><strong class="source-inline">ZONE_HIGHMEM</strong>: This contains page frames<a id="_idIndexMarker694"/> of memory at and above 896 MB.</li>
+			</ul>
+			<p>However, on a 512 MB system, there will be no <strong class="source-inline">ZONE_HIGHMEM</strong>, 16 MB for <strong class="source-inline">ZONE_DMA</strong>, and 496 MB for <strong class="source-inline">ZONE_NORMAL</strong>.</p>
+			<p>From all the preceding, we can complete the definition of logical addresses, adding that these are addresses in kernel space mapped linearly on physical addresses, and that the corresponding physical address can be obtained by using an offset. Kernel virtual addresses are similar to logical addresses in that they are mappings from a kernel-space address to a physical address. However, the difference is that kernel virtual addresses do not always have the same linear, one-to-one mapping<a id="_idIndexMarker695"/> to physical locations as logical addresses do.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">You can convert a physical address<a id="_idIndexMarker696"/> into a logical address using the <strong class="source-inline">__pa(address)</strong> macro and the revert with the <strong class="source-inline">__va(address)</strong> macro.</p>
+			<h3>Understanding high memory</h3>
+			<p>The top 128 MB of the kernel<a id="_idIndexMarker697"/> address space is called a <strong class="bold">high-memory region</strong>. It is used by the kernel to temporarily map physical memory above 1 GB (above 896 MB in reality). When physical memory<a id="_idIndexMarker698"/> above 1 GB (or, more precisely, 896MB) needs to be accessed, the kernel uses that 128 MB to create a temporary mapping to its virtual address space, thus achieving the goal of being able to access all physical pages. You can define high memory as being memory for which logical addresses do not exist and which is not mapped permanently into a kernel address space. The physical memory above 896 MB is mapped on demand to the 128 MB of the <strong class="source-inline">HIGHMEM</strong> region. </p>
+			<p>Mapping to access high memory is created on the fly by the kernel and destroyed when done. This makes high memory access slower. However, the concept of high memory does not exist on 64-bit systems, due to the huge address range (264 TB), where the 3 GB/1 GB (or any similar split scheme) split does not make sense anymore.</p>
+			<h2 id="_idParaDest-147"><a id="_idTextAnchor149"/>An overview of a process address space from the kernel</h2>
+			<p>On a Linux system, each process is represented<a id="_idIndexMarker699"/> in the kernel as an instance of <strong class="source-inline">struct task_struct</strong> (see <strong class="source-inline">include/linux/sched.h</strong>), which characterizes<a id="_idIndexMarker700"/> and describes this process. Before the process starts running, it is allocated a table of memory mapping, stored in a variable of the <strong class="source-inline">struct mm_struct</strong> type (see <strong class="source-inline">include/linux/mm_types.h</strong>). This can be verified by looking at the following excerpt of the <strong class="source-inline">struct task_struct</strong> definition, which embeds pointers to elements of the <strong class="source-inline">struct mm_struct</strong> type:</p>
+			<p class="source-code">struct task_struct{</p>
+			<p class="source-code">    […]</p>
+			<p class="source-code">    struct mm_struct *mm, *active_mm;</p>
+			<p class="source-code">    […]</p>
+			<p class="source-code">}</p>
+			<p>In the kernel, there is a global variable that always points to the current process, <strong class="source-inline">current</strong>, and the <strong class="source-inline">current-&gt;mm</strong> field points to the current<a id="_idIndexMarker701"/> process memory-mapping table. Before going further in our explanation, let's have a look<a id="_idIndexMarker702"/> at the following excerpt of a <strong class="source-inline">struct mm_struct</strong> data structure:</p>
+			<p class="source-code">struct mm_struct {</p>
+			<p class="source-code">    struct vm_area_struct *mmap;</p>
+			<p class="source-code">    unsigned long mmap_base;</p>
+			<p class="source-code">    unsigned long task_size;</p>
+			<p class="source-code">    unsigned long highest_vm_end;</p>
+			<p class="source-code">    pgd_t * pgd;</p>
+			<p class="source-code">    atomic_t mm_users;</p>
+			<p class="source-code">    atomic_t mm_count;</p>
+			<p class="source-code">    atomic_long_t nr_ptes;</p>
+			<p class="source-code">#if CONFIG_PGTABLE_LEVELS &gt; 2</p>
+			<p class="source-code">    atomic_long_t nr_pmds;</p>
+			<p class="source-code">#endif</p>
+			<p class="source-code">    int map_count;</p>
+			<p class="source-code">    spinlock_t page_table_lock;</p>
+			<p class="source-code">    unsigned long total_vm;</p>
+			<p class="source-code">    unsigned long locked_vm;</p>
+			<p class="source-code">    unsigned long pinned_vm;</p>
+			<p class="source-code">    unsigned long data_vm;</p>
+			<p class="source-code">    unsigned long exec_vm;</p>
+			<p class="source-code">    unsigned long stack_vm;</p>
+			<p class="source-code">    unsigned long start_code, end_code, start_data, end_data;</p>
+			<p class="source-code">    unsigned long start_brk, brk, start_stack;</p>
+			<p class="source-code">    unsigned long arg_start, arg_end, env_start, env_end;</p>
+			<p class="source-code">    /* ref to file /proc/&lt;pid&gt;/exe symlink points to */</p>
+			<p class="source-code">    struct file __rcu *exe_file;</p>
+			<p class="source-code">};</p>
+			<p>I intentionally removed some fields we<a id="_idIndexMarker703"/> are not interested in. There are some fields<a id="_idIndexMarker704"/> we will talk about later: <strong class="source-inline">pgd</strong> for example, which is a pointer to the process's base (first entry) level one table (<strong class="bold">Page Global Directory</strong>, abbreviated <strong class="bold">PGD</strong>), written in the translation table base address of the CPU at context switching. For a better understanding of this data structure, we can use the following diagram:</p>
+			<div>
+				<div id="_idContainer037" class="IMG---Figure">
+					<img src="image/B17934_10_003.jpg" alt="Figure 10.3 – A process address space&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.3 – A process address space</p>
+			<p>From a process point<a id="_idIndexMarker705"/> of view, a memory mapping can be seen as nothing<a id="_idIndexMarker706"/> but a set of page table entries dedicated<a id="_idIndexMarker707"/> to a consecutive virtual address range. That <em class="italic">"consecutive virtual address range"</em> is referred to as a memory area, or a <strong class="bold">Virtual Memory Area</strong> (<strong class="bold">VMA</strong>). Each memory mapping<a id="_idIndexMarker708"/> is described<a id="_idIndexMarker709"/> by a start address and length, permissions (such as whether the program can read, write, or execute from that memory), and associated resources (such as physical pages, swap pages, and file contents).</p>
+			<p><strong class="source-inline">mm_struct</strong> has two ways to store process regions (VMAs):</p>
+			<ul>
+				<li>In a red-black tree (a self-balancing binary search tree), whose root element is pointed by the <strong class="source-inline">mm_struct-&gt;mm_rb</strong> field</li>
+				<li>In a linked list, where the first element is pointed by the <strong class="source-inline">mm_struct-&gt;mmap</strong> field</li>
+			</ul>
+			<p>Now that we have had an overview<a id="_idIndexMarker710"/> of a process address space and have<a id="_idIndexMarker711"/> seen that it is made of a set of virtual memory regions, let's dive into the details and study the mechanisms behind these memory regions.</p>
+			<h2 id="_idParaDest-148"><a id="_idTextAnchor150"/>Understanding the concept of VMA</h2>
+			<p>In the kernel, process memory mappings<a id="_idIndexMarker712"/> are organized into areas, each referred to as a VMA. For your information, in each running process on a Linux system, the code section, each mapped file region (a library, for example), or each distinct memory mapping (if any) is materialized by a VMA. A VMA is an architecture-independent structure, with permissions and access control flags, defined by a start address and a length. Their sizes are always a multiple of the page size (<strong class="source-inline">PAGE_SIZE</strong>). A VMA consists of a few pages, each of which<a id="_idIndexMarker713"/> has an entry in the page table (the <strong class="bold">Page Table Entry</strong> (<strong class="bold">PTE</strong>)).</p>
+			<p>A VMA is represented in the kernel as an instance of <strong class="source-inline">struct vma_area</strong>, defined as the following:</p>
+			<p class="source-code">struct vm_area_struct {</p>
+			<p class="source-code">    unsigned long vm_start; </p>
+			<p class="source-code">    unsigned long vm_end;</p>
+			<p class="source-code">    struct vm_area_struct *vm_next, *vm_prev;</p>
+			<p class="source-code">    struct mm_struct *vm_mm;</p>
+			<p class="source-code">    pgprot_t vm_page_prot;</p>
+			<p class="source-code">    unsigned long vm_flags;</p>
+			<p class="source-code">    unsigned long vm_pgoff;</p>
+			<p class="source-code">    struct file * vm_file;</p>
+			<p class="source-code">    [...]</p>
+			<p class="source-code">}</p>
+			<p>For the sake of readability and understandability of this section, only elements that are relevant for us have been listed. However, the following are the meanings<a id="_idIndexMarker714"/> of the remaining elements:</p>
+			<ul>
+				<li><strong class="source-inline">vm_start</strong> is the VMA start address within the address space (<strong class="source-inline">vm_mm</strong>). It is the first address within this VMA.</li>
+				<li><strong class="source-inline">vm_end</strong> is the first byte after our end address within <strong class="source-inline">vm_mm</strong>. It is the first address outside this VMA.</li>
+				<li><strong class="source-inline">vm_next</strong> and <strong class="source-inline">vm_prev</strong> are used to implement a linked list of VM areas per task, sorted by address.</li>
+				<li><strong class="source-inline">vm_mm</strong> is the process address space that this VMA belongs to.</li>
+				<li><strong class="source-inline">vm_page_prot</strong> and <strong class="source-inline">vm_flags</strong> represent the access permission of the VMA. The former is an architecture-level data type, whose update is applied directly to the PTEs of the underlying architecture. It is a form of cached conversion from <strong class="source-inline">vm_flags</strong>, which stores the proper protection bits and the type of mapping in an architecture-independent manner.</li>
+				<li><strong class="source-inline">vm_file</strong> is the file backing this mapping. This can be <strong class="source-inline">NULL</strong> (for example, for anonymous mapping, such as a process's heap or stack).</li>
+				<li><strong class="source-inline">vm_pgoff</strong> is the offset (within <strong class="source-inline">vm_file</strong>) in page size unit. This offset is measured in number of pages.</li>
+			</ul>
+			<p>The following diagram is an overview<a id="_idIndexMarker715"/> of a process memory mapping, highlighting each VMA and describing some of its structure elements: </p>
+			<div>
+				<div id="_idContainer038" class="IMG---Figure">
+					<img src="image/B17934_10_004.jpg" alt="Figure 10.4 – Process memory mappings&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.4 – Process memory mappings</p>
+			<p>The preceding image (from http://duartes.org/gustavo/blog/post/how-the-kernel-manages-your-memory/) describes a process's (started from <strong class="source-inline">/bin/gonzo</strong>) memory mappings (VMAs). We can see interactions between <strong class="source-inline">struct task_struct</strong> and its address space element (<strong class="source-inline">mm</strong>), which then lists<a id="_idIndexMarker716"/> and describes each VMA (the start, the end, and the backing file).</p>
+			<p>You can use the <strong class="source-inline">find_vma()</strong> function to find the VMA that corresponds to a given virtual address. <strong class="source-inline">find_vma()</strong> is declared in <strong class="source-inline">linux/mm.h</strong> as the following:</p>
+			<p class="source-code">extern struct vm_area_struct * find_vma(</p>
+			<p class="source-code">           struct mm_struct * mm, unsigned long addr);</p>
+			<p>This function searches and returns the first VMA that satisfies <strong class="source-inline">vm_start &lt;= addr &lt; vm_end</strong> or returns <strong class="source-inline">NULL</strong> if none is found. <strong class="source-inline">mm</strong> is the process address space to search in. For the current<a id="_idIndexMarker717"/> process, it can be <strong class="source-inline">current-&gt;mm</strong>. The following is an example:</p>
+			<p class="source-code">struct vm_area_struct *vma =</p>
+			<p class="source-code">                     find_vma(task-&gt;mm, 0x603000);</p>
+			<p class="source-code">if (vma == NULL) /* Not found ? */</p>
+			<p class="source-code">    return -EFAULT;</p>
+			<p class="source-code">/* Beyond the end of returned VMA ? */</p>
+			<p class="source-code">if (0x13000 &gt;= vma-&gt;vm_end)</p>
+			<p class="source-code">    return -EFAULT;</p>
+			<p>The preceding code excerpt will look for a VMA whose memory bounds contain <strong class="source-inline">0x603000</strong>. </p>
+			<p>Given a process whose identifier is <strong class="source-inline">&lt;PID&gt;</strong>, the whole memory mappings of this process can be obtained by reading the <strong class="source-inline">/proc/&lt;PID&gt;/maps</strong>, <strong class="source-inline">/proc/&lt;PID&gt;/smaps</strong>, and <strong class="source-inline">/proc/&lt;PID&gt;/pagemap</strong> files. The following lists the mappings of a running process, whose Process Identifier (PID) is <strong class="source-inline">1073</strong>:</p>
+			<p class="source-code"># cat /proc/1073/maps </p>
+			<p class="source-code">00400000-00403000 r-xp 00000000 b3:04 6438             /usr/sbin/net-listener</p>
+			<p class="source-code">00602000-00603000 rw-p 00002000 b3:04 6438             /usr/sbin/net-listener</p>
+			<p class="source-code">00603000-00624000 rw-p 00000000 00:00 0                [heap]</p>
+			<p class="source-code">7f0eebe4d000-7f0eebe54000 r-xp 00000000 b3:04 11717    /usr/lib/libffi.so.6.0.4</p>
+			<p class="source-code">7f0eebe54000-7f0eec054000 ---p 00007000 b3:04 11717    /usr/lib/libffi.so.6.0.4</p>
+			<p class="source-code">7f0eec054000-7f0eec055000 rw-p 00007000 b3:04 11717    /usr/lib/libffi.so.6.0.4</p>
+			<p class="source-code">7f0eec055000-7f0eec069000 r-xp 00000000 b3:04 21629    /lib/libresolv-2.22.so</p>
+			<p class="source-code">7f0eec069000-7f0eec268000 ---p 00014000 b3:04 21629    /lib/libresolv-2.22.so</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">7f0eee1e7000-7f0eee1e8000 rw-s 00000000 00:12 12532    /dev/shm/sem.thk-mcp-231016-sema</p>
+			<p class="source-code">[...]</p>
+			<p>Each line in the preceding excerpt<a id="_idIndexMarker718"/> represents a VMA, and the fields correspond to the <strong class="source-inline">{address (start-end)} {permissions} {offset} {device (major:minor)} {inode} {pathname (image)}</strong> pattern:</p>
+			<ul>
+				<li><strong class="source-inline">address</strong>: Represents the starting and ending address of the VMA.</li>
+				<li><strong class="source-inline">permissions</strong>: Describes access rights of the region: <strong class="source-inline">r</strong> (read), <strong class="source-inline">w</strong> (write), and <strong class="source-inline">x</strong> (execute). <strong class="source-inline">p</strong> is if the mapping is private and <strong class="source-inline">s</strong> is for shared mapping.</li>
+				<li><strong class="source-inline">offset</strong>: If file mapping (the <strong class="source-inline">mmap</strong> system call), it is the offset in the file where the mapping takes place. It is <strong class="source-inline">0</strong> otherwise.</li>
+				<li><strong class="source-inline">major:minor</strong>: If file mapping, these represent the major and minor numbers of the devices in which the file is stored (the device holding the file).</li>
+				<li><strong class="source-inline">inode</strong>: If mapping from a file, this is the <strong class="source-inline">inode</strong> number of the mapped file.</li>
+				<li><strong class="source-inline">pathname</strong>: This is the name of the mapped file or left blank otherwise. There are other region names, such as <strong class="source-inline">[heap]</strong>, <strong class="source-inline">[stack]</strong>, or <strong class="source-inline">[vdso]</strong> (which stands for <strong class="bold">virtual dynamic shared object</strong>, a shared library mapped<a id="_idIndexMarker719"/> by the kernel into every process's address space, in order to reduce performance penalties when system calls switch to kernel mode). </li>
+			</ul>
+			<p>Each page allocated to a process belongs to an area, thus any page that does not live in the VMA does not exist and cannot be referenced by the process. </p>
+			<p>High memory is perfect for user space because its address space must be explicitly mapped. Thus, most high memory is consumed by user applications. <strong class="source-inline">__GFP_HIGHMEM</strong> and <strong class="source-inline">GFP_HIGHUSER</strong> are the flags for requesting the allocation of (potentially) high memory. Without these flags, all kernel allocations return only low memory. There is no way to allocate contiguous physical memory from user space in Linux.</p>
+			<p>Now that VMAs<a id="_idIndexMarker720"/> have no more secrets for us, let's describe the hardware concepts involved in the translation to their corresponding physical addresses, if any, or their creation and allocation otherwise.</p>
+			<h1 id="_idParaDest-149"><a id="_idTextAnchor151"/>Demystifying address translation and MMU</h1>
+			<p>MMU does not only convert virtual addresses<a id="_idIndexMarker721"/> into physical ones but also protects<a id="_idIndexMarker722"/> memory from unauthorized access. Given a process, any page that needs to be accessed from this process must exist in one of its VMAs and, thus, must live in the process's page table (every process has its own).</p>
+			<p>As a recall, memory is organized by chunks of fixed-size named pages for virtual memory and frames for physical memory. The size in our case is 4 KB. However, it is defined and accessible with the <strong class="source-inline">PAGE_SIZE</strong> macro in the kernel. Remember, however, that page size is imposed by the hardware. Considering a 4 KB page-sized system, bytes 0 to 4095 fall on page 0, bytes 4096 to 8191 fall on page 1, and so on.</p>
+			<p>The concept of a page table is introduced to manage mapping<a id="_idIndexMarker723"/> between pages and frames. Pages are spread over tables so that each PTE corresponds to a mapping between a page and a frame. Each process is then given a set of page tables to describe all of its memory regions.</p>
+			<p>To walk through pages, each<a id="_idIndexMarker724"/> page is assigned an index, called a <strong class="bold">page number</strong>. When it comes to a frame, it is a <strong class="bold">Page Frame Number</strong> (<strong class="bold">PFN</strong>). This way, VMAs (logical addresses, more precisely) are composed<a id="_idIndexMarker725"/> of two parts: a page number and an offset. On 32-bit systems, the offset represents the 12 less significant bits of the address, whereas 13 less significant bits represent it on 8 KB page-size systems. The following diagram highlights this concept of addresses split into a page number and an offset:</p>
+			<p class="figure-caption"> </p>
+			<div>
+				<div id="_idContainer039" class="IMG---Figure">
+					<img src="image/B17934_10_005.jpg" alt="Figure 10.5 – Logical address representation&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.5 – Logical address representation</p>
+			<p>How does the OS or CPU know which physical address corresponds to a given logical address? They use a page table as a translation table and know that each entry's index is a virtual page number, and the value<a id="_idIndexMarker726"/> at this index is the PFN. To access physical memory given a virtual memory, the OS<a id="_idIndexMarker727"/> first extracts the offset, the virtual page number, and then walks through the process's page tables to match the virtual page number to the physical page. Once a match occurs, it is then possible to access data in that page frame:</p>
+			<p class="figure-caption"> </p>
+			<div>
+				<div id="_idContainer040" class="IMG---Figure">
+					<img src="image/B17934_10_006.jpg" alt="Figure 10.6 – Address translation&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.6 – Address translation</p>
+			<p>The offset is used to point to the right location in the frame. A page table not only holds mapping between physical and virtual page numbers but also accesses control information (read/write access, privileges, and so on).</p>
+			<p>The following diagram describes address decoding and page table lookup to point to the appropriate location in the appropriate frame:</p>
+			<div>
+				<div id="_idContainer041" class="IMG---Figure">
+					<img src="image/B17934_10_007.jpg" alt=" Figure 10.7 – Virtual to physical address translation&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption"> Figure 10.7 – Virtual to physical address translation</p>
+			<p>The number of bits used to represent the offset is defined by the <strong class="source-inline">PAGE_SHIFT</strong> kernel macro. <strong class="source-inline">PAGE_SHIFT</strong> is the number <a id="_idIndexMarker728"/>of times needed to left-shift 1 bit to obtain the <strong class="source-inline">PAGE_SIZE</strong> value. It is also the number<a id="_idIndexMarker729"/> of times needed to right-shift a page's logical address to obtain its page number, which is the same for a physical address to obtain its page frame number. This macro is architecture-dependent and also depends on the page granularity. Its value could be considered as the following:</p>
+			<p class="source-code">#ifdef CONFIG_ARM64_64K_PAGES</p>
+			<p class="source-code">#define PAGE_SHIFT        16</p>
+			<p class="source-code">#elif defined(CONFIG_ARM64_16K_PAGES)</p>
+			<p class="source-code">#define PAGE_SHIFT       14</p>
+			<p class="source-code">#else</p>
+			<p class="source-code">#define PAGE_SHIFT        12</p>
+			<p class="source-code">#endif</p>
+			<p class="source-code">#define PAGE_SIZE        (_AC(1, UL) &lt;&lt; PAGE_SHIFT)</p>
+			<p>The preceding states that by default (whether on ARM or ARM64), <strong class="source-inline">PAGE_SHIFT</strong> is <strong class="source-inline">12</strong>, which means a 4 KB page size. On ARM64, it <strong class="source-inline">14</strong> or <strong class="source-inline">16</strong> when respectively a 16 KB or 64 KB page size is chosen.</p>
+			<p>With our understanding of address translation, the page table is a partial solution. Let's see why. Most 32-bit architectures<a id="_idIndexMarker730"/> require 32 bits (4 bytes) to represent a page table<a id="_idIndexMarker731"/> entry. On such systems (32-bit) where each process has its private 3 GB user address space, we need 786,432 entries to characterize and cover a process's address space. It represents too much physical memory spent per process just to store the memory mappings. In fact, a process generally uses a small but scattered portion of its virtual address space. To resolve that issue, the<a id="_idIndexMarker732"/> concept of a "level" was introduced. Page tables are hierarchized by level (page level). The space necessary to store a multi-level page table only depends on the virtual address space actually in use, instead of being proportional to the maximum size of the virtual address space. This way, unused memory is no longer represented, and the page table walk-through time is reduced. Moreover, each table entry in level <strong class="source-inline">N</strong> will point to an entry in the table of level <strong class="source-inline">N+1</strong>, level 1 being the higher level. </p>
+			<p>Linux can support up to four levels of paging. However, the number of levels to use is architecture-dependent. The following are descriptions of each lever:</p>
+			<ul>
+				<li><strong class="bold">Page Global Directory (PGD)</strong>: This is the first level (level 1) page table. Each entry is of the <strong class="source-inline">pgd_t</strong> type in the kernel (generally, <strong class="source-inline">unsigned long</strong>) and points to an entry in the table at the second level. In the Linux kernel, <strong class="source-inline">struct tastk_struct</strong> represents a process's description, which<a id="_idIndexMarker733"/> in turn has a member (<strong class="source-inline">mm</strong>) whose type is <strong class="source-inline">struct mm_struct</strong>, which characterizes and represents the process's memory space. In <strong class="source-inline">struct mm_struct</strong>, there is a processor-specific field, <strong class="source-inline">pgd</strong>, which is a pointer to the first entry (entry 0) of the process's level-1 (PGD) page table. Each process has one and only one PGD, which may contain up to 1,024 entries.</li>
+				<li><strong class="bold">Page Upper Directory (PUD)</strong>: This represents the second level<a id="_idIndexMarker734"/> of indirection.</li>
+				<li><strong class="bold">Page Middle Directory (PMD)</strong>: This is the third indirection<a id="_idIndexMarker735"/> level.</li>
+				<li><strong class="bold">Page Table Entry (PTE)</strong>: This is the leaves of the tree. It is an array<a id="_idIndexMarker736"/> of <strong class="source-inline">pte_t</strong>, where each entry points to a physical page.<p class="callout-heading">Note</p><p class="callout">All levels are not always used. The i.MX6's MMU only supports a two-level page table (PGD and PTE), which is the case for almost all 32-bit CPUs. In this case, PUD and PMD are simply ignored.</p></li>
+			</ul>
+			<p>It is important to know that the MMU does not store any mapping. It is a data structure located in RAM. Instead, there<a id="_idIndexMarker737"/> is a special register in the CPU, called the <strong class="bold">Page Table Base Register</strong> (<strong class="bold">PTBR</strong>) or the <strong class="bold">Translation Table Base Register 0</strong> (<strong class="bold">TTBR0</strong>), which points to the<a id="_idIndexMarker738"/> base (entry 0) of the level-1 (top-level) page table (PGD) of the process. It is exactly where the <strong class="source-inline">pdg</strong> field of <strong class="source-inline">struct mm_struct</strong> points: <strong class="source-inline">current-&gt;mm.pgd == TTBR0</strong>. </p>
+			<p>At context switch (when a new process is scheduled and given the CPU), the kernel immediately configures the MMU<a id="_idIndexMarker739"/> and updates the PTBR with the new<a id="_idIndexMarker740"/> process's <strong class="source-inline">pgd</strong>. Now, when a virtual address is given to MMU, it uses the PTBR's content to locate the process's level-1 page table (PGD), and then it uses the level-1 index, extracted from the <strong class="bold">Most-Significant Bits</strong> (<strong class="bold">MSBs</strong>) of the virtual address to find<a id="_idIndexMarker741"/> the appropriate table entry, which contains a pointer to the base address of the appropriate level-2 page table. Then, from that base address, it uses the level-2 index to find the appropriate entry and so on, until it reaches the PTE. ARM architecture (i.MX6, in our case) has a two-level page table. In this case, the level-2 entry is a PTE and points to the physical page (PFN). Only the physical page is found at this step. To access the exact memory location in the page, the MMU extracts the memory offset, also part of the virtual address, and points to the same offset in the physical page.</p>
+			<p>For the sake of understandability, the preceding description has been limited to a two-level paging scheme but can easily extended. The following diagram is a representation of this two-level paging scheme:</p>
+			<p class="figure-caption"> </p>
+			<div>
+				<div id="_idContainer042" class="IMG---Figure">
+					<img src="image/B17934_10_008.jpg" alt="Figure 10.8 – A two-level address translation scheme&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.8 – A two-level address translation scheme</p>
+			<p>When a process needs to read from or write into a memory location (of course, we are talking about virtual memory), the MMU<a id="_idIndexMarker742"/> performs a translation into that<a id="_idIndexMarker743"/> process's page table to find the right entry (PTE). The virtual page number is extracted (from the virtual address) and used by the processor as an index into the process's page table to retrieve its page table entry. If there is a valid page table entry at that offset, the processor takes the page frame number from this entry. If not, it means the process accessed an unmapped area of its virtual memory. A page fault is then raised, and the OS should handle it.</p>
+			<p>In the real world, address translation requires a page-table walk, and it is not always a one-shot operation. There are at least as many memory accesses as there are table levels. A four-level page table would require four memory accesses. In other words, every virtual access would result in five physical memory accesses. The virtual memory concept would be useless if its access were four times slower than physical access. Fortunately, System-on-Chip (SoC) manufacturers<a id="_idIndexMarker744"/> worked hard to find a clever<a id="_idIndexMarker745"/> trick to address this performance issue: modern CPUs use a small associative<a id="_idIndexMarker746"/> and very fast memory called the <strong class="bold">Translation Lookaside Buffer</strong> (<strong class="bold">TLB</strong>), in order to cache the PTEs of recently accessed virtual pages.</p>
+			<h2 id="_idParaDest-150"><a id="_idTextAnchor152"/>Page lookup and the TLB</h2>
+			<p>Before the MMU proceeds to address translation, there is another step involved. As there is a cache for recently accessed data, there is also a cache for recently translated addresses. As data cache speeds up the data accessing process, the TLB<a id="_idIndexMarker747"/> speeds up virtual address translation (yes, address translation is a time-consuming task). It is a <strong class="bold">Content-Addressable Memory</strong> (<strong class="bold">CAM</strong>), where the key is the virtual<a id="_idIndexMarker748"/> address and the value is the physical address. In other words, the TLB is a cache for the MMU. At each memory access, the MMU first checks for recently used pages in the TLB, which contains a few of the virtual address ranges to which physical pages are currently assigned.</p>
+			<h3>How does the TLB work?</h3>
+			<p>On memory access, the CPU <a id="_idIndexMarker749"/>walks through the TLB trying to find the virtual page number of the page<a id="_idIndexMarker750"/> that is being accessed. This step is called a <strong class="bold">TLB lookup</strong>. When a TLB entry is found (a match occurs), it is called TLB hit, and the CPU <a id="_idIndexMarker751"/>just keeps running and uses the PFN found in the TLB entry to calculate the target physical address. There is no page fault when a TLB hit occurs. If a translation can be found in the TLB, virtual memory access will be as fast as physical access. If there is no TLB hit, it<a id="_idIndexMarker752"/> is called TLB miss.</p>
+			<p>On a TLB miss, there are two possibilities. Depending on the processor type, the TLB miss event can be handled by the software, the hardware, or through the MMU:</p>
+			<ul>
+				<li><strong class="bold">Software handling</strong>: The CPU raises a TLB miss interrupt, caught by the OS. The OS then walks<a id="_idIndexMarker753"/> through the process's page table to find the right PTE. If there is a matching and valid entry, then the CPU installs the new translation in the TLB. Otherwise, the page fault handler is executed.</li>
+				<li><strong class="bold">Hardware handling</strong>: It is up to the CPU (the MMU, in fact) to walk through the process's page table<a id="_idIndexMarker754"/> on hardware. If there is a match, the CPU adds the new translation in the TLB. Otherwise, the CPU raises a page fault interrupt, handled by the OS.</li>
+			</ul>
+			<p>In both cases, the page<a id="_idIndexMarker755"/> fault handler is the same, <strong class="source-inline">do_page_fault()</strong>. This function is architecture-dependent; for ARM, it is defined in <strong class="source-inline">arch/arm/mm/fault.c</strong>.</p>
+			<p>The following is a diagram describing a TLB lookup, a TLB hit, or a TLB miss event:</p>
+			<p class="figure-caption"> </p>
+			<div>
+				<div id="_idContainer043" class="IMG---Figure">
+					<img src="image/B17934_10_009.jpg" alt="Figure 10.9 – The MMU and TLB walk-through process&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.9 – The MMU and TLB walk-through process</p>
+			<p>Page table and page directory entries are architecture-dependent. An OS must make sure the structure of a table<a id="_idIndexMarker756"/> corresponds to a structure recognized by the MMU. On ARM processors, the location of the translation table must be written in the <strong class="source-inline">control</strong> coprocessor 15 (CP15) <strong class="source-inline">c2</strong> register, and then enable the caches<a id="_idIndexMarker757"/> and the MMU by writing to the CP15 <strong class="source-inline">c1</strong> register. Have a look at both <a href="http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0056d/BABHJIBH.htm">http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0056d/BABHJIBH.htm</a> and <a href="http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0433c/CIHFDBEJ.html">http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0433c/CIHFDBEJ.html</a> for detailed information.</p>
+			<p>Now that we are comfortable with the address translation schemes and their ease with the TLB, we can talk about memory allocation, which involves manipulating page entries under the hood.</p>
+			<p>Dealing with memory allocation mechanisms and their APIs</p>
+			<p>Before jumping to the list of APIs, let's start<a id="_idIndexMarker758"/> with the following figure, showing the different memory allocators that exist on a Linux-based system, which we will discuss later:</p>
+			<div>
+				<div id="_idContainer044" class="IMG---Figure">
+					<img src="image/B17934_10_010.jpg" alt="Figure 10.10 – Overview of kernel memory allocators&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.10 – Overview of kernel memory allocators</p>
+			<p>The preceding diagram is inspired by <a href="https://bootlin.com/doc/training/linux-kernel/linux-kernel-slides.pdf">https://bootlin.com/doc/training/linux-kernel/linux-kernel-slides.pdf</a>. What it shows is that there is an allocation mechanism to satisfy any kind of memory<a id="_idIndexMarker759"/> request. Depending on what you need memory for, you can choose the one closest to your goal. The main and lowest level allocator is the <strong class="bold">page allocator</strong>, which allocates memory<a id="_idIndexMarker760"/> in units of pages (a page being the smallest memory unit it can deliver). Then comes the <strong class="bold">slab allocator</strong>, which is built on top<a id="_idIndexMarker761"/> of the page allocator, getting pages from it and splitting them into smaller memory entities (by means of slabs and caches). This is the allocator on which the <strong class="source-inline">kmalloc</strong> API relies. While <strong class="source-inline">kmalloc</strong> can be used to request memory from the slab allocator, we can directly talk to the slab<a id="_idIndexMarker762"/> to request memory from its caches, or even build our own caches. </p>
+			<p>Let's start this memory allocation journey with the main and lowest level allocator, the page allocator, from which the others derivate.</p>
+			<h2 id="_idParaDest-151"><a id="_idTextAnchor153"/>The page allocator</h2>
+			<p>The page allocator<a id="_idIndexMarker763"/> is the low-level allocator on the Linux system, the one that serves as a basis for other allocators. This allocator brings with it the concept of the page (virtual) and page frame (physical). So, the system's physical memory is split<a id="_idIndexMarker764"/> into fixed-size blocks (called <strong class="bold">page frames</strong>), while virtual memory is organized into<a id="_idIndexMarker765"/> fixed-size blocks called pages. Page size is always the same as a page frame size. As this is the lowest-level allocator, a page is the smallest unit of memory that the OS will give to any memory request at a low level. In the Linux kernel, a page is represented as an instance of the <strong class="source-inline">struct page</strong> structure, which we will manipulate using dedicated APIs, introduced in the next section. </p>
+			<h3>Page allocation APIs</h3>
+			<p>This is the lowest-level allocator. It allocates and deallocates blocks of pages using the buddy algorithm. Pages<a id="_idIndexMarker766"/> are allocated in blocks that are to the power of 2 in size (to get the best from the buddy algorithm). That means it can allocate a block of 1 page, 2 pages, 4 pages, 8, 16, and so on. Pages returned from this allocation are physically contiguous. <strong class="source-inline">alloc_pages()</strong> is the main API and is defined as the following:</p>
+			<p class="source-code">struct page *alloc_pages(gfp_t mask, unsigned int order)</p>
+			<p>The preceding function returns <strong class="source-inline">NULL</strong> when no page can be allocated. Otherwise, it allocates <em class="italic">2</em><span class="superscript">order</span> pages and returns<a id="_idIndexMarker767"/> a pointer to an instance of <strong class="source-inline">struct page</strong>, which points the first page of the reserved block. There is, however, a helper macro, <strong class="source-inline">alloc_page()</strong>, which can be used to allocate a single page. The following is its definition:</p>
+			<p class="source-code">#define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)</p>
+			<p>This macro wraps <strong class="source-inline">alloc_pages()</strong> with an order parameter set with <strong class="source-inline">0</strong>.</p>
+			<p><strong class="source-inline">__free_pages()</strong> must be used to release memory pages allocated with the <strong class="source-inline">alloc_pages()</strong> function. It takes a pointer to the first page of the allocated block as a parameter, along with the order, the same that was used for allocation. It is defined as the following:</p>
+			<p class="source-code">void __free_pages(struct page *page, unsigned int order);</p>
+			<p>There are other functions working in the same way, but instead of an instance of <strong class="source-inline">struct page</strong>, they return the (logical) address of the reserved block. These are <strong class="source-inline">__get_free_pages()</strong> and <strong class="source-inline">__get_free_page()</strong>, and the following are their definitions:</p>
+			<p class="source-code">unsigned long __get_free_pages(gfp_t mask,</p>
+			<p class="source-code">                               unsigned int order);</p>
+			<p class="source-code">unsigned long get_zeroed_page(gfp_t mask);</p>
+			<p><strong class="source-inline">free_pages()</strong> is used to free a page allocated with <strong class="source-inline">__get_free_pages()</strong>. It takes the kernel address representing the start region of allocated page(s), along with the order, which should be the same as that used for allocation:</p>
+			<p class="source-code">free_pages(unsigned long addr, unsigned int order);</p>
+			<p>Whatever the allocation type is, <strong class="source-inline">mask</strong> speciﬁes the memory zones from where the pages should be allocated and the behavior of the allocators. The following are possible values:</p>
+			<ul>
+				<li><strong class="source-inline">GFP_USER</strong>: For user memory allocation.</li>
+				<li><strong class="source-inline">GFP_KERNEL</strong>: The commonly used flag for kernel allocation.</li>
+				<li><strong class="source-inline">GFP_HIGHMEM</strong>: This requests memory from the <strong class="source-inline">HIGH_MEM</strong> zone.</li>
+				<li><strong class="source-inline">GFP_ATOMIC</strong>: This allocates memory in an atomic manner that cannot sleep. It is used when we need to allocate memory from an interrupt context.</li>
+			</ul>
+			<p>However, you should note<a id="_idIndexMarker768"/> that whether specifying the <strong class="source-inline">GFP_HIGHMEM</strong> flag with <strong class="source-inline">__get_free_pages()</strong> (or <strong class="source-inline">__get_free_page()</strong>) or not, it won't be considered. This flag is masked out in these functions to make sure that the returned address never represents high-memory pages (because of their non-linear/permanent mapping). If you need high memory, use <strong class="source-inline">alloc_pages()</strong> and then <strong class="source-inline">kmap()</strong> to access it.</p>
+			<p><strong class="source-inline">__free_pages()</strong> and <strong class="source-inline">free_pages()</strong> can be mixed. The main difference between them is that <strong class="source-inline">free_page()</strong> takes a logical address as a parameter, whereas <strong class="source-inline">__free_page()</strong> takes a <strong class="source-inline">struct page</strong> structure.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The maximum order that can be used varies between architectures. It depends on the <strong class="source-inline">FORCE_MAX_ZONEORDER</strong> kernel configuration option, which is <strong class="source-inline">11</strong> by default. In this case, the number of pages you can allocate is 1,024. It means that on a 4 KB-sized system, you can allocate up to <em class="italic">1,024 x 4 KB = 4 MB</em> at maximum. On ARM64, the maximum order varies with the selected page size. If it is a 16 KB page size, the maximum order is <strong class="source-inline">12</strong>, and if it is a 64 KB page size, the maximum order is <strong class="source-inline">14</strong>. These size limitations per allocation are valid for <strong class="source-inline">kmalloc()</strong> as well.</p>
+			<h4>Page and addresses conversion functions</h4>
+			<p>There are convenient functions<a id="_idIndexMarker769"/> exposed by the kernel to switch back<a id="_idIndexMarker770"/> and forth between the <strong class="source-inline">struct page</strong> instances and their corresponding logical addresses, which can be useful at different moments while dealing with memory. The <strong class="source-inline">page_to_virt()</strong> function is used to convert a struct page (as returned by <strong class="source-inline">alloc_pages()</strong>, for example) into a kernel logical address. Alternatively, <strong class="source-inline">virt_to_page()</strong> takes a kernel logical address and returns its associated <strong class="source-inline">struct page</strong> instance (as if it was allocated using the <strong class="source-inline">alloc_pages()</strong> function). Both <strong class="source-inline">virt_to_page()</strong> and <strong class="source-inline">page_to_virt()</strong> are declared in <strong class="source-inline">&lt;asm/page.h&gt;</strong> as the following:</p>
+			<p class="source-code">struct page *virt_to_page(void *kaddr);</p>
+			<p class="source-code">void *page_to_virt(struct page *pg)</p>
+			<p>There is another<a id="_idIndexMarker771"/> macro, <strong class="source-inline">page_address()</strong>, which simply wraps <strong class="source-inline">page_to_virt()</strong> and which is declared as the following:</p>
+			<p class="source-code">void *page_address(const struct page *page)</p>
+			<p>It returns the logical address of the page passed in the parameter.</p>
+			<h2 id="_idParaDest-152"><a id="_idTextAnchor154"/>The slab allocator</h2>
+			<p>The slab allocator<a id="_idIndexMarker772"/> is the one on which <strong class="source-inline">kmalloc()</strong> relies. Its main purposes are to eliminate fragmentation caused by memory (de)allocation, which is caused by the buddy system in case of small-size memory allocation, and to speed up memory allocation for commonly used objects.</p>
+			<h3>Understanding the buddy algorithm</h3>
+			<p>To allocate memory, the requested<a id="_idIndexMarker773"/> size is rounded up to the power of two, and the buddy<a id="_idIndexMarker774"/> allocator searches the appropriate list. If no entries exist on the requested list, an entry from the next upper list (which has blocks of twice the size of the previous list) is split<a id="_idIndexMarker775"/> into two halves (called <strong class="bold">buddies</strong>). The allocator uses the first half, while the other is added to the next list down. This is a recursive approach, which stops when either the buddy allocator successfully finds a block that can be split or reaches the largest block size and there are no free blocks available.</p>
+			<p>The following case study is heavily inspired by <a href="http://dysphoria.net/OperatingSystems1/4_allocation_buddy_system.html">http://dysphoria.net/OperatingSystems1/4_allocation_buddy_system.html</a>. For example, if the minimum allocation size is 1K bytes, and the memory size is 1 MB, the buddy allocator will create an empty list for 1K byte holes, an empty list for 2K byte holes, one for 4K byte holes, 8K, 16K, 32K, 64K, 128K, 256K, 512K, and one list for 1 MB holes. All of them are initially empty, except for the 1 MB list, which has only one hole. </p>
+			<p>Let's now imagine a scenario where we want to allocate a 70K block. The buddy allocator will round it up to 128K and will end <a id="_idIndexMarker776"/>up splitting the 1 MB into two 512K blocks, then 256K, and finally 128K, and then it will allocate one of the 128K blocks to the user. The following are schemes<a id="_idIndexMarker777"/> that summarize this scenario:</p>
+			<p class="figure-caption"> </p>
+			<div>
+				<div id="_idContainer045" class="IMG---Figure">
+					<img src="image/B17934_10_011.jpg" alt="Figure 10.11 – Allocation using the buddy algorithm&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.11 – Allocation using the buddy algorithm</p>
+			<p>The deallocation is as fast<a id="_idIndexMarker778"/> as allocation. The following is a figure that summarizes<a id="_idIndexMarker779"/> the deallocation algorithm:</p>
+			<p class="figure-caption"> </p>
+			<div>
+				<div id="_idContainer046" class="IMG---Figure">
+					<img src="image/B17934_10_012.jpg" alt="Figure 10.12 – Deallocation using the buddy algorithm&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.12 – Deallocation using the buddy algorithm</p>
+			<p>In the preceding diagram, we can see that memory<a id="_idIndexMarker780"/> deallocation using the buddy algorithm<a id="_idIndexMarker781"/> works. In the next section, we will study the slab allocator, built on top of this algorithm.</p>
+			<h3>A journey into the slab allocator</h3>
+			<p>Before we introduce the slab allocator, let's define some terms that it uses:</p>
+			<ul>
+				<li><strong class="bold">Slab</strong>: A contiguous piece of physical<a id="_idIndexMarker782"/> memory made of several page frames. Each slab<a id="_idIndexMarker783"/> is divided into equal chunks of the same size, used to store specific types of kernel objects, such as <strong class="source-inline">inode</strong> and <strong class="source-inline">mutexe</strong> objects. A slab can be considered an array of identically sized blocks.</li>
+				<li><strong class="bold">Cache</strong>: This is made of one or more<a id="_idIndexMarker784"/> slabs in a linked list. The cache<a id="_idIndexMarker785"/> only stores objects of the same type (for example, <strong class="source-inline">inode</strong> objects only).</li>
+			</ul>
+			<p>Slabs may be in one of the following states:</p>
+			<ul>
+				<li><strong class="bold">Empty</strong>: Where all objects (chunks) on the slab<a id="_idIndexMarker786"/> are marked as free.</li>
+				<li><strong class="bold">Partial</strong>: Both used and free objects<a id="_idIndexMarker787"/> exist in the slab.</li>
+				<li><strong class="bold">Full</strong>: All objects on the slab<a id="_idIndexMarker788"/> are marked as used.</li>
+			</ul>
+			<p>The memory allocator is responsible for building caches. Initially, each slab is empty and marked so. When one allocates memory for a kernel object, the allocator looks for a free location for that object on a partial/free slab in a cache for that type of object. If not found, the allocator allocates a new slab and adds it to the cache. The new object gets allocated from this slab, and the slab is marked as partial. When the code is done with the memory (memory-freed), the object is simply returned to the slab cache in its initialized state. This is the reason why the kernel also provides helper functions to obtain zeroed initialized memory, which allows us to get rid of previous content. The slab keeps a reference count of how many of its objects are being used so that when all slabs in a cache are full and another object is requested, the slab allocator is responsible for adding new slabs.</p>
+			<p>The following diagram<a id="_idIndexMarker789"/> illustrates the <a id="_idIndexMarker790"/>concept of slabs, caches, and their different states:</p>
+			<p class="figure-caption"> </p>
+			<div>
+				<div id="_idContainer047" class="IMG---Figure">
+					<img src="image/B17934_10_013.jpg" alt="Figure 10.13 – Slabs and caches&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.13 – Slabs and caches</p>
+			<p>It is a bit like creating a per-object allocator. The kernel allocates one cache per type of object, and only objects of the same type can be stored in a cache (for example, only <strong class="source-inline">task_struct</strong> structures).</p>
+			<p>There are different kinds of slab allocators in the kernel, depending on whether one needs compactness, cache-friendliness, or raw speed. These consist of the following:</p>
+			<ul>
+				<li>The <strong class="bold">SLAB</strong> (slab allocator), which is as cache-friendly as possible. This is the original<a id="_idIndexMarker791"/> memory allocator.</li>
+				<li>The <strong class="bold">SLOB</strong> (simple list of blocks), which is as compact as possible, appropriate for systems with<a id="_idIndexMarker792"/> very low memory, mostly embedded systems with a few megabytes or tens of megabytes.</li>
+				<li>The <strong class="bold">SLUB</strong> (unqueued allocator), which is quite simple and requires fewer instruction cost counts. This is the<a id="_idIndexMarker793"/> next-generation replacement memory allocator, enhancing and replacing the SLAB. It is based on the SLAB model but fixes several deficiencies in SLAB, especially on systems with a large number of processors. This has been (and still is) the default memory allocator in the Linux kernel since kernel 2.6.23 (<strong class="source-inline">CONFIG_SLUB=y</strong>). See this patch: <a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=a0acd820807680d2ccc4ef3448387fcdbf152c73">https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=a0acd820807680d2ccc4ef3448387fcdbf152c73</a>.<p class="callout-heading">Note</p><p class="callout">The term <strong class="bold">slab</strong> has become a generic name<a id="_idIndexMarker794"/> referring to a memory allocation strategy employing an object cache, enabling efficient allocation and deallocation of kernel objects. It must not be confused with the allocator of the same name, SLAB, which nowadays has been replaced by SLUB.</p></li>
+			</ul>
+			<h2 id="_idParaDest-153"><a id="_idTextAnchor155"/>kmalloc family allocation</h2>
+			<p><strong class="source-inline">kmalloc()</strong> is a kernel memory allocation<a id="_idIndexMarker795"/> function. It allocates physically contiguous (but not necessarily page-aligned) memory. The following image describes how memory is allocated and returned to the caller: </p>
+			<div>
+				<div id="_idContainer048" class="IMG---Figure">
+					<img src="image/B17934_10_014.jpg" alt="Figure 10.14 – kmalloc memory organization&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.14 – kmalloc memory organization</p>
+			<p>This allocation API is the<a id="_idIndexMarker796"/> general and highest-level memory allocation API in the kernel, which relies on the SLAB allocator. Memory returned from <strong class="source-inline">kmalloc()</strong> has a kernel logical address because it is allocated from the <strong class="source-inline">LOW_MEM</strong> region unless <strong class="source-inline">HIGH_MEM</strong> is specified. It is declared in <strong class="source-inline">&lt;linux/slab.h&gt;</strong>, which is the header to include before using the API. It is defined as follows:</p>
+			<p class="source-code">void *kmalloc(size_t size, int flags);</p>
+			<p>In the preceding code, <strong class="source-inline">size</strong> specifies the size of the memory to be allocated (in bytes). <strong class="source-inline">flags</strong> determines how and where memory should be allocated. Available flags are the same as the page allocator (<strong class="source-inline">GFP_KERNEL</strong>, <strong class="source-inline">GFP_ATOMIC</strong>, <strong class="source-inline">GFP_DMA</strong>, and so on) and the following are their definitions:</p>
+			<ul>
+				<li><strong class="source-inline">GFP_KERNEL</strong>: This is the standard flag. We cannot use this flag in an interrupt handler because its code may sleep. It always returns memory from the <strong class="source-inline">LOM_MEM</strong> zone (hence, a logical address).</li>
+				<li><strong class="source-inline">GFP_ATOMIC</strong>: This guarantees the atomicity of the allocation. This flag is to be used when allocation is needed from an interrupt context. Because memory is allocated from an emergency pool or memory, you should not abuse its usage.</li>
+				<li><strong class="source-inline">GFP_USER</strong>: This allocates memory to a user space process. Memory is then distinct and separated<a id="_idIndexMarker797"/> from those allocated to the kernel.</li>
+				<li><strong class="source-inline">GFP_NOWAIT</strong>: This is to be used if the allocation is performed from within an atomic context, for example, interrupt handler use. This flag prevents direct reclaim and I/O and filesystem operations while doing allocation. Unlike <strong class="source-inline">GFP_ATOMIC</strong>, it does not use memory reserves. Consequently, under memory pressure, the <strong class="source-inline">GFP_NOWAIT</strong> allocation is likely to fail.</li>
+				<li><strong class="source-inline">GFP_NOIO</strong>: Like <strong class="source-inline">GFP_USER</strong>, this can block, but unlike <strong class="source-inline">GFP_USER</strong>, it will not start disk I/O. In other words, it prevents any I/O operation while doing allocation. This flag is mostly used in the block/disk layer.</li>
+				<li><strong class="source-inline">GFP_NOFS</strong>: This will use direct reclaim but will not use any filesystem interfaces.</li>
+				<li><strong class="source-inline">__GFP_NOFAIL</strong>: The virtual memory implementation must retry indefinitely because the caller is incapable of handling allocation failures. The allocation can stall indefinitely, but it will never fail. Consequently, it's useless to test for failure.</li>
+				<li><strong class="source-inline">GFP_HIGHUSER</strong>: This requests to allocate memory from the <strong class="source-inline">HIGH_MEMORY</strong> zone.</li>
+				<li><strong class="source-inline">GFP_DMA</strong>: This allocates memory from <strong class="source-inline">DMA_ZONE</strong>.</li>
+			</ul>
+			<p>On successful allocation of memory, <strong class="source-inline">kmalloc()</strong> returns the virtual (logical, unless high memory is specified) address of the chunk allocated, guaranteed to be physically contiguous. On an error, it returns <strong class="source-inline">NULL</strong>.</p>
+			<p>For a device driver, however, it is recommended to use the managed version, <strong class="source-inline">devm_kmalloc()</strong>, which does not necessarily require freeing the memory, as it is handled internally by the memory core. The following is its prototype:</p>
+			<p class="source-code">void *devm_kmalloc(struct device *dev, size_t size,</p>
+			<p class="source-code">                   gfp_t gfp);</p>
+			<p>In the preceding prototype, <strong class="source-inline">dev</strong> is the device for which memory is allocated.</p>
+			<p>Note that <strong class="source-inline">kmalloc()</strong> relies on SLAB caches when allocating a small size of memory. For this reason, it can internally round<a id="_idIndexMarker798"/> the allocated area size up to the size of the smallest SLAB cache in which that memory can fit. This can result in returning more memory than requested. However, <strong class="source-inline">ksize()</strong> can be used to determine the actual amount (the size in bytes) of memory allocated. You can even use this additional memory, even though a smaller amount of memory was initially specified with the <strong class="source-inline">kmalloc()</strong> call.</p>
+			<p>The following is the <strong class="source-inline">ksize</strong> prototype:</p>
+			<p class="source-code">size_t ksize(const void *objp);</p>
+			<p>In the preceding, <strong class="source-inline">objp</strong> is the object whose real size in bytes will be returned. </p>
+			<p><strong class="source-inline">kmalloc()</strong> has the same size limitations as the page-related allocation API. For example, with the default <strong class="source-inline">FORCE_MAX_ZONEORDER</strong> set to <strong class="source-inline">11</strong>, the maximum size per allocation with <strong class="source-inline">kmalloc()</strong> is <strong class="source-inline">4 MB</strong>.</p>
+			<p><strong class="source-inline">kfree</strong> function is used to free the memory allocated by <strong class="source-inline">kmalloc()</strong>. It is defined as the following:</p>
+			<p class="source-code">void kfree(const void *ptr)</p>
+			<p>The following is an example of allocating and freeing memory using <strong class="source-inline">kmalloc()</strong> and <strong class="source-inline">kfree()</strong> respectively:</p>
+			<p class="source-code">#include &lt;linux/init.h&gt;</p>
+			<p class="source-code">#include &lt;linux/module.h&gt;</p>
+			<p class="source-code">#include &lt;linux/slab.h&gt;</p>
+			<p class="source-code">#include &lt;linux/mm.h&gt;</p>
+			<p class="source-code">static void *ptr; </p>
+			<p class="source-code">static int alloc_init(void) </p>
+			<p class="source-code">{</p>
+			<p class="source-code">    size_t size = 1024; /* allocate 1024 bytes */ </p>
+			<p class="source-code">    ptr = kmalloc(size,GFP_KERNEL); </p>
+			<p class="source-code">    if(!ptr) {</p>
+			<p class="source-code">        /* handle error */</p>
+			<p class="source-code">        pr_err("memory allocation failed\n"); </p>
+			<p class="source-code">        return -ENOMEM; </p>
+			<p class="source-code">    } else {</p>
+			<p class="source-code">        pr_info("Memory allocated successfully\n"); </p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    return 0;</p>
+			<p class="source-code">}</p>
+			<p class="source-code">static void alloc_exit(void)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    kfree(ptr); </p>
+			<p class="source-code">    pr_info("Memory freed\n"); </p>
+			<p class="source-code">}</p>
+			<p class="source-code">module_init(alloc_init); </p>
+			<p class="source-code">module_exit(alloc_exit);</p>
+			<p class="source-code">MODULE_LICENSE("GPL"); </p>
+			<p class="source-code">MODULE_AUTHOR("John Madieu");</p>
+			<p>The kernel provides<a id="_idIndexMarker799"/> other helpers based on <strong class="source-inline">kmalloc()</strong>as follows:</p>
+			<p class="source-code">void kzalloc(size_t size, gfp_t flags);</p>
+			<p class="source-code">void kzfree(const void *p);</p>
+			<p class="source-code">void *kcalloc(size_t n, size_t size, gfp_t flags);</p>
+			<p class="source-code">void *krealloc(const void *p, size_t new_size,</p>
+			<p class="source-code">                gfp_t flags);</p>
+			<p><strong class="source-inline">krealloc()</strong> is the kernel equivalent of user space <strong class="source-inline">realloc()</strong> function. Because memory returned by <strong class="source-inline">kmalloc()</strong> retains the contents<a id="_idIndexMarker800"/> from its previous incarnation, you can request a zeroed <strong class="source-inline">kmalloc</strong>-allocated memory using <strong class="source-inline">kzalloc()</strong>. <strong class="source-inline">kzfree()</strong> is the freeing function for <strong class="source-inline">kzalloc()</strong>, whereas <strong class="source-inline">kcalloc()</strong> allocates memory for an array, and its <strong class="source-inline">n</strong> and <strong class="source-inline">size</strong> parameters respectively represent the number of elements in the array and the size of an element.</p>
+			<p>Since <strong class="source-inline">kmalloc()</strong> returns a memory area in the kernel permanent mapping, the logical address can be translated into a physical address using <strong class="source-inline">virt_to_phys()</strong>, or to a I/O bus address using <strong class="source-inline">virt_to_bus()</strong>. These macros internally call either <strong class="source-inline">__pa()</strong> or <strong class="source-inline">__va()</strong> if necessary. The physical address (<strong class="source-inline">virt_to_phys(kmalloc'ed address)</strong>), downshifted by <strong class="source-inline">PAGE_SHIFT</strong>, will produce a PFN (<strong class="source-inline">pfn</strong>) of the first page from which the chunk is allocated.</p>
+			<h2 id="_idParaDest-154"><a id="_idTextAnchor156"/>vmalloc family allocation</h2>
+			<p><strong class="source-inline">vmalloc()</strong> is the last kernel allocator<a id="_idIndexMarker801"/> we will discuss in the book. It returns memory that is exclusively contiguous in the virtual address space. The underlying frames are scattered, as we can see in the following diagram:</p>
+			<p class="figure-caption"> </p>
+			<div>
+				<div id="_idContainer049" class="IMG---Figure">
+					<img src="image/B17934_10_015.jpg" alt="Figure 10.15 – vmalloc memory organization&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.15 – vmalloc memory organization</p>
+			<p>In the preceding diagram, we can see that memory is not physically contiguous. Moreover, memory returned by <strong class="source-inline">vmalloc()</strong> always comes from the <strong class="source-inline">HIGH_MEM</strong> zone. Addresses returned<a id="_idIndexMarker802"/> are purely virtual (not logical) and cannot be translated into physical ones or bus addresses because there is no guarantee that the backing memory is physically contiguous. It means that memory returned by <strong class="source-inline">vmalloc()</strong> can't be used outside of the microprocessor (you cannot easily use it for a DMA purpose). It is correct to use <strong class="source-inline">vmalloc()</strong> to allocate memory for a large sequence of pages (it does not make sense to use it to allocate one page, for example) that exists only in software, such as a network buffer. It is important to note that <strong class="source-inline">vmalloc()</strong> is slower than <strong class="source-inline">kmalloc()</strong> and page allocator functions because it must both retrieve the memory and build the page tables, or even remap into a virtually contiguous range, whereas <strong class="source-inline">kmalloc()</strong> never does that.</p>
+			<p>Before using the <strong class="source-inline">vmalloc()</strong> API, you should include this header:</p>
+			<p class="source-code">#include &lt;linux/vmalloc.h&gt;</p>
+			<p>The following are the <strong class="source-inline">vmalloc</strong> family prototypes:</p>
+			<p class="source-code">void *vmalloc(unsigned long size);</p>
+			<p class="source-code">void *vzalloc(unsigned long size);</p>
+			<p class="source-code">void vfree(void *addr);</p>
+			<p>In the preceding prototypes, argument size is the size of memory you need to allocate. Upon successful allocation<a id="_idIndexMarker803"/> of memory, it returns the address of the first byte of the allocated memory block. On failure, it returns <strong class="source-inline">NULL</strong>. <strong class="source-inline">vfree()</strong> does the reverse and releases the memory allocated by <strong class="source-inline">vmalloc()</strong>. The <strong class="source-inline">vzalloc</strong> variant returns zeroed initialized memory.</p>
+			<p>The following is an example of using <strong class="source-inline">vmalloc</strong>:</p>
+			<p class="source-code">#include&lt;linux/init.h&gt;</p>
+			<p class="source-code">#include&lt;linux/module.h&gt;</p>
+			<p class="source-code">#include &lt;linux/vmalloc.h&gt;</p>
+			<p class="source-code">Static void *ptr;</p>
+			<p class="source-code">static int alloc_init(void)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    unsigned long size = 8192; /* 2 x 4KB */</p>
+			<p class="source-code">    ptr = vmalloc(size);</p>
+			<p class="source-code">    if(!ptr)</p>
+			<p class="source-code">    {</p>
+			<p class="source-code">        /* handle error */</p>
+			<p class="source-code">        pr_err("memory allocation failed\n");</p>
+			<p class="source-code">        return -ENOMEM;</p>
+			<p class="source-code">    } else {</p>
+			<p class="source-code">        pr_info("Memory allocated successfully\n");</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    return 0;</p>
+			<p class="source-code">}</p>
+			<p class="source-code">static void my_vmalloc_exit(void)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    vfree(ptr);</p>
+			<p class="source-code">    pr_info("Memory freed\n");</p>
+			<p class="source-code">}</p>
+			<p class="source-code">module_init(my_vmalloc_init);</p>
+			<p class="source-code">module_exit(my_vmalloc_exit);</p>
+			<p class="source-code">MODULE_LICENSE("GPL");</p>
+			<p class="source-code">MODULE_AUTHOR("john Madieu, john.madieu@gmail.com");</p>
+			<p><strong class="source-inline">vmalloc()</strong> will allocate non-contiguous physical pages and map them to a contiguous virtual address region. These <strong class="source-inline">vmalloc</strong> virtual addresses are limited<a id="_idIndexMarker804"/> in an area of kernel space, delimited by <strong class="source-inline">VMALLOC_START</strong> and <strong class="source-inline">VMALLOC_END</strong>, which are architecture-dependent. The kernel exposes <strong class="source-inline">/proc/vmallocinfo</strong> to display all <strong class="source-inline">vmalloc</strong>-allocated memory on the system.</p>
+			<h2 id="_idParaDest-155"><a id="_idTextAnchor157"/>A short story about process memory allocation under the hood</h2>
+			<p><strong class="source-inline">vmalloc()</strong> prefers the <strong class="source-inline">HIGH_MEM</strong> zone if it exists, which is suitable for processes, as they require implicit<a id="_idIndexMarker805"/> and dynamic mappings. However, because memory is a limited resource, the kernel will report the allocation of frame pages (physical pages) until necessary (when accessed, either by reading or writing). This<a id="_idIndexMarker806"/> on-demand allocation is called <strong class="bold">lazy allocation</strong>, eliminating the risk of allocating pages that will never be used.</p>
+			<p>Whenever a page is requested, only the page table is updated; in most cases, a new entry is created, which means<a id="_idIndexMarker807"/> only virtual memory is allocated. An interrupt called <strong class="source-inline">page fault</strong> is raised only when a user accesses the page. This interrupt has<a id="_idIndexMarker808"/> a dedicated handler, called <strong class="source-inline">page fault handler</strong>, and is called by the MMU in response to an attempt to access virtual memory, which did not immediately succeed.</p>
+			<p>In fact, a page fault interrupt is raised whatever the access type is (read, write, or execute) to a page whose entry<a id="_idIndexMarker809"/> in the page table has not got the appropriate permission bits set to allow that type of access. The response to that interrupt falls in one of the following three ways:</p>
+			<ul>
+				<li><strong class="bold">The hard fault</strong>: When the page does not reside anywhere (neither in the physical memory nor a memory-mapped file), which means the handler cannot immediately resolve<a id="_idIndexMarker810"/> the fault. The handler will perform I/O operations in order to prepare the physical page needed to resolve the fault and may suspend the interrupted process and switch to another while the system works to resolve the issue.</li>
+				<li><strong class="bold">The soft fault</strong>: When the page resides elsewhere in memory (in the working set of another process). It means<a id="_idIndexMarker811"/> the fault handler may resolve the fault by immediately attaching a page of physical memory to the appropriate page table entry, adjusting the entry, and resuming the interrupted instruction.</li>
+				<li><strong class="bold">The fault cannot be resolved</strong>: This will result<a id="_idIndexMarker812"/> in a bus error or <strong class="bold">segmentation violation</strong> (<strong class="bold">segv</strong>). A <strong class="bold">Segmentation Violation Signal</strong> (<strong class="bold">SIGSEGV</strong>) is sent to the faulty process, killing<a id="_idIndexMarker813"/> it (the default behavior), unless a signal handler has been installed<a id="_idIndexMarker814"/> for the SIGSEV to change the default behavior.</li>
+			</ul>
+			<p>To summarize, memory mappings generally start out with no physical pages attached, only by defining the virtual address ranges without any associated physical memory. The actual physical memory is allocated later in response to a page fault exception when the memory is accessed, since the kernel provides some flags to determine whether the attempted access was legal and specifies the behavior of the page fault handler. Thus, the <strong class="source-inline">brk()</strong> user space, <strong class="source-inline">mmap()</strong>, and similar allocate (virtual) space, but physical memory is attached later.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">A page fault occurring in interrupt<a id="_idIndexMarker815"/> context causes a double fault interrupt, which usually panics the kernel (calling the <strong class="source-inline">panic()</strong> function). It is the reason<a id="_idIndexMarker816"/> why memory allocated in interrupt context is taken from a memory pool, which does not raise a page fault interrupt. If an interrupt occurs when a double fault is being handled, a triple fault exception is generated, causing the CPU to shut down and the OS to immediately reboot. This behavior is architecture-dependent.</p>
+			<h3>The Copy on Write case </h3>
+			<p>Let's consider a memory<a id="_idIndexMarker817"/> region or data that needs to be shared by two or more tasks. The <strong class="bold">Copy on Write</strong> (<strong class="bold">CoW</strong>) (heavily used with <strong class="source-inline">fork()</strong> system call) is a mechanism that allows the operating system not to immediately allocate memory and does not make a  copy of it to each task that shares this data, until one of these tasks modifies (writes into) it – in this case, memory is allocated for its private copy (hence the name, CoW). Let's consider a shared memory page to describe in in the following<a id="_idIndexMarker818"/> how the <strong class="source-inline">page fault handler</strong> manages<a id="_idIndexMarker819"/> CoW:</p>
+			<ol>
+				<li>When the page needs to be shared, a page table entry (whose target is marked as un-writable) pointing to this shared page is added to the process page table of each process accessing the shared page. This is an initial mapping.</li>
+				<li>The mapping will result the creation of a VMA per process, which is added to the VMA list of each process. The shared page is associated these VMAs (that is, the VMA previously created for each process), which are marked as writeable this time. Nothing else will happen as long as no process tries to modify the content of the shared page.</li>
+				<li>When one of the processes tries to write into the shared page (at its first write), the <strong class="source-inline">fault handler</strong> notices the difference between the PTE flag (previously marked as un-writable) and the VMA flag (marked as writable), which means, <em class="italic">"Hey, this is a CoW."</em>. It will then allocate a physical page, which is assigned to the PTE added previously (thus replacing the shared page previously assigned), updating the PTE flags (one of these flags will correspond to marking the PTE as writeable), flushing the TLB entry, and then will execute the <strong class="source-inline">do_wp_page()</strong> function, which will copy the content from the shared address to the new location, which is private to the process that issued the write. Subsequent writes from this process<a id="_idIndexMarker820"/> will be made to the private <a id="_idIndexMarker821"/>copy, not in the shared page.</li>
+			</ol>
+			<p>We can now close our parenthesis on process memory allocation, with which we are now familiar. We have also learned the lazy allocation mechanism and what CoW is. We can also conclude our learning about in-kernel memory allocation. At this point, we can switch to I/O memory operations to talk with hardware devices.</p>
+			<h1 id="_idParaDest-156"><a id="_idTextAnchor158"/>Working with I/O memory to talk to hardware</h1>
+			<p>So far, we have dealt with main memory, and we used to think of memory in terms of RAM. That said, RAM one a peripheral<a id="_idIndexMarker822"/> among many others, and its memory range corresponds to its size. RAM is unique in the way it is entirely<a id="_idIndexMarker823"/> managed by the kernel, transparently for users. The RAM controller is connected to the CPU data/control/address buses, which it shares with other devices. These<a id="_idIndexMarker824"/> devices are referred to as memory-mapped devices because of their locality regarding those buses, and communication (input/output operations) with<a id="_idIndexMarker825"/> those devices is called memory-mapped I/O. These devices include controllers for various buses provided by the CPU (USB, UART, SPI, I2C, PCI, and SATA), but also IPs such as VPU, GPU, Image Processing Unit (IPU), and Secure Non-Volatile Store (SNVS, a feature in i.MX chips from NXP).</p>
+			<p>On a 32-bit system, the CPU has up to 2<span class="superscript">32</span> choices of memory locations (from <strong class="source-inline">0</strong> to <strong class="source-inline">0xFFFFFFFF</strong>). The thing is that not all those addresses address RAM. Some of these are reserved<a id="_idIndexMarker826"/> for peripheral access and are called I/O memory. This I/O memory is split into ranges of various sizes and assigned to those peripherals so that whenever the CPU receives a physical memory access request from the kernel, it can route it to the device whose address range contains the specified physical address. The address range assigned to each device (including the RAM controller) is described<a id="_idIndexMarker827"/> in the SoC data sheet, in a section called <strong class="bold">memory map</strong> most of the time.</p>
+			<p>Since the kernel exclusively works with virtual addresses (through page tables), accessing a particular address for any device would require this address to be mapped first (this is even more true if there is an IOMMU, the MMU equivalent for I/O devices). This mapping of memory addresses other than RAM modules causes a classic hole in the system address space (because address space is shared between memory and I/O).</p>
+			<p>The following diagram <a id="_idIndexMarker828"/>describes how I/O memory and main<a id="_idIndexMarker829"/> memory are seen by the CPU:</p>
+			<div>
+				<div id="_idContainer050" class="IMG---Figure">
+					<img src="image/B17934_10_016.jpg" alt="Figure 10.16 – (IO)MMU and main memory overview&#13;&#10;"/>
+				</div>
+			</div>
+			<p class="figure-caption">Figure 10.16 – (IO)MMU and main memory overview</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">Always keep in mind that the CPU sees main memory (RAM) through the lenses of the MMU and devices through the lenses of IOMMU.</p>
+			<p>The main advantage with that is that the same instructions are used for transferring data to memory and I/O, which reduces software coding logic. There are some disadvantages, however. The first one is that the entire address bus must be fully decoded for every device, which increases the cost of adding hardware to the machine, leading to complex architecture. </p>
+			<p>The other inconvenience is that on a 32-bit system, even with 4 GB of RAM installed, the OS will never use the whole size because of the hole caused by memory-mapped devices, which stole part of the address space. x86 architectures adopted another approach called <strong class="bold">Port Input Output</strong> (<strong class="bold">PIO</strong>), with which registers are accessible<a id="_idIndexMarker830"/> via a dedicated bus by means of specific instructions (<strong class="source-inline">in</strong> and <strong class="source-inline">out</strong>, in an assembler, generally). In this case, device registers are not memory-mapped, and the system<a id="_idIndexMarker831"/> can address the whole address<a id="_idIndexMarker832"/> range for the RAM. </p>
+			<h2 id="_idParaDest-157"><a id="_idTextAnchor159"/>PIO device access</h2>
+			<p>On a system where PIO<a id="_idIndexMarker833"/> is used, I/O devices are mapped into a separate address space. This is usually accomplished by having a different set of signal lines to indicate memory access versus device access. Such systems have two different address spaces, one for system memory, which we already discussed, and the other one for I/O ports, sometimes referred to as port address space<a id="_idIndexMarker834"/> and limited to 65,536 ports. This is an old method and very uncommon nowadays.</p>
+			<p>The kernel exports a few functions (symbols) to handle I/O ports. Prior to accessing any port regions, we must first inform the kernel that we are using a range of ports using the <strong class="source-inline">request_region()</strong> function, which will return <strong class="source-inline">NULL</strong> on error. Once done with the region, we must call <strong class="source-inline">release_region()</strong>. These are both declared in <strong class="source-inline">linux/ioport.h</strong> as the following: </p>
+			<p class="source-code">struct ressource *request_region(unsigned long start,</p>
+			<p class="source-code">                         unsigned long len, char *name);</p>
+			<p class="source-code">void release_region(unsigned long start,</p>
+			<p class="source-code">                         unsigned long len);</p>
+			<p>These are politeness functions that inform the kernel about your intention to make use/release of a region of <strong class="source-inline">len</strong> ports, starting from <strong class="source-inline">start</strong>. The <strong class="source-inline">name</strong> parameter should be set with the name of the device or a meaningful one. Their use is not mandatory, however. It prevents two or more drivers from referencing the same range of ports. You can consult the ports currently in use on the system by reading the content of the <strong class="source-inline">/proc/ioports</strong> files.</p>
+			<p>After the region reservation has succeeded, the following APIs can be used to access the ports:</p>
+			<p class="source-code">u8 inb(unsigned long addr)</p>
+			<p class="source-code">u16 inw(unsigned long addr)</p>
+			<p class="source-code">u32 inl(unsigned long addr)</p>
+			<p>The preceding functions<a id="_idIndexMarker835"/> respectively read 8, 16, or 32-bit-sized (wide) data from the <strong class="source-inline">addr</strong> ports. The write variants are defined as the following:</p>
+			<p class="source-code">void outb(u8 b, unsigned long addr)</p>
+			<p class="source-code">void outw(u16 b, unsigned long addr)</p>
+			<p class="source-code">void outl(u32 b, unsigned long addr)</p>
+			<p>The preceding functions write <strong class="source-inline">b</strong> data, which can be 8, 16, or 32-bit-sized, into the <strong class="source-inline">addr</strong> port.</p>
+			<p>The fact that PIO uses a different set of instructions to access the I/O ports or MMIO is a disadvantage, as it requires more instructions than normal memory to accomplish the same task. For instance, 1-bit testing has only one instruction in MMIO, whereas PIO requires reading the data into a register before testing the bit, which is more than one instruction. One of the advantages of PIO is that it requires less logic to decode addresses, lowering the cost of adding hardware devices.</p>
+			<h2 id="_idParaDest-158"><a id="_idTextAnchor160"/>MMIO device access</h2>
+			<p>Main memory<a id="_idIndexMarker836"/> addresses reside in the same address space as MMIO addresses. The kernel maps the device registers to a portion of the address space that would ordinarily be utilized by RAM so that instead of system memory (that is, RAM), I/O device registration takes place. As a result, talking with an I/O device is analogous to reading and writing to memory addresses dedicated to that device.</p>
+			<p>If we need to access, let's say, the 4 MB of I/O memory assigned to IPU-2 (from <strong class="source-inline">0x02400000</strong> to <strong class="source-inline">0x027fffff</strong>), the CPU (by means of the IOMMU) can assign to us the <strong class="source-inline">0x10000000</strong> to <strong class="source-inline">0x103FFFFF</strong> addresses, which are virtual of course. This is not consuming physical RAM (except for building and storing page table entry), just address space (do you see now why 32-bit systems run into issues with expansion cards such as high-end GPUs that have GB of RAM?), meaning that the kernel will no longer use this virtual memory range to map RAM. Now, a memory write/read to, say, <strong class="source-inline">0x10000004</strong> will be routed to the IPU-2 device. This is the basic premise of memory-mapped I/O.</p>
+			<p>Like PIO, there are MMIO functions to inform the kernel about our intention to use a memory region. Remember that this information is a pure reservation only. These are <strong class="source-inline">request_mem_region()</strong> and <strong class="source-inline">release_mem_region()</strong>, defined as the following:</p>
+			<p class="source-code">struct ressource* request_mem_region(unsigned long start,</p>
+			<p class="source-code">                           unsigned long len, char *name)</p>
+			<p class="source-code">void release_mem_region(unsigned long start, </p>
+			<p class="source-code">                        unsigned long len)</p>
+			<p>These are only politeness functions, though the former builds and returns an appropriate <strong class="source-inline">resource</strong> structure, corresponding to the start and length of the memory region, while the latter releases it.</p>
+			<p>For the device driver, however, it is recommended<a id="_idIndexMarker837"/> to use the managed variant, as it simplifies the code and takes care of releasing the resource. This managed version is defined as the following:</p>
+			<p class="source-code">struct ressource* devm_request_region(</p>
+			<p class="source-code">               struct device *dev, resource_size_t start,</p>
+			<p class="source-code">               resource_size_t n, const char *name);</p>
+			<p>In the preceding, <strong class="source-inline">dev</strong> is the device owning the memory region, and the other parameters are the same as the non-managed version. Upon successful request, the memory region will be visible in <strong class="source-inline">/proc/iomem</strong>, which is a file that contains memory regions in use on the system.</p>
+			<p>Prior to accessing a memory region (and after you successfully request it), the region must be mapped into kernel address space by calling special architecture-dependent functions (which make use of IOMMU to build a page table and thus cannot be called from an interrupt handler). These are <strong class="source-inline">ioremap()</strong> and <strong class="source-inline">iounmap()</strong>, which handle cache coherency as well. The followings are their definitions:</p>
+			<p class="source-code">void __iomem *ioremap(unsigned long phys_addr,</p>
+			<p class="source-code">                      unsigned long size);</p>
+			<p class="source-code">void iounmap(void __iomem *addr);</p>
+			<p>In the preceding functions, <strong class="source-inline">phys_addr</strong> corresponds to the device's physical address as specified in the device tree or in the board file. <strong class="source-inline">size</strong> corresponds to the size of the region to map. <strong class="source-inline">ioremap()</strong> returns a <strong class="source-inline">__iomem void</strong> pointer to the start of the mapped region. Once again, it is recommended to use the managed version, which has the following definition:</p>
+			<p class="source-code">void __iomem *devm_ioremap(struct device *dev,</p>
+			<p class="source-code">                           resource_size_t offset,</p>
+			<p class="source-code">                           resource_size_t size);</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout"><strong class="source-inline">ioremap()</strong> builds new page tables, just as <strong class="source-inline">vmalloc()</strong> does. However, it does not actually allocate any memory but instead returns a special virtual address that can be used to access the specified I/O address. On 32-bit systems, the fact that MMIO steals physical memory address space to create a mapping for memory-mapped I/O devices is a disadvantage, since it prevents the system from using the stolen memory for general RAM purposes.</p>
+			<p>Because the mapping APIs<a id="_idIndexMarker838"/> are architecture-dependent, you should not deference (that is, getting/setting their value by reading/writing to the pointer) such pointers, even though on some architectures you can. The kernel provides portable functions to access memory-mapped regions. These are the following:</p>
+			<p class="source-code">unsigned int ioread8(void __iomem *addr);</p>
+			<p class="source-code">unsigned int ioread16(void __iomem *addr);</p>
+			<p class="source-code">unsigned int ioread32(void __iomem *addr);</p>
+			<p class="source-code">void iowrite8(u8 value, void __iomem *addr);</p>
+			<p class="source-code">void iowrite16(u16 value, void __iomem *addr);</p>
+			<p class="source-code">void iowrite32(u32 value, void __iomem *addr);</p>
+			<p>The preceding functions respectively read and write 8-, 16-, and 32-bit values.</p>
+			<p class="callout-heading">Note</p>
+			<p class="callout"><strong class="source-inline">__iomem</strong> is a kernel cookie used by <strong class="bold">Sparse</strong>, a semantic checker<a id="_idIndexMarker839"/> used by the kernel to find possible coding faults. It prevents mixing normal pointer use (such as dereference) with I/O memory pointers.</p>
+			<p>In this section, we have learned how to map memory-mapped device memory into kernel address space to access its registers using dedicated APIs. This will serve in driving in-chip devices.</p>
+			<h1 id="_idParaDest-159"><a id="_idTextAnchor161"/>Memory (re)mapping</h1>
+			<p>Kernel memory sometimes needs to be remapped, either from kernel to user space, or from high memory to a low memory region (from kernel to kernel space). The common case is remapping the kernel memory<a id="_idIndexMarker840"/> to user space, but there are other cases, such as when we need to access high memory. </p>
+			<h2 id="_idParaDest-160"><a id="_idTextAnchor162"/>Understanding the use of kmap</h2>
+			<p>The Linux kernel permanently maps 896 MB of its address space to the lower 896 MB of the physical memory (low memory). On a 4 GB system, there is only 128 MB left to the kernel to map the remaining 3.2 GB of physical memory (high memory). However, low memory<a id="_idIndexMarker841"/> is directly addressable by the kernel because of the permanent and one-to-one mapping. When it comes to high memory (memory preceding 896 MB), the kernel has to map the requested region of high memory into its address space, and the 128 MB mentioned previously is especially reserved for this. The function used to perform this trick is <strong class="source-inline">kmap()</strong>. The <strong class="source-inline">kmap()</strong> function is used to map a given page into the kernel address space.</p>
+			<p class="source-code">void *kmap(struct page *page);</p>
+			<p><strong class="source-inline">page</strong> is a pointer to the struct page structure to map. When a high memory page is allocated, it is not directly addressable. <strong class="source-inline">kmap()</strong> is the function we call to temporarily map high memory into the kernel address space. The mapping will last until <strong class="source-inline">kunmap()</strong> is called:</p>
+			<p class="source-code">void kunmap(struct page *page);</p>
+			<p>By <em class="italic">temporarily</em>, I mean the mapping should be undone as soon as it is no longer needed. A best programming practice is to unmap high memory mapping when it is no longer required.</p>
+			<p>This function works on both high and low memory. However, if a page structure<a id="_idIndexMarker842"/> resides in low memory, then just the virtual address of the page is returned (because low-memory pages already have permanent mappings). If the page belongs to high memory, a permanent mapping is created in the kernel's page tables, and the address is returned:</p>
+			<p class="source-code">void *kmap(struct page *page)</p>
+			<p class="source-code">{</p>
+			<p class="source-code">    BUG_ON(in_interrupt());</p>
+			<p class="source-code">    if (!PageHighMem(page))</p>
+			<p class="source-code">        return page_address(page);</p>
+			<p class="source-code">    return kmap_high(page);</p>
+			<p class="source-code">}</p>
+			<p><strong class="source-inline">kmap_high()</strong> and <strong class="source-inline">kunmap_high()</strong>, which are defined in <strong class="source-inline">mm/highmem.c</strong>, are at the heart of these implementations. However, <strong class="source-inline">kmap()</strong> maps pages into kernel space using a physically contiguous set of page tables allocated during the boot. Because the page tables are all connected, it's simple to move around without having to consult the page directory all the time. You should note that the <strong class="source-inline">kmap</strong> page tables correspond to kernel virtual addresses beginning with <strong class="source-inline">PKMAP BASE</strong>, which differs per architecture, and the reference count for its page table entries is kept in a separate array called <strong class="source-inline">pkmap_count</strong>.</p>
+			<p>The page frame of the page to map into kernel space is passed to <strong class="source-inline">kmap()</strong> as a <strong class="source-inline">struct *page</strong> argument, and this can be a regular or <strong class="source-inline">HIGHMEM</strong> page; in the first case, <strong class="source-inline">kmap()</strong> simply returns the direct-mapped address. For <strong class="source-inline">HIGHMEM</strong> pages, <strong class="source-inline">kmap()</strong> searches through the <strong class="source-inline">kmap</strong> page tables (which were allocated at boot time) for an unused entry – that is, an entry whose <strong class="source-inline">pkmap_count</strong> value is zero. If there are none, it goes to sleep and waits for another process to <strong class="source-inline">kunmap</strong> a page. When it finds an unused one, it inserts the physical page address of the page we want to map, incrementing at the same time the <strong class="source-inline">pkmap_count</strong> reference count corresponding to the page table entry, and returns the virtual address to the caller. The <strong class="source-inline">page-&gt;virtual</strong> for the page struct is also updated to reflect the mapped address.</p>
+			<p><strong class="source-inline">kunmap()</strong> expects a <strong class="source-inline">struct page*</strong> representing the page<a id="_idIndexMarker843"/> to unmap. It finds the <strong class="source-inline">pkmap_count</strong> entry for the page's virtual address and decrements it. </p>
+			<h2 id="_idParaDest-161"><a id="_idTextAnchor163"/>Mapping kernel memory to user space</h2>
+			<p>Mapping physical addresses<a id="_idIndexMarker844"/> is one of the most common operations, especially<a id="_idIndexMarker845"/> in embedded systems. Sometimes, you may want to share part of the kernel memory with user space. As mentioned earlier, the CPU runs in unprivileged mode when running in user space. To let a process access a kernel memory region, we need to remap that region into the process address space.</p>
+			<h3>Using remap_pfn_range</h3>
+			<p><strong class="source-inline">remap_pfn_range()</strong> maps physical contiguous memory into a process address space by means<a id="_idIndexMarker846"/> of a VMA. It is particularly useful for implementing the <strong class="source-inline">mmap</strong> file operation, which is the backend of the <strong class="source-inline">mmap()</strong> system call. </p>
+			<p>After invoking the <strong class="source-inline">mmap()</strong> system call on a file descriptor (a device-backed file or not) given a region start and length, the CPU will switch to privileged mode. An initial kernel code will create an almost empty VMA as large as the requested mapping region and will run the corresponding <strong class="source-inline">file_operations.mmap</strong> callback, giving the VMA as a parameter. In turn, this callback should call <strong class="source-inline">remap_pfn_range()</strong>. This function will update the VMA and will derive the kernel's PTE of the mapped region before adding it to the process's page table, with different protection flags of course. The process's VMA list will be updated with the insertion of the VMA entry (with appropriate attributes), which will use the derived PTE to access the same memory. This way, the kernel and user space will both point to the same physical memory region, each through their own page tables but with different protection flags. Thus, instead of wasting memory and CPU cycles by copying, the kernel just duplicates the PTEs, each with their own attributes.</p>
+			<p><strong class="source-inline">remap_pfn_range()</strong> is defined as the following:</p>
+			<p class="source-code">int remap_pfn_range(struct vm_area_struct *vma,</p>
+			<p class="source-code">                    unsigned long addr,</p>
+			<p class="source-code">                    unsigned long pfn,</p>
+			<p class="source-code">                    unsigned long size, pgprot_t flags);</p>
+			<p>A successful call will return <strong class="source-inline">0</strong>, and a negative error code is returned on failure. Most of this function's arguments<a id="_idIndexMarker847"/> are provided when the <strong class="source-inline">mmap()</strong> system call is invoked. The following are their descriptions:</p>
+			<ul>
+				<li><strong class="source-inline">vma</strong>: This is the virtual memory area provided by the kernel in case of the <strong class="source-inline">file_operations.mmap</strong> call. It corresponds to the user process's VMA, into which the mapping should be done.</li>
+				<li><strong class="source-inline">addr</strong>: This is the user (virtual) address where the VMA should start (<strong class="source-inline">vma-&gt;vm_start</strong> most of the time). It will result in a mapping from <strong class="source-inline">addr</strong> to <strong class="source-inline">addr + size</strong>.</li>
+				<li><strong class="source-inline">pfn</strong>: This represents the page frame number of the physical memory region to map. To obtain this page frame number, we must consider how the memory allocation was performed:<ul><li>For memory allocated with <strong class="source-inline">kmalloc()</strong> or any other allocation API that returns a kernel logical address (<strong class="source-inline">__get_free_pages()</strong> with the <strong class="source-inline">GFP_KERNEL</strong> flag, for instance), <strong class="source-inline">pfn</strong> can be obtained as follows (obtaining the physical address and right-shifting this address's <strong class="source-inline">PAGE_SHIFT</strong> time):<p class="source-code">    unsigned long pfn =</p><p class="source-code">      virt_to_phys((void *)kmalloc_area)&gt;&gt;PAGE_SHIFT; </p></li><li>For memory allocated with <strong class="source-inline">alloc_pages()</strong>, we can use the following (where <strong class="source-inline">page</strong> is the pointer returned at allocation):<p class="source-code">    unsigned long pfn = page_to_pfn(page)</p></li><li>Finally, for memory allocated with <strong class="source-inline">vmalloc()</strong>, the following can be used:<p class="source-code">    unsigned long pfn = vmalloc_to_pfn(vmalloc_area);</p></li></ul></li>
+				<li><strong class="source-inline">size</strong>: This is the dimension, in bytes, of the area being remapped. If it is not page-aligned, the kernel will take care of its alignment to the (next) page boundary.</li>
+				<li><strong class="source-inline">flags</strong>: This represents the protection requested for the new VMA. The driver can change the final values but should use the initial default values (found in <strong class="source-inline">vma-&gt;vm_page_prot</strong>) as a skeleton using the OR (<strong class="source-inline">|</strong> in the C language) operator. These default values are those which have been set by user space. Some of these flags are as follows:<ul><li><strong class="source-inline">VM_IO</strong>, which specifies a device's memory-mapped I/O.</li><li><strong class="source-inline">VM_PFNMAP</strong>, to specify a page range managed without a baking <strong class="source-inline">struct page</strong>, just pure PFN. This is used most of the time for I/O memory mappings. In other words, it means that the base pages are just raw PFN mappings and do not have a struct page associated with them.</li><li><strong class="source-inline">VM_DONTCOPY</strong>, which tells the kernel not to copy this VMA on a fork.</li><li><strong class="source-inline">VM_DONTEXPAND</strong>, which prevents the VMA from expanding with <strong class="source-inline">mremap()</strong>.</li><li><strong class="source-inline">VM_DONTDUMP</strong>, which prevents the VMA from being included in a core dump, even with <strong class="source-inline">VM_IO</strong> turned off.</li></ul></li>
+			</ul>
+			<p>Memory mapping works with memory regions that are multiples of <strong class="source-inline">PAGE_SIZE</strong>, so, for example, you should allocate<a id="_idIndexMarker848"/> an entire page instead of using a <strong class="source-inline">kmalloc</strong>-allocated buffer. <strong class="source-inline">kmalloc()</strong> can return (if requesting a non-multiple size of <strong class="source-inline">PAGE_SIZE</strong>) a pointer that isn't page-aligned, and in that case, it is a terribly bad idea to use such an unaligned address with <strong class="source-inline">remap_pfn_range()</strong>. Nothing will guarantee that the <strong class="source-inline">kmalloc()</strong>-returned address will be page-aligned, so you might corrupt slab internal data structures. Instead, you should be using <strong class="source-inline">kmalloc(PAGE_SIZE * npages</strong> or, even better, a page allocation API (or something similar because these functions always return a pointer that is page-aligned).</p>
+			<p>If your baking object (a file or device) supports an offset, then the VMA offset (the offset into the object where the mapping must start) should be considered to produce the PFN where mapping must start. <strong class="source-inline">vma-&gt;vm_pgoff</strong> will contain this offset (if specified by user space in the <strong class="source-inline">mmap()</strong>) value in units of the number of pages. The final PFN computation (or the position from where the<a id="_idIndexMarker849"/> mapping must start) will look like the following:</p>
+			<p class="source-code">unsigned long pos</p>
+			<p class="source-code">unsigned long off = vma-&gt;vm_pgoff;</p>
+			<p class="source-code">/*compute the initial PFN according to the memory area */</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">/* Then compute the final position */</p>
+			<p class="source-code">pos = pfn + off</p>
+			<p class="source-code">[...]</p>
+			<p class="source-code">return remap_pfn_range(vma, vma-&gt;vm_start,</p>
+			<p class="source-code">        pos, vma-&gt;vm_end - vma-&gt;vm_start, </p>
+			<p class="source-code">         vma-&gt;vm_page_prot);</p>
+			<p>In the preceding excerpt, the offset (specified in term of number of pages) has been included in the final position computation. This offset can, however, be ignored if the driver implementation does need its support. </p>
+			<p class="callout-heading">Note</p>
+			<p class="callout">The offset can be used differently, by left-shifting <strong class="source-inline">PAGE_SIZE</strong> to obtain the offset by the number of bytes (<strong class="source-inline">offset = vma-&gt;vm_pgoff &lt;&lt; PAGE_SHIFT</strong>), and then adding this offset to the memory start address before computing the final PFN (<strong class="source-inline">pfn = virt_to_phys(kmalloc_area + offset) &gt;&gt; PAGE_SHIFT</strong>).</p>
+			<h4>Remapping vmalloc-allocated pages</h4>
+			<p>Note that memory<a id="_idIndexMarker850"/> allocated with <strong class="source-inline">vmalloc()</strong> is not physically contiguous, so if you need to map a memory region allocated with <strong class="source-inline">vmalloc()</strong>, you must map each page individually and compute the physical address for each page. This can be achieved by looping over all pages in that <strong class="source-inline">vmalloc</strong>-allocated memory region and calling <strong class="source-inline">remap_pfn_range()</strong> as follows:</p>
+			<p class="source-code">while (length &gt; 0) {</p>
+			<p class="source-code">    pfn = vmalloc_to_pfn(vmalloc_area_ptr);</p>
+			<p class="source-code">    if ((ret = remap_pfn_range(vma, start, pfn, </p>
+			<p class="source-code">      PAGE_SIZE, PAGE_SHARED)) &lt; 0) {</p>
+			<p class="source-code">        return ret;</p>
+			<p class="source-code">    }</p>
+			<p class="source-code">    start += PAGE_SIZE;</p>
+			<p class="source-code">    vmalloc_area_ptr += PAGE_SIZE;</p>
+			<p class="source-code">    length -= PAGE_SIZE;</p>
+			<p class="source-code">}</p>
+			<p>In the preceding excerpt, <strong class="source-inline">length</strong> corresponds to the VMA size (<strong class="source-inline">length = vma-&gt;vm_end - vma-&gt;vm_start</strong>). <strong class="source-inline">pfn</strong> is computed for each page, and the starting address for the next mapping is incremented by <strong class="source-inline">PAGE_SIZE</strong> to map the next page in the region. The initial value of <strong class="source-inline">start</strong> is <strong class="source-inline">start = vma-&gt;vm_start</strong>. </p>
+			<p>That said, from<a id="_idIndexMarker851"/> within the kernel, the <strong class="source-inline">vmalloc</strong>-allocated memory can be used normally. The paginated use is necessary for remapping purposes only.</p>
+			<h3>Remapping the I/O memory</h3>
+			<p>Remapping the I/O memory<a id="_idIndexMarker852"/> requires a device's physical addresses, as specified in the device tree or the board file. In this case, for portability reasons, the appropriate function to use is <strong class="source-inline">io_remap_pfn_range()</strong>, whose parameters are the same as <strong class="source-inline">remap_pfn_range()</strong>. The only thing that changes is where the PFN comes from. Its prototype looks like the following: </p>
+			<p class="source-code">int io_remap_page_range(struct vm_area_struct *vma,</p>
+			<p class="source-code">                     unsigned long start,</p>
+			<p class="source-code">                     unsigned long phys_pfn,</p>
+			<p class="source-code">                     unsigned long size, pgprot_t flags);</p>
+			<p>In the preceding function, <strong class="source-inline">vma</strong> and <strong class="source-inline">start</strong> have the same meanings as <strong class="source-inline">remap_pfn_range()</strong>. <strong class="source-inline">phys_pfn</strong> is different, however, in the way it is obtained; it must correspond to the physical I/O memory address, as it will have been given to <strong class="source-inline">ioremap()</strong>, right-shifted <strong class="source-inline">PAGE_SHIFT</strong> times. </p>
+			<p>There is, however, a simplified <strong class="source-inline">io_remap_pfn_range()</strong> for common driver use: <strong class="source-inline">vm_iomap_memory()</strong>. This lite variant is defined as the following:</p>
+			<p class="source-code">int vm_iomap_memory(struct vm_area_struct *vma,</p>
+			<p class="source-code">                    phys_addr_t start, unsigned long len)</p>
+			<p>In the preceding function, <strong class="source-inline">vma</strong> is the user VMA to map to. <strong class="source-inline">start</strong> is the start of the I/O memory region to be mapped (as it would have been given to <strong class="source-inline">ioremap()</strong>), and <strong class="source-inline">len</strong> is the size of area. With <strong class="source-inline">vm_iomap_memory()</strong>, the driver just needs to give us the physical memory<a id="_idIndexMarker853"/> range to be mapped; the function will figure out the rest from the <strong class="source-inline">vma</strong> information. As with <strong class="source-inline">io_remap_pfn_range()</strong>, it returns <strong class="source-inline">0</strong> on success or a negative error code otherwise.</p>
+			<h3>Memory remapping and caching issues</h3>
+			<p>While caching<a id="_idIndexMarker854"/> is generally a good idea, it can introduce side effects, especially if, for a memory-mapped<a id="_idIndexMarker855"/> device (or even RAM), the values written to the mmap'ed registers must be instantaneously visible to the device.</p>
+			<p>You should note that, by default, the kernel remaps memory to user space with caching and buffering enabled. To change the default behavior, drivers must disable the cache on the VMA before invoking the remapping API. In order to do so, the kernel provides <strong class="source-inline">pgprot_noncached()</strong>. In addition to caching, this function also disables the bufferability of the specifier region. This helper takes an initial VMA access protection and returns an updated version with the cache disabled.</p>
+			<p>It is used as follows:</p>
+			<p class="source-code">vma-&gt;vm_page_prot = pgprot_noncached(vma-&gt;vm_page_prot);</p>
+			<p>While testing a driver that I've developed for a memory-mapped device, I faced an issue where I had roughly 20 ms of latency (the time between when I updated the device register in user space through the mmap'ed area and the time when it was visible to the device) when caching was used. </p>
+			<p>After disabling the cache, this latency<a id="_idIndexMarker856"/> almost went away, as it fell below 200 µs. Amazing!</p>
+			<h3>Implementing the mmap file operation</h3>
+			<p>From user space, the <strong class="source-inline">mmap()</strong> system call is used to map physical memory into the address space<a id="_idIndexMarker857"/> of the calling process. In order to support this system call in a driver, this driver must implement the <strong class="source-inline">file_operations.mmap</strong> hook. After the mapping has been done, the user process will be able to write directly into the device memory via the returned address. The kernel will translate any accesses to that mapped region of memory through the usual pointer dereference into file operations.</p>
+			<p>The <strong class="source-inline">mmap()</strong> system call is declared as follows:</p>
+			<p class="source-code">int mmap (void *addr, size_t len, int prot,</p>
+			<p class="source-code">           int flags, int fd, ff_t offset);</p>
+			<p>From the kernel side, the <strong class="source-inline">mmap</strong> field in the driver's file operation structure (<strong class="source-inline">struct file_operations</strong> structure) has the following prototype:</p>
+			<p class="source-code">int (*mmap)(struct file *filp,</p>
+			<p class="source-code">             struct vm_area_struct *vma);</p>
+			<p>In the preceding file operation function, <strong class="source-inline">filp</strong> is a pointer to the open device file for the driver that results from the translation of the <strong class="source-inline">fd</strong> parameter (given in the system call). <strong class="source-inline">vma</strong> is allocated and given as parameter by the kernel. It points to the user process's VMA where the mapping should go. To understand how the kernel creates the new VMA, it uses the parameters given to the <strong class="source-inline">mmap()</strong> system call, which somehow affect some fields of the VMA as follows:</p>
+			<ul>
+				<li><strong class="source-inline">addr</strong> is the user space's virtual address where the mapping should start. It has an impact on <strong class="source-inline">vma&gt;vm_start</strong>. If <strong class="source-inline">NULL</strong> (the portable way), the kernel will automatically pick a free address.</li>
+				<li><strong class="source-inline">len</strong> specifies the length of the mapping and indirectly has an impact on <strong class="source-inline">vma-&gt;vm_end</strong>. Remember that the size of a VMA is always a multiple of <strong class="source-inline">PAGE_SIZE</strong>. It implies that <strong class="source-inline">PAGE_SIZE</strong> is the smallest size a VMA can have. If the <strong class="source-inline">len</strong> argument is not a page size multiple, it will be rounded up to the next highest page size multiple.</li>
+				<li><strong class="source-inline">prot</strong> affects the permission of the VMA, which the driver can find in <strong class="source-inline">vma-&gt;vm_page_prot</strong>. </li>
+				<li><strong class="source-inline">flags</strong> determines the type of mapping that the driver can find in <strong class="source-inline">vma-&gt;vm_flags</strong>. The mapping can be private or shared.</li>
+				<li><strong class="source-inline">offset</strong> specifies the offset within the mapped region. It is computed by the kernel so that it is stored in the <strong class="source-inline">vma-&gt;vm_pgoff</strong> in <strong class="source-inline">PAGE_SIZE</strong> unit.</li>
+			</ul>
+			<p>With all these parameters<a id="_idIndexMarker858"/> defined, we can split the <strong class="source-inline">mmap</strong> file operation implementation into the following steps:</p>
+			<ol>
+				<li value="1">Get the mapping offset and check whether it is beyond our buffer size or not:<p class="source-code">unsigned long offset = vma-&gt;vm_pgoff &lt;&lt; PAGE_SHIFT; </p><p class="source-code">if (offset &gt;= buffer_size)</p><p class="source-code">        return -EINVAL;</p></li>
+				<li>Check whether the mapping length is bigger than our buffer size:<p class="source-code">unsigned long size = vma-&gt;vm_end - vma-&gt;vm_start;</p><p class="source-code">if (buffer_size &lt; (size + offset))</p><p class="source-code">    return -EINVAL;</p></li>
+				<li>Compute the PFN that corresponds to the page where <strong class="source-inline">offset</strong> is located in the buffer. Note that the way the PFN is obtained depends on the way the buffer has been allocated:<p class="source-code">unsigned long pfn;    </p><p class="source-code">pfn = virt_to_phys(buffer + offset) &gt;&gt; PAGE_SHIFT;</p></li>
+				<li>Set the appropriate flags, disabling caching if necessary:<ul><li>Disable caching using <strong class="source-inline">vma-&gt;vm_page_prot = pgprot_noncached(vma-&gt;vm_page_prot);</strong>.</li><li>Set the <strong class="source-inline">VM_IO</strong> flag if necessary: <strong class="source-inline">vma-&gt;vm_flags |= VM_IO;</strong>. It also prevents the VMA from being included in the process's core dump.</li><li>Prevent the VMA from swapping out: <strong class="source-inline">vma-&gt;vm_flags |= VM_DONTEXPAND | VM_DONTDUMP</strong>. In kernel versions before 3.7, <strong class="source-inline">VM_RESERVED</strong> will be used.</li></ul></li>
+				<li>Call <strong class="source-inline">remap_pfn_range()</strong> with the PFN calculated previously, <strong class="source-inline">size</strong>, and the protection flags. We will use <strong class="source-inline">vm_iomap_memory()</strong> in case of I/O memory mapping:<p class="source-code">if (remap_pfn_range(vma, vma-&gt;vm_start, pfn,</p><p class="source-code">                   size, vma-&gt;vm_page_prot)) {</p><p class="source-code">    return -EAGAIN;</p><p class="source-code">}</p><p class="source-code">return 0;</p></li>
+				<li>Finally, pass the function to the <strong class="source-inline">struct file_operations</strong> structure:<p class="source-code">static const struct file_operations my_fops = {</p><p class="source-code">    .owner = THIS_MODULE,</p><p class="source-code">    [...]</p><p class="source-code">    .mmap = my_mmap,</p><p class="source-code">    [...]</p><p class="source-code">};</p></li>
+			</ol>
+			<p>This file operation implementation<a id="_idIndexMarker859"/> closes our series on memory mappings. In this section, we have learned how mappings work under the hood and all the mechanisms involved, caching considerations included. </p>
+			<h1 id="_idParaDest-162"><a id="_idTextAnchor164"/>Summary</h1>
+			<p>This chapter is one of the most important chapters. It demystifies memory management and allocation (how and where) in the Linux kernel. It teaches in detail how mapping and address translation work. Some other aspects, such as talking with hardware devices and remapping memory for user space (on behalf of the <strong class="source-inline">mmap()</strong> system call), were discussed in detail. </p>
+			<p>This provides a strong base to introduce and understand the next chapter, which deals with <strong class="bold">Direct Memory Access</strong> (<strong class="bold">DMA</strong>).</p>
+		</div>
+	</body></html>
