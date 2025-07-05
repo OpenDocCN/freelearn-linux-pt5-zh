@@ -1,61 +1,86 @@
 - en: Chapter 7. Multiple Directories
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第7章。多个目录
 - en: In the previous chapters we were focused on using a single directory server.
     But in a networked environment, you may need to configure multiple directory servers
     to interoperate. In this chapter we will be looking at different ways of getting
     directory servers to interoperate over a network.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前几章中，我们专注于使用单个目录服务器。但在网络环境中，您可能需要配置多个目录服务器以实现互操作。在本章中，我们将讨论不同的方式来让目录服务器在网络上互操作。
 - en: While the focus of this book is OpenLDAP, many of the strategies presented here
     can be adopted to integrate OpenLDAP with other LDAP directory servers, such as
     The Apache Directory Server, Fedora DS, Microsoft's Active Directory, and the
     Novell Directory Server (NDS).
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然本书的重点是OpenLDAP，但这里介绍的许多策略可以应用于将OpenLDAP与其他LDAP目录服务器集成，例如Apache Directory Server、Fedora
+    DS、微软的Active Directory以及Novell Directory Server（NDS）。
 - en: 'The two main processes we will look at are replication (creating a mirror of
     a directory information tree on another directory server) and proxying (allowing
     one directory server to act as an intermediary between an LDAP client and another
     directory server). In this chapter we will cover:'
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将要查看的两个主要过程是复制（在另一个目录服务器上创建目录信息树的镜像）和代理（允许一个目录服务器作为LDAP客户端与另一个目录服务器之间的中介）。在本章中，我们将讨论：
 - en: The basics of synchronizing and replicating directories
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 同步和复制目录的基础
 - en: Directory replication with SyncRepl
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用SyncRepl进行目录复制
 - en: Proxying with the `ldap` backend
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`ldap`后端进行代理
 - en: Adding caching with the Proxy Cache overlay
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用Proxy Cache覆盖层添加缓存
 - en: Using the `transparency` overlay to create a hybrid cache
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`transparency`覆盖层创建混合缓存
 - en: In this chapter we will be working with two servers—one that will host the authoritative
     copy of the directory, and another that will synchronize itself over the network
     with the authoritative copy.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将使用两台服务器——一台将托管目录的权威副本，另一台将通过网络与权威副本进行同步。
 - en: 'Replication: An Overview'
+  id: totrans-10
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 复制：概述
 - en: Sometimes it is desirable to have multiple identical copies of a directory server.
     This can be particularly effective in cases where LDAP servers sustain large volumes
     of traffic, where fail-over protection is required, or in cases where LDAP clients
     are geographically dispersed, and having local copies of a directory would greatly
     expedite service. These are cases where LDAP replication can provide a solution.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时需要多个相同的目录服务器副本。这在LDAP服务器承受大量流量、需要故障转移保护，或LDAP客户端地理分布广泛的情况下尤其有效，在这种情况下，拥有本地目录副本将大大加快服务速度。这些都是LDAP复制可以提供解决方案的场景。
 - en: '**Replication** is the process of configuring two or more directories to contain
     the same directory information tree (or portion of the directory tree), and to
     keep the multiple copies of the directory data synchronized over time. This has
@@ -63,24 +88,32 @@
     predecessor, the University of Michigan LDAP Server, implemented replication early
     on and, because of this, replication has long been considered a standard task
     for an LDAP server.'
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: '**复制**是配置两个或更多目录以包含相同的目录信息树（或目录树的部分），并确保随着时间推移，多个目录数据副本保持同步的过程。这是OpenLDAP套件自诞生以来的核心特性。事实上，其前身——密歇根大学LDAP服务器，早期就实现了复制，因此，复制长期以来一直被视为LDAP服务器的标准任务。'
 - en: In the standard LDAP model, replication is done in a hierarchy. One server is
     considered the **master server** (or the **master DSA** (Directory Server Agent),
     sometimes called the **provider**). This server is responsible for maintaining
     the canonical version of the directory information tree.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 在标准的LDAP模型中，复制是以层次结构的方式进行的。一个服务器被认为是**主服务器**（或者**主DSA**（目录服务器代理），有时称为**提供者**）。该服务器负责维护目录信息树的规范版本。
 - en: 'Beneath the master server are one or more **shadow servers** (sometimes called
     **consumer**, **replica**, or **slave servers** ). A shadow server holds a replica
     of the master server''s directory information tree, and clients can connect to
     the shadow server and perform searches of the directory information tree (DIT).
     Let''s have a look at the following figure:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 在主服务器之下有一个或多个**影子服务器**（有时称为**消费者**、**副本**或**从服务器**）。影子服务器保存主服务器的目录信息树的副本，客户端可以连接到影子服务器并执行对目录信息树（DIT）的查询。我们来看一下下面的图：
 - en: '![Replication: An Overview](img/1021_07_01.jpg)'
+  id: totrans-15
   prefs: []
   type: TYPE_IMG
+  zh: '![复制：概述](img/1021_07_01.jpg)'
 - en: For all practical purposes, shadow servers have read-only features. While the
     shadow servers can handle many LDAP operations, shadow servers are not allowed
     to alter the records in the replicated directory information tree. When add, modify,
@@ -90,212 +123,296 @@
     server to perform that operation. Configuring a referral to point from a shadow
     server to a master server is a simple matter of adding a `referral` directive
     to the `slapd.conf` file.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 就实际应用而言，影像服务器具有只读特性。尽管影像服务器可以处理许多 LDAP 操作，但不允许修改复制的目录信息树中的记录。例如，当接收到添加、修改或删除操作时，影像服务器将返回一个**引用**给客户端，指导客户端转而联系主服务器。引用是一种特殊的响应类型，它引导客户端联系另一个服务器来执行该操作。配置影像服务器指向主服务器的引用，只需要在
+    `slapd.conf` 文件中添加一个 `referral` 指令即可。
 - en: When a client receives a referral it has the information it needs to re-try
     the operation on the correct server.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 当客户端收到一个引用时，它就拥有了重新尝试在正确服务器上执行操作所需的信息。
 - en: Why not allow writing to the slaves? Allowing multiple servers to accept all
     the modifications, additions, and deletions makes it possible for the directory
     information tree to taken on inconsistent states. What happens if two directory
     servers change an attribute at the same time? Or if one modifies a record that
     another is simultaneously deleting? By allowing write operations only on the master
     server, it is much easier to keep the many replicas consistent.
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 为什么不允许对从服务器进行写操作呢？允许多个服务器接受所有的修改、添加和删除操作，使得目录信息树可能处于不一致状态。如果两个目录服务器同时修改一个属性会发生什么？或者如果一个服务器修改了另一个服务器正在删除的记录会怎样？通过仅允许在主服务器上进行写操作，更容易保持多个副本的一致性。
 - en: Note
+  id: totrans-19
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: In the 2.4 release of OpenLDAP, it will be possible to configure **multimaster**
     which will allow multiple servers to act as masters. As with all multimaster configurations,
     there will be risks that certain inconsistencies arise, but these risks should
     be minimized.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 OpenLDAP 2.4 版本中，将可以配置**多主**模式，这将允许多个服务器充当主服务器。和所有多主配置一样，可能会出现某些不一致性风险，但这些风险应当被最小化。
 - en: In OpenLDAP there are two different ways to implement replication. The first
     is by configuring the master server to keep the shadow servers updated. This is
     called the *push* method. The second is to configure the slaves to periodically
     check the master for changes, and update itself accordingly; this is called the
     *pull* method.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 OpenLDAP 中，有两种不同的方式实现复制。第一种是通过配置主服务器来保持影像服务器的同步更新，这称为*推送*方法。第二种是配置从服务器定期检查主服务器是否有变化，并根据变化进行更新，这称为*拉取*方法。
 - en: Until OpenLDAP 2.2, the first model was the only model supported in OpenLDAP,
     and it was done through a stand-alone server called SLURPD. But SLURPD suffered
     from a number of problems and inefficiencies, and is now deprecated. It will be
     removed from OpenLDAP 2.4\. If you are interested in using it to retain backward
     compatibility see the *OpenLDAP* *Administrator's* *Guide* at [http://openldap.org](http://openldap.org).
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 直到 OpenLDAP 2.2，第一种模型才是 OpenLDAP 唯一支持的模型，并且它是通过一个名为 SLURPD 的独立服务器来实现的。但是 SLURPD
+    存在许多问题和低效之处，现在已被弃用，将在 OpenLDAP 2.4 中被移除。如果你有兴趣继续使用它以保持向后兼容性，请参阅 [http://openldap.org](http://openldap.org)
+    中的*OpenLDAP* *管理员* *指南*。
 - en: As SLURPD aged the OpenLDAP developers began working on a better, more robust
     way of replicating directories. The result was the new Syncrhonization-Replication
     (SyncRepl) model, which uses the LDAP synchronization protocol to keep shadow
     directories synchronized with a master server.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 随着 SLURPD 的老化，OpenLDAP 的开发者开始致力于开发一种更好、更强大的目录复制方式。结果就是新的同步复制（SyncRepl）模型，它使用
+    LDAP 同步协议来保持影像目录与主服务器的同步。
 - en: SyncRepl
+  id: totrans-24
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: SyncRepl
 - en: In OpenLDAP 2.2, the developers released a new, experimental form of replication
     called **LDAP Synchronization-Replication**, or **SyncRepl** for short. This method
     was both more reliable and more configurable, and it was further refined and designated
     stable when OpenLDAP 2.3 was released. It is now the preferred way of handling
     replication for OpenLDAP servers.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 OpenLDAP 2.2 中，开发者发布了一种新的实验性复制形式，称为**LDAP 同步复制**，简称为 **SyncRepl**。这种方法更可靠、更可配置，在
+    OpenLDAP 2.3 发布时，它被进一步完善并标记为稳定版本。现在，它是处理 OpenLDAP 服务器复制的首选方式。
 - en: Unlike the SLURPD replication process, SyncRepl does not require a second daemon
     process. The SLAPD server implements the shadow server portion of the code, and
     the provider services (for the master server) are provided in an overlay. SyncRepl
     can use either a shadow-from-master pull or a hybrid pull/push method.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 与SLURPD复制过程不同，SyncRepl不需要第二个守护进程。SLAPD服务器实现了影子服务器部分的代码，而提供者服务（主服务器的服务）则通过叠加层提供。SyncRepl可以使用影子从主服务器拉取或混合拉取/推送方法。
 - en: In the pull scenario (called the **refresh-only operation**), the shadow server
     periodically connects to the master server and requests all changes since the
     last time it checked. The master then sends the shadow all changed records (or,
     in the case of deletions, the DN of the deleted record).
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 在拉取场景中（称为**仅刷新操作**），影子服务器定期连接到主服务器，并请求自上次检查以来的所有更改。然后，主服务器将所有更改的记录发送给影子服务器（如果是删除操作，则发送被删除记录的DN）。
 - en: SynRepl's second method (called **refresh and persist**) is a hybrid of the
     push features exemplified in the SLURPD model and some of the pull features discussed
     above (therefore it is not a *true* push method).
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: SynRepl的第二种方法（称为**刷新并持久化**）是推送特性（在SLURPD模型中体现）和上述一些拉取特性的混合（因此它不是一个*真正的*推送方法）。
 - en: In this scenario, the shadow server makes an initial connection to the master
     and pulls some initial updates. But it leaves the connection open. When the master
     modifies its copy of the directory information tree, it pushes information to
     the shadow server using that open connection. If the shadow server gets disconnected,
     the master server does nothing. The next time the slave server connects though,
     it requests all new changes (like in the pull method), and the master sends them.
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，影子服务器首先连接到主服务器并拉取一些初始更新。但它保持连接打开。当主服务器修改其目录信息树副本时，它会通过该开放连接将信息推送到影子服务器。如果影子服务器断开连接，主服务器不做任何处理。下次从服务器连接时，它会请求所有的新更改（就像在拉取方法中一样），然后主服务器将其发送。
 - en: Note
+  id: totrans-30
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: For more detailed information about LDAP content synchronization and the SyncRepl
     implementation included in OpenLDAP, see RFC 4533 ([http://www.rfc-editor.org/rfc/rfc4533.txt](http://www.rfc-editor.org/rfc/rfc4533.txt))
     and the *OpenLDAP Administrator's Guide* at [http://openldap.org](http://openldap.org).
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关LDAP内容同步和OpenLDAP中包括的SyncRepl实现的更详细信息，请参见RFC 4533（[http://www.rfc-editor.org/rfc/rfc4533.txt](http://www.rfc-editor.org/rfc/rfc4533.txt)）和*OpenLDAP管理员指南*，网址为[http://openldap.org](http://openldap.org)。
 - en: 'The SyncRepl model has some distinct advantages over SLURPD:'
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: SyncRepl模型相对于SLURPD具有一些明显的优势：
 - en: Since the shadow server initiates connections and handles updates, a network
     outage does not cause problems with the reliability of the directory information
     tree. The next time the slave can get back on line it will retrieve all of its
     updates.
+  id: totrans-33
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 由于影子服务器发起连接并处理更新，网络中断不会影响目录信息树的可靠性。下次从服务器重新连接时，它将检索所有更新。
 - en: There is rarely any need to interrupt service on the master server. When a new
     shadow server first connects to the master it downloads the entire directory information
     tree, so there is no need to dump the data from the master server and send it
     to the shadow (though that method is still supported, and it might be expedient
     in cases where there is a large directory information tree and a slow network
     connection).
+  id: totrans-34
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 很少需要中断主服务器的服务。当新的影子服务器首次连接到主服务器时，它会下载整个目录信息树，因此无需从主服务器转储数据并将其发送给影子（尽管仍然支持这种方法，并且在目录信息树较大且网络连接较慢的情况下，这种方法可能更为方便）。
 - en: The flexibility in choosing between the refresh-only and refresh-and-persist
     operations gives you the ability to choose a model that will best match your needs.
+  id: totrans-35
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在选择仅刷新操作和刷新并持久化操作之间的灵活性使您能够选择最适合您需求的模型。
 - en: Each mode of replication has its advantages. In highly distributed networks,
     the refresh-only replication tends to work better as it doesn't require keeping
     a constant connection open across a large and unpredictable network. But since
     the shadow server only checks the master periodically, there can be a lag between
     when the master is updated and when the shadow picks up the changes. Most times
     this does not cause any problems.
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 每种复制模式都有其优点。在高度分布的网络中，由于不需要在一个大且不可预测的网络中保持持续连接，**仅刷新**复制通常效果更好。但由于影子服务器只是定期检查主服务器，因此主服务器更新和影子服务器获取更改之间可能存在延迟。大多数情况下，这不会造成任何问题。
 - en: On a reliable LAN, the refresh-and-persist (refreshAndPersist) replication may
     be a better choice—especially if it is important that changes get from the master
     to the shadow in a minimal amount of time. As soon as the master is changed, it
     will send the updates to the shadow server. This means that there is less waiting
     time.
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 在一个可靠的局域网中，刷新和持久（refreshAndPersist）复制可能是更好的选择——尤其是当从主服务器到影像服务器的更改需要在最短时间内传输时。一旦主服务器发生变化，它将立即将更新发送到影像服务器。这意味着等待时间较短。
 - en: Note
+  id: totrans-38
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Even in the refresh-and-persist (refreshAndPersist) operation, a network outage
     is not catastrophic. The shadow server will simply attempt to re-connect to the
     master server, retrieving updates as soon as it successfully connects.
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 即使是在刷新和持久（refreshAndPersist）操作中，网络中断也不会导致灾难性后果。影像服务器将简单地尝试重新连接到主服务器，并在成功连接后立即获取更新。
 - en: These comments are intended to serve as general guidelines. Since it is fairly
     easy to try both, you may want to experiment to see what works best for you. Generally,
     on a LAN, refresh-and-persist is the best choice, while on slower links, refresh-only
     is better. In the next section we will cover the process of configuring SyncRepl
     between a master and a shadow copy.
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些评论旨在作为一般性指南。由于尝试两者都比较容易，你可能希望通过实验来查看哪个对你最有效。通常，在局域网上，刷新和持久是最佳选择，而在较慢的链接上，刷新仅操作更好。在接下来的章节中，我们将介绍如何配置主服务器与影像副本之间的
+    SyncRepl。
 - en: Configuring SyncRepl
+  id: totrans-41
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 配置 SyncRepl
 - en: The SLAPD server comes with all of the functionality necessary for implementing
     a shadow server, and the `syncprov` overlay provides the functionality for implementing
     a master server.
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: SLAPD 服务器自带实现影像服务器所需的所有功能，而 `syncprov` 覆盖层提供了实现主服务器的功能。
 - en: Note
+  id: totrans-43
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: SyncRepl was introduced in OpenLDAP 2.2, but configuration was significantly
     different. SyncRepl should be avoided in production environments running OpenLDAP
     2.2.
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: SyncRepl 在 OpenLDAP 2.2 中被引入，但当时的配置方式有很大不同。SyncRepl 应避免在运行 OpenLDAP 2.2 的生产环境中使用。
 - en: Getting SyncRepl running requires configuration on both the master and the shadow
     server. The configuration directives for both are added to the backend sections
     of the `slapd.conf` files.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 要使 SyncRepl 运行，需要在主服务器和影像服务器上进行配置。两者的配置指令将添加到 `slapd.conf` 文件的后端部分。
 - en: Configuring the Master Server
+  id: totrans-46
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 配置主服务器
 - en: The first thing we will do is configure one server as a master. This server
     will listen for replication requests from our shadow server and will send updates
     as requested. Throughout this book we have been configuring a SLAPD server. Now
     we will use that server as the master.
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们首先要做的是将一台服务器配置为主服务器。该服务器将监听来自影像服务器的复制请求，并根据请求发送更新。在本书中，我们一直在配置一个 SLAPD 服务器。现在，我们将使用该服务器作为主服务器。
 - en: The functionality of the master server is implemented in an overlay called `syncprov`
     (which is short for **Synchronization Provider**). We need to load and configure
     that overlay.
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 主服务器的功能是通过一个名为 `syncprov` 的覆盖层实现的（`syncprov` 是 **同步提供者** 的缩写）。我们需要加载并配置该覆盖层。
 - en: 'Since our SLAPD server is built using modules, the first step is to add a module-loading
     instruction near the top of the `slapd.conf` file:'
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于我们的 SLAPD 服务器是通过模块构建的，第一步是在 `slapd.conf` 文件的顶部附近添加模块加载指令：
 - en: '[PRE0]'
+  id: totrans-50
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'When the directory server is restarted the `syncprov` module will be loaded.
     Now we need to make some changes to the configuration section for database that
     we are going to replicate. The main portion of this directory configuration looks
     something like this:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 当目录服务器重新启动时，`syncprov` 模块将被加载。现在，我们需要对我们将要复制的数据库的配置部分进行一些更改。该目录配置的主要部分大致如下所示：
 - en: '[PRE1]'
+  id: totrans-52
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: Now we want to set this database up for SyncRepl.
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们想要为 SyncRepl 设置这个数据库。
 - en: 'The first thing to add is a few additional indexes. These indexes will track
     a pair of operational attributes that are frequently accessed in the SyncRepl
     process: the `entryCSN` attribute, and the `entryUUID` attribute.'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先要添加的是一些额外的索引。这些索引将跟踪在 SyncRepl 过程中经常访问的一对操作属性：`entryCSN` 属性和 `entryUUID` 属性。
 - en: 'The `entryCSN` attribute is used to store a **Change Sequence Number (CSN)**
     in each record. The value of `entryCSN` is basically a fine-grained time stamp
     that indicates when the attribute was last modified. The `entryUUID` attribute,
@@ -303,196 +420,287 @@
     and can be used to quickly identify corresponding entries on master and shadow
     servers. Like any other attributes, these attributes can be retrieved through
     an LDAP search:'
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: '`entryCSN`属性用于在每个记录中存储**变更序列号（CSN）**。`entryCSN`的值基本上是一个精细的时间戳，表示该属性最后一次修改的时间。第二个属性`entryUUID`包含该条目的（全局）唯一标识符，可用于快速识别主服务器和影子服务器上的对应条目。像其他属性一样，这些属性可以通过LDAP搜索检索：'
 - en: '[PRE2]'
+  id: totrans-56
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'When SyncRepl searches for these attributes it does equality checking, so we
     should configure an index for performing equality tests:'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 当SyncRepl搜索这些属性时，它会进行相等性检查，因此我们应该为执行相等性测试配置一个索引：
 - en: '[PRE3]'
+  id: totrans-58
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: This `index` directive, which configures two equality indexes—one for each attribute—can
     be added to the `slapd.conf` file just beneath the other `index` directives.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个`index`指令配置了两个相等性索引—每个属性一个—可以将其添加到`slapd.conf`文件中，位于其他`index`指令的下方。
 - en: 'Next we need to load and configure the `syncprov` overlay. There are only two
     configuration directives generally used by this overlay, so our complete overlay
     configuration for the master server looks like this:'
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们需要加载并配置`syncprov`覆盖层。这个覆盖层通常使用的配置指令只有两个，因此我们为主服务器配置的完整覆盖层配置如下所示：
 - en: '[PRE4]'
+  id: totrans-61
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: The first line loads the `syncprov` overlay. The second line specifies how often
     SyncRepl information ought to be written to the database. Just as with the BDB
     and HDB backends, SyncRepl is tuned to perform operations as fast as possible.
     Writing to the underlying database is costly, so streamlining the process can
     improve performance.
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一行加载了`syncprov`覆盖层。第二行指定了SyncRepl信息应多久写入一次数据库。与BDB和HDB后端一样，SyncRepl经过调整，以尽可能快地执行操作。写入底层数据库的代价很高，因此简化这一过程可以提高性能。
 - en: The `syncprov-checkpoint` directive instructs the overlay to only write changes
     to the database when a new write request comes in and either a certain number
     of writes have already occurred (`50` in this case), or a certain number of minutes
     (`10`) has elapsed.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: '`syncprov-checkpoint`指令指示覆盖层仅在新的写入请求到来时才将更改写入数据库，并且已经发生了特定数量的写入（在此情况下为`50`次），或者已经过去了特定数量的分钟（在此情况下为`10`分钟）。'
 - en: The second directive, `syncprov-sessionlog`, specifies how many modifications
     and deletions ought to be stored in the session log. The master uses information
     in this log to determine what information needs to be sent to the shadow servers.
     In this case, it will store the latest 100 modifications and deletions.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 第二个指令，`syncprov-sessionlog`，指定了应在会话日志中存储多少次修改和删除。主服务器使用此日志中的信息来确定需要发送给影子服务器的信息。在这种情况下，它将存储最近的100次修改和删除。
 - en: 'Our finished configuration looks something like this:'
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们完成的配置看起来像这样：
 - en: '[PRE5]'
+  id: totrans-66
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: Once modifications to `slapd.conf` are finished it is a good idea to run `slaptest`
     to make sure the configuration file can be parsed, and then (for good measure)
     run `slapindex` to update the index files.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦完成了对`slapd.conf`的修改，最好运行`slaptest`来确保配置文件可以被解析，然后（为了保险起见）运行`slapindex`来更新索引文件。
 - en: Creating a SyncRepl User
+  id: totrans-68
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 创建SyncRepl用户
 - en: The last thing we need to do to prepare the master server is create a special
     account for synchronization. The shadow server will connect to the master using
     this account.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 准备主服务器的最后一步是创建一个用于同步的特殊帐户。影子服务器将使用这个帐户连接到主服务器。
 - en: 'We will create an account similar to the one we use for performing authentication:'
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将创建一个类似于用于执行身份验证的帐户：
 - en: '[PRE6]'
+  id: totrans-71
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'We can load this record with the `ldapadd` client:'
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以使用`ldapadd`客户端加载此记录：
 - en: '[PRE7]'
+  id: totrans-73
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'In order for the replication account to work, it will also need permissions
     to update the requisite entries in the directory. This means that the ACLs must
     grant this user the permissions. While we could spell out detailed ACLs as we
     did in Chapter 4, for the sake of expedience we will just add the new SyncRepl
     user to the `cn=LDAP` `Admins` group with `ldapmodify`:'
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了使复制帐户正常工作，它还需要有权限更新目录中的必要条目。这意味着ACL必须授予此用户相应的权限。虽然我们可以像第4章那样详细列出ACL，但为了方便起见，我们将只将新的SyncRepl用户添加到`cn=LDAP`
+    `Admins`组中，并使用`ldapmodify`：
 - en: '[PRE8]'
+  id: totrans-75
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: Now, the `uid=syncrepl` user is a member of the LDAP administrators group, and
     the ACLs that apply to that group will also apply to our new user.
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，`uid=syncrepl` 用户是 LDAP 管理员组的成员，并且应用于该组的 ACL 也将应用于我们的新用户。
 - en: That is all there is to configuring the directory to act as a master. Next,
     we will configure the shadow server.
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 这就是将目录配置为主服务器的所有步骤。接下来，我们将配置影子服务器。
 - en: Configuring the Shadow Server
+  id: totrans-78
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 配置影子服务器
 - en: We will configure our shadow server to use `refreshOnly` replication, where
     the slave server periodically checks the master for updates and, if it finds any,
     retrieves the changes and loads them into its own directory tree.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将配置影子服务器使用 `refreshOnly` 复制方式，主服务器会定期检查更新，如果发现有更新，则获取更改并将其加载到自己的目录树中。
 - en: 'Our shadow server will be a fresh instance of SLAPD, running on another server
     on the same LAN. Let''s start with a basic `slapd.conf` file. We will change this
     file as we configure SyncRepl:'
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的影子服务器将是一个全新的 SLAPD 实例，运行在同一局域网中的另一台服务器上。我们从一个基础的 `slapd.conf` 文件开始。随着配置 SyncRepl，我们将对这个文件进行修改：
 - en: '[PRE9]'
+  id: totrans-81
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'This should look familiar, based on the configuration we assembled in Chapters
     2 and 3\. There are a few things to note though:'
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 基于我们在第 2 章和第 3 章中汇总的配置，这应该是很熟悉的。不过，有几点需要注意：
 - en: All of the schemas that the master uses must be loaded on the shadow server
     too.
+  id: totrans-83
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 主服务器使用的所有模式也必须在影子服务器上加载。
 - en: In this case we are going to replicate the entire master directory onto this
     shadow SLAPD server, so we want the suffix to be the same, `dc=example,dc=com`.
+  id: totrans-84
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在这种情况下，我们将把整个主目录复制到这个影子 SLAPD 服务器，因此我们希望后缀保持一致，`dc=example,dc=com`。
 - en: We do not want a root password for this instance. All updates will come from
     the master, and we do not want any changes to be made locally.
+  id: totrans-85
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 我们不希望此实例有根密码。所有更新将来自主服务器，我们不希望在本地进行任何更改。
 - en: There is no requirement that the indexes be the same on the master and the shadow
     server (in fact, there is no requirement that the master and shadow server even
     run the same database backends), but we do want to make sure that `objectclass`,
     `entryCSN`, and `entryUUID` are all indexed, since those are important for SLAPD's
     performance.
+  id: totrans-86
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 对于主服务器和影子服务器，索引不必完全相同（事实上，主服务器和影子服务器甚至可以使用不同的数据库后端），但我们确实希望确保 `objectclass`、`entryCSN`
+    和 `entryUUID` 都被索引，因为它们对 SLAPD 的性能至关重要。
 - en: This basic `slapd.conf` file should be capable of running a stand-alone server.
     But we don't want to run a stand-alone server; we want it to get its information
     from, and stay synchronized with, the master server.
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个基础的 `slapd.conf` 文件应该能够运行一个独立的服务器。但我们不想运行一个独立的服务器；我们希望它从主服务器获取信息并与主服务器保持同步。
 - en: The syncrepl Directive
+  id: totrans-88
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: syncrepl 指令
 - en: When a shadow SLAPD server performs its synchronization operations, it acts
     like a special sort of LDAP client. It binds to the master server and performs
     LDAP operations—usually the special LDAP synchronization operation defined in
     RFC 4533.
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 当影子 SLAPD 服务器执行同步操作时，它充当一种特殊的 LDAP 客户端。它绑定到主服务器并执行 LDAP 操作——通常是 RFC 4533 中定义的特殊
+    LDAP 同步操作。
 - en: It should come as no surprise then, to find that configuring a shadow server
     to act like a SyncRepl consumer is similar to configuring other LDAP clients.
     Most of the configuration has to do with providing information about how the shadow
     should bind to the master and how it should perform searches.
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，配置一个影子服务器作为 SyncRepl 消费者，类似于配置其他 LDAP 客户端。这大部分配置与提供有关影子服务器如何绑定主服务器以及如何执行搜索的信息有关。
 - en: 'The majority of the configuration work for implementing a shadow server is
     done with one `slapd.conf` directive: `syncrepl`. This directive takes a number
     of parameters, in `name=value` format, that specify how the shadow server is to
     behave. Here is a `syncrepl` directive that contains all of the parameters necessary
     to perform basic synchronization. In the `slapd.conf` file, this directive goes
     in the database configuration section for our `example.com` backend:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 实现影子服务器的配置工作大部分通过一个 `slapd.conf` 指令完成：`syncrepl`。该指令采用多个参数，格式为 `name=value`，用于指定影子服务器的行为。以下是一个包含执行基本同步所需所有参数的
+    `syncrepl` 指令。在 `slapd.conf` 文件中，该指令位于我们 `example.com` 后端的数据库配置部分：
 - en: '[PRE10]'
+  id: totrans-92
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'This directive provides the minimum configuration necessary to make SyncRepl
     work. The directive has seven name/value parameters: `rid`, `provider`, `type`,
     `interval`, `searchbase`, `binddn`, and `credentials`.'
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 该指令提供了使 SyncRepl 工作所需的最小配置。该指令有七个名称/值参数：`rid`、`provider`、`type`、`interval`、`searchbase`、`binddn`
+    和 `credentials`。
 - en: The first parameter is `rid`, the **Replica Identifier (RID)**. This three-digit
     number must be unique among all of the shadow servers that use the same master
     server. The master SLAPD instance uses the RID to track which consumer servers
     are contacting it. Typically, it is best start with a low RID number and increment
     it for each shadow server. Thus, `rid=001` indicates that this is the first shadow
     server. If we were to add a second shadow copy it would be `rid=002`.
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个参数是 `rid`，即 **副本标识符 (RID)**。该三位数字必须在所有使用相同主服务器的影子服务器中是唯一的。主 SLAPD 实例使用 RID
+    来跟踪哪些消费者服务器在与它连接。通常，最好从较低的 RID 数字开始，并为每个影子服务器递增它。因此，`rid=001` 表示这是第一个影子服务器。如果我们添加第二个影子副本，则会是
+    `rid=002`。
 - en: Note
+  id: totrans-95
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: In earlier versions of OpenLDAP the master had to contain a list of all RIDs
     for its consumer servers. That is no longer necessary.
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 在早期版本的 OpenLDAP 中，主服务器必须包含其消费者服务器的所有 RID 列表。现在不再需要这样做。
 - en: 'The provider parameter should contain the LDAP URL for the master. Either `ldap://`
     or `ldaps://` protocols can be used. The host portion can be either a host name
     or an IP address, and an optional port can be added to the end, separated by a
@@ -500,83 +708,121 @@
     you could use a provider like this: `ldaps://10.0.1.34:6868`. Note that only this
     simple form of LDAP URL can be used. The complete LDAP URL syntax, such as containing
     a base DN, search filter, and so on, is not supported here.'
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: '`provider` 参数应包含主服务器的 LDAP URL。可以使用 `ldap://` 或 `ldaps://` 协议。主机部分可以是主机名或 IP
+    地址，并且可以在末尾添加可选端口，通过冒号分隔。例如，要通过非标准端口使用 LDAPS 连接到主服务器，可以使用如下格式的 provider：`ldaps://10.0.1.34:6868`。请注意，这里仅支持这种简单的
+    LDAP URL 格式。包含基本 DN、搜索过滤器等的完整 LDAP URL 语法在这里不被支持。'
 - en: Tip
+  id: totrans-98
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Using StartTLS instead of SSL/TLS**'
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: '**使用 StartTLS 替代 SSL/TLS**'
 - en: You can configure the shadow server to connect over LDAP (unencrypted) and then
     issue a StartTLS command to begin TLS encryption between it and the master server.
     To do this, add `starttls=yes` (or `starttls=critical` if failure to finish TLS
     negotiation should stop the transaction).
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 您可以配置影子服务器通过 LDAP（未加密）连接，然后发出 StartTLS 命令以开始与主服务器之间的 TLS 加密。为此，添加 `starttls=yes`（如果
+    TLS 协商失败应停止事务，则使用 `starttls=critical`）。
 - en: The `type` parameter determines which of the two replication modes the shadow
     server will use when connecting to the master. The only acceptable values are
     `refreshOnly` and `refreshAndPersist`.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: '`type` 参数确定影子服务器在连接主服务器时将使用哪种复制模式。唯一可接受的值是 `refreshOnly` 和 `refreshAndPersist`。'
 - en: In our example we used the `refreshOnly` option. In a refresh-and-persist configuration
     the `interval` parameter will be ignored.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的示例中，我们使用了 `refreshOnly` 选项。在刷新并持久化配置中，`interval` 参数将被忽略。
 - en: Otherwise, there are no significant differences between configuring refresh-only
     and refresh-and-persist.
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 否则，配置仅刷新和刷新并持久化之间没有显著差异。
 - en: The `interval` parameter indicates how long the shadow server will wait before
     checking the master for updates. This applies to the `refreshOnly` mode where
     the consumer server connects, checks for updates, and then disconnects. It will
     then wait the period specified by `interval` before checking again.
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: '`interval` 参数表示影子服务器在检查主服务器更新之前等待的时间。这适用于 `refreshOnly` 模式，在该模式下，消费者服务器连接、检查更新然后断开连接。然后，它将等待由
+    `interval` 参数指定的时间段后再进行下一次检查。'
 - en: The syntax for the `interval` parameter is `dd:hh:mm:ss`, where `dd` is number
     of days to wait, `hh` is hours, `mm` is minutes, and `ss` is seconds. If this
     parameter is not specified it defaults to one day (`01:00:00:00`). A shorter interval
     is often desirable especially if it is important for shadow servers to provide
     up-to-date information right away. In the previous example the shadow server will
     wait five minutes (`00:00:05:00`) between checks.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: '`interval` 参数的语法为 `dd:hh:mm:ss`，其中 `dd` 表示等待的天数，`hh` 为小时，`mm` 为分钟，`ss` 为秒。如果未指定该参数，则默认值为一天
+    (`01:00:00:00`)。通常希望选择较短的间隔，特别是当影子服务器需要提供最新信息时。在前面的示例中，影子服务器将在每次检查之间等待五分钟 (`00:00:05:00`)。'
 - en: Tip
+  id: totrans-106
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: If it is very important for shadow servers to stay closely synchronized, and
     the shadow is on the same LAN as the master, the refreshAndPersist mode is probably
     a better fit.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果影像服务器必须与主服务器保持紧密同步，并且影像服务器与主服务器位于同一局域网，则 `refreshAndPersist` 模式可能更适合。
 - en: One potential difficulty with the `refreshOnly` mode arises in the case where
     the master server becomes unavailable (for example, because of a network outage
     or a server failure). How should the shadow server behave? In addition to the
     interval parameter, there is an additional parameter that allows tuning of the
     refresh interval but this option takes effect only when the master server cannot
     be reached.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 `refreshOnly` 模式下，一个潜在的困难出现在主服务器不可用的情况下（例如，由于网络中断或服务器故障）。这时，影像服务器应如何处理？除了
+    `interval` 参数外，还有一个额外的参数，允许调整刷新间隔，但该选项仅在无法连接到主服务器时生效。
 - en: 'This parameter, `retry`, provides information about what should be done when
     the shadow server cannot contact the master server. It looks like this: `retry="120`
     `10"`. This instructs the shadow server to retry the connection every `120` seconds
     up to `10` times when the master server becomes unavailable.'
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 此参数 `retry` 提供了影像服务器在无法联系到主服务器时应如何处理的信息。它的格式如下：`retry="120` `10"`。这指示影像服务器在主服务器不可用时每120秒重试一次，最多重试10次。
 - en: Tip
+  id: totrans-110
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Using the retry Parameter**'
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: '**使用 retry 参数**'
 - en: It is a good idea to set the retry parameter in both refresh-only and refresh-and-persist
     configurations. This will ensure that a brief network failure does not disturb
     replication.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 refresh-only 和 refresh-and-persist 配置中设置 retry 参数是一个好主意。这将确保短暂的网络故障不会干扰复制过程。
 - en: 'This parameter can take multiple pairs. For example, we can configure it to
     check a couple of times in short intervals, then (if it still cannot connect)
     to test again at longer intervals for a longer period of time: `retry="30` `10`
@@ -585,256 +831,367 @@
     be connected, then it will wait ten minutes (600 seconds), and try again. It will
     repeat this process twenty more times. But after these attempts the shadow server
     will give up trying to reach the master.'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 此参数可以包含多个参数对。例如，我们可以配置它在短时间内检查几次，然后（如果仍然无法连接）在更长的时间间隔内再次测试：`retry="30` `10`
+    `600` `20"`。这次，如果影像服务器无法连接到主服务器，它将每30秒尝试一次，共尝试10次。如果主服务器仍然无法连接，则它将等待十分钟（600秒）后再尝试一次。它会重复此过程再进行20次。但在这些尝试后，影像服务器将放弃继续尝试连接主服务器。
 - en: To configure the shadow server to test indefinitely—to keep trying until it
     connects—the special `+` (plus) symbol can be inserted in lieu of a retry count.
     For example, the parameter `retry="60` `+"` would instruct the shadow SLAPD to
     try connecting to the master once a minute until it finally succeeds, in which
     case it will return to its regular timing as set in the `interval` parameter.
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 要配置影像服务器无限期测试——即不断尝试直到连接成功——可以插入特殊的 `+`（加号）符号代替重试次数。例如，参数 `retry="60` `+"` 会指示影像
+    SLAPD 每分钟尝试连接主服务器，直到最终成功为止，成功后将恢复到 `interval` 参数设置的常规时间间隔。
 - en: After the interval parameter is the `searchbase` parameter. This indicates what
     the base DN for the synchronization request will be. Generally, `searchbase` should
     be the same as the database `suffix` directive for the shadow server.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 `interval` 参数之后是 `searchbase` 参数。该参数指示同步请求的基本 DN。通常，`searchbase` 应与影像服务器的数据库
+    `suffix` 指令相同。
 - en: 'A shadow server need not replicate the entire directory information tree of
     the master server. For example, we could have configured the shadow server to
     just replicate the `ou=users` branch with a database configuration like this:'
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 影像服务器不必复制主服务器的整个目录信息树。例如，我们可以配置影像服务器仅复制 `ou=users` 分支，数据库配置如下：
 - en: '[PRE11]'
+  id: totrans-117
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: Again, note that `suffix` and `searchbase` are the same.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 再次提醒，`suffix` 和 `searchbase` 是相同的。
 - en: 'The `searchbase` directive is one of several that compose the search specification.
     We could also use `scope`, `filter`, `attrs`, `attrsonly`, `sizelimit`, and `timelimit`
     parameters to construct a more complex search specification. Leaving these parameters
     off though, we have simply accepted the default which performs a search like this:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: '`searchbase` 指令是构成搜索规范的多个指令之一。我们还可以使用 `scope`、`filter`、`attrs`、`attrsonly`、`sizelimit`
+    和 `timelimit` 参数来构建更复杂的搜索规范。不过，如果不使用这些参数，我们只是接受了默认设置，它会执行如下的搜索：'
 - en: '`scope` is set to `sub`'
+  id: totrans-120
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`scope` 设置为 `sub`'
 - en: The `filter` is set to `(objectclass=*)`.
+  id: totrans-121
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`filter` 设置为 `(objectclass=*)`。'
 - en: The `attrs` field is set to `*`,`+`, which will request all regular and operational
     attributes
+  id: totrans-122
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`attrs` 字段设置为 `*`,`+`，这将请求所有常规和操作属性。'
 - en: No `attrsonly` flag is included so both attributes and values are returned
+  id: totrans-123
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 没有包括 `attrsonly` 标志，因此返回的既有属性也有值。
 - en: The `sizelimit` and `timelimit` parameters are both set to `unlimited`
+  id: totrans-124
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`sizelimit` 和 `timelimit` 参数都设置为 `unlimited`。'
 - en: The sixth and seventh parameters in the `syncrepl` directive are `binddn` and
     `credentials`. These are used to perform a simple bind to the directory.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: '`syncrepl` 指令中的第六和第七个参数是 `binddn` 和 `credentials`。这些用于执行简单绑定到目录。'
 - en: When configuring the master server we created the `uid=syncrepl` account. Now
     we will use that same DN to connect from the shadow server to the master. As was
     noted before, the master server does not automatically grant this account any
     special privileges; the ACLs on the master will be applied to this account.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置主服务器时，我们创建了 `uid=syncrepl` 账户。现在，我们将使用相同的 DN 从影像服务器连接到主服务器。如前所述，主服务器不会自动授予此账户任何特殊权限；主服务器上的
+    ACL 将应用于该账户。
 - en: Also, size and time limits will be applied to this user. A frequently made mistake
     when configuring SyncRepl is to inadvertently subject the SyncRepl user to a size
     or time limit that is too low. The result of this is that the shadow server may
     only get part of the directory information tree that it is supposed to have, and
     will not be able to provide clients with complete directory information.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 此用户将应用大小和时间限制。配置 SyncRepl 时一个常见的错误是无意中将 SyncRepl 用户设置为过低的大小或时间限制。结果是，影像服务器可能只获取了它应该拥有的目录信息树的部分内容，无法为客户端提供完整的目录信息。
 - en: If system resources allow, you will typically want to allow the SyncRepl user
     unlimited time and request size.
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果系统资源允许，通常建议为 SyncRepl 用户提供无限的时间和请求大小。
 - en: The `credentials` parameter, in the case of a simple bind, holds the password.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: '`credentials` 参数在简单绑定的情况下保存密码。'
 - en: Note
+  id: totrans-130
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Our basic configuration uses a simple bind and an unencrypted (plain LDAP) connection.
     This is not secure. Using StartTLS, SSL/TLS, or an appropriately strong SASL mechanism
     would provide increased security.
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的基本配置使用简单绑定和未加密的（纯 LDAP）连接。这不安全。使用 StartTLS、SSL/TLS 或适当强度的 SASL 机制将提供更高的安全性。
 - en: 'Simple binding is not the only type supported for SyncRepl. SASL authentication
     can also be turned on, though this may require additional parameters:'
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 简单绑定并不是 SyncRepl 支持的唯一类型。SASL 身份验证也可以启用，尽管这可能需要额外的参数：
 - en: '`bindmethod=sasl`: By default, the bind method is set to simple. To enable
     SASL authentication this parameter must be manually set.'
+  id: totrans-133
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`bindmethod=sasl`：默认情况下，绑定方法设置为简单。要启用 SASL 身份验证，必须手动设置此参数。'
 - en: '`saslmech=<SASL` `Mechanism>`: This should be set, for example, to `DIGEST-MD5`
     to do MD5 hashing of the password prior to transmitting it. See the SASL section
     in Chapter 4 for more information.'
+  id: totrans-134
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`saslmech=<SASL` `Mechanism>`：此项应设置为，例如，`DIGEST-MD5`，以便在传输前对密码进行 MD5 哈希。更多信息请参见第
+    4 章中的 SASL 部分。'
 - en: '`authcid=<uid>`: This should be set to the SASL ID of the account that will
     be used to authenticate. The (similar) `authzid` parameter can be used to configure
     an alternate authorization account.'
+  id: totrans-135
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`authcid=<uid>`：此项应设置为用于身份验证的账户的 SASL ID。类似的 `authzid` 参数可用于配置备用授权账户。'
 - en: '`credentials=<SASL` `Credentials>`: The `credentials` field is used, in SASL
     authentication, to pass credential information to the SASL subsystem. In the DIGEST-MD5
     mechanism, for example, `credentials` holds the account''s password.'
+  id: totrans-136
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`credentials=<SASL` `Credentials>`：`credentials` 字段用于 SASL 身份验证，将凭据信息传递给 SASL
+    子系统。例如，在 DIGEST-MD5 机制中，`credentials` 保存账户的密码。'
 - en: '`realm=<SASL` `Realm>`: Realm information (see Chapter 4) can be passed with
     this parameter.'
+  id: totrans-137
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`realm=<SASL` `Realm>`：此参数可传递领域信息（参见第 4 章）。'
 - en: '`secprops=<SASL` `Security` `Props>`: Additional SASL security properties can
     be passed with this parameter.'
+  id: totrans-138
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`secprops=<SASL` `Security` `Props>`：可以通过此参数传递额外的 SASL 安全属性。'
 - en: Finally, it should be noted that by default, during a SyncRepl operation, the
     shadow server does not perform schema checking on the records that it receives
     from the master. In other words, if the master sends the shadow server a record
     that violates schema constraints, the shadow server will simply store the errant
     record, making no attempt to validate or reject it.
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后需要注意的是，默认情况下，在SyncRepl操作期间，影像服务器不会对从主服务器接收到的记录进行模式检查。换句话说，如果主服务器发送给影像服务器的记录违反了模式约束，影像服务器会简单地存储该不合法记录，而不会尝试验证或拒绝它。
 - en: Usually, it is desirable to have schema checking disabled. Since the master
     server should always be doing schema checking a second set of identical checks
     is redundant, and it slows down the replication process. However, on rare occasions
     it may be desirable to have that extra layer of evaluation. Schema checking of
     replicated records can be enabled in the `syncrepl` directive by adding the `schemachecking=on`
     parameter.
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，禁用模式检查是可取的。由于主服务器应始终执行模式检查，第二套相同的检查是多余的，并且会减慢复制过程。然而，在极少数情况下，可能希望进行额外的评估。在`syncrepl`指令中通过添加`schemachecking=on`参数可以启用对复制记录的模式检查。
 - en: Configuring a Referral
+  id: totrans-141
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 配置引用
 - en: Operations that write to a replicated directory information tree can only be
     done on the master server. You cannot, for example, change an attribute by connecting
     to a shadow server and performing an LDAP add operation. In other words, shadow
     servers are effectively read-only.
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: 对复制的目录信息树执行写操作只能在主服务器上进行。例如，你不能通过连接到影像服务器并执行LDAP添加操作来更改某个属性。换句话说，影像服务器实际上是只读的。
 - en: 'If a client attempts to modify an entry on a shadow server, that server will
     respond that it will not perform the modification:'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果客户端尝试在影像服务器上修改条目，该服务器将响应并表示不会执行修改操作：
 - en: '[PRE12]'
+  id: totrans-144
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: In this example, when we tried to modify the description attribute value for
     our own record, the server responded with `unwilling` `to` `perform` error.
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，当我们尝试修改自己的记录的描述属性值时，服务器响应了`unwilling` `to` `perform`错误。
 - en: 'While a shadow server cannot allow updates of its own data, it can be configured
     to redirect the client to the master server. This is done by adding an additional
     directive to the database section (typically just below the `syncrepl` directive)
     to indicate what server requests should be redirected to. The directive looks
     like this:'
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然影像服务器不能允许更新其自身的数据，但可以配置为将客户端重定向到主服务器。这是通过在数据库部分（通常就在`syncrepl`指令下方）添加额外的指令来实现的，指示请求应被重定向到哪个服务器。指令如下所示：
 - en: '[PRE13]'
+  id: totrans-147
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'Now, when a client attempts to perform a write operation, instead of receiving
     an error, it will receive a referral:'
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，当客户端尝试执行写操作时，不会收到错误，而是会收到一个引用：
 - en: '[PRE14]'
+  id: totrans-149
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: Many clients can be configured to do what is called **referral chasing**. That
     is, when they receive a referral they can automatically follow the referral. In
     a case like the given one, the client would automatically attempt the modification
     operation against the master server at `directory.example.com`.
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 许多客户端可以配置为执行所谓的**引用追踪**。也就是说，当它们收到引用时，可以自动跟随该引用。在此情况下，客户端将自动尝试在`directory.example.com`主服务器上执行修改操作。
 - en: Starting Replication
+  id: totrans-151
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 启动复制
 - en: At this point we have taken a close look at both the master and shadow configuration
     options for SyncRepl. Now we are ready to turn things on.
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 到此为止，我们已经仔细查看了主服务器和影像服务器的SyncRepl配置选项。现在我们准备启用这些配置。
 - en: Once the master server is configured it must be restarted for the configuration
     changes to take effect. Once the `syncprov` overlay is loaded, SLAPD will be functioning
     as a master. This should all be done before starting up the configured consumer
     server, otherwise the shadow server will try to fetch information from the master,
     but the master will not have the necessary LDAP operation available.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦主服务器配置完成，必须重新启动才能使配置更改生效。当`syncprov`叠加层加载后，SLAPD将作为主服务器运行。所有这些步骤应在启动配置好的消费者服务器之前完成，否则，影像服务器将尝试从主服务器获取信息，而主服务器将没有必要的LDAP操作可用。
 - en: After the master is running again the shadow server can be started. For a small
     to medium-sized directory on a network with decent bandwidth, there is no reason
     to manually load any directory data into the shadow server. Instead, when the
     shadow server initially contacts the master, it will fetch a fresh copy of the
     directory information tree (to the extent that the master's ACLs allow) and store
     it all locally.
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 在主服务器重新运行后，可以启动影子服务器。对于中小型目录，以及带宽足够的网络，无需手动将任何目录数据加载到影子服务器中。相反，当影子服务器首次连接到主服务器时，它将获取一份新的目录信息树副本（在主服务器的ACL允许的范围内），并将其全部存储到本地。
 - en: Within a few minutes, the shadow server should have a correct and complete replica
     of the information stored in the master server.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 几分钟之内，影子服务器应该会有一份正确且完整的副本，包含主服务器中存储的信息。
 - en: For Larger Directories...
+  id: totrans-156
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 对于较大的目录...
 - en: The automatic download of the directory information tree from master to shadow
     is definitely easy to do, but with a large directory information tree with gigabytes
     of information, performing the update over the network (using the LDAP protocol
     for every transaction) can be unduly time-intensive as well as resource-intensive.
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 从主服务器到影子服务器自动下载目录信息树确实很容易，但当目录信息树非常庞大且包含几GB数据时，通过网络执行更新（每个事务都使用LDAP协议）可能会消耗大量时间和资源。
 - en: In such cases, it is often better to use `slapcat` on the master to dump the
     directory contents (no need to stop SLAPD to do this), and then transfer the LDIF
     file to the shadow server and import it with `slapadd`.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，通常最好在主服务器上使用`slapcat`来导出目录内容（无需停止SLAPD即可执行此操作），然后将LDIF文件传输到影子服务器，并通过`slapadd`导入。
 - en: Note
+  id: totrans-159
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: '[Appendix C](apc.html "Appendix C. Useful LDAP Commands") contains instructions
     on using `slapcat` and `slapadd` to dump and load SLAPD databases.'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: '[附录C](apc.html "附录C. 有用的LDAP命令")包含使用`slapcat`和`slapadd`来导出和加载SLAPD数据库的指令。'
 - en: Since the `slapcat` and `slapadd` programs do not incur the overhead of the
     LDAP network protocol, they can outperform SyncRepl on adding new records. And
     on networks where bandwidth cannot be devoted to such large-scale data transfers,
     LDIF files can be transported via alternate (offline) media.
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于`slapcat`和`slapadd`程序不涉及LDAP网络协议的开销，因此在添加新记录时，它们的性能可以超过SyncRepl。在带宽无法专门用于大规模数据传输的网络中，LDIF文件也可以通过其他（离线）介质传输。
 - en: Once the directory databases have been populated with `slapadd`, you can start
     the shadow server.
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦目录数据库通过`slapadd`填充完毕，你可以启动影子服务器。
 - en: Delta SyncRepl
+  id: totrans-163
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: Delta SyncRepl
 - en: By default, when the master sends a shadow server a modified or added record,
     it sends *the* *entire* *record*, not just the changes. This is done because the
     master does not keep track of what information has been sent to the shadow server.
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，当主服务器向影子服务器发送修改或添加的记录时，它会发送*整个* *记录*，而不仅仅是更改部分。这是因为主服务器并不会追踪已经发送到影子服务器的信息。
 - en: But the `accesslog` overlay does keep track of what information is sent to the
     shadow servers. By configuring SLAPD to use the `accesslog` overlay to provide
     logging information for the the `syncprov` overlay the replication process can
@@ -842,123 +1199,179 @@
     This is called **Delta SyncRepl**. In modification-heavy networks or directories
     that contain very large records, this streamlining can result in noticeable performance
     improvements.
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，`accesslog`叠加层确实会跟踪发送到影子服务器的信息。通过配置SLAPD使用`accesslog`叠加层来提供`syncprov`叠加层的日志信息，可以简化复制过程，只发送更改过的信息，而不是整个记录。这被称为**Delta
+    SyncRepl**。在修改频繁的网络或包含非常大记录的目录中，这种简化可能会带来明显的性能提升。
 - en: Note
+  id: totrans-166
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: '**Delta SyncRepl** is an advanced configuration. As it involves the cooperation
     of a couple of overlays, as well as some fairly-complicated configuration, it
     may not be the best solution for all configurations. My own experience with small
     and medium-sized directories replicating over LAN and WAN links has been that
     regular SyncRepl is sufficient, and Delta SyncRepl is not necessary.'
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: '**Delta SyncRepl**是一种高级配置。由于它涉及多个叠加层的协作，以及一些相当复杂的配置，因此它可能不是所有配置的最佳解决方案。我在处理小型和中型目录通过局域网（LAN）和广域网（WAN）链接复制的经验表明，常规的SyncRepl已足够，Delta
+    SyncRepl并非必需。'
 - en: Configuring Delta SyncRepl requires a few changes on the master server, and
     a small change on the shadow server.
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置Delta SyncRepl需要在主服务器上进行一些更改，并在影子服务器上进行少量更改。
 - en: The Master Server's Configuration
+  id: totrans-169
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 主服务器的配置
 - en: 'The master server must be running the `accesslog` overlay, which we implemented
     in Chapter 5\. We will start off by setting up the logging database for that overlay.
     This configuration is very similar to the one created in Chapter 5:'
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 主服务器必须运行第5章中实现的`accesslog`覆盖层。我们将从为该覆盖层设置日志数据库开始。这一配置与第5章中创建的配置非常相似：
 - en: '[PRE15]'
+  id: totrans-171
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: This section creates a new logging database, named `cn=log`, into which access
     log information will be written.
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节创建了一个新的日志数据库，名为`cn=log`，所有访问日志信息都将写入该数据库。
 - en: Only a few lines in this section differ from the configuration in Chapter 5\.
     First, the index directive now builds indexes on `reqStart`, `objectclass`, `entryCSN`,
     and `reqResult`. While `reqStart` and `entryCSN` are used internally, the SyncRepl
     consumer will make heavy use of `objectclass` and `reqResult` attributes, so indexing
     these will speed up the replication process.
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节中只有几行与第5章的配置有所不同。首先，索引指令现在会在`reqStart`、`objectclass`、`entryCSN`和`reqResult`上建立索引。虽然`reqStart`和`entryCSN`主要用于内部，但SyncRepl消费者会大量使用`objectclass`和`reqResult`属性，因此对这些属性建立索引将加速复制过程。
 - en: The last four directives are new. The `syncprov` overlay must be added to the
     accesslog database configuration in order to configure the accesslog for SyncRepl.
     These two flags, `syncprov-nopresent` and `syncprov-reloadhint`, both must be
     turned on (`TRUE`) for the Delta SyncRepl to work. In fact, the `syncprov-nopresent`
     flag should *only* be turned on when doing Delta SyncRepl.
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后四个指令是新的。必须将`syncprov`覆盖层添加到accesslog数据库的配置中，以配置SyncRepl的访问日志。这两个标志，`syncprov-nopresent`和`syncprov-reloadhint`，都必须开启（`TRUE`），以使Delta
+    SyncRepl正常工作。事实上，`syncprov-nopresent`标志*仅*应在进行Delta SyncRepl时启用。
 - en: Tip
+  id: totrans-175
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Setting Limits and ACLs**'
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: '**设置限制和ACL**'
 - en: Depending on your `sizelimit` and `timelimit` settings, you may need to explicitly
     grant the `uid=syncrepl` user unlimited time and size limits on the `cn=log` database.
     Also, make sure the ACLs for this database grant `read` access to `uid=syncrepl`.
     See Chapter 4 for more on ACLs, and Chapter 5 for more on `limit` directives.
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据你的`sizelimit`和`timelimit`设置，你可能需要显式地为`uid=syncrepl`用户在`cn=log`数据库上授予无限制的时间和大小限制。同时，确保该数据库的ACL（访问控制列表）为`uid=syncrepl`授予`read`访问权限。有关ACL的更多信息，请参见第4章，关于`limit`指令的内容，请参见第5章。
 - en: Finally, we want to give the `syncrepl` user unlimited search time and result
     size with the `limit` directive introduced in Chapter 5.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们希望通过第5章中介绍的`limit`指令，为`syncrepl`用户提供无限的搜索时间和结果大小。
 - en: 'Next, we need to slightly reconfigure the database that we are going to replicate.
     In the `slapd.conf` file, this should be placed directly beneath the given accesslog
     definition:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们需要稍微重新配置我们将要复制的数据库。在`slapd.conf`文件中，这应该直接放置在给定的accesslog定义下方：
 - en: '[PRE16]'
+  id: totrans-180
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: The highlighted section marks the new addition to the database section of the
     replicated backend database. The `accesslog` overlay here is configured to use
     the `cn=log` database defined previously. The only operations we need to record
     are those that write to the database (add, modify, delete, and modrdn).
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 高亮的部分标记了新增加的数据库部分，该部分属于复制后端数据库中的数据库。这里配置的`accesslog`覆盖层将使用之前定义的`cn=log`数据库。我们需要记录的操作仅包括写入数据库的操作（添加、修改、删除和modrdn）。
 - en: Note
+  id: totrans-182
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Depending on your size and time-limit settings, you may also need to add an
     explicit limits directive granting `uid=syncrepl` unlimited time and result size
     to finish operations.
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据你的大小和时间限制设置，你可能还需要添加一个显式的限制指令，授予`uid=syncrepl`无限的时间和结果大小以完成操作。
 - en: These are the only changes that need to be done on the master. Now we will look
     at the changes to the shadow server's `slapd.conf` file.
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些是主服务器需要做的唯一更改。现在我们将看看影子服务器的`slapd.conf`文件中的更改。
 - en: The Shadow Server's Configuration
+  id: totrans-185
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 影子服务器的配置
 - en: 'On the consumer (shadow server) side, enabling Delta SyncRepl requires the
     addition of a couple of parameters in the `syncrepl` directive:'
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 在消费者（影子服务器）端，启用Delta SyncRepl需要在`syncrepl`指令中添加几个参数：
 - en: '[PRE17]'
+  id: totrans-187
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: The new portion of the `syncrepl` directive consists of the addition of the
     three highlighted lines at the end of the given example. These lines instruct
     the shadow server to consult the master's accesslog database to get information
     about synchronization.
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: '`syncrepl`指令的新部分由给定示例末尾新增的三行构成。这些行指示影子服务器查阅主服务器的accesslog数据库以获取同步信息。'
 - en: The `syncdata` parameter indicates what source SyncRepl should use to get information
     about the records which need updating. This should be set to `accesslog` to indicate
     that we are using an accesslog backend.
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: '`syncdata` 参数指示 SyncRepl 应该使用哪个源来获取需要更新的记录信息。应该设置为 `accesslog`，表示我们使用的是 accesslog
+    后端。'
 - en: The `logbase` directive should be set to the base DN of the access-log on the
     master server. In the previous section we set this to `cn=log`.
+  id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: '`logbase` 指令应该设置为主服务器上 access-log 的基础 DN。在前面的章节中，我们将其设置为 `cn=log`。'
 - en: Finally, the `logfilter` parameter defines what filter ought to be used when
     searching the master server's accesslog. When it comes to replication, we want
     information about any changes to the database—adds, modifies, modRDNs, or deletes.
@@ -968,109 +1381,161 @@
     the directory and we don't want to replicate those). In cases where writes are
     successful the `reqResult` flag will be set to `0`. So we add that to our filter
     too.
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，`logfilter` 参数定义了在搜索主服务器的 accesslog 时应该使用的过滤器。在复制过程中，我们需要有关数据库任何更改的信息——添加、修改、modRDN
+    或删除。这些都是写入操作，并将使用 `auditWriteObject` 对象类记录在 accesslog 中。此外，我们只想同步成功完成的事务（记住，accesslog
+    会记录更改目录的失败尝试，我们不希望复制这些）。在写入成功的情况下，`reqResult` 标志将被设置为 `0`。因此，我们也将此添加到过滤器中。
 - en: Note
+  id: totrans-192
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'For a complete set of configuration files doing Delta SyncRepl, see the following
     Tech Note on the Connexitor blog: [http://www.connexitor.com/forums/viewtopic.php?t=3](http://www.connexitor.com/forums/viewtopic.php?t=3)
     (Connexitor is Symas''s commercially-supported distribution of OpenLDAP).'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关完整的 Delta SyncRepl 配置文件集，请参见 Connexitor 博客上的以下技术说明：[http://www.connexitor.com/forums/viewtopic.php?t=3](http://www.connexitor.com/forums/viewtopic.php?t=3)（Connexitor
+    是 Symas 提供的商业支持版本 OpenLDAP）。
 - en: Now both the master and the shadow servers are configured. When starting things
     up for the first time you may want to delete the old shadow database (see the
     instructions earlier in this chapter) and start over. Again, restart the master
     server before starting the consumer.
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在主服务器和影像服务器都已配置完毕。首次启动时，你可能希望删除旧的影像数据库（请参见本章前面的说明）并重新开始。再次，启动消费者之前先重启主服务器。
 - en: That's all there is to configuring Delta SyncRepl. Next, we will take a look
     at some strategies for debugging replication problems.
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 这就是配置 Delta SyncRepl 的所有内容。接下来，我们将探讨一些调试复制问题的策略。
 - en: Debugging SyncRepl
+  id: totrans-196
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 调试 SyncRepl
 - en: One of the frustrating factors of configuring a network-based server-to-server
     setup like SyncRepl is the difficulty in debugging. Here are a few tips for making
     SyncRepl debugging easier.
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置基于网络的服务器到服务器的设置（如 SyncRepl）时，调试的难度是一个令人沮丧的因素。以下是一些使 SyncRepl 调试变得更容易的提示。
 - en: Starting Over
+  id: totrans-198
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 从头开始
 - en: Sometimes a first shot at configuring replication fails. It is possible, and
     in fact quite easy, to wipe out the entire database for the shadow server and
     then start over again from scratch.
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时首次配置复制会失败。实际上，非常容易清除影像服务器的整个数据库，并从头开始重新配置。
 - en: 'If you are using the BDB or HDB backends, all you need to do is delete all
     of the data files in the database directory:'
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你使用的是 BDB 或 HDB 后端，只需要删除数据库目录中的所有数据文件：
 - en: '[PRE18]'
+  id: totrans-201
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: Note
+  id: totrans-202
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'Warning: Make sure you do not delete the `DB_CONFIG` file!'
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 警告：确保不要删除 `DB_CONFIG` 文件！
 - en: The next time you restart SLAPD it will rebuild the data files from scratch.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 下次重新启动 SLAPD 时，它将从头开始重建数据文件。
 - en: Similar steps can be taken to migrate databases, fix corrupted backends, and
     so forth. But these cases require a little more care. For more detailed instructions,
     see [Appendix C](apc.html "Appendix C. Useful LDAP Commands").
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 类似的步骤也可以用于迁移数据库、修复损坏的后端等。但这些情况需要更多的关注。有关更详细的说明，请参见 [附录 C](apc.html "附录 C. 有用的
+    LDAP 命令")。
 - en: Strategic Logging
+  id: totrans-206
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 策略日志记录
 - en: 'Another way of debugging replication is to run the shadow SLAPD instance in
     the foreground and turn on the `sync` log level:'
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 调试复制的另一种方法是将影像 SLAPD 实例以前台模式运行，并启用 `sync` 日志级别：
 - en: '[PRE19]'
+  id: totrans-208
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: This will print verbose information on the synchronization process.
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将打印关于同步过程的详细信息。
 - en: Increasing log information on the master server may also be helpful. The `acl`
     logging level can be useful for evaluating how access rules are applied to the
     SyncRepl user's requests. For harder issues, the `trace` debug level can also
     be very helpful.
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: 增加主服务器上的日志信息也可能有所帮助。`acl`日志级别对于评估如何将访问规则应用于SyncRepl用户的请求非常有用。对于更复杂的问题，`trace`调试级别也非常有帮助。
 - en: A Few Common Mistakes
+  id: totrans-211
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 一些常见错误
 - en: There are a few common mistakes made when configuring SyncRepl.
+  id: totrans-212
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置SyncRepl时常见的一些错误。
 - en: '**Limits and ACLs** : I have already mentioned the time- and size-limit issue:
     `sizelimit` and `timelimit` directives apply to the SyncRepl user just as they
     do to any other non-manager account. If the database has more entries than the
     maximum size limit, or the connection takes a long time to replicate, then the
     replication from master to shadow may end prematurely, resulting in an incomplete
     synchronization.'
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: '**限制和ACL**：我已经提到过时间限制和大小限制的问题：`sizelimit`和`timelimit`指令适用于SyncRepl用户，就像它们适用于其他非管理员帐户一样。如果数据库中的条目超过了最大大小限制，或者复制连接需要很长时间，那么从主服务器到阴影服务器的复制可能会提前结束，导致同步不完整。'
 - en: ACLs too can have surprising results in replication. If an ACL denies access
     to the SyncRepl user, it will not be able to synchronize that information. That,
     too, can result in incomplete synchronization. Fortunately, SLAPD will attempt
     to automatically bridge as many of these inconsistencies as it can. Unfortunately,
     that may keep the problem invisible for a longer period of time.
+  id: totrans-214
   prefs: []
   type: TYPE_NORMAL
+  zh: ACL也可能在复制中产生意想不到的结果。如果ACL拒绝SyncRepl用户的访问权限，则该用户将无法同步该信息。这也可能导致同步不完整。幸运的是，SLAPD会尝试自动弥补尽可能多的这些不一致性。不幸的是，这可能会使问题在更长时间内保持不可见。
 - en: '**Untuned DB_CONFIG**: In Chapter 5, we looked at the `DB_CONFIG` file, a special
     configuration file for tuning the BDB/HDB database backend. When configuring a
     shadow server it is important to put a `DB_CONFIG` file in the database directory
@@ -1079,126 +1544,175 @@
     brief occasional searches, this can have detrimental effects on replication. Larger
     transactions (like the initial update or transferring of significant modifications)
     can be many times slower than they would be with a well-tuned database environment.'
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
+  zh: '**未调优的DB_CONFIG**：在第5章中，我们查看了`DB_CONFIG`文件，这是一个用于调优BDB/HDB数据库后端的特殊配置文件。在配置阴影服务器时，重要的是在数据库目录(`/var/lib/ldap`)中放置一个`DB_CONFIG`文件。如果`DB_CONFIG`文件缺失或调优不当，数据库环境将变得更慢。虽然这在执行简短偶尔的搜索时可能不易察觉，但这会对复制产生不利影响。较大的事务（如初始更新或转移重要修改）可能会比使用经过良好调优的数据库环境时慢得多。'
 - en: Sometimes, this just increases delay times in updating the database, but when
     combined with time limits, it can result in truncated synchronizations.
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时，这只是增加了更新数据库时的延迟，但当与时间限制结合使用时，它可能导致同步被截断。
 - en: '**Failed SASL Authentication**: SASL configurations can sometimes cause confusion
     when implementing SyncRepl (or SLURPD, for that matter). If you typically use
     SASL for authentication, and the SASL information is not stored in the directory
     information tree, then you will also need to make sure the external SASL data
     is synchronized.'
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: '**SASL认证失败**：在实现SyncRepl（或SLURPD）时，SASL配置有时会导致混淆。如果你通常使用SASL进行认证，并且SASL信息没有存储在目录信息树中，那么你还需要确保外部SASL数据被同步。'
 - en: In Chapter 4 we configured SASL to do DIGEST-MD5 authentication using the external
     `/etc/sasldb2` file for storing passwords. If we are to use SASL DIGEST-MD5 authentication
     on our shadow servers, we will need to make sure that they each have the same
     `/etc/sasldb2` file, which will require using some other non-OpenLDAP tool, like
     **rsync** ([http://samba.anu.edu.au/rsync/](http://samba.anu.edu.au/rsync/)).
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: 在第4章中，我们配置了SASL使用外部的`/etc/sasldb2`文件进行DIGEST-MD5认证，用于存储密码。如果我们要在阴影服务器上使用SASL
+    DIGEST-MD5认证，则需要确保每个服务器都有相同的`/etc/sasldb2`文件，这就需要使用一些其他非OpenLDAP工具，如**rsync**([http://samba.anu.edu.au/rsync/](http://samba.anu.edu.au/rsync/))。
 - en: One method of working around this is to store cleartext SASL passwords inside
     of the directory, instead of in the `sasldb2` file. This is done simply by using
     the `{CLEARTEXT}` password hash instead of `{SSHA}` or some other mechanism. See
     Chapter 3 for more information. The OpenLDAP Administrator's Guide ([http://openldap.org](http://openldap.org))
     also explains this configuration.
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
+  zh: 解决这个问题的一种方法是将明文SASL密码存储在目录中，而不是存储在`sasldb2`文件中。这可以通过使用`{CLEARTEXT}`密码哈希而不是`{SSHA}`或其他机制来实现。有关更多信息，请参见第3章。OpenLDAP管理员指南（[http://openldap.org](http://openldap.org)）也解释了这种配置。
 - en: Simple binding (by DN and user password) should work just fine with replication,
     as should the SASL EXTERNAL authentication we configured in Chapter 6.
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 简单绑定（通过DN和用户密码）应该能够与复制正常工作，就像我们在第六章配置的SASL EXTERNAL认证一样。
 - en: Configuring an LDAP Proxy
+  id: totrans-221
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 配置LDAP代理
 - en: Sometimes, instead of replicating a directory information tree, it is desirable
     to proxy the communication with an LDAP directory. In this scenario a SLAPD server
     is configured to stand between clients and another LDAP server elsewhere on the
     network, and respond to client requests with directory information retrieved from
     the other LDAP server.
+  id: totrans-222
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时，代替复制目录信息树，可能需要代理与LDAP目录的通信。在这种情况下，配置一个SLAPD服务器，站在客户端与网络上另一个LDAP服务器之间，响应客户端请求，并从其他LDAP服务器检索目录信息来响应请求。
 - en: OpenLDAP supports a couple of different ways of configuring SLAPD to serve as
     a proxy.
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenLDAP支持几种不同的配置方式，将SLAPD配置为代理。
 - en: Using the LDAP Backend
+  id: totrans-224
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 使用LDAP后端
 - en: One way of setting up proxying between two servers is to configure one server
     to use the `ldap` backend (instead of BDB or HDB). The `ldap` backend listens
     for requests and, when it gets them, transparently forwards the request to another
     LDAP server. For example, say we have two servers, directory.example.com, which
     stores the database, and proxy.example.com which uses the `ldap` backend to proxy
     requests to the directory.example.com server.
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 设置两个服务器之间的代理的一种方式是配置一个服务器使用`ldap`后端（而不是BDB或HDB）。`ldap`后端监听请求，当收到请求时，透明地将请求转发到另一个LDAP服务器。例如，假设我们有两个服务器，directory.example.com，存储数据库，和proxy.example.com，使用`ldap`后端将请求代理到directory.example.com服务器。
 - en: From the client's perspective, when the client connects to proxy.example.com,
     it appears to get results from proxy.example.com. All network traffic moves between
     the client and the proxy, and there is nothing in the returned results that indicates
     that the result were fetched from another server. In addition, the `ldap` backend
     follows referrals automatically, rather then requiring the client application
     to do referral chasing.
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 从客户端的角度来看，当客户端连接到proxy.example.com时，它看起来是从proxy.example.com获取结果的。所有网络流量在客户端和代理之间传输，返回的结果中没有任何内容表明结果是从另一个服务器获取的。此外，`ldap`后端会自动跟随引用，而不需要客户端应用程序进行引用追踪。
 - en: From the perspective of directory.example.com, the connection comes from proxy.example.com.
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 从directory.example.com的角度来看，连接来自proxy.example.com。
 - en: At the protocol level, the `ldap` backend transparently forwards all requests
     from the client on to the other server. In other words, when the client binds,
     it is not binding to proxy.example.com but to directory.example.com.
+  id: totrans-228
   prefs: []
   type: TYPE_NORMAL
+  zh: 在协议层面，`ldap`后端会透明地将客户端的所有请求转发到其他服务器。换句话说，当客户端进行绑定时，它绑定的不是proxy.example.com，而是directory.example.com。
 - en: Note
+  id: totrans-229
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: This too is configurable, and more advanced binding configurations can be achieved.
     Such features are discussed in the section *Using* *Identity* *Management* *Features*.
+  id: totrans-230
   prefs: []
   type: TYPE_NORMAL
+  zh: 这也是可以配置的，且可以实现更高级的绑定配置。有关此类功能的讨论，请参见*使用* *身份* *管理* *功能*一节。
 - en: Every client gets its own connection from the proxy to the directory, with one
     exception. All the clients that connect as the anonymous user are proxied through
     the same connection to the remote server.
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个客户端都会获得一个独立的连接，从代理到目录，唯一的例外是，所有作为匿名用户连接的客户端都通过相同的连接代理到远程服务器。
 - en: Note
+  id: totrans-232
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: TLS connections go from the client to the proxy. The proxy can be configured
     to use TLS between it and the remote server either when the client requests TLS,
     or every time the proxy connects to the remote server. This is done with the `tls`
     directive for the `ldap` backend.
+  id: totrans-233
   prefs: []
   type: TYPE_NORMAL
+  zh: TLS连接从客户端到代理。代理可以配置为在客户端请求TLS时，或每次代理连接到远程服务器时使用TLS与远程服务器进行通信。这可以通过`ldap`后端的`tls`指令来实现。
 - en: 'Configuring the `ldap` backend to act as a proxy is very simple. Here is a
     complete `slapd.conf` configured for the `ldap` backend:'
+  id: totrans-234
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置`ldap`后端作为代理非常简单。下面是一个完整的`slapd.conf`配置，用于`ldap`后端：
 - en: '[PRE20]'
+  id: totrans-235
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: The significant points of this example are highlighted.
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 本例的重点已被突出显示。
 - en: Once the `back_ldap` module has been loaded, the backend is defined in just
     three directives. The database directive points to the `ldap` backend (instead
     of the `hdb` backend we have been using in previous chapters).
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦加载了`back_ldap`模块，后端仅通过三条指令来定义。数据库指令指向`ldap`后端（而不是我们在前几章中使用的`hdb`后端）。
 - en: The `uri` directive takes as a value a space-separated list of LDAP URLs. In
     this case there is only one. Having more than one URL comes in handy when one
     of the servers goes down. When there is a list, the `ldap` backend will try to
     connect to the servers in order. If the first server is down, it will move on
     to the second URL, and so on until it either runs out of servers or finally makes
     a connection.
+  id: totrans-238
   prefs: []
   type: TYPE_NORMAL
+  zh: '`uri`指令的值为以空格分隔的LDAP URL列表。在这个例子中，只有一个URL。当有多个URL时，尤其是在某个服务器故障时会很有用。当URL列表存在时，`ldap`后端会按照顺序尝试连接服务器。如果第一个服务器无法连接，它会切换到第二个URL，依此类推，直到所有服务器都尝试过或者最终成功连接。'
 - en: The `suffix` directive indicates which suffix or suffixes this backend serves.
     This should contain the base DN or DNs that the remote directory provides. It
     is possible to use the proxy to make available only a branch or two of the remote
@@ -1206,98 +1720,139 @@
     to `dc=example,dc=com`. But we could set the suffix on this proxy to `ou=users,dc=example,dc=com`,
     and users of this server would then only be able to search that part of the directory
     information tree through this proxy.
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: '`suffix`指令指定该后端服务的后缀或多个后缀。这应包含远程目录提供的基准DN或多个DN。通过这种方式，使用代理可以仅使远程服务器的某个分支或几个分支可用。例如，远程服务器可能提供`dc=example,dc=com`的访问权限。但我们可以将代理上的后缀设置为`ou=users,dc=example,dc=com`，这样该服务器的用户就只能通过该代理搜索目录信息树的这一部分。'
 - en: Note
+  id: totrans-240
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: A number of OpenLDAP users have reported successfully implementing the `ldap`
     backend to proxy requests to other directory servers, such as Microsoft's Active
     Directory.
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些OpenLDAP用户报告成功实现了`ldap`后端，将请求代理到其他目录服务器，如Microsoft的Active Directory。
 - en: 'There are a handful of other configuration options available for the `ldap`
     backend, all of which are document in the `slapd-ldap` man page: `man` `slapd-ldap`.
     But we will only look at one subset: the identity management features.'
+  id: totrans-242
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ldap`后端还有一些其他可用的配置选项，所有这些都在`slapd-ldap`手册页中有记录：`man` `slapd-ldap`。但我们将只关注其中的一部分：身份管理功能。'
 - en: Using Identity Management Features
+  id: totrans-243
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用身份管理功能
 - en: There are more sophisticated things that can be done with the `ldap` backend.
     You can, for instance, separate the authentication and authorization tasks, authenticating
     as the DN supplied by the client but then performing all work as a different user.
+  id: totrans-244
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ldap`后端可以做更多复杂的操作。例如，你可以将身份验证和授权任务分开，客户端提供的DN进行身份验证，但所有操作都以另一个用户的身份执行。'
 - en: This feature, called **ID assertion**, allows you to set up a proxy (perhaps
     accessible on a less secure network) that can allow users to bind as themselves,
     but then use an account with lower permissions (such as a system account whose
     permissions are restricted by ACLs) to get only a limited subset of information
     from the directory.
+  id: totrans-245
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个名为**ID断言**的功能，允许你设置一个代理（可能位于较不安全的网络上），使得用户能够以自己身份进行绑定，但随后使用一个权限较低的帐户（如权限受到ACL限制的系统帐户）从目录中获取有限的信息子集。
 - en: 'Configuring ID assertion requires only a few additional directives. On the
     proxy, you will need to add two directives to the `ldap` database configuration:
     `idassert-bind` and `idassert-authzFrom`.'
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置ID断言只需要几个额外的指令。在代理上，你需要向`ldap`数据库配置中添加两个指令：`idassert-bind`和`idassert-authzFrom`。
 - en: 'The `idassert-bind` directive specifies how the proxy server ought to authenticate
     to the remote directory server. Here''s an example configuration:'
+  id: totrans-247
   prefs: []
   type: TYPE_NORMAL
+  zh: '`idassert-bind`指令指定代理服务器如何验证远程目录服务器。以下是一个示例配置：'
 - en: '[PRE21]'
+  id: totrans-248
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: This directive defines the account (and authentication style) that the proxy
     will use to connect to the remote directory in order to authenticate the client.
+  id: totrans-249
   prefs: []
   type: TYPE_NORMAL
+  zh: 该指令定义了代理用于连接到远程目录以验证客户端的帐户（及其认证方式）。
 - en: The supported values of `bindmethod` are `simple` (to do a simple bind), `sasl`
     (to do SASL binds), and `none`. If `none` is used then ID assertion is not done
     (which achieves the same effect as not using this directive at all).
+  id: totrans-250
   prefs: []
   type: TYPE_NORMAL
+  zh: '`bindmethod`的支持值有`simple`（进行简单绑定）、`sasl`（进行SASL绑定）和`none`。如果使用`none`，则不会进行身份声明（这与完全不使用该指令的效果相同）。'
 - en: The `binddn` and `credentials` parameters specify the DN and password for connecting
     to the remote directory.
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: '`binddn`和`credentials`参数指定连接到远程目录的DN和密码。'
 - en: The mode parameter specifies whose identity will be asserted to the remote server.
     In the given example we set the mode to `none`, which means that the proxy will
     assert the DN specified in `binddn` as its identity. In other words, the proxy
     will perform all operations on the remote server as the DN in `binddn`.
+  id: totrans-252
   prefs: []
   type: TYPE_NORMAL
+  zh: '`mode`参数指定将向远程服务器声明哪个身份。在给定的示例中，我们将`mode`设置为`none`，这意味着代理将声明`binddn`中指定的DN作为其身份。换句话说，代理将在远程服务器上以`binddn`中的DN身份执行所有操作。'
 - en: For a more complicated proxy, you can set `mode` to `anonymous` (which asserts
     the anonymous identity to the remote directory) or `self` (which asserts the identity
     sent by the client). These implement the **Proxied Authorization** (**proxyAuth**)
     **Control** defined in RFC 4370 ([http://www.rfc-editor.org/rfc/rfc4370.txt](http://www.rfc-editor.org/rfc/rfc4370.txt)).
+  id: totrans-253
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于更复杂的代理，您可以将`mode`设置为`anonymous`（这将向远程目录声明匿名身份）或`self`（这将声明由客户端发送的身份）。这些实现了RFC
+    4370中定义的**代理授权**（**proxyAuth**）**控制**（[http://www.rfc-editor.org/rfc/rfc4370.txt](http://www.rfc-editor.org/rfc/rfc4370.txt)）。
 - en: For `anonymous` or `self`, you may also need to set the `authz-policy` directive
     in `ldap.conf`, and add `authzFrom` or `authzTo` entries to the proxy's or client's
     DN (respectively). For more information see the man pages for `slapd.conf` and
     `slapd-ldap`.
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于`anonymous`或`self`，您可能还需要在`ldap.conf`中设置`authz-policy`指令，并向代理或客户端的DN（分别）添加`authzFrom`或`authzTo`条目。有关更多信息，请参阅`slapd.conf`和`slapd-ldap`的手册页。
 - en: 'The `idassert-authzFrom` directive is used to authorize which clients can make
     use of the proxy. For example, we could set a rule that allows users to use the
     proxy if their DNs are in the `ou=users` subtree:'
+  id: totrans-255
   prefs: []
   type: TYPE_NORMAL
+  zh: '`idassert-authzFrom`指令用于授权哪些客户端可以使用代理。例如，我们可以设置一条规则，允许用户使用代理，如果他们的DN位于`ou=users`子树中：'
 - en: '[PRE22]'
+  id: totrans-256
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: Like other directives that make use of the `dn` specifier, this one supports
     the regular list of modifiers, like `dn.subtree`, `dn.one`, and `dn.regex`. See
     the discussion of limits in Chapter 5 for an explanation of these modifiers.
+  id: totrans-257
   prefs: []
   type: TYPE_NORMAL
+  zh: 与其他使用`dn`说明符的指令一样，这个指令支持常规的修饰符列表，如`dn.subtree`、`dn.one`和`dn.regex`。有关这些修饰符的解释，请参阅第5章中的限制讨论。
 - en: Turning the Simple Proxy into a Caching Proxy
+  id: totrans-258
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 将简单代理转换为缓存代理
 - en: As we have configured the proxy so far, every request to the proxy is relayed
     to the remote directory server. No results are retained on the proxy. So when
     the same request is performed several times, the proxy connects to the remote
@@ -1305,14 +1860,18 @@
     to use the `pcache` (**Proxy Cache**) overlay to add caching to the proxy, storing
     a subset of the remote directory on the proxy. This can significantly speed up
     performance in some cases.
+  id: totrans-259
   prefs: []
   type: TYPE_NORMAL
+  zh: 目前我们已经配置了代理，每个请求都被转发到远程目录服务器，代理本身不保存任何结果。因此，当相同的请求被多次执行时，代理每次都会连接到远程目录服务器并转发请求。然而，可以使用`pcache`（**代理缓存**）叠加层为代理添加缓存，将远程目录的一个子集存储在代理上。这在某些情况下可以显著提升性能。
 - en: Proxy Cache works by storing a subset of frequently-accessed information in
     a database on the proxy SLAPD instance. When the proxy receives a request for
     information stored in the cache, it will return the cached data instead of fetching
     the records from the remote server.
+  id: totrans-260
   prefs: []
   type: TYPE_NORMAL
+  zh: 代理缓存通过将经常访问的信息的子集存储在代理SLAPD实例的数据库中来工作。当代理收到一个请求，且该请求的信息已存储在缓存中时，它将返回缓存数据，而不是从远程服务器获取记录。
 - en: Records are stored in an **LRU (Least Recently Used)** cache, which means that
     once the cache fills up, the records that were accessed *least* *recently* are
     removed to make way for new entries. Additionally, an entry is only served out
@@ -1321,198 +1880,281 @@
     the entry. This keeps the proxy from serving stale or out of date information
     that has changed in the main directory since the last time the proxy accessed
     the records.
+  id: totrans-261
   prefs: []
   type: TYPE_NORMAL
+  zh: 记录存储在**LRU（最近最少使用）**缓存中，这意味着一旦缓存被填满，访问*最少* *最近*的记录会被移除，以腾出空间供新条目进入。此外，缓存中的条目只会在一定的时间（称为生存时间，TTL）内提供服务，之后代理将重新连接到远程目录以获取该条目的新副本。这可以防止代理提供过时或已经改变的主目录信息。
 - en: Note
+  id: totrans-262
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Binding is not cached by `pcache`. Every client connection must still bind,
     and the behavior of the bind operation depends on the configuration of the `ldap`
     backend. It can use ID assertion, or pass authentication through to the remote
     host.
+  id: totrans-263
   prefs: []
   type: TYPE_NORMAL
+  zh: '`pcache`不会缓存绑定操作。每个客户端连接仍然需要执行绑定操作，绑定操作的行为取决于`ldap`后端的配置。它可以使用ID断言，或者将认证请求传递到远程主机。'
 - en: The `pcache` overlay is configured in the proxy's `slapd.conf` file. The first
     few steps of implementing the `pcache` overlay are familiar. Near the top of our
     configuration file we need to add the `moduleload` `pcache` line to load the correct
     module.
+  id: totrans-264
   prefs: []
   type: TYPE_NORMAL
+  zh: '`pcache`覆盖层在代理的`slapd.conf`文件中进行配置。实现`pcache`覆盖层的前几个步骤很熟悉。在配置文件的顶部附近，我们需要添加`moduleload`
+    `pcache`行来加载正确的模块。'
 - en: 'In the database section we need to add the `pcache` overlay with the usual
     `overlay` directive. Then, there are several directives necessary to configure
     the `pcache` overlay. Here is the entire database configuration section for an
     `ldap` database with the proxy cache overlay:'
+  id: totrans-265
   prefs: []
   type: TYPE_NORMAL
+  zh: 在数据库部分，我们需要使用常见的`overlay`指令添加`pcache`覆盖层。然后，有几个指令是必需的，用于配置`pcache`覆盖层。以下是包含代理缓存覆盖层的`ldap`数据库完整配置部分：
 - en: '[PRE23]'
+  id: totrans-266
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: The beginning of the file does not differ much from the identity assertion configuration
     we used in the previous section. One difference however, is the addition of the
     `rootdn` directive which is required by the database-backed `pcache` overlay.
     It is never used for authentication purposes so using the base DN of the directory
     is fine.
+  id: totrans-267
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件的开始部分与我们在上一节中使用的身份断言配置相差不大。然而，有一个不同之处是，添加了`rootdn`指令，这是数据库支持的`pcache`覆盖层所要求的。它从未用于认证目的，因此使用目录的基本DN是可以的。
 - en: 'Once the overlay has been added to the overlay stack using `overlay` `pcache`,
     the first proxy cache directive appears:'
+  id: totrans-268
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦通过`overlay` `pcache`将覆盖层添加到覆盖层堆栈中，第一个代理缓存指令就会出现：
 - en: '[PRE24]'
+  id: totrans-269
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'This directive handles the core configuration of the proxy cache engine. It
     has five different parameters:'
+  id: totrans-270
   prefs: []
   type: TYPE_NORMAL
+  zh: 该指令处理代理缓存引擎的核心配置。它有五个不同的参数：
 - en: 'The database type: `pcache` needs a place to store the cached data, and it
     can use one of the underlying database mechanisms such as `bdb`, `hdb`, or `ldif`.
     If you want an efficient storage system, `bdb` or `hdb` are the best choices.
     Later in the configuration, we will have to set some directives for the database.'
+  id: totrans-271
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 数据库类型：`pcache`需要一个存储缓存数据的地方，可以使用底层数据库机制中的一个，比如`bdb`、`hdb`或`ldif`。如果你需要高效的存储系统，`bdb`或`hdb`是最佳选择。稍后在配置中，我们还需要为数据库设置一些指令。
 - en: 'The maximum number of entries in the cache: You can set an upper limit on the
     number of entries that will be cached. You can estimate how many entries you need
     based on the number of records in this database and the type of use that this
     proxy will get.'
+  id: totrans-272
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 缓存中的最大条目数：你可以设置一个上限来控制缓存中的条目数量。你可以根据该数据库中的记录数量以及代理的使用类型来估算需要缓存的条目数。
 - en: 'The number of attribute sets to store: The proxy cache stores a subset of information
     from the remote directory. Which attributes are cached is controlled by defining
     **attribute sets**. This parameter should be set to the number of attribute sets
     defined. We will initially define one, so the value above is `1`.'
+  id: totrans-273
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 存储的属性集数量：代理缓存存储来自远程目录的一部分信息。哪些属性被缓存通过定义**属性集**来控制。此参数应设置为已定义的属性集的数量。我们将首先定义一个，所以上面的值为`1`。
 - en: The maximum number of entires per search result. Some searches can return a
     large number of entries, and this takes up a lot of space on the proxy (and introduces
     inefficiency if this particular large search is not frequently performed). To
     avoid such a problem, this parameter specifies the maximum number of entries that
     a search can have if its results are to be cached. A search that returns more
     than the max (`50` in this case) will not be cached.
+  id: totrans-274
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 每次搜索结果的最大条目数。有些搜索可能返回大量条目，这会占用代理服务器上的大量空间（如果这个特定的大搜索不经常执行，这也会引入低效）。为了避免这种问题，参数指定了搜索结果在缓存时可以有的最大条目数。如果搜索返回的条目数超过最大值（此例中为
+    `50`），则该搜索不会被缓存。
 - en: The consistency check interval. This specifies the number of seconds to wait
     between checking records for expired TTLs. If a record's TTL has passed, then
     the record is considered stale and is removed from the cache.
+  id: totrans-275
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一致性检查间隔。该参数指定检查记录过期 TTL 的时间间隔（秒）。如果记录的 TTL 已经过期，那么该记录将被视为过期并从缓存中移除。
 - en: 'The first field in the `proxycache` directive is the database type, specifying
     what database backend will be used to store cached data. Now we need to add a
     few directives to configure that database backend:'
+  id: totrans-276
   prefs: []
   type: TYPE_NORMAL
+  zh: '`proxycache` 指令中的第一个字段是数据库类型，用于指定将用于存储缓存数据的数据库后端。现在我们需要添加一些指令来配置该数据库后端：'
 - en: '[PRE25]'
+  id: totrans-277
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: The `directory` directive (a familiar one we used when configuring the HDB backend
     in Chapter 3) points to the directory where the BDB files will be stored.
+  id: totrans-278
   prefs: []
   type: TYPE_NORMAL
+  zh: '`directory` 指令（这是我们在第 3 章配置 HDB 后端时使用过的）指向将存储 BDB 文件的目录。'
 - en: 'If you set `directory` to a location that doesn''t exist yet, make sure to
     create that directory on the file system: `mkdir` `/var/lib/ldap/cache`. You should
     also put a copy of the `DB_CONFIG` file in the `cache/` directory, or else the
     default Berkeley DB settings will be used, and those usually result in poor performance.'
+  id: totrans-279
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你将 `directory` 设置为一个尚不存在的位置，请确保在文件系统上创建该目录：`mkdir` `/var/lib/ldap/cache`。你还应该将
+    `DB_CONFIG` 文件的副本放入 `cache/` 目录，否则将使用默认的 Berkeley DB 设置，而这些通常会导致性能较差。
 - en: After the database directive, there are several index directives which specify
     which indexes ought to be created and what types of searches each should support.
     As usual, these index files can be used to expedite performance.
+  id: totrans-280
   prefs: []
   type: TYPE_NORMAL
+  zh: 在数据库指令之后，有几个索引指令，指定应创建哪些索引以及每个索引支持的搜索类型。如同往常一样，这些索引文件可以加速性能。
 - en: 'There are two indexes that should definitely be included: an equality index
     on `objectclass`, and an equality index on `queryid`. The `queryid` index is specific
     to the `pcache` backend which uses `queryid` to identify queries cached in the
     database. Other indexes should be specified where they will increase lookup speeds
     for the queries defined in the proxy cache templates (which we will examine in
     a moment).'
+  id: totrans-281
   prefs: []
   type: TYPE_NORMAL
+  zh: 应该包含两个索引：一个是 `objectclass` 的等式索引，另一个是 `queryid` 的等式索引。`queryid` 索引特定于 `pcache`
+    后端，后者使用 `queryid` 来识别缓存数据库中的查询。应该指定其他索引，以提高代理缓存模板中定义的查询的查找速度（稍后我们将查看这些模板）。
 - en: You can also use other directives (like `cachesize`) that are defined for the
     BDB backend. See the discussion in Chapter 5 and the man page for `slapd-bdb`
     for more detail.
+  id: totrans-282
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还可以使用为 BDB 后端定义的其他指令（如 `cachesize`）。有关详细信息，请参阅第 5 章的讨论以及 `slapd-bdb` 的手册页。
 - en: 'Now we have a few more pcache-specific directives to examine:'
+  id: totrans-283
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们有一些更多与 `pcache` 相关的指令需要检查：
 - en: '[PRE26]'
+  id: totrans-284
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: The `proxycachequeries` directive specifies how many queries (not entries) should
     be cached.
+  id: totrans-285
   prefs: []
   type: TYPE_NORMAL
+  zh: '`proxycachequeries` 指令指定应缓存多少查询（而非条目）。'
 - en: The `proxyattrset` directive indicates what attributes ought to be cached. The
     proxy cache stores a subset of the remote directory. That subset is not merely
     a subset of the total entries, but also a subset of the attributes for each entry.
     In the example here, this `proxyattrset` specifies that only the `uid`, `mail`,
     `cn`, `sn`, and `givenName` attributes (and their values) should be cached. A
     request for any other attribute will be proxied to the remote server.
+  id: totrans-286
   prefs: []
   type: TYPE_NORMAL
+  zh: '`proxyattrset` 指令指定了应该缓存哪些属性。代理缓存存储了远程目录的一个子集。这个子集不仅是总条目的子集，还包括每个条目的属性子集。这里的示例中，`proxyattrset`
+    指定了只缓存 `uid`、`mail`、`cn`、`sn` 和 `givenName` 属性（及其值）。对其他属性的请求将被代理到远程服务器。'
 - en: 'The `proxyattrset` directive has two parts:'
+  id: totrans-287
   prefs: []
   type: TYPE_NORMAL
+  zh: '`proxyattrset` 指令包含两个部分：'
 - en: The first is an integer identifier, `0` for the first `proxyattrset`, `1` for
     the second, and so on
+  id: totrans-288
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 第一个是一个整数标识符，`0` 代表第一个 `proxyattrset`，`1` 代表第二个，以此类推。
 - en: The second part is the list of attributes (separated by spaces) that will be
     stored in the cache
+  id: totrans-289
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 第二部分是要存储在缓存中的属性列表（以空格分隔）
 - en: There can be more than one `proxyattrset`, but the total number of `proxyattrset`
     directives must be explicitly specified in the `proxycache` directive. In our
     configuration, we only have one `proxyattrset` directive, so the third parameter
     (the number of attribute sets) in the `proxycache` directive is set to `1`.
+  id: totrans-290
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以有多个 `proxyattrset`，但 `proxycache` 指令中必须显式指定 `proxyattrset` 指令的总数。在我们的配置中，只有一个
+    `proxyattrset` 指令，因此在 `proxycache` 指令中的第三个参数（属性集的数量）设置为 `1`。
 - en: 'The last directive is the `proxytemplate` directive. A **filter template**
     specifies what sort of searches will be stored in the cache, and indicates which
     attributes will be stored for records that match the search filter. The directive
     has three parameters:'
+  id: totrans-291
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后的指令是 `proxytemplate` 指令。**过滤器模板**指定将存储在缓存中的搜索类型，并指示哪些属性将存储在与搜索过滤器匹配的记录中。该指令有三个参数：
 - en: A filter template
+  id: totrans-292
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个过滤器模板
 - en: The `proxyattrset` directive to use
+  id: totrans-293
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 要使用的 `proxyattrset` 指令
 - en: The TTL for entries that match this template
+  id: totrans-294
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 与此模板匹配的条目的 TTL
 - en: 'A filter template is a variation on a regular LDAP filter. A regular filter
     might look like this: `(uid=m*)`, or `(&(ou=users)(objectclass=person))`. A filter
     template is a filter without the asserted value; that is, it is a template with
     nothing on the right-side of the equals sign. `(uid=)` and `(&(ou=)(objectclass=))`
     are filter templates for the two search filters.'
+  id: totrans-295
   prefs: []
   type: TYPE_NORMAL
+  zh: 过滤器模板是常规 LDAP 过滤器的变体。常规过滤器可能如下所示：`(uid=m*)`，或 `(&(ou=users)(objectclass=person))`。过滤器模板是没有声明值的过滤器；也就是说，它是一个没有等号右侧值的模板。`(uid=)`
+    和 `(&(ou=)(objectclass=))` 是这两种搜索过滤器的过滤器模板。
 - en: If an incoming search's filter matches the filter template (and it doesn't return
     more than the maximum number of results) then it will be handled by the cache.
     For example, the filters `(uid=*)`, `(uid=mat*)` and `(uid=dave)` all match the
     filter template `(uid=)`. They can be handled by the cache, but `(&(uid=*)(ou=system))`
     cannot as it doesn't match a defined filter template.
+  id: totrans-296
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果传入搜索的过滤器与过滤器模板匹配（并且返回的结果不超过最大结果数），那么它将由缓存处理。例如，过滤器 `(uid=*)`、`(uid=mat*)`
+    和 `(uid=dave)` 都与过滤器模板 `(uid=)` 匹配。它们可以由缓存处理，但 `(&(uid=*)(ou=system))` 不能，因为它不匹配任何定义的过滤器模板。
 - en: The second parameter is the numeric identifier for the `proxyattrset` directive
     that should be used. In our example we set this to `0`, which uses `proxyattrset`
     `0`. Thus, this filter template caches the values of the `uid`, `mail`, `cn`,
     `sn`, and `givenName` attributes.
+  id: totrans-297
   prefs: []
   type: TYPE_NORMAL
+  zh: 第二个参数是应该使用的 `proxyattrset` 指令的数字标识符。在我们的示例中，我们将其设置为 `0`，这使用 `proxyattrset` `0`。因此，此过滤器模板缓存了
+    `uid`、`mail`、`cn`、`sn` 和 `givenName` 属性的值。
 - en: The `proxyattrset` directive is used to determine whether to serve incoming
     searches from the cache or by connecting to the remote directory. If the request
     matches a search filter template, and the attributes list supplied by the client
@@ -1524,282 +2166,413 @@
     the proxy will fetch the information from the remote server. Why is this? Simply
     because one of the attributes, `telephoneNumber`, is not stored in the cache at
     all, and so the `pcache` overlay cannot fulfill the entire request.
+  id: totrans-298
   prefs: []
   type: TYPE_NORMAL
+  zh: '`proxyattrset` 指令用于确定是从缓存中提供传入的搜索请求，还是通过连接到远程目录来处理请求。如果请求与搜索过滤器模板匹配，并且客户端提供的属性列表仅包含
+    `proxyattrset` 中的属性，那么结果可能会从代理缓存中提供。例如，如果请求使用搜索过滤器 `(uid=m*)`（它与 `(uid=)` 模板匹配），并请求
+    `uid`、`mail` 和 `sn` 属性，这些结果可以从缓存中提供。另一方面，如果属性列表是 `uid`、`mail` 和 `telephoneNumber`，那么缓存将被跳过，代理将从远程服务器获取信息。为什么会这样？原因很简单，因为其中一个属性
+    `telephoneNumber` 根本没有存储在缓存中，因此 `pcache` 覆盖层无法满足整个请求。'
 - en: The third parameter for the `proxytemplate` directive is the TTL. This specifies
     how many seconds an entry can be in the cache before it is considered stale and
     removed or refreshed.
+  id: totrans-299
   prefs: []
   type: TYPE_NORMAL
+  zh: '`proxytemplate` 指令的第三个参数是 TTL。它指定条目可以在缓存中存在多少秒，之后它被认为是过时的，并将被移除或刷新。'
 - en: 'There is a special fourth parameter that can be used too: the so-called **Negative
     TTL**. By default, the proxy cache caches only successful requests. That is, if
     a search request is made, and the remote directory returns zero records, no information
     is cached.'
+  id: totrans-300
   prefs: []
   type: TYPE_NORMAL
+  zh: 还有一个特殊的第四个参数也可以使用：所谓的**负TTL**。默认情况下，代理缓存仅缓存成功的请求。也就是说，如果发出搜索请求，并且远程目录返回零条记录，则不会缓存任何信息。
 - en: Sometimes, however, it might be useful to cache a "miss," so that if the same
     query comes in again it can be immediately served from the cache, instead of requiring
     another trip to the remote directory—a trip likely to result in the same empty
     result set. The negative TTL parameter allows you to turn on caching of misses,
     and also set the number of seconds that a negative result (a record of a miss)
     should be retained in the cache.
+  id: totrans-301
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，有时缓存一个“未命中”可能会很有用，这样如果相同的查询再次到来，就可以立即从缓存中提供，而不需要再次访问远程目录——这个过程可能会导致相同的空结果集。负TTL参数允许你启用未命中的缓存，并设置负结果（未命中的记录）在缓存中应保留的秒数。
 - en: Notes on the Attribute Sets and Templates
+  id: totrans-302
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 关于属性集和模板的说明
 - en: One of the potentially confusing things about the proxy cache overlay is the
     relationship between attribute sets and filter templates (and the `proxycache`
     directive's count of attribute sets).
+  id: totrans-303
   prefs: []
   type: TYPE_NORMAL
+  zh: 代理缓存覆盖中可能令人困惑的一点是属性集和过滤器模板之间的关系（以及`proxycache`指令的属性集计数）。
 - en: 'Every attribute set should be referenced by at least one filter template. But
     multiple filter templates can use the same attribute set. For example, the following
     is legitimate:'
+  id: totrans-304
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个属性集应该至少由一个过滤器模板引用。但多个过滤器模板可以使用相同的属性集。例如，以下是合法的：
 - en: '[PRE27]'
+  id: totrans-305
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: In this case, both filter templates refer to the same attribute set (the one
     with the ID number `0`).
+  id: totrans-306
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，两个过滤器模板都引用了相同的属性集（ID号为`0`的那个）。
 - en: 'The same template can be used with different attribute sets. Here''s what happens
     under such circumstances. Consider the following:'
+  id: totrans-307
   prefs: []
   type: TYPE_NORMAL
+  zh: 同一个模板可以与不同的属性集一起使用。在这种情况下，发生的情况如下所示。考虑以下内容：
 - en: '[PRE28]'
+  id: totrans-308
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: The above is legal and works but has interesting results.
+  id: totrans-309
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述是合法的，并且可以正常工作，但具有有趣的结果。
 - en: Note
+  id: totrans-310
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Notice that the third parameter of `proxycache` is now `2` instead of `1`. This
     reflects the fact that there are now two `proxyattrset` directives defined.
+  id: totrans-311
   prefs: []
   type: TYPE_NORMAL
+  zh: 注意，`proxycache`的第三个参数现在是`2`而不是`1`。这反映了现在定义了两个`proxyattrset`指令的事实。
 - en: If a search is done for `(uid=m*)` requesting `uid` and `mail`, a cache entry
     will be generated for the first attribute set.
+  id: totrans-312
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果执行`(uid=m*)`的搜索，要求返回`uid`和`mail`，则会为第一个属性集生成一个缓存条目。
 - en: But if a search is done for `(uid=m*)` requesting `uid` and `description`, then
     an entry is generated for the second attribute set.
+  id: totrans-313
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，如果执行`(uid=m*)`的搜索，要求返回`uid`和`description`，则会为第二个属性集生成一个条目。
 - en: If a search is done for `(uid=m*)` requesting `mail` and `description`, it will
     *miss* both caches and results will be retrieved from the remote server.
+  id: totrans-314
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果执行`(uid=m*)`的搜索，要求返回`mail`和`description`，它将*错过*两个缓存，并且结果将从远程服务器检索。
 - en: The proxy cache overlay can turn the `ldap` backend into more than just a simple
     proxy. By tuning the attribute sets and templates to match frequently used queries,
     you can use `pcache` to improve the responsiveness of the proxy and reduce the
     amount of traffic to the remote directory.
+  id: totrans-315
   prefs: []
   type: TYPE_NORMAL
+  zh: 代理缓存覆盖可以将`ldap`后端转变为不仅仅是一个简单的代理。通过调整属性集和模板以匹配常用的查询，你可以使用`pcache`来提高代理的响应速度，并减少对远程目录的流量。
 - en: A Translucent Proxy
+  id: totrans-316
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 半透明代理
 - en: Consider the following situation. A remote directory contains the basic information
     that you need. You want to create an LDAP proxy to that directory but there are
     a few values that you want to modify on the proxy (but not on the remote directory).
+  id: totrans-317
   prefs: []
   type: TYPE_NORMAL
+  zh: 考虑以下情况。一个远程目录包含你所需的基本信息。你想要创建一个到该目录的LDAP代理，但有一些值你希望在代理上修改（而不是在远程目录上修改）。
 - en: This can be done with the `translucent` overlay, which proxies requests to a
     remote directory, but also allows attributes to be locally modified and stored
     while not modifying the remote directory information tree. This sort of hybrid
     proxy is called a **translucent proxy**.
+  id: totrans-318
   prefs: []
   type: TYPE_NORMAL
+  zh: 这可以通过`translucent`覆盖来实现，它代理对远程目录的请求，但同时允许在不修改远程目录信息树的情况下，本地修改和存储属性。此类混合代理被称为**半透明代理**。
 - en: We will briefly take a look at configuring a translucent proxy.
+  id: totrans-319
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将简要介绍如何配置半透明代理。
 - en: 'As usual, near the top of the `slapd.conf` file of the proxy, we will need
     to load the translucency module. We will also need the LDAP and BDB module, since
     both backends will be used:'
+  id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: 如常规操作一样，在代理的`slapd.conf`文件顶部附近，我们需要加载透明模块。我们还需要LDAP和BDB模块，因为将使用这两个后端：
 - en: '[PRE29]'
+  id: totrans-321
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: Now we can skip ahead in the configuration file to the database section.
+  id: totrans-322
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们可以跳到配置文件中的数据库部分。
 - en: 'For a translucent proxy we will need to configure it to store some information
     locally, but also act like a proxy and retrieve information from a remote directory
     server. Here is a sample configuration for the `transparent` overlay:'
+  id: totrans-323
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于translucent代理，我们需要将其配置为在本地存储一些信息，但同时像代理一样工作并从远程目录服务器检索信息。以下是`transparent`叠加层的示例配置：
 - en: '[PRE30]'
+  id: totrans-324
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: The `transparent` overlay uses a database (in this case the `bdb` backend) to
     store information locally, and then implicitly uses the `ldap` backend to connect
     to the remote directory. As with the `pcache` overlay, it is best to use BDB or
     HDB for the backend data storage mechanism.
+  id: totrans-325
   prefs: []
   type: TYPE_NORMAL
+  zh: '`transparent`叠加层使用数据库（在此例中是`bdb`后端）将信息本地存储，然后隐式使用`ldap`后端连接到远程目录。与`pcache`叠加层一样，最好使用BDB或HDB作为后端数据存储机制。'
 - en: 'For the `bdb` backend configuration, we need the usual directives: `directory`,
     `suffix`, `rootdn`, `rootpw`, and one or more `index` directives (we should at
     least have an equality index on `objectclass`).'
+  id: totrans-326
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于`bdb`后端配置，我们需要常规指令：`directory`、`suffix`、`rootdn`、`rootpw`，以及一个或多个`index`指令（我们至少应该在`objectclass`上有一个相等索引）。
 - en: We also turn off modification timestamps (`lastmod` `off`) so that SLAPD doesn't
     automatically generate the corresponding `modifiersName` and `modifyTimestamp`
     operational attributes. You can remove this line if you want that information
     to be stored in the proxy's database but, when a client requests a record from
     the proxy, it will see different modification information than it would see if
     connecting to the remote directory.
+  id: totrans-327
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还关闭了修改时间戳（`lastmod` `off`），以防止SLAPD自动生成相应的`modifiersName`和`modifyTimestamp`操作属性。如果你希望将这些信息存储在代理的数据库中，可以删除此行，但当客户端从代理请求记录时，它将看到不同的修改信息，而不是连接到远程目录时看到的信息。
 - en: The `rootdn` and `rootpw` password play a special role in a translucent proxy.
     This DN is the *only* user that can add new records to the proxy's database. And
     any LDAP modification, add, or modRDN operations that come from this user will
     change *only* the local copy of the data.
+  id: totrans-328
   prefs: []
   type: TYPE_NORMAL
+  zh: '`rootdn`和`rootpw`密码在translucent代理中扮演着特殊角色。这个DN是*唯一*可以向代理数据库添加新记录的用户。来自该用户的任何LDAP修改、添加或modRDN操作只会改变*本地*数据副本。'
 - en: Note
+  id: totrans-329
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: The root DN can only access values on the remote server that it is allowed to
     access, but it can add or modify any record on the local translucent database.
     This means, effectively, that it may be able to write entries into branches of
     the directory tree that it cannot access (because of ACLs on the remote directory).
+  id: totrans-330
   prefs: []
   type: TYPE_NORMAL
+  zh: 根DN只能访问它被允许访问的远程服务器上的值，但可以在本地的translucent数据库中添加或修改任何记录。这意味着，实际上，它可能能够将条目写入它无法访问的目录树分支（由于远程目录上的ACL限制）。
 - en: Now we have the backend database configured. Next, we want to configure the
     `translucent` overlay.
+  id: totrans-331
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经配置好了后端数据库。接下来，我们要配置`translucent`叠加层。
 - en: After the `overlay` directive, inserting `translucent` into the overlay stack,
     we need to supply the `translucent` overlay with information about the remote
     directory.
+  id: totrans-332
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`overlay`指令之后，插入`translucent`到叠加层堆栈中，我们需要为`translucent`叠加层提供关于远程目录的信息。
 - en: 'Since the `translucent` overlay uses the `ldap` backend, any `ldap` backend
     parameters can be used here:'
+  id: totrans-333
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于`translucent`叠加层使用`ldap`后端，因此可以在此处使用任何`ldap`后端参数：
 - en: '[PRE31]'
+  id: totrans-334
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: The `uri` directive is used to point the translucent proxy to the remote server.
     And again we use the identity assertion discussed earlier in this chapter to handle
     authorization to information from the remote server.
+  id: totrans-335
   prefs: []
   type: TYPE_NORMAL
+  zh: '`uri`指令用于将translucent代理指向远程服务器。我们再次使用本章前面讨论的身份验证来处理对远程服务器信息的授权。'
 - en: 'Now let''s examine a few examples of the translucent proxy in action. First,
     we can grab a record proxied from the remote server:'
+  id: totrans-336
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在让我们来看一些translucent代理实际应用的例子。首先，我们可以从远程服务器获取一个代理的记录：
 - en: '[PRE32]'
+  id: totrans-337
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: In this example we use `ldapsearch` to connect to the proxy (`ldap://proxy.example.com`)
     and retrieve the record with `uid=manny`.
+  id: totrans-338
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，我们使用`ldapsearch`连接到代理（`ldap://proxy.example.com`），并检索具有`uid=manny`的记录。
 - en: This operation causes the proxy to retrieve the record from the remote server.
     It then compares that record to the information in its own database of modifications
     and, if any local modifications to that record apply, they will be inserted into
     the resulting record.
+  id: totrans-339
   prefs: []
   type: TYPE_NORMAL
+  zh: 该操作会导致代理从远程服务器检索记录。然后，它将该记录与其自身的修改数据库中的信息进行比较，并且如果该记录存在任何本地修改，修改将插入到结果记录中。
 - en: 'Let''s say that we want to add a `description` field to Manny''s record, but
     we only want that field to exist on the proxy not on the remote directory. We
     can accomplish this by using `ldapmodify`, and authenticating as the root DN for
     the proxy (`uid=authenticate,ou=system,dc=example,dc=com`):'
+  id: totrans-340
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设我们想要在Manny的记录中添加一个`description`字段，但我们只希望该字段存在于代理中，而不是在远程目录中。我们可以通过使用`ldapmodify`来实现，并以代理的root
+    DN（`uid=authenticate,ou=system,dc=example,dc=com`）进行身份验证：
 - en: '[PRE33]'
+  id: totrans-341
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'This modification simply adds the description attribute along with the message:
     **This was added only to the proxy**.'
+  id: totrans-342
   prefs: []
   type: TYPE_NORMAL
+  zh: 此修改仅添加了描述属性，并附上消息：**此项仅添加到代理中**。
 - en: Note
+  id: totrans-343
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Note that in this example we bind as the DN listed as the rootdn for the translucent
     database. That is because this is the only DN that can write to the translucent
     (local) database.
+  id: totrans-344
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，在此示例中，我们以列为透明数据库rootdn的DN进行绑定。这是因为这是唯一可以写入透明（本地）数据库的DN。
 - en: 'Now the modification should have been written only to the translucent database.
     As a result we should be able to repeat our search before against the proxy and
     see the new description field:'
+  id: totrans-345
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在修改应该仅写入透明数据库。因此，我们应该能够在代理上重复进行搜索，并查看新的描述字段：
 - en: '[PRE34]'
+  id: totrans-346
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'When the proxy receives this search operation, it requests the entire record
     for `uid=manny` from the remote directory. That record looks something like this
     (plus the operational attributes, which are not shown):'
+  id: totrans-347
   prefs: []
   type: TYPE_NORMAL
+  zh: 当代理收到此搜索操作时，它会从远程目录请求整个`uid=manny`的记录。该记录大致如下（加上操作属性，这些属性未显示）：
 - en: '[PRE35]'
+  id: totrans-348
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'The translucent proxy then compares that record with its own, which looks like
     this:'
+  id: totrans-349
   prefs: []
   type: TYPE_NORMAL
+  zh: 透明代理随后将该记录与其自己的记录进行比较，结果如下：
 - en: '[PRE36]'
+  id: totrans-350
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: The two records are then merged, with changes to the translucent database taking
     precedence over those from the remote directory. The result is the appending of
     the `description` attribute to the end of the returned record.
+  id: totrans-351
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，这两条记录会被合并，透明数据库的更改会优先于远程目录的更改。结果是将`description`属性附加到返回记录的末尾。
 - en: Note
+  id: totrans-352
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: The translucent database can be dumped with the `slapcat` tool, and backups
     can be loaded with the `slapadd` tool.
+  id: totrans-353
   prefs: []
   type: TYPE_NORMAL
+  zh: 透明数据库可以使用`slapcat`工具进行转储，备份可以使用`slapadd`工具加载。
 - en: 'But how do we know that this modification wasn''t written to the remote directory?
     We can run a search on that directory and see the unchanged record:'
+  id: totrans-354
   prefs: []
   type: TYPE_NORMAL
+  zh: 但我们如何知道此修改没有写入远程目录呢？我们可以在该目录上运行搜索，查看未更改的记录：
 - en: '[PRE37]'
+  id: totrans-355
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: A transparent proxy can be used to provide local modification of entries that
     are otherwise controlled externally. Like the other forms of proxying, there is
     no OpenLDAP-specific remote directory, the transparent proxy can use any standards-compliant
     LDAP v3 directory as a remote directory.
+  id: totrans-356
   prefs: []
   type: TYPE_NORMAL
+  zh: 透明代理可以用于提供本地修改条目的功能，而这些条目原本由外部控制。与其他形式的代理一样，没有特定于OpenLDAP的远程目录，透明代理可以使用任何符合标准的LDAP
+    v3目录作为远程目录。
 - en: Summary
+  id: totrans-357
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: In this chapter we have examined several strategies for configuring LDAP servers
     to work cooperatively. We first looked at synchronizing and replicating a directory
     information tree from a master directory to one or more shadow (subordinate) directory
     servers using SyncRepl.
+  id: totrans-358
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章我们已经研究了多种配置LDAP服务器以便协同工作的策略。我们首先探讨了如何使用SyncRepl将目录信息树从主目录同步和复制到一个或多个影像（从属）目录服务器。
 - en: 'After looking at replication we turned to proxying, and looked at three different
     proxy configurations: the simple proxy, a caching proxy, and a transparent proxy.'
+  id: totrans-359
   prefs: []
   type: TYPE_NORMAL
+  zh: 在查看了复制功能后，我们转向了代理，研究了三种不同的代理配置：简单代理、缓存代理和透明代理。
 - en: This chapter concludes our detailed look at the OpenLDAP server suite. Next
     we will turn to the tasks of integrating LDAP and extending applications to make
     use of directory data. Most of the applications we will examine use the OpenLDAP
     libraries to implement their LDAP functionality.
+  id: totrans-360
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章结束了我们对OpenLDAP服务器套件的详细分析。接下来，我们将转向LDAP集成和扩展应用程序以利用目录数据的任务。我们将要研究的大多数应用程序使用OpenLDAP库来实现其LDAP功能。
