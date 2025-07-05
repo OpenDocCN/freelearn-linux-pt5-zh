@@ -1,52 +1,71 @@
 - en: Chapter 3. CentOS Filesystems – A Deeper Look
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第三章 CentOS文件系统——更深入的探索
 - en: So we know that our filesystems are comprised of files and directories; both
     of which are files, just different types. However, what about links, pipes, and
     sockets? What are they and how are they used? And why do we talk of links? What
     is the difference between a hard link and soft link? I think I need to sit down.
     I can feel one of my turns coming on.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以我们知道我们的文件系统由文件和目录组成；它们都是文件，只是类型不同。那么，链接、管道和套接字呢？它们是什么，又是如何使用的？为什么我们要谈论链接？硬链接和软链接有什么区别？我想我需要坐下来思考一下。我能感觉到一阵晕眩即将来临。
 - en: 'Let''s also challenge the traditional filesystem design; you may well have
     worked with a **logical volume manager** (**LVM**) in the past, but let me tell
     you just how last century that is. You are going to be blown away by the power
     and ease of your enterprise filesystem management using BTRFS, pronounced Better
     FS. We will cover the following sections in this chapter:'
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们也挑战传统的文件系统设计；你可能曾经使用过**逻辑卷管理器**（**LVM**），但是让我告诉你那已经是上个世纪的事了。你将会被BTRFS（Better
+    FS）强大和简便的企业级文件系统管理所震撼。我们将在本章涵盖以下几个部分：
 - en: '**A magician''s secret**: We reveal how to count subdirectories without actually
     counting them.'
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**魔术师的秘密**：我们揭示如何在不实际计算的情况下计算子目录的数量。'
 - en: '**Special permissions**: This will cover the tail of the `wall` command and
     how it met the GUID bit.'
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**特殊权限**：这将涵盖`wall`命令的尾部以及它如何与GUID位结合使用。'
 - en: '**Naming your pipes**: I am sure that you would not care to be unnamed, and
     your pipes feel this way too. We investigate how to use named pipes to enable
     **inter-process communication** (**IPC**).'
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**命名你的管道**：我敢肯定你不希望没有名字，而你的管道也是如此。我们来探讨如何使用命名管道来实现**进程间通信**（**IPC**）。'
 - en: '**Understanding the command stat**: This will cover all you ever needed to
     know about an inode, the files'' metadata.'
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**理解命令 stat**：这将涵盖你需要了解的所有有关inode和文件元数据的知识。'
 - en: '**Enterprise filesystem shootout**: In BTRFS versus LVM, BTRFS wins hands down.
     We look at what is new in the BTRFS and see how we can make use of snapshots and
     extend volumes.'
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**企业级文件系统对决**：在BTRFS与LVM的对决中，BTRFS毫无悬念地获胜。我们将看看BTRFS中的新特性，并探讨如何使用快照和扩展卷。'
 - en: A magician's secret
+  id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 一个魔术师的秘密
 - en: We know that there are many groups of people in this world that can and often
     do annoy us; magicians perhaps being just one of those groups of people. They
     annoy us because we do not know how they do what they do; quite simply we know
@@ -54,136 +73,200 @@
     to break the honor of the magician's circle and disclose a little trick within
     CentOS Linux that you can use to trick your colleagues; believe me when I say
     that this is one trick worth knowing.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们知道这个世界上有很多团体的人可以也常常让我们烦恼；魔术师可能就是这些人之一。他们让我们烦恼是因为我们不知道他们是如何做到他们所做的；简单来说，我们知道自己被愚弄了，但却不知道具体怎么回事。好了，让我来打破魔术师圈子的荣耀，揭示一个可以用来愚弄你同事的小技巧，确保你会觉得这个技巧值得知道。
 - en: 'Let me show you that if I run the following command on my CentOS 6.5 system,
     I will be shown a long listing of the specified `doc` directory:'
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我给你演示一下，如果我在我的CentOS 6.5系统上运行以下命令，我将看到指定的`doc`目录的长列表：
 - en: '[PRE0]'
+  id: totrans-11
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'The output on my system is as follows:'
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 我系统上的输出如下：
 - en: '[PRE1]'
+  id: totrans-13
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: The first number that is displayed, `758`, is the *link* count. This shows the
     number of filenames that are hard linked to the file's metadata; in simple terms,
     this directory has 758 separate names.
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 显示的第一个数字，`758`，是*链接*计数。这表示与文件元数据硬链接的文件名数量；简单来说，这个目录有758个不同的名称。
 - en: Immediately from this value, I can categorically state that this directory has
     756 subdirectories!
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 从这个值出发，我可以明确地声明这个目录有756个子目录！
 - en: '*"It''s not rocket science, it is subtracting 2 from a number"*'
+  id: totrans-16
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: '*“这不是火箭科学，就是从一个数字中减去2”*'
 - en: The formula is simple! For a given directory, the number of subdirectories is
     equal to the hard link count of two.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 公式很简单！对于给定的目录，子目录的数量等于硬链接计数的两倍。
 - en: I think it is time that we investigate this a little further. When a new directory
     is created, it is initiated with the link count being equal to two; in other words,
     each new directory has to have two names that point to it. This will consist of
     the directory name and the file named `.` (just the period by itself).
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 我想是时候进一步调查一下了。当一个新目录被创建时，它的链接计数会初始化为2；换句话说，每个新目录必须有两个指向它的名称。这包括目录名和名为` .`（就是一个句点）的文件。
 - en: 'In fact, in a new directory, there are always two new files that are created
     along with the directory: the `.` and `..` files.'
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 事实上，在一个新目录中，通常会同时创建两个新文件：` .` 和 `..` 文件。
 - en: The `.` file represents the directory itself
+  id: totrans-20
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`.` 文件代表目录本身'
 - en: The `..` file represents the parent directory
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`..` 文件代表父目录'
 - en: 'Try this yourself; it is easier to understand and might prevent you from going
     too dotty over this:'
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 自己试试；这样理解会更容易，也许能防止你过于迷惑：
 - en: '[PRE2]'
+  id: totrans-23
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'The following screenshot shows the new directory and the listing of the two
     hidden files therein. The color coding, natural to BASH, highlights both files
     in blue, which indicate that they represent directories:'
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下截图显示了新目录以及其中两个隐藏文件的列表。BASH中的颜色编码将这两个文件突出显示为蓝色，表示它们代表目录：
 - en: '![A magician''s secret](img/5902OS_03_01.jpg)'
+  id: totrans-25
   prefs: []
   type: TYPE_IMG
+  zh: '![魔术师的秘密](img/5902OS_03_01.jpg)'
 - en: 'I am sure, when you take time to think, that we use the dot notation as a form
     of shorthand all the time. Consider the following code using the copy command
     `cp`:'
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 我相信，当你仔细思考时，你会发现我们总是使用点符号作为一种简写形式。请看以下使用 `cp` 复制命令的代码：
 - en: '[PRE3]'
+  id: totrans-27
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'Here, we copy the `hosts` file from the `/etc` directory to the current directory
     using the notation of a single dot. In the following example, we change to the
     parent directory using the `cd` command:'
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们使用单点符号从 `/etc` 目录复制 `hosts` 文件到当前目录。在下面的示例中，我们使用 `cd` 命令切换到父目录：
 - en: '[PRE4]'
+  id: totrans-29
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: We can now begin understanding how a directory's link count relates to the subdirectory
     count. If the filename consists of two dots representing the parent directory,
     then for each subdirectory we create in the given directory, we will have a new
     file pointing to the parent directory. Each of these double-dot files is hard
     linked to the subdirectory's parent directory.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们可以开始理解目录的链接计数是如何与子目录数量相关的。如果文件名由两个点组成，表示父目录，那么对于我们在给定目录中创建的每个子目录，我们将会有一个新文件指向父目录。这些双点文件是硬链接到子目录的父目录的。
 - en: Hard links
+  id: totrans-31
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 硬链接
 - en: 'In Linux filesystems, we have two types of links: hard links and soft or symbolic
     links. Hard links are, as we have seen, the name or names of the file. A regular
     file will have just a single name when it is first created. We can add additional
     names to the file using the `ln` command:'
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 Linux 文件系统中，我们有两种类型的链接：硬链接和软链接（或符号链接）。硬链接，正如我们所见，是文件的名称或多个名称。一个普通文件在首次创建时只有一个名称。我们可以使用
+    `ln` 命令为文件添加更多名称：
 - en: '[PRE5]'
+  id: totrans-33
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'We will walk through the steps we executed on our system as follows:'
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将按照以下步骤演示我们在系统上执行的操作：
 - en: We move to our home directory.
+  id: totrans-35
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们移动到主目录。
 - en: Then, we create a new file containing the word `Hello`.
+  id: totrans-36
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 然后，我们创建一个新文件，内容是 `Hello`。
 - en: The `ln` command links the original file to a new name, `the_samefile`. We now
     have two filenames that point to the same metadata. The hard link count of both
     files will be two; the names point to the same metadata.
+  id: totrans-37
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`ln` 命令将原始文件链接到一个新名称 `the_samefile`。现在我们有两个文件名指向相同的元数据。两个文件的硬链接计数将为二；这两个名称指向相同的元数据。'
 - en: Using the `ls` command with the option for the long listing, `-l`, will display
     the hard link count. The option, `-i`, will display the inode number of the file.
     The inode number of both files will be the same. As hard links share the same
     inode number, the source and target file must be on the same filesystem. An inode
     is an entry within a single filesystem.
+  id: totrans-38
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用 `ls` 命令并带上长列表选项 `-l`，将显示硬链接计数。选项 `-i` 将显示文件的 inode 号。两个文件的 inode 号将是相同的。由于硬链接共享相同的
+    inode 号，源文件和目标文件必须位于同一个文件系统中。inode 是单个文件系统中的一个条目。
 - en: Symbolic links
+  id: totrans-39
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 符号链接
 - en: 'Symbolic links, or soft links as they are sometimes referred to, are completely
     separate files whose data points to another filename; as such, they can cross
     the filesystem boundaries and be a little more useful than hard links. Symbolic
@@ -193,86 +276,126 @@
     independent files with their own name, inode, and data. The data of a symbolic
     link is the pointer to the target files. In the following code segment, we can
     see the creation and display of a symbolic link:'
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 符号链接，或有时称为软链接，是完全独立的文件，其数据指向另一个文件名；因此，它们可以跨越文件系统边界，比硬链接更有用。符号链接的文件类型为`l`，表示它们是一种特殊类型的文件。硬链接是常规文件，仅能通过硬链接计数来识别为链接。符号链接不会影响文件的硬链接计数；它们是完全独立的文件，拥有自己的名称、inode和数据。符号链接的数据是指向目标文件的指针。在以下代码段中，我们可以看到符号链接的创建和显示：
 - en: '[PRE6]'
+  id: totrans-41
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'Let''s walk through the following steps that create a symbolic link in our
     home directory:'
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们按照以下步骤在我们的主目录中创建一个符号链接：
 - en: We first move to our home directory.
+  id: totrans-43
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们首先移动到我们的主目录。
 - en: The `ln` command links the original file to a new name, `the_linkedfile`. The
     option `-s` will create a soft link.
+  id: totrans-44
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`ln`命令将原始文件链接到一个新名称`the_linkedfile`。选项`-s`将创建一个软链接。'
 - en: Using the `ls` command, which is the option for the long listing, `-l`, we can
     see from the output that the first character, which indicates the file type, shows
     an `l` indicating that this file is a symbolic link. The extended output also
     shows where the target file is.
+  id: totrans-45
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`ls`命令，其中选项`-l`用于长列表格式，我们可以从输出中看到，第一个字符表示文件类型，显示`l`表示该文件是符号链接。扩展输出还会显示目标文件的位置。
 - en: Special permissions
+  id: totrans-46
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 特殊权限
 - en: 'The permissions or *mode* of a file you we will be familiar with is **Read,
     Write, and eXecute** (**RWX**). These permissions can be set to the three objects:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件的权限或*模式*是我们熟悉的**读取、写入和执行**（**RWX**）。这些权限可以应用于三个对象：
 - en: User
+  id: totrans-48
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 用户
 - en: Group
+  id: totrans-49
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 组
 - en: Others
+  id: totrans-50
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 其他用户
 - en: 'The standard permissions are shown with their octal notation, should you want
     a quick revision exercise, as follows:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 标准权限通过其八进制表示形式展示，如果你想快速复习，可以参考如下：
 - en: '![Special permissions](img/5902OS_03_02.jpg)'
+  id: totrans-52
   prefs: []
   type: TYPE_IMG
+  zh: '![特殊权限](img/5902OS_03_02.jpg)'
 - en: 'There is a fourth block of permissions that precedes user, group, and others.
     This block is for the special permissions; however, rather than representing RWX,
     the permissions comprise of:'
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 在用户、组和其他权限之前，还有一个权限块。这一块用于特殊权限；但是，它并不表示RWX，而是包含以下内容：
 - en: The set user ID (SUID) bit
+  id: totrans-54
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置用户ID位（SUID）
 - en: The set group ID (SGID) bit
+  id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置组ID位（SGID）
 - en: The sticky bit
+  id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Sticky位
 - en: 'Using symbolic notations, these permissions can be added to `file1`, which
     acts as our axiom for the filename during the following demonstration:'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用符号表示法，这些权限可以添加到`file1`，在接下来的演示中`file1`充当文件名的公理：
 - en: '[PRE7]'
+  id: totrans-58
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: The SUID bit
+  id: totrans-59
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 设置用户ID位（SUID）
 - en: The set user ID bit is used when a program needs to run using another user ID
     other than the user running the program. When set, the program runs with the permissions
     of the file's owner and not the user ID of the current user. This is set on some
@@ -281,50 +404,74 @@
     program but they do not have the permissions to write to the `/etc/shadow` file,
     where the passwords are stored. The program will always execute as the root user
     no matter who initiates it.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 设置用户ID位（SUID）用于程序需要以除运行该程序的用户之外的其他用户ID运行时。当设置该位时，程序将以文件所有者的权限运行，而不是当前用户的用户ID。这通常应用于某些简单程序；例如，密码程序`/usr/bin/passwd`就设置了这个权限。这样做是因为普通用户可以更改自己的密码，但没有权限写入`/etc/shadow`文件，密码正是存储在该文件中。无论谁启动该程序，程序都将始终以root用户身份执行。
 - en: 'If you are curious and want to see how many files on your system have this
     permission included, then the `find` command may come to your aid:'
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你感到好奇，想看看系统中有多少文件包含此权限，那么`find`命令可能会对你有所帮助：
 - en: '[PRE8]'
+  id: totrans-62
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: The command, as typed, will search the OS root directory, `/`, down for any
     file that includes the SUID bit, `-perm +4000`.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 命令会按原样搜索操作系统根目录`/`，查找包含SUID位的文件，`-perm +4000`。
 - en: The SGID bit
+  id: totrans-64
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 设置组ID位（SGID）
 - en: 'Similar to the set UID bit, if the SGID permission is set on an executable,
     then the program will run with the group ID of the file''s group rather than the
     group ID of the current user. This is set by default in the `/usr/bin/wall` file,
     and we will again take a closer look by executing the following command:'
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 与设置 UID 位类似，如果在可执行文件上设置了 SGID 权限，则程序将以文件所属组的组 ID 而不是当前用户的组 ID 来运行。这在 `/usr/bin/wall`
+    文件中默认设置，我们将通过执行以下命令再次深入了解：
 - en: '[PRE9]'
+  id: totrans-66
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: From the output, we see that the permissions read `r-xr-sr-x`. The lowercase
     `s` indicates that the SGID and execute permissions are set. If it were an uppercase
     `S`, then the execute permission would not be set for the group.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 从输出结果来看，权限为 `r-xr-sr-x`。小写字母 `s` 表示已经设置了 SGID 和执行权限。如果是大写字母 `S`，则表示没有为组设置执行权限。
 - en: When looking at the `/usr/bin/wall` program, we should understand that this
     program is used to send messages to user consoles; it is a group owned by the
     `tty` group. With the SGID bit set, when any user executes this program, he or
     she run with the privileges of the `tty` group.
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 查看 `/usr/bin/wall` 程序时，我们应该理解，这个程序用于向用户控制台发送消息；它是由 `tty` 组拥有的。通过设置 SGID 位，当任何用户执行这个程序时，他或她将以
+    `tty` 组的权限来运行。
 - en: 'A user logged on to a console has some control over these messages using the
     `y` or `n` option with the `mesg` command:'
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 登录到控制台的用户可以通过在 `mesg` 命令中使用 `y` 或 `n` 选项来控制这些消息：
 - en: '[PRE10]'
+  id: totrans-70
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'We could leave the matter at this, understanding that we are simply enabling
     and disabling messages to our console. We could, but we would not learn the relationship
     with the SGID bit on the wall program, and we would not unlock the fountain of
@@ -333,45 +480,68 @@
     The output on my system shows `/dev/pts/1`. Obtaining a long listing of the device
     file using the following command will show the file type and permissions. The
     file type is `c` indicating a character device:'
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们本可以在这里结束，理解我们只是在启用和禁用控制台的消息传递功能。我们可以这么做，但这样我们就无法学习到与 SGID 位和 wall 程序之间的关系，也无法解锁理解所带来的知识泉源。在控制台中，我们将确定当前连接的是哪个控制台；`tty`
+    命令将在这里帮助我们。我的系统输出显示 `/dev/pts/1`。使用以下命令获取该设备文件的详细列表，将显示文件类型和权限。文件类型为 `c`，表示这是一个字符设备：
 - en: '[PRE11]'
+  id: totrans-72
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'From the output, we can see the permissions of the file; the group owner is
     `tty` and, if messaging is enabled, the group will have the write permission.
     If messaging is disabled, the group will have no permission. We can combine the
     two commands together using the bracket expansion we first saw in [Chapter 1](ch01.html
     "Chapter 1. Taming vi"), *Taming vi*:'
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 从输出结果来看，我们可以看到文件的权限；组所有者是 `tty`，如果启用了消息传递，组将具有写权限。如果禁用了消息传递，组将没有权限。我们可以结合两条命令，使用我们在[第
+    1 章](ch01.html "第 1 章. 驯服 vi")*《驯服 vi》*中首次看到的括号扩展：
 - en: '[PRE12]'
+  id: totrans-74
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: The contents of the brackets are evaluated first; the output from which is in
     turn processed using the `ls -l` command.
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 括号中的内容会首先被计算；计算结果会通过`ls -l`命令进一步处理。
 - en: 'In the following screenshot, messaging is disabled as the group does not have
     the write permission to the console:'
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下图中，由于组没有写权限，消息传递已被禁用：
 - en: '![The SGID bit](img/5902OS_03_03.jpg)'
+  id: totrans-77
   prefs: []
   type: TYPE_IMG
+  zh: '![SGID 位](img/5902OS_03_03.jpg)'
 - en: 'When we enable messaging and review the output in the following screenshot,
     we can see that, miraculously, the write permission now shows for the group:'
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们启用消息传递并查看以下截图中的输出时，我们可以看到，神奇的是，现在组权限中已经显示了写权限：
 - en: '![The SGID bit](img/5902OS_03_04.jpg)'
+  id: totrans-79
   prefs: []
   type: TYPE_IMG
+  zh: '![SGID 位](img/5902OS_03_04.jpg)'
 - en: We have now seen a little more of that initial Linux magic in which we indulged
     in earlier in this chapter. Moreover, we have seen how to apply it to real-world
     Linux issues by controlling the use of the `/usr/bin/wall` command via the `/usr/bin/mesg`
     command.
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们现在已经稍微了解了一下本章开头提到的 Linux 魔法。此外，我们还看到了如何通过 `/usr/bin/mesg` 命令控制 `/usr/bin/wall`
+    命令的使用，从而将其应用于实际的 Linux 问题。
 - en: 'However, the giving from the SGID does not stop with executable files. The
     SGID bit can also be set on directories. When set on a directory, the SGID bit
     ensures that all new files created within the directory are group owned by the
@@ -380,20 +550,29 @@
     directory. If we set the group ownership of the directory to the `apache` group,
     we can then use the SGID bit to maintain the correct ownership of all files created.
     The following commands demonstrate this intricate procedure:'
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，SGID 的作用不仅仅局限于可执行文件。SGID 位也可以设置在目录上。当设置在目录上时，SGID 位确保目录中创建的所有新文件都由目录中的组所有。为了更好地理解这一点，假设我们的网页服务器的文档根目录（即网页存放位置）设置为
+    `/var/www/html/` 目录。如果我们将该目录的组所有权设置为 `apache` 组，那么我们就可以使用 SGID 位来保持所有创建文件的正确所有权。以下命令展示了这个复杂的操作：
 - en: '[PRE13]'
+  id: totrans-82
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: Now, each new web page created `in /var/www/html` will automatically be group
     owned by the `apache` group. We have now seen that the SGID bit can be effective
     on executable files and directories.
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，每个在 `/var/www/html` 中创建的新网页将自动由 `apache` 组拥有。我们现在已经看到了 SGID 位在可执行文件和目录上的有效性。
 - en: The sticky bit
+  id: totrans-84
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 粘滞位
 - en: 'The final special permission is the sticky bit. This is used on directories
     and set on the `/tmp` directory during the default installation of CentOS. The
     ability to delete a file is controlled by directory permissions and not by, as
@@ -403,82 +582,119 @@
     for users to delete any file. To limit the deletions to files owned by the user,
     the sticky bit is applied to the directory. To add the sticky bit permission to
     the `/data` directory, we can use the following command:'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后的特殊权限是粘滞位。它用于目录，并在 CentOS 默认安装时设置在 `/tmp` 目录上。删除文件的能力由目录权限控制，而不是如一些人所想的那样，由文件的权限控制。当你创建或删除文件时，你实际上是在对目录进行操作。这意味着，在一个像
+    `/tmp` 这样的共享目录中，所有用户都可以写入该目录，因此，用户有可能删除任何文件。为了将删除权限限制为用户拥有的文件，粘滞位被应用于该目录。要将粘滞位权限添加到
+    `/data` 目录，我们可以使用以下命令：
 - en: '[PRE14]'
+  id: totrans-86
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: Naming your pipes
+  id: totrans-87
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 给管道命名
 - en: 'I am sure that we all have come across the vertical bar or pipe character `|`;
     we can use this to create command pipelines, where the output of one command is
     piped to the input of another. As a simple demonstration, we can use the following
     commands as an illustration of how often we may use unnamed pipes:'
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 我相信我们都遇到过竖线或管道字符 `|`；我们可以使用它来创建命令管道，将一个命令的输出传递到另一个命令的输入。作为简单示范，我们可以使用以下命令，来说明我们通常会如何使用无名管道：
 - en: '[PRE15]'
+  id: totrans-89
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: The first command, `yum list installed`, lists all the installed packages which
     will be a considerable size; in order to reduce the content, we search for the
     string `plymouth` with the second command `grep`. The two lines of code are conjoined
     with an unnamed pipe. It is said to be unnamed as it is transient and only exists
     for the instance that the two commands run, which, incidentally, is much shorter
     than the life of a mayfly.
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个命令 `yum list installed` 列出所有已安装的软件包，结果会非常庞大；为了减少内容，我们使用第二个命令 `grep` 搜索 `plymouth`
+    字符串。两行代码通过一个无名管道连接在一起。之所以说它是无名的，是因为它是暂时的，只在两个命令运行的实例中存在，而这段时间的长度要比蜉蝣的寿命还短。
 - en: 'This transient nature may not be useful to us in every situation, in which
     case we can create named pipes, which are files with the pipe type. Files can
     be one of the following types:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种短暂的特性在每种情况下可能并不总是有用，这时我们可以创建命名管道，它是具有管道类型的文件。文件可以是以下几种类型之一：
 - en: Regular file
+  id: totrans-92
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 普通文件
 - en: Directory
+  id: totrans-93
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 目录
 - en: Symbolic link
+  id: totrans-94
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 符号链接
 - en: Socket
+  id: totrans-95
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 套接字
 - en: Named pipe
+  id: totrans-96
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 命名管道
 - en: Character device
+  id: totrans-97
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 字符设备
 - en: Block device
+  id: totrans-98
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 块设备
 - en: 'You should be quite familiar with the first three types, but we tend to see
     the others less, although we saw a character device file `/dev/pts/1` in the previous
     section where we were looking at the SGID bit. Character devices are simply terminals
     that we can access. Here, we want to keep our focus on the file type of pipe,
     some of which may exist in your filesystem already. We can hunt them using the
     `find` command, searching for a file type `p`:'
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 你应该对前三种类型非常熟悉，但我们通常较少看到其他类型，尽管我们在前一节中看到过字符设备文件`/dev/pts/1`，当时我们在查看SGID位时。字符设备实际上就是我们可以访问的终端。在这里，我们希望将焦点保持在管道的文件类型上，其中一些可能已经存在于你的文件系统中。我们可以使用`find`命令来查找它们，搜索文件类型为`p`的文件：
 - en: '[PRE16]'
+  id: totrans-100
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'Running this command as a standard user, you can expect errors related to directories
     to which we do not have rights; in such a case, it is often easier to redirect
     errors to `/dev/null`, as we have done here. Having the `autofs` service running
     on your system will create named pipes: `/var/run/autofs.fifo-misc` and `/var/run/autofs.fifo-net`.'
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 作为标准用户运行此命令时，你可能会遇到与我们没有权限的目录相关的错误；在这种情况下，通常更容易将错误重定向到`/dev/null`，正如我们在这里所做的那样。系统上运行`autofs`服务将创建命名管道：`/var/run/autofs.fifo-misc`和`/var/run/autofs.fifo-net`。
 - en: Named pipes allow for different processes to talk with each other or interprocess
     communication. With unnamed pipes, the processes are always running in the same
     parent hierarchy, the same BASH shell in other words. As such, they are useful
@@ -490,415 +706,610 @@
     of the named pipe waiting for the input from clients on the system, releasing
     us from the inward facing coterie, which is the unnamed pipe, into a wider expanse
     of communication.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 命名管道允许不同的进程相互通信或进行进程间通信。使用无名管道时，进程总是运行在同一父级层次结构中，换句话说，它们运行在相同的BASH shell中。因此，它们有用，但仅限于我们和我们狭隘的世界。然而，命名管道则打开了一个命令的输入，允许任何在该系统上运行的进程访问，而不考虑进程层级结构。这或许类似于你第一次意识到，世界上有比怀特岛更多的度假地的那一刻。像`autofs`服务这样的服务进程可能会连接到命名管道的输出，等待系统上客户端的输入，将我们从面对内向的小圈子（即无名管道）解放出来，进入更广阔的通信空间。
 - en: The easiest way to explain how named pipes operate is to demonstrate them. So
     why don't we open two terminal windows? These can be graphical terminals running
     on the desktop if this is easier. I will stay logged in through my own standard
     account into both windows.
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 解释命名管道如何工作的最简单方法是通过演示它们。那么，为什么不打开两个终端窗口呢？如果更方便的话，这些可以是桌面上的图形终端。我将通过我的标准帐户保持登录状态，进入这两个窗口。
 - en: 'In the first terminal window, we can type the following groups of commands:'
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 在第一个终端窗口中，我们可以输入以下一组命令：
 - en: '[PRE17]'
+  id: totrans-105
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'While the first window waits for input, we can go to the second terminal window
     and feed data to the input of the pipe:'
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 当第一个窗口等待输入时，我们可以切换到第二个终端窗口，并将数据输入到管道的输入端：
 - en: '[PRE18]'
+  id: totrans-107
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: Immediately, we will see the result in the first window as we are now able to
     count the lines of output from the `ls` command that we input in the second terminal.
     By doing this, we have allowed two separate processes to talk with each other.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我们在第二个终端中输入`ls`命令并查看输出时，第一个窗口将立刻显示结果。通过这样做，我们已经使两个独立的进程能够相互通信。
 - en: Understanding the command stat
+  id: totrans-109
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 理解命令 stat
 - en: 'The CentOS command line is full of tools, and trying to learn them all is perhaps
     a lifetime''s work. As with all tasks, reaching the finish line begins with the
     first step. Our first step will be to delve into the world of the `/usr/bin/stat`
     command. By using this command, we can query a file''s metadata. A file in CentOS
     consists of:'
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: CentOS命令行充满了工具，尝试学习它们所有的工具可能是一辈子的工作。就像所有任务一样，到达终点线的第一步始于第一步。我们的第一步将是深入了解`/usr/bin/stat`命令的世界。通过使用此命令，我们可以查询文件的元数据。CentOS中的文件由以下部分组成：
 - en: A filename (hard link)
+  id: totrans-111
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 文件名（硬链接）
 - en: File metadata (inode)
+  id: totrans-112
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 文件元数据（inode）
 - en: Data
+  id: totrans-113
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 数据
 - en: 'Using `stat` and the filename alone, we can view the complete inode metadata.
     This is demonstrated with the following group of commands:'
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 仅使用`stat`命令和文件名，我们可以查看完整的inode元数据。通过以下命令组可以演示这一点：
 - en: '[PRE19]'
+  id: totrans-115
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'The following screenshot displays the output of `stat`:'
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下截图显示了`stat`命令的输出：
 - en: '![Understanding the command stat](img/5902OS_03_05.jpg)'
+  id: totrans-117
   prefs: []
   type: TYPE_IMG
+  zh: '![理解命令 stat](img/5902OS_03_05.jpg)'
 - en: 'We can see that the complete metadata is displayed, but if we choose, we can
     display just elements of the metadata; for example, to display the file permissions
     in the octal format, run the following command:'
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以看到完整的元数据被显示出来，但如果我们选择的话，也可以只显示元数据的某些元素；例如，要以八进制格式显示文件权限，请运行以下命令：
 - en: '[PRE20]'
+  id: totrans-119
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'To display the permission in human-readable format, run the following command:'
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 要以人类可读的格式显示权限，请运行以下命令：
 - en: '[PRE21]'
+  id: totrans-121
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: The output will show `664` and `-rw-rw-r`, respectively. The inode will always
     store the permissions in the octal format, but many commands, such as `ls` and
     `stat` can convert to a friendlier format.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 输出将显示`664`和`-rw-rw-r`，分别表示权限。inode始终以八进制格式存储权限，但许多命令，如`ls`和`stat`，可以将其转换为更友好的格式。
 - en: 'There are three timestamps that are stored in the inode:'
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: inode中存储了三个时间戳：
 - en: The last access time
+  id: totrans-124
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 最后访问时间
 - en: The last modified time
+  id: totrans-125
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 最后修改时间
 - en: The last changed time
+  id: totrans-126
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 最后更改时间
 - en: The last access time
+  id: totrans-127
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 最后访问时间
 - en: 'The last access time for a file lists the time that the file was last read.
     This is dependent on the filesystem maintaining the last access time; there is
     a mount option noatime that prevents the last access time from being updated.
     To list the last access time for the file, run the following command:'
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件的最后访问时间列出了文件最后被读取的时间。这取决于文件系统是否维护最后访问时间；有一个挂载选项`noatime`可以防止最后访问时间被更新。要列出文件的最后访问时间，可以运行以下命令：
 - en: '[PRE22]'
+  id: totrans-129
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'The time shown for me is 10:12\. If I now read the file and run the command
     again, the time will change:'
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 对我来说，当前时间是10:12。如果我现在读取文件并再次运行命令，时间将发生变化：
 - en: '[PRE23]'
+  id: totrans-131
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: The time now shows as 10:28\. This is useful to find out if files are being
     read on a system. If they are not, it indicates that perhaps they are not needed
     and can be archived onto another device.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 当前时间显示为10:28。这对于了解系统中文件是否被读取非常有用。如果没有被读取，则可能意味着这些文件不再需要，可以归档到其他设备上。
 - en: The last modified time
+  id: totrans-133
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 最后修改时间
 - en: The last modified time for a file indicates when the file itself was changed,
     that is, the file's data. If we edit the file and then check the last modified
     time, it will have changed.
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件的最后修改时间表示文件本身何时被更改，即文件的数据。如果我们编辑文件然后检查最后修改时间，它将发生变化。
 - en: '[PRE24]'
+  id: totrans-135
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: This is now 10:36 as opposed to 10:12 when the original content was created.
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在的时间是10:36，而原始内容创建时是10:12。
 - en: Tip
+  id: totrans-137
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: The output from `ls -l` also shows the file's last modified time.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ls -l`命令的输出还会显示文件的最后修改时间。'
 - en: The last changed time
+  id: totrans-139
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 最后更改时间
 - en: 'The last changed time of a file relates to when the metadata was changed, as
     opposed to the file''s data. Changing the file permissions, for example, will
     alter the last changed time:'
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件的最后更改时间与元数据更改的时间相关，而不是文件数据的更改时间。例如，改变文件权限将会更改最后更改时间：
 - en: '[PRE25]'
+  id: totrans-141
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: The time for my system now shows that the file's metadata was changed at 10:41.
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: 我的系统现在显示文件的元数据在10:41时被更改。
 - en: Enterprise filesystem shootout
+  id: totrans-143
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 企业文件系统对抗
 - en: 'The LVM has been for many years the way to manage disk growth, and allowing
     logical volumes to span over multiple disks and support backing up through the
     use of snapshots. LVMs, although very good, still require a filesystem to sit
     on top of the logical volume and hence, incur an extra level of management; bearing
     in mind that the LVM system itself has three levels of management:'
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: LVM已经是管理磁盘增长的方式多年，允许逻辑卷跨多个磁盘并通过快照进行备份。尽管LVM非常好，但仍然需要文件系统放在逻辑卷之上，因此会涉及额外的管理层级；需要记住的是，LVM系统本身有三层管理：
 - en: '**Physical volumes**: These are the disk space made available to the LVM system'
+  id: totrans-145
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**物理卷**：这些是提供给LVM系统的磁盘空间。'
 - en: '**Volume groups**: These organize the physical volumes to be made available
     to the consumer'
+  id: totrans-146
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**卷组**：这些用于组织物理卷，以便提供给用户使用。'
 - en: '**Logical volumes**: These consume the disk space made available via the volume
     groups and are presented to the filesystem tools to be formatted'
+  id: totrans-147
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**逻辑卷**：这些占用了通过卷组提供的磁盘空间，并被呈现给文件系统工具进行格式化。'
 - en: Now just because we have used such software for the last 10 years or so does
     not give it the right to continue unchallenged, even within the enterprise. We
     now see **B-tree filesystem** (**BTRFS**) pronounced as **Better FS** making inroads
     in Linux. BTRFS is available on version 0.20 to install and can be used on CentOS
     6.5, although caution should be taken, as it is marked as experimental.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，仅仅因为我们在过去的十年左右使用过这些软件，并不意味着它可以毫无挑战地继续存在，即便是在企业中。我们现在看到**B树文件系统**（**BTRFS**）被称为**更好的文件系统**，正在Linux中逐步普及。BTRFS在版本0.20中可以安装，并且可以在CentOS
+    6.5上使用，尽管需要注意，它被标记为实验性。
 - en: What BTRFS has to offer
+  id: totrans-149
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: BTRFS的优势
 - en: 'With over 55 kernel-based filesystems in the Linux kernel tree currently, do
     we really need another one? The first issue here is that many filesystems have
     limited or very specific usage; only the extN systems such as ext2, ext3, and
     ext4 are truly general purpose but even with the latest incarnation of these,
     ext4, the size limit is 16 TB. BTRFS scales to 16 **exabytes** (**EB**) and brings
     reliability features previously not found, as follows:'
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 目前Linux内核树中有超过55种基于内核的文件系统，我们真的需要另一个吗？这里的第一个问题是，许多文件系统有着有限的或非常特定的使用场景；只有像ext2、ext3和ext4这样的extN文件系统才是通用的，尽管这些文件系统的最新版本ext4的大小限制为16TB。BTRFS扩展到16
+    **艾字节**（**EB**），并带来了以前未曾出现的可靠性功能，具体如下：
 - en: Very fast filesystem creation
+  id: totrans-151
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 非常快速的文件系统创建
 - en: Data and metadata checksums
+  id: totrans-152
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 数据和元数据校验和
 - en: Snapshotting
+  id: totrans-153
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 快照功能
 - en: Online scrub to fix issues
+  id: totrans-154
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在线修复以解决问题
 - en: Installing BTRFS
+  id: totrans-155
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 安装BTRFS
 - en: 'On the CentOS 6.5 demonstration system I am using, we will first need to install
     BTRFS:'
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我使用的CentOS 6.5演示系统上，我们首先需要安装BTRFS：
 - en: '[PRE26]'
+  id: totrans-157
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: Now that we have the utilities installed, we can begin to experience the power
     and simplicity of BTRFS. My lab machine currently has four additional free partitions
     on the second drive; each one consists of 1 GB to use in the following demonstrations.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经安装了相关工具，可以开始体验BTRFS的强大与简洁。我的实验室计算机当前在第二块硬盘上有四个额外的空闲分区；每个分区大小为1GB，用于以下演示。
 - en: Creating a BTRFS filesystem
+  id: totrans-159
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 创建BTRFS文件系统
 - en: 'To kick off the show today, we will first create a BTRFS filesystem on a single
     1 GB partition, mount it to the `/data` directory, and copy some data to it as
     follows:'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了开始今天的演示，我们首先将在一个1GB的单一分区上创建一个BTRFS文件系统，将其挂载到`/data`目录，并按如下方式复制一些数据：
 - en: '[PRE27]'
+  id: totrans-161
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: From these commands, you will see that we copy some of the existing PDF files
     to give us some real data to use in the demonstration, ensuring that we will see
     no loss of data during the exercises. The final command line shows the filesystem
     and confirms it size of 1 GB.
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 从这些命令中，你会看到我们复制了一些现有的PDF文件，为演示提供了真实数据，确保在演练过程中不会丢失数据。最后的命令行显示了文件系统并确认其大小为1GB。
 - en: Expanding a BTRFS filesystem
+  id: totrans-163
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 扩展BTRFS文件系统
 - en: 'We may well be running out of space within the `/data` structure; we are not
     but we can imagine. If we were using an LVM structure, we would have to run several
     commands to expand the existing filesystem across a new partition or disk. This
     would be the process in LVMs:'
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可能会发现`/data`结构中的空间即将用完；虽然目前还没有用完，但我们可以设想一下。如果我们使用的是LVM结构，我们就必须运行几个命令来扩展现有文件系统，跨越新的分区或磁盘。这将是LVM中的过程：
 - en: 'Volume management in the old way requires us to execute the following commands:'
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 旧方式的卷管理要求我们执行以下命令：
 - en: '[PRE28]'
+  id: totrans-166
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: Volume management with BTRFS
+  id: totrans-167
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 使用BTRFS进行卷管理
 - en: 'As we can see, there are four commands to be executed, all with a generous
     sprinkling of syntax that will try to trip us up. We can now see how to do this
     using BTRFS:'
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 如我们所见，执行这些命令时有四个步骤，所有命令都有一定的语法难度，容易让我们出错。我们现在可以看到如何使用BTRFS来完成这一过程：
 - en: '[PRE29]'
+  id: totrans-169
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'That''s it! That is all that we needed to do, and we now have a 2 GB volume.
     We can confirm this by using the following command:'
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 就是这样！我们所需要做的就是这些，现在我们已经有了一个2GB的卷。我们可以通过以下命令确认这一点：
 - en: '[PRE30]'
+  id: totrans-171
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'Both commands will confirm that we now have 2 GB of disk space available in
     the volume and the data is still there and accessible. The volume metadata is
     copied to both partitions. In this way, we can view the volume information from
     either device:'
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 两个命令将确认我们现在在卷中有2GB的可用磁盘空间，数据仍然存在且可以访问。卷的元数据被复制到两个分区中。通过这种方式，我们可以从任意设备查看卷信息：
 - en: '[PRE31]'
+  id: totrans-173
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: Both commands will show the same data, as their metadata is stored on both devices.
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 两个命令将显示相同的数据，因为它们的元数据存储在两个设备上。
 - en: Balancing the filesystem
+  id: totrans-175
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 平衡文件系统
 - en: 'If we had genuinely added the extra partition because we were running out of
     disk space within the original volume, then we can balance the data across the
     complete volume now as follows:'
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们真的因为原始卷的磁盘空间不足而添加了额外的分区，那么我们现在可以按照以下方式平衡整个卷中的数据：
 - en: '[PRE32]'
+  id: totrans-177
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: The `-m` argument represents the metadata and `-d` represents the data. In this
     way, the disks are equally used.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: '`-m` 参数表示元数据，`-d` 表示数据。通过这种方式，磁盘会均衡使用。'
 - en: Adding an entry to /etc/fstab
+  id: totrans-179
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 添加条目到 /etc/fstab
 - en: 'One would assume that we would like the `/data` directory mounted at boot time
     and we will add an entry to the `/etc/fstab` file. When mounting from this file,
     we must reference all the devices:'
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 一般来说，我们希望 `/data` 目录在启动时挂载，因此我们会在 `/etc/fstab` 文件中添加条目。在从该文件挂载时，我们必须引用所有的设备：
 - en: '[PRE33]'
+  id: totrans-181
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: In this way, we instruct the early mount process of the device construction
     when a BTRFS scan is not available.
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过这种方式，我们在 BTRFS 扫描不可用时指示设备构建的早期挂载过程。
 - en: Creating an RAID1 mirror
+  id: totrans-183
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 创建一个 RAID1 镜像
 - en: 'Software **redundant array of inexpensive disks** (**RAID**) is also support
     by BTRFS. The following are the currently supported RAID levels:'
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 软件**冗余便宜磁盘阵列**（**RAID**）也被 BTRFS 支持。目前支持的 RAID 级别如下：
 - en: 'RAID 0: Striping without redundancy'
+  id: totrans-185
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'RAID 0: 没有冗余的条带化'
 - en: 'RAID 1: Disk mirroring'
+  id: totrans-186
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'RAID 1: 磁盘镜像'
 - en: 'RAID 10: Striped mirror'
+  id: totrans-187
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'RAID 10: 条带化镜像'
 - en: We can create a mirrored device using BTRFS software mirroring, should we need
     it. This does not give us extra disk space, but does provide fault tolerance in
     the case of a disk failure. We can emulate this in our setup, but as all of our
     partitions are on one disk, it will not help against disk failure, but the idea
     holds true.
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果需要，我们可以使用 BTRFS 软件镜像创建一个镜像设备。这并不会为我们提供额外的磁盘空间，但在磁盘故障的情况下提供容错能力。我们可以在我们的设置中模拟这一点，但因为所有分区都在同一块磁盘上，它对磁盘故障没有帮助，但这个概念是成立的。
 - en: '[PRE34]'
+  id: totrans-189
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: Creating the mirror, we use RAID1 for the metadata and data `-m` and `–d`, respectively.
     The disk space available is 1 GB. Whatever we write to `/dev/sdb7` is mirrored
     to `/dev/sdb8`; with mirroring, we lose 50 percent of the data storage but have
     a high level of redundancy.
+  id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: 创建镜像时，我们分别使用 RAID1 为元数据和数据 `-m` 和 `–d`。可用的磁盘空间是 1 GB。我们写入`/dev/sdb7`的内容会镜像到`/dev/sdb8`；使用镜像时，我们失去
+    50% 的数据存储，但获得了较高的冗余性。
 - en: 'We will again need to add an entry to the `/etc/fstab` file, as seen earlier
     to ensure the system mounts correctly during boot time:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们需要再次向 `/etc/fstab` 文件添加条目，如前所见，以确保系统在启动时正确挂载：
 - en: '[PRE35]'
+  id: totrans-192
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: Using BTRFS snapshots
+  id: totrans-193
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用 BTRFS 快照
 - en: 'Analyzing what you have so far, BTRFS is quite cool, don''t you think? However,
     we have not yet exhausted the wealth of goodness that it has to offer. Snapshots
     can be used as read only or read/write copies of data. The reality is that there
     is no need to copy data as it is effectively linked until it changes in one of
     the locations. In this way, a snapshot of a large filesystem can be taken instantly.
     You can use snapshots in the following ways:'
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 分析到目前为止，BTRFS 还是挺酷的，你不觉得吗？不过，我们还没有完全挖掘它所能提供的所有优势。快照可以作为只读或读/写的数据副本来使用。实际上，没必要复制数据，因为它们在未改变的情况下是有效链接的。通过这种方式，可以瞬间创建一个大型文件系统的快照。你可以通过以下方式使用快照：
 - en: As part of a backup solution where you may be concerned with open files affecting
     the backup, the snapshot will be created as read only and subsequently you will
     implement a backup of the snapshot. In this way, the backup will be of the host
     filesystem at the point in time that the snapshot was created.
+  id: totrans-195
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 作为备份解决方案的一部分，如果你担心打开的文件会影响备份，可以创建只读快照，随后你可以备份该快照。通过这种方式，备份将是快照创建时主机文件系统的状态。
 - en: Snapshots can be useful where you know many files will change in a structure
     and you may want to restore the original files quickly. Perhaps where you are
     working with scripts to modify many files, you can easily revert to the snapshot
     copies if the scripts prove not to be as robust as you had imagined, thought,
     or hoped.
+  id: totrans-196
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 快照在你知道很多文件会在某个结构中发生变化，并且你可能希望快速恢复原始文件的情况下非常有用。比如当你使用脚本修改多个文件时，如果脚本的效果不如你预期、想象或希望的那样，你可以轻松地恢复到快照副本。
 - en: The snapshot *must* be created in the same filesystem as the target data; as
     we mentioned before, the rapid creation of the snapshot is affected by a form
     of internal linking within the filesystem. Within a BTRFS filesystem, we can create
     subvolumes. Subvolumes allow discrete management identities within the BTRFS filesystem.
     We will take a snapshot of a BTRFS subvolume storing it in another subvolume on
     the same filesystem.
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 快照*必须*在与目标数据相同的文件系统中创建；正如我们之前提到的，快照的快速创建受到文件系统内部链接方式的影响。在BTRFS文件系统中，我们可以创建子卷。子卷允许在BTRFS文件系统中进行独立的管理标识。我们将对一个BTRFS子卷进行快照，并将其存储在同一文件系统中的另一个子卷中。
 - en: To achieve this, we shall define two subvolumes within the `/data` BTRFS filesystem.
     Defining the subvolumes will create both the directories in the filesystem as
     well as the BTRFS subvolume entities. We will create a snapshot of the first subvolume,
@@ -906,57 +1317,85 @@
     a snapshot of the complete filesystem as changes to the snapshot will need to
     be written back to itself casing infinite recursion; believe me infinite recursion
     is not a good thing, not a good thing, not a good thing,…
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了实现这一点，我们将在`/data` BTRFS 文件系统中定义两个子卷。定义子卷将创建文件系统中的目录以及 BTRFS 子卷实体。我们将创建第一个子卷的快照，并将其存储在同一`/data`文件系统中的第二个子卷中。我们不能对整个文件系统创建快照，因为快照的更改需要写回自身，这会导致无限递归；相信我，无限递归不是一件好事，不是好事，不是好事……
 - en: 'Let''s begin by creating the two subvolumes:'
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们首先创建这两个子卷：
 - en: '[PRE36]'
+  id: totrans-200
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'We can list subvolumes easily using the following command:'
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以使用以下命令轻松列出子卷：
 - en: '[PRE37]'
+  id: totrans-202
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: With the subvolumes in place, we can now move our existing data to the `/data/working`
     directory, allowing some data to be ready for snapshotting. The working directory,
     as the name suggests, should be where our real data is stored and the lifeblood
     of our organization. If this data fails, then so does our organization and we
     lose our jobs. It makes sense that this data is managed carefully.
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 在子卷到位之后，我们可以将现有数据移动到`/data/working`目录，从而让一些数据准备好进行快照。顾名思义，工作目录应该是存储我们实际数据的地方，它是我们组织的命脉。如果这些数据发生故障，我们的组织也会随之崩溃，我们也会失去工作。因此，理应小心管理这些数据。
 - en: '[PRE38]'
+  id: totrans-204
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: Our scenario is that we test scripts that will delete files based perhaps on
     the last accessed time; I do realize that we should not be working with live data
     but living on the edge does liven up our otherwise mundane life. That said, we
     have not entirely lost all sense of the importance of this data. Before we run
     the scripts, we create a read-only snapshot of the data.
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的场景是测试可能根据最后访问时间删除文件的脚本；我意识到我们不应该使用实时数据，但生活在边缘的感觉能让我们原本单调的生活充满活力。话虽如此，我们还没有完全失去对这些数据重要性的感知。在运行脚本之前，我们会创建一个数据的只读快照。
 - en: 'To create a read-only snapshot of the working subvolume, execute the following
     command:'
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 要创建工作子卷的只读快照，请执行以下命令：
 - en: '[PRE39]'
+  id: totrans-207
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: 'We can list the available subvolumes as shown earlier with the following command:'
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以像之前一样使用以下命令列出可用的子卷：
 - en: '[PRE40]'
+  id: totrans-209
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'From the output, we can see that the snapshot appears as a new subvolume. Listing
     the contents of both directories should indicate that the contents are the same:'
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: 从输出中，我们可以看到快照显示为一个新的子卷。列出两个目录的内容应该表明它们的内容是相同的：
 - en: '[PRE41]'
+  id: totrans-211
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: The name `first-run` is not important, but perhaps we can create multiple snapshots
     based on the data before the first run of the scripts, before the second run of
     the scripts, and so on. At this stage, the snapshot really does not take up any
@@ -966,12 +1405,16 @@
     be the case if the files were modified in any way rather than deleted; the snapshot
     holds the files as they were at the time the snapshot was created. We can simply
     copy the files back to the original location in the event of a catastrophe.
+  id: totrans-212
   prefs: []
   type: TYPE_NORMAL
+  zh: '`first-run`这个名称并不重要，但也许我们可以根据脚本第一次运行前、第二次运行前的数据创建多个快照。在这个阶段，快照实际上并没有占用任何空间，因为源和目标中的数据是相同的。如果我们删除了`/data/working`中的所有文件，那么BTRFS中的**写时复制**（**COW**）技术将会在`/data/backup/first-run`中创建这些文件。如果这些文件以任何方式被修改而不是删除，情况也是一样的；快照会保留文件在创建快照时的状态。在发生灾难时，我们可以简单地将文件复制回原始位置。'
 - en: Summary
+  id: totrans-213
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 摘要
 - en: 'This chapter has seen us disseminate the filesystem structure that we find
     in CentOS Linux and opens our comfort zone to entertain new technologies such
     as BTRFS. We began with a little trickery or understanding of the hard link count
@@ -980,21 +1423,29 @@
     file led us to look more at `/usr/bin/stat` and the options that it supplies to
     us including the three timestamps, not of the apocalypse but of the file itself:
     last access, last modified, and last changed.'
+  id: totrans-214
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章带领我们深入了解了CentOS Linux中的文件系统结构，并使我们能够探索像BTRFS这样的新技术。我们从了解如何通过`ls`或`stat`命令查看硬链接数量开始。这个数量显示了多少个文件名与一个inode或文件元数据相关联。理解文件的元数据使我们进一步研究了`/usr/bin/stat`以及它提供的选项，包括三种时间戳，它们不是末日预兆，而是文件本身的时间戳：最后访问时间、最后修改时间和最后更改时间。
 - en: A little foray into special permissions released the knowledge of how users
     can enable and disable console messaging, the console files being group owned
     by the `tty` group, and the write permission being added and removed.
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
+  zh: 一点关于特殊权限的探讨让我们了解了用户如何启用和禁用控制台消息，控制台文件由`tty`组拥有，写入权限可以被添加或移除。
 - en: Finally, we basked in the glory that is the BTRFS filesystem. This is truly
     something to start working with now as this will be the enterprise filesystem
     of choice for years to come. Providing both filesystem and volume management in
     a single task is simplified and improved beyond measure.
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们沐浴在BTRFS文件系统的荣耀中。这真的是一个现在就开始使用的技术，因为它将是未来几年内企业级文件系统的首选。将文件系统和卷管理合并在一个任务中，简化并极大地提升了管理效率。
 - en: You now need to prepare yourself for the banquet that is YUM and of software
     repository management tool, Yellowdog Update Manager, ensuring that we know a
     little more than simply `yum install`.
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在你需要为YUM以及软件仓库管理工具Yellowdog Update Manager的盛宴做好准备，确保我们掌握的不仅仅是`yum install`这一点。
