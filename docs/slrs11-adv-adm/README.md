@@ -1,6 +1,6 @@
-# Github DevOps 加速指南
+# Solaris 11 高级管理
 
-> 原文：[`annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e`](https://annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e)
+> 原文：[`annas-archive.org/md5/d798fed6801363e3c493ed91d8bc1298`](https://annas-archive.org/md5/d798fed6801363e3c493ed91d8bc1298)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 

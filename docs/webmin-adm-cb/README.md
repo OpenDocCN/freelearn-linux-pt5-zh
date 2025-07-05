@@ -1,6 +1,6 @@
-# Github DevOps 加速指南
+# Webmin 管理秘籍
 
-> 原文：[`annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e`](https://annas-archive.org/md5/677f27c30764b3701bc2b6cf6de3a30e)
+> 原文：[`annas-archive.org/md5/84cf2e9ed80568ee621e169b740dc335`](https://annas-archive.org/md5/84cf2e9ed80568ee621e169b740dc335)
 > 
 > 译者：[飞龙](https://github.com/wizardforcel)
 > 
