@@ -1,0 +1,5087 @@
+- en: 2 Securing User Accounts
+  id: totrans-0
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+  zh: 2 用户账户安全
+- en: Join our book community on Discord
+  id: totrans-1
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 加入我们的书籍社区，和我们一起在Discord上讨论
+- en: '[https://packt.link/SecNet](https://packt.link/SecNet)'
+  id: totrans-2
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '[https://packt.link/SecNet](https://packt.link/SecNet)'
+- en: '![](img/file19.png)'
+  id: totrans-3
+  prefs: []
+  type: TYPE_IMG
+  zh: '![](img/file19.png)'
+- en: Managing users is one of the more challenging aspects of IT administration.
+    You need to make sure that users can always access their stuff and that they can
+    perform the required tasks to do their jobs. You also need to ensure that users'
+    stuff is always secure from unauthorized users and that users can't perform any
+    tasks that don't fit their job description. It's a tall order, but we aim to show
+    that it's doable. In this chapter, we'll look at how to lock down user accounts
+    and user credentials to protect them from attackers and snoopers. We'll also look
+    at how to prevent users from having any more privileges than they have to have
+    in order to perform their jobs.
+  id: totrans-4
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 用户管理是IT管理中较为具有挑战性的方面之一。你需要确保用户能够始终访问他们的文件，并且能够执行完成工作所需的任务。你还需要确保用户的文件始终受到未授权用户的保护，并且用户不能执行与他们工作描述不符的任务。这是一个艰巨的任务，但我们旨在证明这是可以做到的。在本章中，我们将讨论如何锁定用户账户和用户凭证，以保护它们免受攻击者和窥探者的侵害。我们还将探讨如何防止用户获得超出其工作所需权限的特权。
+- en: 'The specific topics covered in this chapter are as follows:'
+  id: totrans-5
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 本章涵盖的具体内容如下：
+- en: The dangers of logging in as the root user
+  id: totrans-6
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 以root用户登录的危险
+- en: The advantages of using `sudo`
+  id: totrans-7
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 使用`sudo`的优势
+- en: Setting up `sudo` privileges for full administrative users and for users with
+    only certain delegated privileges
+  id: totrans-8
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 为完全管理员用户和仅具有某些委派权限的用户设置`sudo`权限
+- en: Advanced tips and tricks to use `sudo`
+  id: totrans-9
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 使用`sudo`的高级技巧
+- en: Locking down users' home directories
+  id: totrans-10
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 锁定用户的主目录
+- en: Enforcing strong password criteria
+  id: totrans-11
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 强制执行强密码标准
+- en: Setting and enforcing password and account expiration
+  id: totrans-12
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 设置并强制执行密码和账户过期规则
+- en: Preventing brute-force password attacks
+  id: totrans-13
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 防止暴力破解密码攻击
+- en: Locking user accounts
+  id: totrans-14
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 锁定用户账户
+- en: Setting up security banners
+  id: totrans-15
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 设置安全横幅
+- en: Detecting compromised passwords
+  id: totrans-16
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 检测被破坏的密码
+- en: Understanding central user management systems
+  id: totrans-17
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 理解中央用户管理系统
+- en: The dangers of logging in as the root user
+  id: totrans-18
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 以root用户登录的危险
+- en: A huge advantage that Unix and Linux operating systems have over Windows is
+    that Unix and Linux do a much better job of keeping privileged administrative
+    accounts separated from normal user accounts. Indeed, one reason that older versions
+    of Windows were so susceptible to security issues, such as drive-by virus infections,
+    was the common practice of setting up user accounts with administrative privileges,
+    without having the protection of the **User Access Control (UAC)** that's in newer
+    versions of Windows. (Even with UAC, Windows systems still do get infected, just
+    not quite as often.) With Unix and Linux, it's a lot harder to infect a properly
+    configured system.
+  id: totrans-19
+  prefs: []
+  type: TYPE_NORMAL
+  zh: Unix和Linux操作系统相对于Windows的一个巨大优势在于，Unix和Linux在将特权管理员账户与普通用户账户分离方面做得更好。事实上，旧版本的Windows容易受到安全问题的攻击，例如病毒感染，就是因为常常设置了具有管理员权限的用户账户，而没有像新版Windows那样启用**用户帐户控制（UAC）**。
+    （即使有了UAC，Windows系统仍然会受到感染，只是频率没有那么高。）在Unix和Linux中，要感染一个配置正确的系统要困难得多。
+- en: 'You probably already know that the all-powerful administrator account on a
+    Unix or Linux system is the root account. If you''re logged in as the root user,
+    you can do anything you want to do to that system. So you may think, "Yeah, that''s
+    handy, so that''s what I''ll do." However, always logging in as the root user
+    can present a whole load of security problems. Consider the following. Logging
+    in as the root user can do the following:'
+  id: totrans-20
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你可能已经知道，Unix或Linux系统中无所不能的管理员账户是root账户。如果你以root用户身份登录，你可以对系统做任何你想做的事情。所以你可能会想，“是的，这很方便，所以我就这么做。”然而，始终以root用户登录可能会带来一堆安全问题。考虑以下情况，以root用户登录可能会带来以下风险：
+- en: Make it easier for you to accidentally perform an action that causes damage
+    to the system
+  id: totrans-21
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 让你更容易意外执行对系统造成损害的操作
+- en: Make it easier for someone else to perform an action that causes damage to the
+    system
+  id: totrans-22
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 让其他人更容易执行对系统造成损害的操作
+- en: So if you always log on as the root user, or even if you just make the root
+    user account readily accessible, you could say that you're doing a big part of
+    attackers' and intruders' work for them. Also, imagine if you were the head Linux
+    administrator at a large corporation, and the only way to allow users to perform
+    admin tasks was to give them all the root password. What would happen if one of
+    those users were to leave the company? You wouldn't want that person to still
+    have the ability to log in to the systems, so you'd have to change the password
+    and distribute the new one to all of the other users. And what if you just want
+    users to have admin privileges only for certain tasks, instead of having full
+    root privileges?
+  id: totrans-23
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 因此，如果你总是以 root 用户身份登录，或者即使你只是让 root 用户账户变得容易访问，可以说你在为攻击者和入侵者做了大部分的工作。而且，想象一下，如果你是一个大型公司的
+    Linux 系统管理员，而允许用户执行管理任务的唯一方式是将 root 密码提供给所有人。如果其中一个用户离开了公司，你肯定不希望该用户依然能登录到系统，所以你不得不更改密码并将新密码分发给其他所有用户。那么如果你只希望用户对某些任务拥有管理员权限，而不是拥有完整的
+    root 权限怎么办？
+- en: What we need is a mechanism that allows users to perform administrative tasks
+    without incurring the risk of having them always log on as the root user, and
+    that would also allow users to have only the admin privileges they really need
+    to perform a certain job. In Linux and Unix, we have that mechanism in the form
+    of the `sudo` utility.
+  id: totrans-24
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我们需要的是一种机制，使用户能够执行管理任务，而无需承担一直以 root 用户身份登录的风险，并且该机制还允许用户仅拥有完成某项工作所需的最小管理员权限。在
+    Linux 和 Unix 系统中，我们有这种机制，形式就是 `sudo` 工具。
+- en: The advantages of using sudo
+  id: totrans-25
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 使用 `sudo` 的优势
+- en: 'Used properly, the `sudo` utility can greatly enhance the security of your
+    systems, and it can make an administrator''s job much easier. With `sudo`, you
+    can do the following:'
+  id: totrans-26
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如果使用得当，`sudo` 工具可以极大增强系统的安全性，并且能让管理员的工作变得更加轻松。使用 `sudo` 后，你可以执行以下操作：
+- en: Assign certain users full administrative privileges, while assigning other users
+    only the privileges they need to perform tasks that are directly related to their
+    respective jobs.
+  id: totrans-27
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 为某些用户分配完整的管理员权限，同时为其他用户分配执行与其工作直接相关的任务所需的权限。
+- en: Allow users to perform administrative tasks by entering their own normal user
+    passwords so that you don't have to distribute the root password to everybody
+    and his brother.
+  id: totrans-28
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 允许用户通过输入自己正常的用户密码来执行管理任务，这样你就不必把 root 密码分发给每个人。
+- en: Make it harder for intruders to break into your systems. If you implement `sudo`
+    and disable the root user account, would-be intruders won't know which account
+    to attack because they won't know which one has admin privileges.
+  id: totrans-29
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 增加入侵者突破你系统的难度。如果你启用了 `sudo` 并禁用了 root 用户账户，那么潜在的入侵者就无法知道该攻击哪个账户，因为他们无法知道哪个账户具有管理员权限。
+- en: Create `sudo` policies that you can deploy across an entire enterprise network,
+    even if that network has a mix of Unix, BSD, and Linux machines.
+  id: totrans-30
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 创建可以在整个企业网络中部署的 `sudo` 策略，即便这个网络包含了混合的 Unix、BSD 和 Linux 系统。
+- en: Improve your auditing capabilities because you'll be able to see what users
+    are doing with their admin privileges.
+  id: totrans-31
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 提升你的审计能力，因为你将能够看到用户在使用其管理员权限时的操作。
+- en: 'With regard to that last bullet point, consider the following snippet from
+    the `secure` log of my CentOS 7 virtual machine:'
+  id: totrans-32
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 关于上面最后一点，请参考我 CentOS 7 虚拟机的 `secure` 日志中的以下片段：
+- en: '[PRE0]'
+  id: totrans-33
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE0]'
+- en: 'You can see that I used `su -` to log in to the root command prompt and that
+    I then logged back out. While I was logged in, I did several things that require
+    root privileges, but none of that got recorded. What did get recorded though is
+    something that I did with `sudo`. That is, because the root account is disabled
+    on this machine, I used my `sudo` privilege to get `su -` to work for me. Let''s
+    look at another snippet to show a bit more detail about how this works:'
+  id: totrans-34
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你可以看到我使用了 `su -` 登录到 root 命令提示符，然后又退出了。在我登录的过程中，我执行了几项需要 root 权限的操作，但这些操作并没有被记录下来。唯一被记录下来的，是我使用
+    `sudo` 执行的操作。也就是说，由于该机器上的 root 账户被禁用了，我使用了我的 `sudo` 权限来使 `su -` 能正常工作。让我们看另一个片段，进一步展示这个过程是如何运作的：
+- en: '[PRE1]'
+  id: totrans-35
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE1]'
+- en: This time, I used my `sudo` privilege to open a log file, to view my hard drive
+    configuration, to perform a system update, to check the status of the Secure Shell
+    daemon, and to once again view a log file. So, if you were the security administrator
+    at my company, you'd be able to see whether or not I'm abusing my `sudo` power.
+  id: totrans-36
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这次，我使用了我的`sudo`权限打开了一个日志文件，查看了我的硬盘配置，执行了系统更新，检查了Secure Shell守护进程的状态，并再次查看了一个日志文件。所以，如果你是我公司的安全管理员，你将能够看到我是否在滥用我的`sudo`权限。
+- en: Now, you're asking, "What's to prevent a person from just doing a `sudo su -`
+    to prevent his or her misdeeds from being detected?" That's easy. Just don't give
+    people the power to go to the root command prompt.
+  id: totrans-37
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，你可能会问：“那有什么能防止一个人直接执行`sudo su -`，以避免他的不当行为被发现呢？”这个问题很简单。只需要不给用户进入根命令提示符的权限。
+- en: Setting up sudo privileges for full administrative users
+  id: totrans-38
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 为完整的管理员用户设置sudo权限
+- en: Before we look at how to limit what users can do, let's first look at how to
+    allow a user to do everything, including logging in to the root command prompt.
+    There are a couple of methods for doing that.
+  id: totrans-39
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在我们讨论如何限制用户可以做什么之前，让我们先看看如何允许用户做所有事情，包括登录根命令提示符。有几种方法可以实现这一点。
+- en: Adding users to a predefined admin group
+  id: totrans-40
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 将用户添加到预定义的管理员组
+- en: The first method, which is the simplest, is to add users to a predefined administrators
+    group and then, if it hasn't already been done, to configure the `sudo` policy
+    to allow that group to do its job. It's simple enough to do except that different
+    Linux distro families use different admin groups.
+  id: totrans-41
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 第一种方法是最简单的，就是将用户添加到预定义的管理员组，然后，如果还没有配置`sudo`策略，就配置该策略，以允许该组执行任务。虽然这种方法很简单，但不同的Linux发行版使用不同的管理员组。
+- en: 'On Unix, BSD, and most Linux systems, you would add users to the wheel group.
+    (Members of the Red Hat family, including CentOS and AlmaLinux, fall into this
+    category.) When I do the `groups` command on any of my RHEL-type machines, I get
+    this:'
+  id: totrans-42
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在Unix、BSD和大多数Linux系统中，你需要将用户添加到`wheel`组。（包括CentOS和AlmaLinux在内的Red Hat家族成员属于这一类。）当我在任何一台RHEL类机器上执行`groups`命令时，我会得到如下输出：
+- en: '[PRE2]'
+  id: totrans-43
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE2]'
+- en: 'This shows that I''m a member of the `wheel` group. By doing `sudo visudo`,
+    I''ll open the `sudo` policy file. Scrolling down, we''ll see the line that gives
+    the `wheel` group its awesome power:'
+  id: totrans-44
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这显示我属于`wheel`组。通过执行`sudo visudo`，我将打开`sudo`策略文件。向下滚动，我们可以看到赋予`wheel`组强大权限的那一行：
+- en: '[PRE3]'
+  id: totrans-45
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE3]'
+- en: 'The percent sign indicates that we''re working with a group. The three appearances
+    of `ALL` means that members of that group can perform any command, as any user,
+    on any machine in the network on which this policy is deployed. The only slight
+    catch is that group members will be prompted to enter their own normal user account
+    passwords in order to perform a `sudo` task. Scroll down a bit more and you''ll
+    see the following:'
+  id: totrans-46
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 百分号表示我们正在处理一个组。`ALL`出现三次表示该组的成员可以在网络上部署此策略的任何机器上以任何用户身份执行任何命令。唯一的小问题是，组成员在执行`sudo`任务时会被提示输入他们自己的正常用户账户密码。再往下滚动，你会看到以下内容：
+- en: '[PRE4]'
+  id: totrans-47
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE4]'
+- en: If we were to comment out the `%wheel` line in the former snippet and remove
+    the comment symbol from in front of the `%wheel` line in this snippet, then members
+    of the wheel group would be able to perform all of their `sudo` tasks without
+    ever having to enter any password. That's something that I really don't recommend,
+    even for home use. In a business setting, allowing people to have password-less
+    `sudo` privileges is a definite no-no.
+  id: totrans-48
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如果我们在前面的代码片段中注释掉`%wheel`行，并且在这个代码片段中去掉`%wheel`行前的注释符号，那么`wheel`组的成员将能够执行所有`sudo`任务，而无需输入任何密码。这是我真的不推荐的做法，即使是家庭使用也不应该这样做。在商业环境中，允许人员拥有无密码的`sudo`权限绝对是不可取的。
+- en: 'To add an existing user to the `wheel` group, use `usermod` with the `-G` option.
+    You might also want to use the `-a` option, in order to prevent removing the user
+    from other groups to which he or she belongs. For our example, let''s add Maggie:'
+  id: totrans-49
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 要将现有用户添加到`wheel`组中，使用带有`-G`选项的`usermod`命令。你可能还想使用`-a`选项，以防止将用户从他或她所属的其他组中移除。以我们的示例为例，我们来添加Maggie：
+- en: '[PRE5]'
+  id: totrans-50
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE5]'
+- en: 'You can also add a user account to the `wheel` group as you create it. Let''s
+    do that now for Frank:'
+  id: totrans-51
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你也可以在创建用户账户时将其添加到`wheel`组中。我们现在就为Frank执行这个操作：
+- en: '[PRE6]'
+  id: totrans-52
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE6]'
+- en: Tip
+  id: totrans-53
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 提示
+- en: ''
+  id: totrans-54
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Note that, with my usage of `useradd`, I''m assuming that we''re working with
+    a member of the Red Hat family, which comes with predefined default settings to
+    create user accounts. For non-Red Hat-type distros that use the `wheel` group,
+    you''d need to either reconfigure the default settings or use extra option switches
+    in order to create the user''s home directory and to assign the correct shell.
+    Your command then would look something like this:'
+  id: totrans-55
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 请注意，使用`useradd`时，我假设我们在使用的是Red Hat系列的操作系统，因为它默认会创建用户账户。对于使用`wheel`组的非Red Hat系列发行版，你需要重新配置默认设置，或者使用额外的选项来创建用户的家目录并分配正确的shell。你的命令应该像这样：
+- en: '[PRE7]'
+  id: totrans-56
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE7]'
+- en: For members of the Debian family, including Ubuntu, the procedure is the same,
+    except that you would use the `sudo` group instead of the `wheel` group. (This
+    kind of figures, considering that the Debian folk have pretty much always marched
+    to the beat of a different drum.)
+  id: totrans-57
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 对于Debian系列的成员，包括Ubuntu，过程是一样的，只是你需要使用`sudo`组而不是`wheel`组。（考虑到Debian的开发者一向走自己的路，这一点也不奇怪。）
+- en: 'Tip:'
+  id: totrans-58
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 提示：
+- en: ''
+  id: totrans-59
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: One way in which this technique would come in handy is whenever you need to
+    create a virtual private server on a cloud service, such as Rackspace, DigitalOcean,
+    or Vultr. When you log in to one of those services and initially create your virtual
+    machine, the cloud service will have you log in to that virtual machine as the
+    root user. (This even happens with Ubuntu, even though the root user account is
+    disabled whenever you do a local installation of Ubuntu.)
+  id: totrans-60
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 这种技术的一个应用场景是在你需要在云服务上创建虚拟专用服务器时，比如在Rackspace、DigitalOcean或Vultr上。当你登录到这些服务并首次创建虚拟机时，云服务会让你以root用户身份登录到虚拟机。（即使在Ubuntu上进行本地安装时root用户账户是禁用的，这种情况依然存在。）
+- en: ''
+  id: totrans-61
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'The first thing that you''ll want to do in this scenario is to create a normal
+    user account for yourself and give it full `sudo` privileges. Then, log out of
+    the root account and log back in with your normal user account. You''ll then want
+    to disable the root account with this command:'
+  id: totrans-62
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 在这种情况下，你首先需要为自己创建一个普通用户账户，并赋予该账户完全的`sudo`权限。然后，退出root账户，使用你的普通用户账户重新登录。接下来，你需要使用以下命令禁用root账户：
+- en: '[PRE8]'
+  id: totrans-63
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE8]'
+- en: You'll also want to do some additional configuration to lock down Secure Shell
+    access, but we'll cover that in *Chapter 6*, *SSH Hardening.*
+  id: totrans-64
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 你还需要做一些额外的配置以限制Secure Shell访问，但我们将在*第6章*，*SSH加固*中介绍这些内容。
+- en: Creating an entry in the sudo policy file
+  id: totrans-65
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 在sudo策略文件中创建条目
+- en: 'Okay, adding users to either the `wheel` group or the `sudo` group works great
+    if you''re either just working with a single machine or if you''re deploying a
+    `sudo` policy across a network that uses just one of these two admin groups. But
+    what if you want to deploy a `sudo` policy across a network with a mixed group
+    of both Red Hat and Ubuntu machines? Or what if you don''t want to go around to
+    each machine to add users to an admin group? Then, just create an entry in the
+    `sudo` policy file. You can either create an entry for an individual user or create
+    a user alias. If you do `sudo visudo` on either your CentOS or one of your AlmaLinux
+    virtual machines, you''ll see a commented-out example of a user alias:'
+  id: totrans-66
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 好的，如果你只是在处理单台机器，或者只在使用这两种管理员组中的一个组跨网络部署`sudo`策略，那么将用户添加到`wheel`组或`sudo`组非常有效。但是如果你想要在一个包含Red
+    Hat和Ubuntu机器的混合网络中部署`sudo`策略呢？或者你不想到每台机器上去添加用户到管理员组？那么，只需在`sudo`策略文件中创建条目即可。你可以为单个用户创建条目，也可以创建一个用户别名。如果你在CentOS或其中一台AlmaLinux虚拟机上执行`sudo
+    visudo`，你将看到一个已被注释掉的用户别名示例：
+- en: '[PRE9]'
+  id: totrans-67
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE9]'
+- en: 'You can uncomment this line and add your own set of usernames, or you can just
+    add a line with your own user alias. To give members of the user alias full `sudo`
+    power, add another line that would look like this:'
+  id: totrans-68
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你可以取消注释这行并添加你自己的用户名，或者你可以直接添加一行来创建自己的用户别名。要给予用户别名中的成员完全的`sudo`权限，请再添加一行，内容如下：
+- en: '[PRE10]'
+  id: totrans-69
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE10]'
+- en: 'It''s also possible to add a `visudo` entry for just a single user, and you
+    might need to do that under very special circumstances. Here''s an example:'
+  id: totrans-70
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 也可以为单个用户添加`visudo`条目，你可能需要在非常特殊的情况下这么做。以下是一个示例：
+- en: '[PRE11]'
+  id: totrans-71
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE11]'
+- en: But for ease of management, it's best to go with either a user group or a user
+    alias.
+  id: totrans-72
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 但为了便于管理，最好选择使用用户组或用户别名。
+- en: 'Tip:'
+  id: totrans-73
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 提示：
+- en: ''
+  id: totrans-74
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: The `sudo` policy file is the `/etc/sudoers` file. I always hesitate to tell
+    students that because, every once in a while, I have a student try to edit it
+    in a regular text editor. That doesn't work though, so please don't try it. Always
+    edit `sudoers` with the `sudo visudo` command.
+  id: totrans-75
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: '`sudo`策略文件是`/etc/sudoers`文件。我总是犹豫着告诉学生这个，因为时不时会有学生尝试用普通文本编辑器编辑它。然而，这并不奏效，所以请不要尝试。一定要通过`sudo
+    visudo`命令编辑`sudoers`文件。'
+- en: Setting up sudo for users with only certain delegated privileges
+  id: totrans-76
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 为用户设置仅限特定委派权限的sudo
+- en: A basic tenet of IT security philosophy is to give network users enough privileges
+    so that they can get their jobs done, but no privileges beyond that. So, you'll
+    want as few people as possible to have full `sudo` privileges. (If you have the
+    root user account enabled, you'll want even fewer people to know the root password.)
+    You'll also want a way to delegate privileges to people according to what their
+    specific jobs are. Backup admins will need to be able to perform backup tasks,
+    help desk personnel will need to perform user management tasks, and so on. With
+    `sudo`, you can delegate these privileges and disallow users from doing any other
+    administrative jobs that don't fit their job description.
+  id: totrans-77
+  prefs: []
+  type: TYPE_NORMAL
+  zh: IT安全哲学的基本原则是给予网络用户足够的权限，让他们完成工作，但不要赋予超出其职能范围的权限。所以，你会希望尽可能少的人拥有完全的`sudo`权限。（如果你启用了root用户账户，你会希望更少的人知道root密码。）你还需要一种方法，根据用户的具体工作分配权限。备份管理员需要执行备份任务，帮助台人员需要执行用户管理任务，等等。通过`sudo`，你可以委派这些权限，并禁止用户做任何不符合其职位描述的其他管理工作。
+- en: 'The best way to explain this is to have you open `visudo` on your any of the
+    RHEL-type virtual machines. CentOS 7, AlmaLinux 8 and AlmaLinux 9 all work well
+    for this. So, go ahead and start up one of them and enter:'
+  id: totrans-78
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 最好的解释方法是让你在任何一台RHEL类型的虚拟机上打开`visudo`。CentOS 7、AlmaLinux 8和AlmaLinux 9都适用于此。所以，先启动其中一台，并输入：
+- en: '[PRE12]'
+  id: totrans-79
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE12]'
+- en: 'Unlike Ubuntu, the RHEL-type distros have a fully commented and well-documented
+    `sudoers` file. I''ve already shown you the line that creates the `ADMIN` user
+    alias, and you can create other user aliases for other purposes. You can, for
+    example, create a `BACKUPADMINS` user alias for backup administrators, a `WEBADMINS`
+    user alias for web server administrators, or whatever else you desire. So, you
+    could add a line that looks something like this:'
+  id: totrans-80
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 与Ubuntu不同，RHEL类型的发行版有一个完全注释并且文档化良好的`sudoers`文件。我已经向你展示了创建`ADMIN`用户别名的行，你还可以为其他目的创建其他用户别名。例如，你可以创建一个`BACKUPADMINS`用户别名用于备份管理员，一个`WEBADMINS`用户别名用于Web服务器管理员，或者你需要的其他任何别名。所以，你可以添加像这样的行：
+- en: '[PRE13]'
+  id: totrans-81
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE13]'
+- en: That's good, except that Vicky and Cleopatra still can't do anything. You'll
+    need to assign some duties to the user alias.
+  id: totrans-82
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这很好，除了Vicky和Cleopatra依然无法执行任何操作。你需要为用户别名分配一些职责。
+- en: 'If you look at the example user alias mentioned later, you''ll see a list of
+    example command aliases. One of these examples just happens to be `SOFTWARE`,
+    which contains the commands that an admin would need in order to either install
+    or remove software or to update the system. It''s commented out, as are all of
+    the other example command aliases, so you''ll need to remove the hash symbol from
+    the beginning of the line before you can use it:'
+  id: totrans-83
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如果你查看稍后提到的示例用户别名，你会看到一组示例命令别名。其中一个示例恰好是`SOFTWARE`，它包含了管理员在安装、移除软件或更新系统时所需要的命令。它被注释掉了，就像所有其他示例命令别名一样，因此在使用之前，你需要去掉行首的哈希符号：
+- en: '[PRE14]'
+  id: totrans-84
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE14]'
+- en: 'Now, it''s just a simple matter of assigning the `SOFTWARE` command alias to
+    the `SOFTWAREADMINS` user alias:'
+  id: totrans-85
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，只需要简单地将`SOFTWARE`命令别名分配给`SOFTWAREADMINS`用户别名即可：
+- en: '[PRE15]'
+  id: totrans-86
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE15]'
+- en: Vicky and Cleopatra, both members of the `SOFTWAREADMINS` user alias, can now
+    run the `rpm`, `up2date`, and `yum` commands with root privileges, on all servers
+    on which this policy is installed.
+  id: totrans-87
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，作为`SOFTWAREADMINS`用户别名成员的Vicky和Cleopatra，可以在所有安装了该策略的服务器上，使用root权限运行`rpm`、`up2date`和`yum`命令。
+- en: 'All but one of these predefined command aliases are ready to use after you
+    uncomment them and assign them to either a user, group, or user alias. The one
+    exception is the `SERVICES` command alias:'
+  id: totrans-88
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 除了`SERVICES`命令别名之外，其他所有预定义的命令别名在你取消注释并将其分配给用户、组或用户别名后就可以使用了：
+- en: '[PRE16]'
+  id: totrans-89
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE16]'
+- en: 'The problem with this `SERVICES` alias is that it also lists the different
+    subcommands for the `systemctl` command. The way `sudo` works is that if a command
+    is listed by itself, then the assigned user can use that command with any subcommands,
+    options, or arguments. So, in the `SOFTWARE` example, members of the `SOFTWARE`
+    user alias can run a command such as this:'
+  id: totrans-90
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这个 `SERVICES` 别名的问题在于，它还列出了 `systemctl` 命令的不同子命令。`sudo` 的工作原理是，如果某个命令单独列出，那么被分配的用户可以使用该命令的任何子命令、选项或参数。所以，在
+    `SOFTWARE` 示例中，`SOFTWARE` 用户别名的成员可以运行如下命令：
+- en: '[PRE17]'
+  id: totrans-91
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE17]'
+- en: 'But when a command is listed in the command alias with a subcommand, option,
+    or argument, that''s all anyone who''s assigned to the command alias can run.
+    With the `SERVICES` command alias in its current configuration, the `systemctl`
+    commands just won''t work. To see why, let''s set Charlie and Lionel up in the
+    `SERVICESADMINS` user alias and then uncomment the `SERVICES` command alias, as
+    we did earlier:'
+  id: totrans-92
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 但是，当命令在命令别名中列出，并带有子命令、选项或参数时，那就是被分配到该命令别名的任何人可以执行的所有内容。在当前配置的 `SERVICES` 命令别名中，`systemctl`
+    命令将无法工作。为了看到原因，我们将 Charlie 和 Lionel 设置在 `SERVICESADMINS` 用户别名中，然后像之前那样取消注释 `SERVICES`
+    命令别名：
+- en: '[PRE18]'
+  id: totrans-93
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE18]'
+- en: 'Now, watch what happens when Lionel tries to check the status of the Secure
+    Shell service:'
+  id: totrans-94
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，看看当 Lionel 尝试检查 Secure Shell 服务的状态时会发生什么：
+- en: '[PRE19]'
+  id: totrans-95
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE19]'
+- en: 'Okay, so Lionel can run `sudo systemctl status`, which is pretty much useless,
+    but he can''t do anything meaningful, such as specifying the service that he wants
+    to check. That''s a bit of a problem. There are two ways to fix this, but there''s
+    only one way that you want to use. You could just eliminate all of the `systemctl`
+    subcommands and make the `SERVICES` alias look like this:'
+  id: totrans-96
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 好的，Lionel 可以运行 `sudo systemctl status`，这几乎没有什么用处，但他不能做任何有意义的事情，比如指定他想要检查的服务。这有点问题。有两种方法可以解决这个问题，但只有一种是你想要使用的。你可以直接删除所有
+    `systemctl` 子命令，让 `SERVICES` 别名看起来像这样：
+- en: '[PRE20]'
+  id: totrans-97
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE20]'
+- en: 'But if you do that, Lionel and Charlie will also be able to shut down or reboot
+    the system, edit the services files, or change the machine from one systemd target
+    to another. That''s probably not what you want. Because the `systemctl` command
+    covers a lot of different functions, you have to be careful not to allow delegated
+    users to access too many of those functions. A better solution would be to add
+    a wildcard to each of the `systemctl` subcommands:'
+  id: totrans-98
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 但是，如果你这么做，Lionel 和 Charlie 也将能够关闭或重启系统，编辑服务文件，或将机器从一个 systemd 目标切换到另一个。这可能不是你想要的。由于
+    `systemctl` 命令涵盖了许多不同的功能，你必须小心不要让授权的用户访问太多这些功能。一个更好的解决方案是，在每个 `systemctl` 子命令中添加一个通配符：
+- en: '[PRE21]'
+  id: totrans-99
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE21]'
+- en: 'Now, Lionel and Charlie can perform any of the `systemctl` functions that are
+    listed in this command alias, for any service:'
+  id: totrans-100
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，Lionel 和 Charlie 可以执行这个命令别名中列出的任何 `systemctl` 功能，用于任何服务：
+- en: '[PRE22]'
+  id: totrans-101
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE22]'
+- en: 'Keep in mind that you''re not limited to using user aliases and command aliases.
+    You can also assign privileges to either a Linux group or an individual user.
+    You can also assign individual commands to a user alias, Linux group, or individual
+    user. Here''s an example:'
+  id: totrans-102
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 请记住，你不仅限于使用用户别名和命令别名。你还可以将权限分配给 Linux 组或单个用户。你还可以将单独的命令分配给用户别名、Linux 组或单个用户。下面是一个例子：
+- en: '[PRE23]'
+  id: totrans-103
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE23]'
+- en: Katelyn can now do all of the commands in the `STORAGE` command alias, whereas
+    Gunther can only use `fdisk` to look at the partition tables. The members of the
+    `backup_admins` Linux group can do commands in the `BACKUP` command alias.
+  id: totrans-104
+  prefs: []
+  type: TYPE_NORMAL
+  zh: Katelyn 现在可以执行 `STORAGE` 命令别名中的所有命令，而 Gunther 只能使用 `fdisk` 查看分区表。`backup_admins`
+    Linux 组的成员可以执行 `BACKUP` 命令别名中的命令。
+- en: 'The last thing we''ll look at in this topic is the host aliases examples that
+    you see preceding the user alias example:'
+  id: totrans-105
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 本主题中我们最后要看的内容是你在用户别名示例前看到的主机别名示例：
+- en: '[PRE24]'
+  id: totrans-106
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE24]'
+- en: 'Each host alias consists of a list of server hostnames. This is what allows
+    you to create one `sudoers` file on one machine and deploy it across the network.
+    For example, you could create a `WEBSERVERS` host alias, a `WEBADMINS` user alias,
+    and a `WEBCOMMANDS` command alias with the appropriate commands. Your configuration
+    would look something like this:'
+  id: totrans-107
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 每个主机别名都由一组服务器主机名组成。这使得你可以在一台机器上创建一个 `sudoers` 文件，并通过网络进行部署。例如，你可以创建一个 `WEBSERVERS`
+    主机别名，一个 `WEBADMINS` 用户别名，以及一个包含适当命令的 `WEBCOMMANDS` 命令别名。你的配置大致如下：
+- en: '[PRE25]'
+  id: totrans-108
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE25]'
+- en: Now, when a user types a command into a server on the network, `sudo` will first
+    look at the hostname of that server. If the user is authorized to perform that
+    command on that server, then `sudo` allows it. Otherwise, `sudo` denies it. In
+    a small to medium-sized business, it would probably work just fine to manually
+    copy the master `sudoers` file to all the servers on the network. But in a large
+    enterprise, you'll want to streamline and automate the process. For this, you
+    could use something like Puppet, Chef, or Ansible. (These three technologies are
+    beyond the scope of this book, but you'll find plenty of books and video courses
+    about all three of them on the Packt website.)
+  id: totrans-109
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，当用户在网络上的服务器中输入命令时，`sudo` 将首先查看该服务器的主机名。如果该用户被授权在该服务器上执行命令，则 `sudo` 允许执行。否则，`sudo`
+    将拒绝执行。在中小型企业中，手动将主 `sudoers` 文件复制到所有服务器可能完全没问题。但在大型企业中，你需要简化并自动化这一过程。为此，你可以使用
+    Puppet、Chef 或 Ansible 等工具。（这三种技术超出了本书的范围，但你可以在 Packt 网站上找到许多关于它们的书籍和视频课程。）
+- en: All of these techniques will work on your Ubuntu VM as well as on the CentOS
+    VM. The only catch is that Ubuntu doesn't come with any predefined command aliases,
+    so you'll have to type them in yourself.
+  id: totrans-110
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 所有这些技巧都适用于你的 Ubuntu 虚拟机，也适用于 CentOS 虚拟机。唯一的区别是，Ubuntu 没有预定义的命令别名，因此你需要自己手动输入。
+- en: Anyway, I know that you're tired of reading, so let's do some work.
+  id: totrans-111
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 无论如何，我知道你已经厌倦了阅读，现在让我们开始做一些实际操作吧。
+- en: Hands-on lab for assigning limited sudo privileges
+  id: totrans-112
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 分配有限 sudo 权限的实操实验
+- en: In this lab, you'll create some users and assign them different levels of privileges.
+    To simplify things, let’s use the AlmaLinux 9 virtual machine.
+  id: totrans-113
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在这个实验中，你将创建一些用户并为他们分配不同的权限。为了简化操作，我们使用 AlmaLinux 9 虚拟机。
+- en: 'Log in to either the AlmaLinux virtual machine and create user accounts for
+    Lionel, Katelyn, and Maggie:'
+  id: totrans-114
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 登录到 AlmaLinux 虚拟机并为 Lionel、Katelyn 和 Maggie 创建用户账户：
+- en: '[PRE26]'
+  id: totrans-115
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE26]'
+- en: 'Open `visudo`:'
+  id: totrans-116
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 打开 `visudo`：
+- en: '[PRE27]'
+  id: totrans-117
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE27]'
+- en: Find the `STORAGE` command alias and remove the comment symbol from in front
+    of it.
+  id: totrans-118
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 找到 `STORAGE` 命令别名，并移除它前面的注释符号。
+- en: 'Add the following lines to the end of the file, using tabs to separate the
+    columns:'
+  id: totrans-119
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在文件末尾添加以下行，使用制表符分隔列：
+- en: '[PRE28]'
+  id: totrans-120
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE28]'
+- en: Save the file and exit `visudo`.
+  id: totrans-121
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 保存文件并退出 `visudo`。
+- en: 'To save time, we''ll use `su` to log in to the different user accounts. That
+    way, you won''t need to log out of your own account to perform these steps. First,
+    log in to Lionel''s account and verify that he has full `sudo` privileges by running
+    several root-level commands:'
+  id: totrans-122
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为了节省时间，我们将使用 `su` 来登录不同的用户账户。这样，你就不需要退出自己的账户来执行这些步骤。首先，登录到 Lionel 的账户，并通过运行多个
+    root 权限的命令来验证他是否具有完整的 `sudo` 权限：
+- en: '[PRE29]'
+  id: totrans-123
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE29]'
+- en: 'This time, log in as Katelyn and try to run some root-level commands. Don''t
+    be too disappointed if they don''t all work, though:'
+  id: totrans-124
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 这次，请以 Katelyn 的身份登录并尝试运行一些 root 权限的命令。不过，如果这些命令并不完全成功，也不必太失望：
+- en: '[PRE30]'
+  id: totrans-125
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE30]'
+- en: Finally, log in as Maggie, and run the same set of commands that you ran for
+    Katelyn.
+  id: totrans-126
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 最后，以 Maggie 的身份登录，并运行与 Katelyn 相同的一组命令。
+- en: Keep in mind that, although we only had three individual users for this lab,
+    you could just as easily have handled more users by setting them up in user aliases
+    or Linux groups.
+  id: totrans-127
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 请记住，尽管我们在这个实验中只使用了三个独立用户，但你完全可以通过设置用户别名或 Linux 用户组来处理更多的用户。
+- en: Since `sudo` is such a great security tool, you would think that everyone would
+    use it, right? Sadly, that's not the case. Pretty much any time you look at either
+    a Linux tutorial website or a Linux tutorial YouTube channel, you'll see the person
+    who's doing the demo logged in at the root user command prompt. In some cases,
+    I've seen the person remotely logged in as the root user on a cloud-based virtual
+    machine. Now, if logging in as the root user is already a bad idea, then logging
+    in across the internet as the root user is an even worse idea. In any case, seeing
+    everybody do these tutorial demos from the root user's shell drives me absolutely
+    crazy.
+  id: totrans-128
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 既然 `sudo` 是如此强大的安全工具，你一定会认为每个人都会使用它，对吧？遗憾的是，事实并非如此。几乎每次你查看 Linux 教程网站或 Linux
+    教程 YouTube 频道时，你都会看到演示者以 root 用户身份登录。在某些情况下，我看到演示者在云虚拟机上远程以 root 用户身份登录。现在，如果以
+    root 用户身份登录已经是一个糟糕的主意，那么通过互联网以 root 用户身份登录就更加糟糕了。不管怎样，看到每个人都从 root 用户的 shell 中演示这些教程，真让我抓狂。
+- en: ''
+  id: totrans-129
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Having said all this, there are some things that don't work with `sudo`. Bash
+    shell internal commands such as `cd` don't work with it, and using `echo` to inject
+    kernel values into the `/proc` filesystem also doesn't work with it. For tasks
+    such as these, a person would have to go to the root command prompt. Still, though,
+    make sure that only users who absolutely have to use the root user command prompt
+    have access to it.
+  id: totrans-130
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 说到这些，有些事情是无法与 `sudo` 一起使用的。像 `cd` 这样的 Bash shell 内部命令无法与其一起使用，使用 `echo` 向 `/proc`
+    文件系统注入内核值也无法与其一起工作。对于这些任务，用户必须切换到 root 命令提示符。然而，确保只有那些必须使用 root 用户命令提示符的人才能访问它。
+- en: Next, let’s look at some more advanced sudo usage.
+  id: totrans-131
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 接下来，让我们来看一些更高级的 sudo 用法。
+- en: Advanced tips and tricks for using sudo
+  id: totrans-132
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 使用 sudo 的高级技巧和窍门
+- en: Now that we've looked at the basics of setting up a good `sudo` configuration,
+    we're confronted with a bit of a paradox. That is, even though `sudo` is a security
+    tool, certain things that you can do with it can make your system even more insecure
+    than it was. Let's see how to avoid that.
+  id: totrans-133
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在我们已经了解了设置良好的 `sudo` 配置的基础知识，我们面临着一个悖论。也就是说，尽管 `sudo` 是一种安全工具，但你可以用它做的某些事情，反而可能使你的系统变得比原来更不安全。让我们看看如何避免这种情况。
+- en: The sudo timer
+  id: totrans-134
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: sudo 定时器
+- en: By default, the `sudo` timer is set for five minutes. This means that once a
+    user performs one `sudo` command and enters a password, he or she can perform
+    another `sudo` command within five minutes without having to enter the password
+    again. Although this is obviously handy, it can also be problematic if users were
+    to walk away from their desks with a command terminal still open.
+  id: totrans-135
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 默认情况下，`sudo` 定时器设置为五分钟。这意味着一旦用户执行了一个 `sudo` 命令并输入了密码，他或她可以在五分钟内执行另一个 `sudo`
+    命令，而无需再次输入密码。尽管这显然很方便，但如果用户在命令终端仍然打开的情况下离开桌面，这也可能成为一个问题。
+- en: If the five-minute timer hasn't yet expired, someone else could come along and
+    perform some root-level task. If your security needs require it, you can easily
+    disable this timer by adding a line to the `Defaults` section of the `sudoers`
+    file. This way, users will have to enter their passwords every time they run a
+    `sudo` command. You can make this a global setting for all users, or you can just
+    set it for certain individual users.
+  id: totrans-136
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如果五分钟定时器还没有到期，其他人可能会过来执行一些 root 级别的任务。如果你的安全需求要求这样做，你可以通过在 `sudoers` 文件的 `Defaults`
+    部分添加一行来轻松禁用此定时器。这样，用户每次运行 `sudo` 命令时都必须输入密码。你可以将其设为全局设置，也可以仅为某些个别用户设置。
+- en: 'Let''s also say that you''re sitting in your nice, cozy cubicle, logged in
+    to a remote Linux server that still has the five-minute timer enabled. If you
+    need to leave your desk for a moment, your best action would be to log out of
+    the server first. Short of that, you could just reset the `sudo` timer by running
+    this command:'
+  id: totrans-137
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 假设你正坐在一个舒适的工作间，登录到一台远程 Linux 服务器，而这台服务器的五分钟定时器仍然启用。如果你需要离开你的桌子片刻，最好的做法是先退出服务器。否则，你可以通过运行以下命令来重置
+    `sudo` 定时器：
+- en: '[PRE31]'
+  id: totrans-138
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE31]'
+- en: This is one of the few `sudo` actions you can do without entering a password.
+    But the next time you do a `sudo` command, you will have to enter your password,
+    even if it has been less than five minutes since you entered your password previously.
+  id: totrans-139
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这是少数几个无需输入密码即可执行的 `sudo` 操作之一。但下次你执行 `sudo` 命令时，即使上次输入密码距离现在还不到五分钟，你也必须再次输入密码。
+- en: View your sudo privileges
+  id: totrans-140
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 查看你的 sudo 权限
+- en: 'Are you unsure of what `sudo` privileges that you possess? Not to worry, you
+    have a way to find out. Just run this command:'
+  id: totrans-141
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 不确定你拥有哪些 `sudo` 权限吗？不用担心，你有办法查找。只需运行以下命令：
+- en: '[PRE32]'
+  id: totrans-142
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE32]'
+- en: 'When I do this for myself, I first see some of the environmental variables
+    for my account, and then I see that I have full `sudo` privileges:'
+  id: totrans-143
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 当我为自己执行此操作时，我首先会看到我帐户的一些环境变量，然后我会看到我拥有完整的 `sudo` 权限：
+- en: '[PRE33]'
+  id: totrans-144
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE33]'
+- en: 'When Frank, my formerly feral flamepoint Siamese cat, does this for his account,
+    he sees that he can only do the `fdisk -l` command:'
+  id: totrans-145
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 当我的猫 Frank（以前是流浪的火焰点暹罗猫）为他的帐户执行此操作时，他看到他只能执行 `fdisk -l` 命令：
+- en: '[PRE34]'
+  id: totrans-146
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE34]'
+- en: But since he's a cat, he doesn't complain. Instead, he'll just try to do something
+    sneaky, as we'll see in just a bit.
+  id: totrans-147
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 但由于他是一只猫，他不会抱怨。相反，他会试图做一些偷偷摸摸的事情，就像我们稍后看到的那样。
+- en: Hands-on lab for disabling the sudo timer
+  id: totrans-148
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+  zh: 禁用 sudo 定时器的动手实验
+- en: 'For this lab, you''ll disable the `sudo` timer on your AlmaLinux VM:'
+  id: totrans-149
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 对于这个实验，你将禁用你 AlmaLinux 虚拟机上的 `sudo` 定时器：
+- en: Log in to the same AlmaLinux virtual machine that you used for the previous
+    lab. We'll be using the user accounts that you've already created.
+  id: totrans-150
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 登录到你用于上一个实验的相同AlmaLinux虚拟机。我们将使用你已经创建的用户账户。
+- en: 'At your own user account command prompt, enter the following commands:'
+  id: totrans-151
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在你自己的用户账户命令提示符下，输入以下命令：
+- en: '[PRE35]'
+  id: totrans-152
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE35]'
+- en: You'll see that you only needed to enter the password once to do all three commands.
+  id: totrans-153
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你会看到，只需要输入一次密码就能执行这三个命令。
+- en: 'At your own user account command prompt, run the following:'
+  id: totrans-154
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在你自己的用户账户命令提示符下，运行以下命令：
+- en: '[PRE36]'
+  id: totrans-155
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE36]'
+- en: 'Note how the `sudo -k` command resets your timer, so you''ll have to enter
+    your password again. Open `visudo` with the following command:'
+  id: totrans-156
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 请注意，`sudo -k`命令会重置你的计时器，因此你需要再次输入密码。使用以下命令打开`visudo`：
+- en: '[PRE37]'
+  id: totrans-157
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE37]'
+- en: 'In the `Defaults specification` section of the file, add the following line:'
+  id: totrans-158
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在文件的`Defaults specification`部分，添加以下行：
+- en: '[PRE38]'
+  id: totrans-159
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE38]'
+- en: Save the file and exit `visudo`.
+  id: totrans-160
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 保存文件并退出`visudo`。
+- en: Perform the commands that you performed in *Step 2*. This time, you should see
+    that you have to enter a password every time.
+  id: totrans-161
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 执行你在*步骤2*中执行的命令。这次，你应该会看到每次都需要输入密码。
+- en: 'Open `visudo` and modify the line that you added so that it looks like this:'
+  id: totrans-162
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 打开`visudo`并修改你添加的那一行，使其如下所示：
+- en: '[PRE39]'
+  id: totrans-163
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE39]'
+- en: Save the file and exit `visudo`.
+  id: totrans-164
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 保存文件并退出`visudo`。
+- en: From your own account shell, repeat the commands that you performed in *Step
+    2*. Then, log in as Lionel and perform the commands again.
+  id: totrans-165
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在你自己的账户Shell中，重复你在*步骤2*中执行的命令。然后，以Lionel身份登录，并再次执行这些命令。
+- en: 'View your own `sudo` privileges by running the following:'
+  id: totrans-166
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 通过运行以下命令查看你自己的`sudo`权限：
+- en: '[PRE40]'
+  id: totrans-167
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE40]'
+- en: Note that this procedure also works for Ubuntu.
+  id: totrans-168
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 请注意，这个过程同样适用于Ubuntu。
+- en: Preventing users from having root shell access
+  id: totrans-169
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 防止用户拥有root shell访问权限
+- en: 'Let''s say that you want to set up a user with limited `sudo` privileges, but
+    you did so by adding a line like this:'
+  id: totrans-170
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 假设你想为某个用户设置有限的`sudo`权限，但你是通过添加类似这样的行来实现的：
+- en: '[PRE41]'
+  id: totrans-171
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE41]'
+- en: I'm sorry to say that you haven't limited Maggie's access at all. You have effectively
+    given her full `sudo` privileges with both the Bash shell and the ZSH shell. So,
+    don't add lines like this to your `sudoers` because it will get you into trouble.
+  id: totrans-172
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 很抱歉地告诉你，你并没有限制Maggie的访问权限。你实际上已经赋予了她完整的`sudo`权限，包括Bash和ZSH Shell。因此，不要在你的`sudoers`文件中添加这样的行，因为这会让你陷入麻烦。
+- en: Preventing users from using shell escapes
+  id: totrans-173
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 防止用户使用Shell转义功能
+- en: 'Certain programs, especially text editors and pagers, have a handy shell escape
+    feature. This allows a user to run a shell command without having to exit the
+    program first. For example, from the command mode of the Vi and Vim editors, someone
+    could run the `ls` command by running `:!ls`. Executing the command would look
+    like this:'
+  id: totrans-174
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 某些程序，特别是文本编辑器和分页程序，具有便捷的Shell转义功能。用户可以在不退出程序的情况下运行Shell命令。例如，在Vi和Vim编辑器的命令模式下，用户可以通过运行`:!ls`来执行`ls`命令。执行该命令的结果如下所示：
+- en: '[PRE42]'
+  id: totrans-175
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE42]'
+- en: 'The output would look like this:'
+  id: totrans-176
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 输出将如下所示：
+- en: '[PRE43]'
+  id: totrans-177
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE43]'
+- en: 'Now, imagine that you want Frank to be able to edit the `sshd_config` file
+    and only that file. You might be tempted to add a line to your `sudo` configuration
+    that would look like this:'
+  id: totrans-178
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，假设你想让Frank只能编辑`sshd_config`文件，而不是其他文件。你可能会想在你的`sudo`配置中添加一行，类似如下：
+- en: '[PRE44]'
+  id: totrans-179
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE44]'
+- en: 'This looks like it would work, right? Well, it doesn''t, because once Frank
+    has opened the `sshd_config` file with his `sudo` privilege, he can then use Vim''s
+    shell escape feature to perform other root-level commands, which includes being
+    able to edit other configuration files. You can fix this problem by having Frank
+    use `sudoedit` instead of `vim`:'
+  id: totrans-180
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这看起来好像可行，对吧？实际上并非如此，因为一旦Frank通过他的`sudo`权限打开了`sshd_config`文件，他就可以使用Vim的Shell转义功能来执行其他root级命令，其中包括编辑其他配置文件。你可以通过让Frank使用`sudoedit`而不是`vim`来解决这个问题：
+- en: '[PRE45]'
+  id: totrans-181
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE45]'
+- en: '`sudoedit` has no shell escape feature, so you can safely allow Frank to use
+    it. Other programs that have a shell escape feature include the following:'
+  id: totrans-182
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`sudoedit`没有Shell转义功能，因此你可以安全地允许Frank使用它。其他具有Shell转义功能的程序包括：'
+- en: emacs
+  id: totrans-183
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: emacs
+- en: less
+  id: totrans-184
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: less
+- en: view
+  id: totrans-185
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: view
+- en: more
+  id: totrans-186
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: more
+- en: Preventing users from using other dangerous programs
+  id: totrans-187
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 防止用户使用其他危险程序
+- en: 'Some programs that don''t have shell escapes can still be dangerous if you
+    give users unrestricted privileges to use them. These include the following:'
+  id: totrans-188
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 有些没有Shell转义功能的程序，如果你给用户无限制的使用权限，仍然可能是危险的。这些程序包括：
+- en: cat
+  id: totrans-189
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: cat
+- en: cut
+  id: totrans-190
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: cut
+- en: awk
+  id: totrans-191
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: awk
+- en: sed
+  id: totrans-192
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: sed
+- en: If you must give someone `sudo` privileges to use one of these programs, it's
+    best to limit their use to only specific files. And that brings us to our next
+    tip.
+  id: totrans-193
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如果你必须授予某人使用这些程序的`sudo`权限，最好将他们的使用限制在特定文件上。这也是我们接下来的提示。
+- en: Limiting the user's actions with commands
+  id: totrans-194
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 限制用户使用命令的操作
+- en: 'Let''s say that you create a `sudo` rule so that Sylvester can use the `systemctl`
+    command:'
+  id: totrans-195
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 假设您创建了一个 `sudo` 规则，让 Sylvester 可以使用 `systemctl` 命令：
+- en: '[PRE46]'
+  id: totrans-196
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE46]'
+- en: 'This allows Sylvester to have full use of the `systemctl` features. He can
+    control daemons, edit service files, shut down or reboot, and carry out every
+    other function that `systemctl` does. That''s probably not what you want. It would
+    be better to specify what `systemctl` functions that Sylvester is allowed to do.
+    Let''s say that you want him to be able to control just the Secure Shell service.
+    You can make the line look like this:'
+  id: totrans-197
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这使得 Sylvester 可以完全使用 `systemctl` 的功能。他可以控制守护进程、编辑服务文件、关闭或重启系统，并执行 `systemctl`
+    的所有其他功能。显然，这可能不是您所希望的。最好指定允许 Sylvester 执行的 `systemctl` 功能。假设您希望他只能控制 Secure Shell
+    服务，您可以将这行修改为如下：
+- en: '[PRE47]'
+  id: totrans-198
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE47]'
+- en: 'Sylvester can now do everything he needs to do with the Secure Shell service,
+    but he can''t shut down or reboot the system, edit other service files, or change
+    systemd targets. But what if you want Sylvester to do only certain specific actions
+    with the Secure Shell service? Then you''ll have to omit the wildcard and specify
+    all of the actions that you want Sylvester to do:'
+  id: totrans-199
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，Sylvester 可以做他需要做的任何与 Secure Shell 服务相关的事情，但他不能关闭或重启系统，不能编辑其他服务文件，或者改变 systemd
+    目标。但如果您希望 Sylvester 只执行 Secure Shell 服务的某些特定操作，那您就需要去掉通配符并指定所有允许 Sylvester 执行的操作：
+- en: '[PRE48]'
+  id: totrans-200
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE48]'
+- en: Now, Sylvester can only restart the Secure Shell service or check its status.
+  id: totrans-201
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，Sylvester 只能重启 Secure Shell 服务或检查其状态。
+- en: 'Tip:'
+  id: totrans-202
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 提示：
+- en: ''
+  id: totrans-203
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: When writing `sudo` policies, you'll want to be aware of the differences between
+    the different Linux and Unix distributions on your network. For example, on Red
+    Hat-type systems, the `systemctl` binary file is located in the `/usr/bin` directory.
+    On Debian/Ubuntu systems, it's located in the `/bin` directory. If you have to
+    roll out a `sudoers` file to a large enterprise network with mixed operating systems,
+    you can use host aliases to ensure that servers will only allow the execution
+    of commands that are appropriate for their operating systems.
+  id: totrans-204
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 在编写 `sudo` 策略时，您需要注意网络上不同 Linux 和 Unix 发行版之间的差异。例如，在 Red Hat 类型的系统上，`systemctl`
+    可执行文件位于 `/usr/bin` 目录下；而在 Debian/Ubuntu 系统中，它位于 `/bin` 目录下。如果您需要将 `sudoers` 文件推广到一个拥有多个操作系统的大型企业网络中，可以使用主机别名来确保服务器只允许执行适合其操作系统的命令。
+- en: ''
+  id: totrans-205
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Also, be aware that some system services have different names on different Linux
+    distributions. On Red Hat-type systems, the Secure Shell service is `sshd`. On
+    Debian/Ubuntu systems, it's just plain `ssh`.
+  id: totrans-206
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 同时，请注意某些系统服务在不同的 Linux 发行版上有不同的名称。在 Red Hat 类型的系统中，Secure Shell 服务是 `sshd`，而在
+    Debian/Ubuntu 系统中，它的名称是 `ssh`。
+- en: Letting users run as other users
+  id: totrans-207
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 允许用户以其他用户身份运行命令
+- en: 'In the following line, `(ALL)` means that Sylvester can run the `systemctl`
+    commands as any user:'
+  id: totrans-208
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在以下一行中，`(ALL)` 表示 Sylvester 可以以任何用户身份运行 `systemctl` 命令：
+- en: '[PRE49]'
+  id: totrans-209
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE49]'
+- en: 'This effectively gives Sylvester root privileges for these commands because
+    the root user is definitely any user. You could, if desired, change that `(ALL)`
+    to `(root)` in order to specify that Sylvester can only run these commands as
+    the root user:'
+  id: totrans-210
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这实际上赋予了 Sylvester 执行这些命令的 root 权限，因为 root 用户绝对是任何用户。如果需要，您可以将 `(ALL)` 更改为 `(root)`，以指定
+    Sylvester 只能以 root 用户身份执行这些命令：
+- en: '[PRE50]'
+  id: totrans-211
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE50]'
+- en: 'Okay, there''s probably not much point in that because nothing changes. Sylvester
+    had root privileges for these `systemctl` commands before, and he still has them
+    now. But there are more practical uses for this feature. Let''s say that Vicky
+    is a database admin, and you want her to run as the `database` user:'
+  id: totrans-212
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 好吧，可能这没什么意义，因为没有任何变化。之前 Sylvester 就拥有了这些 `systemctl` 命令的 root 权限，现在他依然拥有。但这个功能有更实际的用途。假设
+    Vicky 是数据库管理员，您希望她以 `database` 用户身份运行：
+- en: '[PRE51]'
+  id: totrans-213
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE51]'
+- en: 'Vicky could then run the command as the database user by entering the following
+    command:'
+  id: totrans-214
+  prefs: []
+  type: TYPE_NORMAL
+  zh: Vicky 现在可以通过输入以下命令，以数据库用户身份运行命令：
+- en: '[PRE52]'
+  id: totrans-215
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE52]'
+- en: This is one of those features that you might not use that often, but keep it
+    in mind anyway. You never know when it might come in handy.
+  id: totrans-216
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这是一个可能不常用的功能，但还是要记住它。你永远不知道什么时候它会派上用场。
+- en: Preventing abuse via user's shell scripts
+  id: totrans-217
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 防止通过用户的 shell 脚本滥用权限
+- en: 'So, what if a user has written a shell script that requires `sudo` privileges?
+    To answer that, let''s have Frank create the `frank_script.sh` shell script that
+    looks like this:'
+  id: totrans-218
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 那么，如果用户编写了一个需要`sudo`权限的 shell 脚本该怎么办呢？为了解答这个问题，让我们让 Frank 创建一个名为 `frank_script.sh`
+    的 shell 脚本，内容如下：
+- en: '[PRE53]'
+  id: totrans-219
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE53]'
+- en: 'Okay, he wouldn''t need `sudo` privileges for that, but let''s pretend that
+    he does. After he sets the executable permission and runs it with `sudo`, the
+    output will look like this:'
+  id: totrans-220
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 好吧，他其实不需要`sudo`权限，但我们假装他需要。在他设置了可执行权限并使用`sudo`运行脚本后，输出将如下所示：
+- en: '[PRE54]'
+  id: totrans-221
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE54]'
+- en: 'So, naturally frustrated, Frank requested that I create a `sudo` rule so that
+    he can run the script. So, I open `visudo` and add this rule for Frank:'
+  id: totrans-222
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 所以，Frank自然地感到沮丧，要求我创建一个`sudo`规则，以便他可以运行这个脚本。于是，我打开`visudo`并为Frank添加这个规则：
+- en: '[PRE55]'
+  id: totrans-223
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE55]'
+- en: 'Now when Frank runs the script with `sudo`, it works:'
+  id: totrans-224
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，当Frank使用`sudo`运行脚本时，它可以正常工作：
+- en: '[PRE56]'
+  id: totrans-225
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE56]'
+- en: 'But since this file is in Frank''s own home directory and he is its owner,
+    he can edit it any way he wants. So, being the sneaky type, he adds the `sudo
+    -i` line to the end of the script so that it now looks like this:'
+  id: totrans-226
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 但是，由于这个文件在Frank自己的家目录中，而且他是它的所有者，他可以随意编辑它。所以，作为一个狡猾的类型，他在脚本的末尾添加了`sudo -i`这一行，使得脚本现在看起来是这样的：
+- en: '[PRE57]'
+  id: totrans-227
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE57]'
+- en: 'Be prepared for a shock as you watch what happens next:'
+  id: totrans-228
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 准备好迎接即将发生的震惊吧：
+- en: '[PRE58]'
+  id: totrans-229
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE58]'
+- en: As you can see, Frank is now logged in as the root user.
+  id: totrans-230
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如你所见，Frank现在已经以root用户身份登录。
+- en: What `sudo -i` does is to log a person in to the root user's shell, the same
+    way that `sudo su -` does. If Frank were to do `sudo -i` from his own command
+    prompt, it would fail because Frank doesn't have the privilege to do that. But
+    he does have the `sudo` privilege to run his own shell script. By leaving the
+    shell script in his own home directory, Frank can put root-level commands into
+    it. By running the script with `sudo`, the root-level commands in the script will
+    execute with root-level privileges.
+  id: totrans-231
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`sudo -i`的作用是让用户登录到root用户的shell，类似于`sudo su -`。如果Frank在自己的命令提示符下执行`sudo -i`，它将失败，因为Frank没有这个权限。但他有权限使用`sudo`运行自己的脚本。通过将脚本保存在自己的家目录中，Frank可以将root级命令写入其中。通过`sudo`运行该脚本时，脚本中的root级命令将以root权限执行。'
+- en: 'To remedy this, I''ll use my awesome powers of `sudo` to move Frank''s script
+    to the `/usr/local/sbin/` directory and change the ownership to the root user
+    so that Frank won''t be able to edit it. And of course, before I do that, I''ll
+    make sure to delete that `sudo -i` line from it:'
+  id: totrans-232
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 为了解决这个问题，我将使用我的强大`sudo`权限，将Frank的脚本移动到`/usr/local/sbin/`目录，并将所有权更改为root用户，这样Frank就无法编辑它。当然，在我这样做之前，我会确保从脚本中删除`sudo
+    -i`这一行：
+- en: '[PRE59]'
+  id: totrans-233
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE59]'
+- en: 'Finally, I''ll open `visudo` and change his rule to reflect the new location
+    of the script. The new rule looks like this:'
+  id: totrans-234
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 最后，我将打开`visudo`并更改他的规则，以反映脚本的新位置。新的规则如下所示：
+- en: '[PRE60]'
+  id: totrans-235
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE60]'
+- en: 'Frank can still run the script, but he can''t edit it:'
+  id: totrans-236
+  prefs: []
+  type: TYPE_NORMAL
+  zh: Frank仍然可以运行脚本，但他无法编辑它：
+- en: '[PRE61]'
+  id: totrans-237
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE61]'
+- en: Detecting and deleting default user accounts
+  id: totrans-238
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 检测并删除默认用户账户
+- en: 'One challenge of dealing with **Internet of Things (IoT)** devices is that
+    you don''t do a normal operating system installation on them as you would when
+    setting up a normal server. Instead, you download an image that has the operating
+    system pre-installed, and burn that image to a microSD card. The installed operating
+    system is set up with a default user account, and many times that user is set
+    up with full `sudo` privileges and isn''t required to enter a `sudo` password.
+    Let''s take, for example, the Raspex Linux distribution for the Raspberry Pi.
+    (Raspex is built from Ubuntu source code.) On the documentation page of the Raspex
+    download site, we see that the default user is `raspex`, and the default password
+    for that user is also **raspex**. We also see that the default password for the
+    `root` user is **root**:'
+  id: totrans-239
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 处理**物联网（IoT）**设备的一个挑战是，你并不像在设置正常的服务器时那样进行正常的操作系统安装。相反，你下载一个预装了操作系统的镜像，并将该镜像写入microSD卡。已安装的操作系统会设置一个默认用户账户，而且很多时候这个账户被赋予了完整的`sudo`权限，并且不需要输入`sudo`密码。以Raspberry
+    Pi的Raspex Linux发行版为例。（Raspex是基于Ubuntu源代码构建的。）在Raspex下载站点的文档页面上，我们看到默认用户是`raspex`，该用户的默认密码也是**raspex**。我们还看到`root`用户的默认密码是**root**：
+- en: '![19501_02_01.png](img/file20.png)'
+  id: totrans-240
+  prefs: []
+  type: TYPE_IMG
+  zh: '![19501_02_01.png](img/file20.png)'
+- en: 19501_02_01.png
+  id: totrans-241
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 19501_02_01.png
+- en: So, the default credentials are out there for all the world to see. Obviously,
+    the first thing you want to do when setting up an IoT device is to set up your
+    own user account, give it a good password, and give it `sudo` privileges. Then
+    get rid of that default account, because leaving it in place, especially if you
+    leave the default password, is just asking for trouble.
+  id: totrans-242
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 所以，默认的凭证暴露给了全世界显而易见。显然，当你在设置IoT设备时，首先要做的就是设置你自己的用户账户，给它设置一个强密码，并赋予它`sudo`权限。然后删除那个默认账户，因为留下它，尤其是如果你留下默认密码的话，简直就是在自找麻烦。
+- en: 'But let''s dig deeper. Look in the `/etc/password` file on Raspex, and you''ll
+    see the default user there:'
+  id: totrans-243
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 但是让我们深入挖掘一下。查看Raspex上的`/etc/password`文件，你会看到默认用户：
+- en: '[PRE62]'
+  id: totrans-244
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE62]'
+- en: 'Then, look in the `/etc/sudoers` file, and you''ll see this line, which allows
+    the `raspex` user to do all `sudo` commands without having to enter a password:'
+  id: totrans-245
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然后，查看`/etc/sudoers`文件，你会看到这一行，它允许`raspex`用户执行所有`sudo`命令而无需输入密码：
+- en: '[PRE63]'
+  id: totrans-246
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE63]'
+- en: Another thing to watch out for is that some Linux distributions for IoT devices
+    have this rule in a separate file in the `/etc/sudoers.d` directory, instead of
+    in the main `sudoers` file. Either way, you'll want to delete this rule, as well
+    as the default user account, when you set up your IoT device. And of course, you'll
+    also want to change the `root` user password, and then lock the `root` user account.
+  id: totrans-247
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 另一个需要注意的是，一些用于物联网设备的Linux发行版会将此规则放在`/etc/sudoers.d`目录的一个单独文件中，而不是主`sudoers`文件中。无论如何，在设置物联网设备时，你都需要删除这个规则以及默认用户账户。当然，你还需要更改`root`用户密码，并锁定`root`用户账户。
+- en: All right, let’s take a quick look at some new features that have been recently
+    added to sudo.
+  id: totrans-248
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 好的，让我们快速看一下最近新增的一些sudo功能。
+- en: New sudo Features
+  id: totrans-249
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 新的sudo特性
+- en: I mentioned before that one of the beautiful things about sudo is that it allows
+    you to see what users are doing with their sudo privileges. Beginning with sudo
+    version 1.9.0, the sudo logging experience has been greatly enhanced. You can
+    now save sudo log messages in .json format, which allows sudo to log much more
+    information than it normally would, in a format that’s easier to parse. Beginning
+    with sudo version 1.9.4, you can also have sudo send its log messages to a central
+    log server, making it more difficult for bad actors to delete mention of their
+    dirty deeds from the system log files.
+  id: totrans-250
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我之前提到过，sudo的一个美妙之处在于，它允许你查看用户在使用sudo权限时的操作。从sudo版本1.9.0开始，sudo的日志记录功能得到了极大增强。你现在可以将sudo的日志消息保存为.json格式，这使得sudo能够记录比通常更多的信息，且格式更易于解析。从sudo版本1.9.4开始，你还可以让sudo将日志消息发送到中央日志服务器，这样恶意行为者就更难从系统日志文件中删除他们的恶行记录。
+- en: 'Unfortunately, space constraints don’t allow me to do a full write-up about
+    these new features here. That’s okay, though. Over at Opensource.com, Mr. Peter
+    Czanik has written a great article that explains them very well. So, I’ll just
+    refer you to him:'
+  id: totrans-251
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 不幸的是，由于空间限制，我无法在这里对这些新特性进行详细说明。不过没关系。在Opensource.com网站上，Peter Czanik先生写了一篇很好的文章，详细解释了这些特性。所以，我会把你引导到他的文章：
+- en: 5 new sudo features sysadmins need to know in 2022-- [https://opensource.com/article/22/2/new-sudo-features-2022](https://opensource.com/article/22/2/new-sudo-features-2022)
+  id: totrans-252
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 系统管理员2022年需要了解的5个新sudo特性-- [https://opensource.com/article/22/2/new-sudo-features-2022](https://opensource.com/article/22/2/new-sudo-features-2022)
+- en: 'I should also mention that in order to know which new sudo features your Linux
+    distro supports, you’ll need to know which version of sudo that is includes. Find
+    out by doing:'
+  id: totrans-253
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我还应该提到，要了解你的Linux发行版支持哪些新sudo特性，你需要知道它包含的是哪个版本的sudo。你可以通过以下方式来查找：
+- en: '[PRE64]'
+  id: totrans-254
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE64]'
+- en: Next, let’s look at some SUSE quirkiness.
+  id: totrans-255
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 接下来，我们来看看一些SUSE的独特之处。
+- en: Special sudo Considerations for SUSE and OpenSUSE
+  id: totrans-256
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: SUSE和OpenSUSE的特殊sudo考虑事项
+- en: If you’ve ever worked with any kind of SUSE machine, you may have been puzzled
+    by the fact that it asks for the root user’s password, rather than your own password,
+    when you perform a sudo command. That’s because SUSE has a whole different way
+    of doing business with sudo.
+  id: totrans-257
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如果你曾经使用过任何类型的SUSE机器，你可能会困惑于，当你执行sudo命令时，它要求输入root用户的密码，而不是你自己的密码。这是因为SUSE有一种与众不同的方式来处理sudo。
+- en: When you install a SUSE distro, you’ll see a user creation screen that looks
+    similar to the one that you’ve seen on the RHEL-type distros.
+  id: totrans-258
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 当你安装SUSE发行版时，你会看到一个类似于RHEL类型发行版的用户创建界面。
+- en: '![19501_02_02.png](img/file21.png)'
+  id: totrans-259
+  prefs: []
+  type: TYPE_IMG
+  zh: '![19501_02_02.png](img/file21.png)'
+- en: 19501_02_02.png
+  id: totrans-260
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 19501_02_02.png
+- en: However, when you check the **Use this password for system administrator** box,
+    it doesn’t add your user account to the wheel group as the RHEL-type distros do.
+    Instead, it automatically assigns the same password that you created for yourself
+    to the root user account. So, you and the root user will both have the same password.
+  id: totrans-261
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然而，当你勾选**将此密码用于系统管理员**复选框时，它并不会像RHEL类型的发行版那样将你的用户账户添加到wheel组中。相反，它会自动将你为自己创建的密码分配给root用户账户。所以，你和root用户将会拥有相同的密码。
+- en: 'When you do sudo visudo on a SUSE machine, you’ll see these two lines that
+    you don’t see on any other Linux distro:'
+  id: totrans-262
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 当你在SUSE机器上执行`sudo visudo`时，你会看到这两行，而其他任何Linux发行版都没有：
+- en: '[PRE65]'
+  id: totrans-263
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE65]'
+- en: 'This means that any user who has the root user password can perform all sudo
+    commands. To be fair though, the comments that precede these two lines inform
+    us that this is only for the initial system setup, and that we should reconfigure
+    sudo in the normal way before putting the machine into production use. To do that,
+    first add your own user account to the wheel group, like so:'
+  id: totrans-264
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这意味着任何拥有 root 用户密码的用户都可以执行所有 sudo 命令。不过，公平地说，前面这两行的注释告诉我们，这只是用于初始系统设置，在将机器投入生产使用之前，我们应按照正常方式重新配置
+    sudo。为此，首先将自己的用户帐户添加到 wheel 组，如下所示：
+- en: '[PRE66]'
+  id: totrans-265
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE66]'
+- en: 'Cause the group membership to take effect by logging out of the system and
+    then logging back in. Use the groups command to verify wheel group membership,
+    like so:'
+  id: totrans-266
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 通过注销系统并重新登录来使组成员资格生效。使用 groups 命令验证是否属于 wheel 组，如下所示：
+- en: '[PRE67]'
+  id: totrans-267
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE67]'
+- en: 'Next, do sudo visudo, and comment out the two lines that we looked at before.
+    They should now look like this:'
+  id: totrans-268
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 接下来，执行 sudo visudo 命令，并注释掉之前我们查看的两行。它们现在应该看起来像这样：
+- en: '[PRE68]'
+  id: totrans-269
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE68]'
+- en: (Or, better yet, just delete the lines.)
+  id: totrans-270
+  prefs: []
+  type: TYPE_NORMAL
+  zh: （或者，更好的是，直接删除这些行。）
+- en: 'Scroll down in the file until you see this line:'
+  id: totrans-271
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 向下滚动文件，直到你看到这一行：
+- en: '[PRE69]'
+  id: totrans-272
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE69]'
+- en: 'Remove the preceding comment symbol to make the line look like this:'
+  id: totrans-273
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 删除前面的注释符号，使该行看起来像这样：
+- en: '[PRE70]'
+  id: totrans-274
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE70]'
+- en: Save the file and exit visudo. Now, when you do a sudo command, you’ll be asked
+    to enter your own password instead of the root user’s password.
+  id: totrans-275
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 保存文件并退出 visudo。现在，当你执行 sudo 命令时，你将被要求输入自己的密码，而不是 root 用户的密码。
+- en: '[PRE71]'
+  id: totrans-276
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE71]'
+- en: 'Of course, the root user account is still enabled, so let’s disable it, like
+    so:'
+  id: totrans-277
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 当然，root 用户帐户仍然启用，因此让我们将其禁用，如下所示：
+- en: '[PRE72]'
+  id: totrans-278
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE72]'
+- en: All righty, that pretty much covers the sudo topic. Let’s look at how to secure
+    normal user accounts.
+  id: totrans-279
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 好的，这基本上涵盖了 sudo 相关内容。接下来我们来看一下如何保护普通用户账户。
+- en: Locking down users' home directories the Red Hat way
+  id: totrans-280
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 以 Red Hat 方式锁定用户的主目录
+- en: This is another area where different Linux distro families do business differently
+    from each other. As we shall see, each distro family comes with different default
+    security settings for users’ home directories. A security administrator who oversees
+    a mixed environment of different Linux distros will need to take this into account.
+  id: totrans-281
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这是不同 Linux 发行版家族之间业务差异的另一个领域。正如我们将看到的，每个发行版家族对用户主目录的默认安全设置不同。一个管理混合环境的安全管理员需要考虑这一点。
+- en: 'One beautiful thing about Red Hat Enterprise Linux and all of its offspring,
+    such as CentOS and AlmaLinux, is that they have better out-of-the-box security
+    than any other Linux distro. This makes it quicker and easier to harden Red Hat-type
+    systems because much of the work has already been done. One thing that''s already
+    been done for us is locking down users'' home directories:'
+  id: totrans-282
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 关于 Red Hat Enterprise Linux 及其所有衍生版本（如 CentOS 和 AlmaLinux）的一大优点是，它们比其他任何 Linux
+    发行版具有更好的开箱即用安全性。这使得加固 Red Hat 类型系统更加快捷和容易，因为许多工作已经完成。已经为我们完成的一项工作是锁定用户的主目录：
+- en: '[PRE73]'
+  id: totrans-283
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE73]'
+- en: 'By default, the `useradd` utility on Red Hat-type systems creates user home
+    directories with a permissions setting of `700`. This means that only the user
+    who owns the home directory can access it. All other normal users are locked out.
+    We can see why by looking at the `/etc/login.defs` file. On your CentOS 7 VM,
+    scroll down toward the bottom of the file, and you''ll see this:'
+  id: totrans-284
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 默认情况下，Red Hat 类型系统上的 `useradd` 工具会创建权限设置为 `700` 的用户主目录。这意味着只有拥有该主目录的用户可以访问它。所有其他普通用户都无法访问。我们可以通过查看
+    `/etc/login.defs` 文件来了解原因。在你的 CentOS 7 虚拟机上，向文件底部滚动，你会看到以下内容：
+- en: '[PRE74]'
+  id: totrans-285
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE74]'
+- en: 'In the login.defs file of a RHEL 8 or RHEL 9-type distro, such as AlmaLinux,
+    you’ll see that the UMASK is set for wide-open permissions, which seems a bit
+    strange. Here’s what that looks like:'
+  id: totrans-286
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在 RHEL 8 或 RHEL 9 类型发行版（如 AlmaLinux）的 login.defs 文件中，你会看到 UMASK 设置为完全开放的权限，这看起来有些奇怪。如下所示：
+- en: '[PRE75]'
+  id: totrans-287
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE75]'
+- en: 'But, a few lines below that, you’ll see a brand-new directive that we never
+    had before, which looks like this:'
+  id: totrans-288
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 但是，在下面几行，你会看到一个全新的指令，这是我们之前没有见过的，看起来像这样：
+- en: '[PRE76]'
+  id: totrans-289
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE76]'
+- en: So, even though the UMASK is wide-open, new user home directories still get
+    properly locked-down.
+  id: totrans-290
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 所以，尽管 UMASK 是完全开放的，但新用户的主目录仍然会被正确地锁定。
+- en: The `login.defs` file is one of two files where default settings for `useradd`
+    are configured. Either the `UMASK` line or the HOME_MODE line is what determines
+    the permissions values on home directories as they get created. Red Hat-type distros
+    have it configured with the `077` value, which removes all permissions from the
+    group and others. This `UMASK` line is in the `login.defs` file for all Linux
+    distros, but until recently, Red Hat-type distros have been the only ones that
+    have `UMASK` set to such a restrictive value by default. Most non-Red Hat distros
+    usually have a `UMASK` value of `022`, which creates home directories with a permissions
+    value of `755`. This allows everybody to enter everybody else's home directories
+    and access each others' files.
+  id: totrans-291
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`login.defs` 文件是配置 `useradd` 默认设置的两个文件之一。`UMASK` 行或 `HOME_MODE` 行决定了在创建主目录时的权限值。红帽类发行版通常配置为
+    `077`，这会去掉组和其他用户的所有权限。所有 Linux 发行版的 `login.defs` 文件中都有这一 `UMASK` 行，但直到最近，红帽类发行版是唯一将
+    `UMASK` 设置为如此严格值的发行版。大多数非红帽类发行版通常将 `UMASK` 设置为 `022`，这会创建一个权限值为 `755` 的主目录。这样，任何人都能进入他人的主目录并访问彼此的文件。'
+- en: Locking down users' home directories the Debian/Ubuntu way
+  id: totrans-292
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 按 Debian/Ubuntu 的方式锁定用户主目录
+- en: 'Debian and its offspring, such as Ubuntu, have two user creation utilities:'
+  id: totrans-293
+  prefs: []
+  type: TYPE_NORMAL
+  zh: Debian 及其衍生版，如 Ubuntu，提供了两个用户创建工具：
+- en: '`useradd`'
+  id: totrans-294
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`useradd`'
+- en: '`adduser`'
+  id: totrans-295
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`adduser`'
+- en: Let's have a look at both of them.
+  id: totrans-296
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 让我们看看它们两个。
+- en: useradd on Debian/Ubuntu
+  id: totrans-297
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 在 Debian/Ubuntu 上添加用户
+- en: 'The `useradd` utility is there, but Debian and Ubuntu don''t come with the
+    handy preconfigured defaults as the Red Hat-type distros do. If you were to just
+    do `sudo useradd frank` on a default Debian/Ubuntu machine, Frank would have no
+    home directory and would be assigned the wrong default shell. So, to create a
+    user account with `useradd` on a Debian or Ubuntu system, the command would look
+    something like this:'
+  id: totrans-298
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`useradd` 工具存在，但 Debian 和 Ubuntu 并不像红帽类发行版那样提供预配置的默认设置。如果你只是执行 `sudo useradd
+    frank` 在默认的 Debian/Ubuntu 机器上，Frank 将没有主目录，并且会被分配错误的默认 shell。因此，要在 Debian 或 Ubuntu
+    系统上使用 `useradd` 创建一个用户账户，命令应该是这样的：'
+- en: '[PRE77]'
+  id: totrans-299
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE77]'
+- en: 'In this command, we have the following:'
+  id: totrans-300
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在这个命令中，我们有：
+- en: '`-m` creates the home directory.'
+  id: totrans-301
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`-m` 创建主目录。'
+- en: '`-d` specifies the home directory.'
+  id: totrans-302
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`-d` 指定主目录。'
+- en: '`-s` specifies Frank''s default shell. (Without the `-s`, Debian/Ubuntu would
+    assign to Frank the `/bin/sh shell`.)'
+  id: totrans-303
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`-s` 指定 Frank 的默认 shell。（如果没有 `-s`，Debian/Ubuntu 会将 `/bin/sh shell` 分配给 Frank。）'
+- en: 'When you look at the home directories on either a Debian or an Ubuntu 20.04
+    machine, you''ll see that they''re wide open, with execute and read privileges
+    for everybody:'
+  id: totrans-304
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 当你查看 Debian 或 Ubuntu 20.04 机器上的主目录时，你会看到它们是完全开放的，所有人都可以执行和读取：
+- en: '[PRE78]'
+  id: totrans-305
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE78]'
+- en: 'As you can see, Frank and I can get into each other''s stuff. (And no, I don''t
+    want Frank getting into my stuff.) Each user could change the permissions on his
+    or her own directory, but how many of your users would know how to do that? So,
+    let''s fix that ourselves:'
+  id: totrans-306
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 如你所见，Frank 和我可以访问对方的东西。（不， 我可不想让 Frank 碰我的东西。）每个用户可以修改自己目录的权限，但有多少用户知道该如何做呢？所以，让我们自己来解决这个问题：
+- en: '[PRE79]'
+  id: totrans-307
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE79]'
+- en: 'Let''s see what we have now:'
+  id: totrans-308
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 让我们看看现在的情况：
+- en: '[PRE80]'
+  id: totrans-309
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE80]'
+- en: That looks much better.
+  id: totrans-310
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 看起来好多了。
+- en: 'To change the default permissions setting for home directories, open `/etc/login.defs`
+    for editing. Look for this line:'
+  id: totrans-311
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 要更改主目录的默认权限设置，请打开 `/etc/login.defs` 进行编辑。找到这一行：
+- en: '[PRE81]'
+  id: totrans-312
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE81]'
+- en: 'Change it to this:'
+  id: totrans-313
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 将其更改为：
+- en: '[PRE82]'
+  id: totrans-314
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE82]'
+- en: Now, new users' home directories will get locked down on creation, just as they
+    do with Red Hat and its offspring.
+  id: totrans-315
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，新用户的主目录在创建时将会被锁定，就像红帽及其衍生版一样。
+- en: 'On Ubuntu 22.04, things are different. Ubuntu developers have finally realized
+    that users’ home directories should be locked down by default. So, the HOME_MODE
+    setting in an Ubuntu 22.04 login.defs file now looks like this:'
+  id: totrans-316
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在 Ubuntu 22.04 上，情况有所不同。Ubuntu 开发者终于意识到，用户的主目录默认应该被锁定。因此，Ubuntu 22.04 的 `login.defs`
+    文件中的 HOME_MODE 设置现在是这样的：
+- en: '[PRE83]'
+  id: totrans-317
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE83]'
+- en: This includes access permissions for a user’s own personal group, but that’s
+    okay. It still effectively means that only the respective owners of the various
+    home directories can get into them.
+  id: totrans-318
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这包括用户自己个人组的访问权限，但没关系，这仍然有效地意味着只有各自的主目录拥有者才能进入。
+- en: adduser on Debian/Ubuntu
+  id: totrans-319
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 在 Debian/Ubuntu 上添加用户
+- en: The `adduser` utility is an interactive way to create user accounts and passwords
+    with a single command, which is unique to the Debian family of Linux distros.
+    Most of the default settings that are missing from the Debian implementation of
+    `useradd` are already set for `adduser`. On Debian and Ubuntu 20.04, it creates
+    user home directories with the wide-open `755` permissions value. Fortunately,
+    that's easy to change. (We'll see how in just a bit.) On Ubuntu 22.04, it creates
+    properly locked-down home directories with the restrictive 750 permissions value.
+  id: totrans-320
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`adduser`工具是一种交互式的用户账户和密码创建方式，使用一个命令即可完成，这在Debian家族的Linux发行版中是独有的。大多数在Debian实现的`useradd`中缺失的默认设置，`adduser`已经为其设置好了。在Debian和Ubuntu
+    20.04中，它创建的用户家目录权限为开放的`755`，幸运的是，这很容易更改。（稍后我们会看到如何更改。）在Ubuntu 22.04中，它创建的家目录权限为更严格的750权限值。'
+- en: 'Although `adduser` is handy for just casual creation of user accounts, it doesn''t
+    offer the flexibility of `useradd` and it isn''t suitable for use in shell scripting.
+    One thing that `adduser` can do that `useradd` can’t is to automatically encrypt
+    a user''s home directory as you create the account. To make it work, you''ll first
+    have to install the `ecryptfs-utils` package. So, to create an account with an
+    encrypted home directory for Cleopatra, you do the following:'
+  id: totrans-321
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 尽管`adduser`对于创建用户账户非常方便，但它没有`useradd`那样的灵活性，也不适合在 shell 脚本中使用。`adduser`能做到`useradd`做不到的一件事是：在创建账户时自动加密用户的家目录。要使其生效，首先需要安装`ecryptfs-utils`软件包。因此，要为Cleopatra创建一个加密家目录的账户，您需要执行以下操作：
+- en: '[PRE84]'
+  id: totrans-322
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE84]'
+- en: 'The first time that Cleopatra logs in, she''ll need to run the `ecryptfs-unwrap-passphrase`
+    command that''s mentioned in the preceding output. She''ll then want to write
+    her passphrase down and store it in a safe place:'
+  id: totrans-323
+  prefs: []
+  type: TYPE_NORMAL
+  zh: Cleopatra第一次登录时，需要运行前面输出中提到的`ecryptfs-unwrap-passphrase`命令。然后她需要记下她的密码短语并将其存储在安全的地方：
+- en: '[PRE85]'
+  id: totrans-324
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE85]'
+- en: We'll look at the whole encryption thing in more detail when we get to the encryption
+    chapter.
+  id: totrans-325
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我们将在加密章节时更详细地讨论加密的相关内容。
+- en: Hands-on lab for configuring adduser
+  id: totrans-326
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+  zh: 配置adduser的实践实验
+- en: For this lab, we'll be working with the `adduser` utility on an Ubuntu 22.04
+    VM.
+  id: totrans-327
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在本实验中，我们将使用Ubuntu 22.04虚拟机上的`adduser`工具。
+- en: 'Install the `ecryptfs-utils` package:'
+  id: totrans-328
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 安装`ecryptfs-utils`软件包：
+- en: '[PRE86]'
+  id: totrans-329
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE86]'
+- en: 'Create a user account with an encrypted home directory for Cleopatra and then
+    view the results:'
+  id: totrans-330
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为Cleopatra创建一个具有加密家目录的用户账户，然后查看结果：
+- en: '[PRE87]'
+  id: totrans-331
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE87]'
+- en: 'Log in as Cleopatra and run the `ecryptfs-unwrap-passphrase` command:'
+  id: totrans-332
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 以Cleopatra身份登录并运行`ecryptfs-unwrap-passphrase`命令：
+- en: '[PRE88]'
+  id: totrans-333
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE88]'
+- en: Note that some of the information that `adduser` asks for is optional, and you
+    can just hit the *Enter* key for those items.
+  id: totrans-334
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 请注意，`adduser`要求提供的一些信息是可选的，您可以直接按*Enter*键跳过这些项。
+- en: Enforcing strong password criteria
+  id: totrans-335
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 强制实施强密码标准
+- en: 'You wouldn''t think that a benign-sounding topic such as strong password criteria
+    would be so controversial, but it is. The conventional wisdom that you''ve undoubtedly
+    heard for your entire computer career says:'
+  id: totrans-336
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你可能不会想到，看似平凡的强密码标准竟然如此有争议，但事实确实如此。你在整个计算机职业生涯中听到的传统智慧是：
+- en: Make passwords of a certain minimum length.
+  id: totrans-337
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 设置密码的最低长度。
+- en: Make passwords that consist of a combination of uppercase letters, lowercase
+    letters, numbers, and special characters.
+  id: totrans-338
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 设置由大写字母、小写字母、数字和特殊字符组合成的密码。
+- en: Ensure that passwords don't contain any words that are found in the dictionary
+    or that are based on the users' own personal data.
+  id: totrans-339
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 确保密码不包含任何字典中的单词或用户个人数据的相关信息。
+- en: Force users to change their passwords on a regular basis.
+  id: totrans-340
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 强制用户定期更改密码。
+- en: But, using your favorite search engine, you'll see that different experts disagree
+    on the details of these criteria. For example, you'll see disagreements about
+    whether passwords should be changed every 30, 60, or 90 days, disagreements about
+    whether all four types of characters need to be in a password, and even disagreements
+    on what the minimum length of a password should be.
+  id: totrans-341
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 但是，通过使用你喜欢的搜索引擎，你会发现不同的专家在这些标准的细节上存在分歧。例如，有专家对于密码是否应该每30、60或90天更改存在分歧，也有专家对密码中是否需要包含所有四种类型的字符存在不同意见，甚至对于密码的最小长度应该是多少也存在争议。
+- en: The most interesting controversy of all comes from—of all places—the guy who
+    invented the preceding criteria to begin with. He now says that it's all bunk
+    and regrets having come up with it. He now says that we should be using passphrases
+    that are long, yet easy to remember. He also says that they should be changed
+    only if they've been breached.
+  id: totrans-342
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 最有趣的争议来自——从一个非常意想不到的地方——就是最初发明上述标准的那个人。他现在说这一切都是胡说八道，并后悔自己提出了这些标准。他现在说我们应该使用既长又易于记住的密码短语，并且只有在密码泄露的情况下才应更改。
+- en: Bill Burr, the former National Institutes of Standards and Technology (NIST)
+    engineer who created the strong password criteria that I outlined earlier, shares
+    his thoughts about why he now disavows his own work. Refer to [https://www.pcmag.com/news/355496/you-might-not-need-complex-alphanumeric-passwords-after-all](https://www.pcmag.com/news/355496/you-might-not-need-complex-alphanumeric-passwords-after-all).
+  id: totrans-343
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 比尔·伯尔（Bill Burr），前美国国家标准与技术研究院（NIST）工程师，他是我之前提到的强密码标准的制定者，分享了他现在为何否定自己工作的原因。详细内容请参见[https://www.pcmag.com/news/355496/you-might-not-need-complex-alphanumeric-passwords-after-all](https://www.pcmag.com/news/355496/you-might-not-need-complex-alphanumeric-passwords-after-all)。
+- en: ''
+  id: totrans-344
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: And, since the original edition of this book was published, NIST has come to
+    agree with Bill Burr. They have now changed their password implementation criteria
+    to match Mr. Burr's recommendations. You can read about that at
+  id: totrans-345
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 自本书的初版发布以来，NIST已经开始同意比尔·伯尔的观点。他们现在已经将密码实施标准更改为符合伯尔先生的建议。你可以在此阅读更多内容。
+- en: ''
+  id: totrans-346
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '[https://www.riskcontrolstrategies.com/2018/01/08/new-nist-guidelines-wrong/](https://www.riskcontrolstrategies.com/2018/01/08/new-nist-guidelines-wrong/).'
+  id: totrans-347
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: '[https://www.riskcontrolstrategies.com/2018/01/08/new-nist-guidelines-wrong/](https://www.riskcontrolstrategies.com/2018/01/08/new-nist-guidelines-wrong/)。'
+- en: However, having said all that, there is the reality that many organizations
+    are still wedded to the idea of using complex passwords that regularly expire,
+    and you'll have to abide by their rules if you can't convince them otherwise.
+    And besides, if you are using traditional passwords, you do want them to be strong
+    enough to resist any sort of password attack. So now, we'll take a look at the
+    mechanics of enforcing strong password criteria on a Linux system.
+  id: totrans-348
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然而，尽管如此，现实情况是，许多组织仍然坚持使用复杂的密码并且定期过期，如果你无法说服他们改变，他们会要求你遵守这些规则。此外，如果你使用传统密码，你确实希望它们足够强大，以抵御任何形式的密码攻击。所以现在，我们来看看如何在Linux系统上强制执行强密码标准。
+- en: 'Tip:'
+  id: totrans-349
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 提示：
+- en: ''
+  id: totrans-350
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: I have to confess that I had never before thought to try creating a passphrase
+    to use in place of a password on a Linux system. So, I just now tried it on my
+    CentOS virtual machine to see if it would work.
+  id: totrans-351
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 我必须承认，我以前从未想过尝试在Linux系统上创建一个密码短语来替代密码。因此，我刚刚在我的CentOS虚拟机上尝试了一下，看看它是否有效。
+- en: ''
+  id: totrans-352
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: I created an account for Maggie, my black-and-white tuxedo kitty. For her password,
+    I entered the passphrase `I like other kitty cats`. You may think, "Oh, that's
+    terrible. This doesn't meet any complexity criteria*,* and it uses dictionary
+    words. How is that secure?" But the fact that it's a phrase with distinct words
+    separated by blank spaces does make it secure and very difficult to brute-force.
+  id: totrans-353
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 我为玛吉（Maggie）创建了一个账户，她是我那只黑白相间的燕尾服猫咪。她的密码，我设置了密码短语`I like other kitty cats`。你可能会想：“哦，这太糟糕了。这不符合任何复杂度标准，*而且*它使用了字典词汇。这样怎么能算安全呢？”但事实上，作为一个由不同词汇组成的短语，并且这些词汇通过空格分开，确实使它变得安全，并且非常难以通过暴力破解攻击。
+- en: ''
+  id: totrans-354
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Now, in real life, I would never create a passphrase that expresses my love
+    for cats because it's not hard to find out that I really do love cats. Rather,
+    I would choose a passphrase about some more obscure part of my life that nobody
+    but me knows about. In any case, there are two advantages of passphrases over
+    passwords. They're more difficult to crack than traditional passwords, yet they're
+    easier for users to remember. For extra security, though, just don't create passphrases
+    about a fact of your life that everybody knows about.
+  id: totrans-355
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 现在，在现实生活中，我绝不会创建一个表达我对猫咪喜爱的密码短语，因为很容易发现我确实非常喜欢猫。而是，我会选择一个与我生活中的某个不为人知的、更隐秘的部分相关的密码短语。无论如何，密码短语相比传统密码有两个优点。它们比传统密码更难破解，同时用户也更容易记住。不过，为了额外的安全性，千万不要创建一个关于你生活中大家都知道的事实的密码短语。
+- en: Installing and configuring pwquality
+  id: totrans-356
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 安装与配置 pwquality
+- en: 'We''ll be using the `pwquality` module for the **Pluggable Authentication Module**
+    (**PAM**). This is a newer technology that has replaced the old `cracklib` module.
+    On any Red Hat 7 or newer type of system, and on SUSE and OpenSUSE, `pwquality`
+    is installed by default, even if you do a minimal installation. If you `cd` into
+    the `/etc/pam.d` directory, you can do a `grep` operation to see that the PAM
+    configuration files are already set up. `retry=3` means that a user will only
+    have three tries to get the password right when logging in to the system:'
+  id: totrans-357
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我们将使用 `pwquality` 模块来配置 **可插拔认证模块**（**PAM**）。这是一个更新的技术，已经取代了旧的 `cracklib` 模块。在任何
+    Red Hat 7 或更高版本的系统上，以及在 SUSE 和 OpenSUSE 系统中，`pwquality` 都会默认安装，即使是进行最小化安装时也是如此。如果你
+    `cd` 到 `/etc/pam.d` 目录，你可以进行 `grep` 操作，查看 PAM 配置文件是否已经设置好。`retry=3` 意味着用户在登录系统时，只有三次机会输入正确的密码：
+- en: '[PRE89]'
+  id: totrans-358
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE89]'
+- en: 'On Debian and Ubuntu, you’ll need to install pwquality yourself, like this:'
+  id: totrans-359
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在 Debian 和 Ubuntu 上，你需要自行安装 pwquality，如下所示：
+- en: '[PRE90]'
+  id: totrans-360
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE90]'
+- en: The rest of the procedure is the same for all of our operating systems and consists
+    of just editing the `/etc/security/pwquality.conf` file. When you open this file
+    in your text editor, you'll see that everything is commented out, which means
+    that no password complexity criteria are in effect. You'll also see that it's
+    very well documented because every setting has its own explanatory comment.
+  id: totrans-361
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 其余的过程在所有操作系统中都是一样的，只需要编辑 `/etc/security/pwquality.conf` 文件。当你在文本编辑器中打开此文件时，你会看到所有内容都被注释掉了，这意味着没有启用任何密码复杂性标准。你还会看到这个文件非常有文档说明，因为每个设置都有相应的解释性注释。
+- en: 'You can set password complexity criteria however you want just by uncommenting
+    the appropriate lines and setting the appropriate values. Let''s take a look at
+    just one setting:'
+  id: totrans-362
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你可以根据需要设置密码复杂性标准，只需取消注释相关行并设置相应的值。让我们来看一下其中一个设置：
+- en: '[PRE91]'
+  id: totrans-363
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE91]'
+- en: 'The minimum length setting works on a credit system. This means that for every
+    different type of character class in the password, the minimum required password
+    length will be reduced by one character. For example, let''s set `minlen` to a
+    value of `19` and try to assign Katelyn the password `turkeylips`:'
+  id: totrans-364
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 最小长度设置基于积分系统。这意味着密码中每种不同类型的字符类别都会减少一个所需的最小密码长度。例如，我们将 `minlen` 设置为 `19`，并尝试给
+    Katelyn 分配密码 `turkeylips`：
+- en: '[PRE92]'
+  id: totrans-365
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE92]'
+- en: 'Because the lowercase characters in `turkeylips` count as credit for one type
+    of character class, we''re only required to have 18 characters instead of 19\.
+    If we try this again with `TurkeyLips`, we''ll get:'
+  id: totrans-366
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 因为 `turkeylips` 中的小写字母算作一种字符类别的积分，所以我们只需要 18 个字符，而不是 19 个。如果我们再次尝试使用 `TurkeyLips`，我们会得到：
+- en: '[PRE93]'
+  id: totrans-367
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE93]'
+- en: This time, the uppercase `T` and uppercase `L` count as a second character class,
+    so we only need to have 17 characters in the password.
+  id: totrans-368
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这一次，大写字母 `T` 和大写字母 `L` 计算为第二个字符类别，所以我们只需要 17 个字符的密码。
+- en: 'Just below the `minlen` line, you''ll see the credit lines. Let''s say that
+    you don''t want lowercase letters to count toward your credits. You would find
+    this line:'
+  id: totrans-369
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在 `minlen` 这一行下方，你会看到积分设置行。假设你不希望小写字母计算在积分内。你会找到这一行：
+- en: '[PRE94]'
+  id: totrans-370
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE94]'
+- en: 'Uncomment it, and change the `1` to a `0`:'
+  id: totrans-371
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 取消注释，并将 `1` 改为 `0`：
+- en: '[PRE95]'
+  id: totrans-372
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE95]'
+- en: 'Then, try assigning Katelyn `turkeylips` as a password:'
+  id: totrans-373
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 然后，尝试将 `turkeylips` 作为密码分配给 Katelyn：
+- en: '[PRE96]'
+  id: totrans-374
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE96]'
+- en: This time, the `pwquality` really does want 19 characters. If we set a credit
+    value to something higher than `1`, we would get credit for multiple characters
+    of the same class type up to that value.
+  id: totrans-375
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这一次，`pwquality` 确实要求 19 个字符。如果我们将积分值设置为大于 `1` 的数值，我们会对同一类字符类型获得多个积分，直到该数值为止。
+- en: 'We can also set the credit values to negative numbers in order to require a
+    certain number of characters types in a password. For example, we could have this:'
+  id: totrans-376
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我们还可以将积分值设置为负数，以要求密码中有一定数量的字符类型。例如，我们可以这样设置：
+- en: '[PRE97]'
+  id: totrans-377
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE97]'
+- en: 'This would require at least three digits in a password. However, it''s a really
+    bad idea to use this feature, because someone who''s doing a password attack would
+    soon find the patterns that you require, which would help the attacker to more
+    precisely direct the attack. If you need to require that a password has multiple
+    character types, it would be better to use the `minclass` parameter:'
+  id: totrans-378
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这将要求密码中至少有三个数字。然而，使用这个功能是非常不明智的，因为进行密码攻击的人很快就能发现你要求的模式，这将帮助攻击者更精确地发起攻击。如果你需要要求密码包含多种字符类型，最好使用
+    `minclass` 参数：
+- en: '[PRE98]'
+  id: totrans-379
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE98]'
+- en: It's already set to a value of `3`, which would require characters from three
+    different classes. To use this value, all you have to do is to remove the comment
+    symbol.
+  id: totrans-380
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 它已经设置为`3`，这将要求密码字符来自三个不同的类别。要使用此值，你只需移除注释符号。
+- en: The rest of the parameters in `pwquality.conf` work pretty much the same way,
+    and each one has a well-written comment to explain what it does.
+  id: totrans-381
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`pwquality.conf`中的其余参数的工作方式基本相同，每个参数都有一个精心编写的注释来解释其作用。'
+- en: 'Tip:'
+  id: totrans-382
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 提示：
+- en: ''
+  id: totrans-383
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: If you use your `sudo` privilege to set someone else's password, the system
+    will complain if you create a password that doesn't meet complexity criteria,
+    but it will let you do it. If a normal user were to try to change his or her own
+    password without `sudo` privileges, the system would not allow a password that
+    doesn't meet complexity criteria.
+  id: totrans-384
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 如果你使用`sudo`权限设置其他人的密码，当你创建一个不符合复杂性要求的密码时，系统会发出警告，但仍然允许你执行此操作。如果普通用户在没有`sudo`权限的情况下尝试更改自己的密码，系统则不允许设置不符合复杂性要求的密码。
+- en: Hands-on lab for setting password complexity criteria
+  id: totrans-385
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+  zh: 设置密码复杂性要求的实践实验
+- en: For this lab, you can use either a CentOS, AlmaLinux, or Ubuntu virtual machine,
+    as desired. The only difference is that you won't perform Step 1 for either CentOS
+    or AlmaLinux.
+  id: totrans-386
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 对于这个实验，你可以使用CentOS、AlmaLinux或Ubuntu虚拟机，任选其一。唯一的区别是，你不需要在CentOS或AlmaLinux上执行第1步。
+- en: 'For Ubuntu only, install the `libpam-pwquality` package:'
+  id: totrans-387
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 仅限Ubuntu，安装`libpam-pwquality`包：
+- en: '[PRE99]'
+  id: totrans-388
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE99]'
+- en: 'Open the `/etc/security/pwquality.conf` file in your preferred text editor.
+    Remove the comment symbol from in front of the `minlen` line and change the value
+    to `19`. It should now look like this:'
+  id: totrans-389
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 打开`/etc/security/pwquality.conf`文件，使用你喜欢的文本编辑器。移除`minlen`行前的注释符号，并将值更改为`19`。它现在应该像这样：
+- en: '[PRE100]'
+  id: totrans-390
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE100]'
+- en: Save the file and exit the editor.
+  id: totrans-391
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 保存文件并退出编辑器。
+- en: Create a user account for Goldie and attempt to assign her the passwords `turkeylips`,
+    `TurkeyLips`, and `Turkey93Lips`. Note the change in each warning message.
+  id: totrans-392
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为Goldie创建一个用户账户，并尝试为她分配密码`turkeylips`、`TurkeyLips`和`Turkey93Lips`。注意每条警告信息中的变化。
+- en: 'In the `pwquality.conf` file, comment out the `minlen` line. Uncomment the
+    `minclass` line and the `maxclassrepeat` line. Change the `maxclassrepeat` value
+    to `5`. The lines should now look like this:'
+  id: totrans-393
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在`pwquality.conf`文件中，注释掉`minlen`这一行，取消注释`minclass`和`maxclassrepeat`这一行。将`maxclassrepeat`的值更改为`5`。现在，这些行应该像这样：
+- en: '[PRE101]'
+  id: totrans-394
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE101]'
+- en: Save the file and exit the text editor.
+  id: totrans-395
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 保存文件并退出文本编辑器。
+- en: Try assigning various passwords that don't meet the complexity criteria that
+    you've set to Goldie's account and view the results.
+  id: totrans-396
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 尝试为Goldie的账户分配各种不符合你设定的复杂性要求的密码，并查看结果。
+- en: In the `/etc/login.defs` file on your CentOS 7 machine, you'll see the line
+    `PASS_MIN_LEN 5`.
+  id: totrans-397
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 在你CentOS 7机器的`/etc/login.defs`文件中，你会看到`PASS_MIN_LEN 5`这一行。
+- en: ''
+  id: totrans-398
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Supposedly, this is to set the minimum password length, but in reality, `pwquality`
+    overrides it. So, you could set this value to anything at all, and it would have
+    no effect.
+  id: totrans-399
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 理论上，这是为了设置最小密码长度，但实际上，`pwquality`会覆盖它。所以，你可以将该值设置为任何值，它都不会产生任何影响。
+- en: Setting and enforcing password and account expiration
+  id: totrans-400
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 设置并强制执行密码和账户过期政策
+- en: Something you never want is to have unused user accounts remain active. There
+    have been incidents where an administrator set up user accounts for temporary
+    usage, such as for a conference, and then just forgot about them after the accounts
+    were no longer needed.
+  id: totrans-401
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你绝对不希望未使用的用户账户仍然保持激活状态。曾经发生过管理员为临时使用设置用户账户，比如用于会议，之后在账户不再需要时忘记了这些账户。
+- en: Another example would be if your company were to hire contract workers whose
+    contract expires on a specific date. Allowing those accounts to remain active
+    and accessible after the temporary employees leave the company would be a huge
+    security problem. In cases like these, you want a way to ensure that temporary
+    user accounts aren't forgotten about when they're no longer needed. If your employer
+    subscribes to the conventional wisdom that users should change their passwords
+    on a regular basis, then you'll also want to ensure that it gets done.
+  id: totrans-402
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 另一个例子是，如果你的公司雇佣了合同工，合同在特定日期到期。如果让这些账户在临时员工离开公司后仍然保持激活并可访问，将是一个巨大的安全问题。在这种情况下，你需要一种方式来确保临时用户账户在不再需要时不会被遗忘。如果你的雇主遵循定期更改密码的传统做法，那么你还需要确保这个要求得到执行。
+- en: Password expiration data and account expiration data are two different things.
+    They can be set either separately or together. When someone's password expires,
+    he or she can change it, and everything will be all good. If somebody's account
+    expires, only someone with the proper admin privileges can unlock it.
+  id: totrans-403
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 密码过期数据和帐户过期数据是两件不同的事情。它们可以单独或一起设置。当某人的密码过期时，他或她可以更改密码，一切就会恢复正常。如果某人的帐户过期，只有拥有适当管理员权限的人才能解锁帐户。
+- en: 'To get started, take a look at the expiry data for your own account. Note that
+    you won''t need `sudo` privileges to look at your own data, but you will still
+    need to specify your own username:'
+  id: totrans-404
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 要开始，请查看您自己帐户的过期数据。请注意，查看您自己的数据不需要`sudo`权限，但您仍然需要指定自己的用户名：
+- en: '[PRE102]'
+  id: totrans-405
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE102]'
+- en: 'You can see here that no expiration data have been set. Everything here is
+    set according to the out-of-the-box system default values. Other than the obvious
+    items, here''s a breakdown of what you see:'
+  id: totrans-406
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 您可以看到，这里没有设置过期时间。一切都是根据开箱即用的系统默认值设置的。除了显而易见的项目外，以下是对您看到内容的简要说明：
+- en: '`Password inactive`: If this were set to a positive number, I would have that
+    many days to change an expired password before the system would lock out my account.'
+  id: totrans-407
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`密码不活跃`：如果这个值设置为正数，则表示在密码过期后，我会有这么多天的时间来更改密码，直到系统锁定我的帐户。'
+- en: '`Minimum number of days between password change`: Because this is set to `0`,
+    I can change my password as often as I like. If it were set to a positive number,
+    I would have to wait that number of days after changing my password before I could
+    change it again.'
+  id: totrans-408
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`密码更改之间的最小天数`：由于这个值设置为`0`，我可以随时更改密码。如果它设置为一个正数，则在更改密码后，我必须等待指定天数才能再次更改密码。'
+- en: '`Maximum number of days between password change`: This is set to the default
+    value of `99999`, meaning that my password will never expire.'
+  id: totrans-409
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`密码更改之间的最大天数`：默认值为`99999`，意味着我的密码永远不会过期。'
+- en: '`Number of days of warning before password expires`: The default value is `7`,
+    but that''s rather meaningless when the password is set to never expire.'
+  id: totrans-410
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`密码过期前的警告天数`：默认值为`7`，但当密码设置为永不过期时，这个值其实没什么意义。'
+- en: With the `chage` utility, you can either set password and account expiration
+    data for other users or use the `-l` option to view expiration data. Any unprivileged
+    user can use `chage -l` without `sudo` to view his or her own data. To either
+    set data or view someone else's data, you need `sudo`. We'll take a closer look
+    at `chage` a bit later.
+  id: totrans-411
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 使用`chage`工具，您可以为其他用户设置密码和帐户过期时间，或者使用`-l`选项查看过期时间。任何无特权的用户都可以使用`chage -l`命令而无需`sudo`来查看自己的数据。要设置数据或查看其他用户的数据，您需要`sudo`权限。稍后我们将详细了解`chage`。
+- en: 'Before we look at how to change expiration data, let''s first look at where
+    the default settings are stored. We''ll first look at the `/etc/login.defs` file.
+    Here are the three relevant lines:'
+  id: totrans-412
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在我们查看如何更改过期时间之前，首先来看看默认设置存储在哪里。我们首先看一下`/etc/login.defs`文件。以下是三行相关内容：
+- en: '[PRE103]'
+  id: totrans-413
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE103]'
+- en: You can edit these values to fit your organization's needs. For example, changing
+    `PASS_MAX_DAYS` to a value of `30` would cause all new user passwords from that
+    point on to have a 30-day expiration data. (By the way, setting the default password
+    expiry data in `login.defs` works for all of the Linux distros that we’re using.)
+  id: totrans-414
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 您可以编辑这些值以适应您组织的需求。例如，将`PASS_MAX_DAYS`更改为`30`，将导致从那时起所有新用户的密码都有30天的有效期。（顺便说一句，在`login.defs`中设置默认的密码过期时间对我们使用的所有Linux发行版都有效。）
+- en: Configuring default expiry data for useradd for Red Hat-type systems only
+  id: totrans-415
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 仅针对Red Hat类型系统配置`useradd`的默认过期时间
+- en: 'The `/etc/default/useradd` file has the rest of the default settings. In this
+    case, we''ll look at the one from the AlmaLinux 9 machine:'
+  id: totrans-416
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`/etc/default/useradd`文件包含其余的默认设置。在这种情况下，我们将查看AlmaLinux 9机器上的文件：'
+- en: Ubuntu also has the `useradd` configuration file, but it doesn't work. No matter
+    how you configure it, the Ubuntu version of `useradd` just won't read it. So,
+    the write-up about this file only applies to Red Hat-type systems.
+  id: totrans-417
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: Ubuntu也有`useradd`配置文件，但它不起作用。不管您怎么配置，Ubuntu版本的`useradd`根本不会读取它。所以关于这个文件的说明仅适用于Red
+    Hat类型的系统。
+- en: '[PRE104]'
+  id: totrans-418
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE104]'
+- en: 'The `EXPIRE=` line sets the default expiration date for new user accounts.
+    By default, there is no default expiration date. `INACTIVE=-1` means that user
+    accounts won''t be automatically locked out after the users'' passwords expire.
+    If we set this to a positive number, then any new users will have that many days
+    to change an expired password before the account gets locked. To change the defaults
+    in the `useradd` file, you can either hand-edit the file or use `useradd -D` with
+    the appropriate option switch for the item that you want to change. For example,
+    to set a default expiration date of December 31, 2023, the command would be as
+    follows:'
+  id: totrans-419
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`EXPIRE=`行设置新用户账户的默认到期日期。默认情况下，没有默认到期日期。`INACTIVE=-1`表示用户密码过期后，用户账户不会自动锁定。如果我们将其设置为正数，则新用户将有多少天的时间来更改过期的密码，直到账户被锁定。要更改`useradd`文件中的默认值，你可以手动编辑该文件，或者使用`useradd
+    -D`并搭配相应的选项开关来修改你想更改的项目。例如，要设置默认到期日期为2023年12月31日，命令如下：'
+- en: '[PRE105]'
+  id: totrans-420
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE105]'
+- en: 'To see the new configuration, you can either open the `useradd` file or just
+    do `sudo useradd -D`:'
+  id: totrans-421
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 要查看新的配置，你可以打开`useradd`文件或直接执行`sudo useradd -D`：
+- en: '[PRE106]'
+  id: totrans-422
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE106]'
+- en: 'You''ve now set it so that any new user accounts that get created will have
+    the same expiration date. You can do the same thing with either the `INACTIVE`
+    setting or the `SHELL` setting:'
+  id: totrans-423
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，你已经设置了任何新创建的用户账户将具有相同的到期日期。你也可以通过`INACTIVE`设置或`SHELL`设置来实现同样的效果：
+- en: '[PRE107]'
+  id: totrans-424
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE107]'
+- en: Now, any new user accounts that get created will have the Zsh shell set as the
+    default shell and will have to have expired passwords changed within five days
+    to prevent having the account automatically locked out.
+  id: totrans-425
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，任何新创建的用户账户都会将Zsh设置为默认Shell，并且密码过期后必须在五天内更改，以防止账户被自动锁定。
+- en: '`useradd` doesn''t do any safety checks to ensure that the default shell that
+    you''ve assigned is installed on the system. In our case, Zsh isn''t installed,
+    but `useradd` will still allow you to create accounts with Zsh as the default
+    shell.'
+  id: totrans-426
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: '`useradd`不会进行任何安全检查来确保你指定的默认Shell已经安装在系统中。在我们的案例中，Zsh没有安装，但`useradd`仍然允许你将Zsh设置为默认Shell来创建账户。'
+- en: So, just how useful is this `useradd` configuration feature in real life? Probably
+    not that much, unless you need to create a whole bunch of user accounts at once
+    with the same settings. Even so, a savvy admin would just automate the process
+    with a shell script, rather than messing around with this configuration file.
+  id: totrans-427
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 那么，`useradd`的这个配置功能在现实生活中有多有用呢？可能并不太有用，除非你需要一次性创建大量具有相同设置的用户账户。即使如此，精明的管理员也会通过Shell脚本来自动化这个过程，而不是去弄这个配置文件。
+- en: Setting expiry data on a per-account basis with useradd and usermod
+  id: totrans-428
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 使用useradd和usermod为每个账户设置到期数据
+- en: You might find it useful to set the default password expiry data in `login.defs`,
+    but you probably won't find it too useful to configure the `useradd` configuration
+    file. Really, what are the chances that you'll want to create all user accounts
+    with the same account expiration date? Setting password expiry data in `login.defs`
+    is more useful because you'll just be saying that you want new passwords to expire
+    within a certain number of days, rather than to have them all expire on a specific
+    date.
+  id: totrans-429
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你可能会觉得在`login.defs`中设置默认密码到期数据很有用，但你可能不会觉得配置`useradd`配置文件有多大用处。说实话，几乎不太可能需要你为所有用户账户设置相同的到期日期？在`login.defs`中设置密码到期数据更有用，因为你可以直接设置新密码将在一定天数内到期，而不是在某个特定日期过期。
+- en: 'Most likely, you''ll want to set account expiry data on a per-account basis,
+    depending on whether you know that the accounts will no longer be needed as of
+    a specific date. There are three ways that you can do this:'
+  id: totrans-430
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 很可能，你会根据账户是否会在特定日期后不再需要来为每个账户设置到期数据。有三种方式可以做到这一点：
+- en: Use `useradd` with the appropriate option switches to set expiry data as you
+    create the accounts. (If you need to create a whole bunch of accounts at once
+    with the same expiry data, you can automate the process with a shell script.)
+  id: totrans-431
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 使用`useradd`和适当的选项开关在创建账户时设置到期数据。（如果你需要一次性创建一堆账户并设置相同的到期数据，你可以通过Shell脚本来自动化这个过程。）
+- en: Use `usermod` to modify expiry data on existing accounts. (The beautiful thing
+    about `usermod` is that it uses the same option switches as `useradd`.)
+  id: totrans-432
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 使用`usermod`修改现有账户的到期数据。（`usermod`的优点是它使用的选项开关与`useradd`相同。）
+- en: Use `chage` to modify expiry data on existing accounts. (This one uses a whole
+    different set of option switches.)
+  id: totrans-433
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 使用`chage`修改现有账户的到期数据。（这个命令使用了完全不同的一组选项开关。）
+- en: 'You can use `useradd` and `usermod` to set account expiry data, but not to
+    set password expiry data. The only two option switches that affect account expiry
+    data are as follows:'
+  id: totrans-434
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你可以使用`useradd`和`usermod`来设置账户过期数据，但不能设置密码过期数据。影响账户过期数据的两个选项开关如下：
+- en: '`-e`: Use this to set an expiration date for the account, in the form YYYY-MM-DD.'
+  id: totrans-435
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`-e`：使用此选项设置账户的过期日期，格式为YYYY-MM-DD。'
+- en: '`-f`: Use this to set the number of days after the user''s password expires
+    that you want for his or her account to get locked out.'
+  id: totrans-436
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`-f`：使用此选项设置用户密码过期后，账户被锁定的天数。'
+- en: 'Let''s say that you want to create an account for Charlie that will expire
+    at the end of 2025\. On a Red Hat-type machine, you could enter the following:'
+  id: totrans-437
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 假设你想为Charlie创建一个将在2025年底过期的账户。在Red Hat类机器上，你可以输入以下命令：
+- en: '[PRE108]'
+  id: totrans-438
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE108]'
+- en: 'On a non-Red Hat-type machine, you''d have to add the option switches that
+    create the home directory and assign the correct default shell:'
+  id: totrans-439
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在非Red Hat类的机器上，你需要添加创建主目录并分配正确默认shell的选项开关：
+- en: '[PRE109]'
+  id: totrans-440
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE109]'
+- en: 'Use `chage -l` to verify what you''ve entered:'
+  id: totrans-441
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 使用`chage -l`来验证你输入的内容：
+- en: '[PRE110]'
+  id: totrans-442
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE110]'
+- en: 'Now, let''s say that Charlie''s contract has been extended, and you need to
+    change his account expiration to the end of January 2026\. You''ll use `usermod`
+    the same way on any Linux distro:'
+  id: totrans-443
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 假设Charlie的合同已经延长，你需要将他的账户过期时间更改为2026年1月底。你可以像在任何Linux发行版上使用`usermod`一样操作：
+- en: '[PRE111]'
+  id: totrans-444
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE111]'
+- en: 'Again, verify that everything is correct with `chage -l`:'
+  id: totrans-445
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 再次使用`chage -l`验证所有设置是否正确：
+- en: '[PRE112]'
+  id: totrans-446
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE112]'
+- en: 'Optionally, you can set the number of days before an account with an expired
+    password will get locked out:'
+  id: totrans-447
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 可选地，你可以设置密码过期后账户被锁定前的天数：
+- en: '[PRE113]'
+  id: totrans-448
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE113]'
+- en: But if you were to do that now, you wouldn't see any difference in the `chage
+    -l` output because we still haven't set expiration data for Charlie's password.
+  id: totrans-449
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 但如果现在进行此操作，你在`chage -l`输出中不会看到任何变化，因为我们仍然没有设置Charlie密码的过期数据。
+- en: Setting expiry data on a per-account basis with chage
+  id: totrans-450
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 使用chage设置每个账户的过期数据
+- en: 'You would only use `chage` to modify existing accounts, and you would use it
+    for setting either an account expiration or a password expiration. Here are the
+    relevant option switches:'
+  id: totrans-451
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你只会使用`chage`来修改现有账户，并用它来设置账户过期或密码过期。以下是相关的选项开关：
+- en: '| **Option** | **Explanation** |'
+  id: totrans-452
+  prefs: []
+  type: TYPE_TB
+  zh: '| **选项** | **说明** |'
+- en: '| `-d` | If you use the `-d 0` option on someone''s account, you''ll force
+    the user to change his or her password on their next login. |'
+  id: totrans-453
+  prefs: []
+  type: TYPE_TB
+  zh: '| `-d` | 如果你在某人的账户上使用`-d 0`选项，你将强制用户在下次登录时更改密码。 |'
+- en: '| `-E` | This is equivalent to the lowercase `-e` for `useradd` or `usermod`
+    . It sets the expiration date for the user account. |'
+  id: totrans-454
+  prefs: []
+  type: TYPE_TB
+  zh: '| `-E` | 这相当于`useradd`或`usermod`中的小写`-e`。它设置用户账户的过期日期。 |'
+- en: '| `-I` | This is equivalent to `-f` for `useradd` or `usermod` . It sets the
+    number of days before an account with an expired password will be locked out.
+    |'
+  id: totrans-455
+  prefs: []
+  type: TYPE_TB
+  zh: '| `-I` | 这相当于`useradd`或`usermod`中的`-f`。它设置密码过期后账户被锁定之前的天数。 |'
+- en: '| `-m` | This sets the minimum number of days between password changes. In
+    other words, if Charlie changes his password today, the `-m 5` option will force
+    him to wait five days before he can change his password again. |'
+  id: totrans-456
+  prefs: []
+  type: TYPE_TB
+  zh: '| `-m` | 这设置密码更改之间的最小天数。换句话说，如果Charlie今天更改了密码，`-m 5`选项将强制他等待五天才能再次更改密码。 |'
+- en: '| `-M` | This sets the maximum number of days before a password expires. (Be
+    aware, though, that if Charlie last set his password 89 days ago, using a `-M
+    90` option on his account will cause his password to expire tomorrow, not 90 days
+    from now.) |'
+  id: totrans-457
+  prefs: []
+  type: TYPE_TB
+  zh: '| `-M` | 这设置密码过期之前的最大天数。（但要注意，如果Charlie上次设置密码是在89天前，使用`-M 90`选项将导致他的密码明天过期，而不是90天后的今天。）
+    |'
+- en: '| `-W` | This will set the number of warning days for passwords that are about
+    to expire. |'
+  id: totrans-458
+  prefs: []
+  type: TYPE_TB
+  zh: '| `-W` | 这将设置密码即将过期时的警告天数。 |'
+- en: 'You can set just one of these data items at a time or you can set them all
+    at once. In fact, to avoid frustrating you with a different demo for each individual
+    item, let''s set them all at once, except for `-d 0`, and then we''ll see what
+    we''ve got:'
+  id: totrans-459
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 你可以一次设置这些数据项中的一个，或者你可以一次性设置所有这些数据。事实上，为了避免给你带来麻烦而为每个单独的项做不同的演示，让我们一次性设置它们，除了`-d
+    0`，然后看看我们得到了什么：
+- en: '[PRE114]'
+  id: totrans-460
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE114]'
+- en: All expiration data have now been set.
+  id: totrans-461
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 所有过期数据现在已被设置。
+- en: 'For our final example, let''s say that you''ve just created a new account for
+    Samson, and you want to force him to change his password the first time he logs
+    in. There are two ways to do that. Either way, you would do it after you''ve set
+    his password initially. For example, let''s do this:'
+  id: totrans-462
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在我们的最后一个示例中，假设你刚为Samson创建了一个新账户，并且你希望强制他在第一次登录时更改密码。有两种方法可以做到这一点。无论哪种方式，都应在你最初设置密码之后进行。例如，操作如下：
+- en: '[PRE115]'
+  id: totrans-463
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE115]'
+- en: Next, we will go through a hands-on lab.
+  id: totrans-464
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 接下来，我们将进行一个实操实验。
+- en: Hands-on lab for setting account and password expiry data
+  id: totrans-465
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 设置账户和密码过期数据的实操实验
+- en: 'In this lab, you''ll create a couple of new user accounts, set expiration data,
+    and view the results. You can do this lab on any of your virtual machines. The
+    only difference will be with the `useradd` commands:'
+  id: totrans-466
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在这个实验中，你将创建几个新的用户账户，设置过期日期，并查看结果。你可以在任何虚拟机上进行此实验，唯一的区别是`useradd`命令的使用：
+- en: 'On your CentOS or AlmaLinux VM, create a user account for Samson with the expiration
+    date of June 30, 2025, and view the results:'
+  id: totrans-467
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在你的CentOS或AlmaLinux虚拟机上，为Samson创建一个用户账户，设置过期日期为2025年6月30日，并查看结果：
+- en: '[PRE116]'
+  id: totrans-468
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE116]'
+- en: 'For Ubuntu, run this command:'
+  id: totrans-469
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 对于Ubuntu，运行以下命令：
+- en: '[PRE117]'
+  id: totrans-470
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE117]'
+- en: 'Use `usermod` to change Samson''s account expiration date to July 31, 2025:'
+  id: totrans-471
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使用`usermod`命令将Samson的账户过期日期更改为2025年7月31日：
+- en: '[PRE118]'
+  id: totrans-472
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE118]'
+- en: 'Assign a password to Samson''s account, then force him to change his password
+    on his first login. Log in as Samson, change his password, then login to your
+    own account:'
+  id: totrans-473
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为Samson的账户设置密码，然后强制他在第一次登录时更改密码。以Samson身份登录，修改密码，然后重新登录到你的账户：
+- en: '[PRE119]'
+  id: totrans-474
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE119]'
+- en: 'Use `chage` to set a five-day waiting period for changing passwords, a password
+    expiration period of 90 days, an inactivity period of two days, and a warning
+    period of five days:'
+  id: totrans-475
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使用`chage`命令设置密码更改的等待期为五天，密码过期周期为90天，不活跃期为两天，警告期为五天：
+- en: '[PRE120]'
+  id: totrans-476
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE120]'
+- en: Keep this account, because you'll be using it for the lab in the next section.
+  id: totrans-477
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 保留这个账户，因为你将在下一部分的实验中使用它。
+- en: Next, let's see how to prevent brute-force attacks.
+  id: totrans-478
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 接下来，让我们来看一下如何防止暴力破解攻击。
+- en: Preventing brute-force password attacks
+  id: totrans-479
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 防止暴力破解密码攻击
+- en: Amazingly enough, this is another topic that engenders a bit of controversy.
+    I mean, nobody denies the wisdom of automatically locking out user accounts that
+    are under attack. The controversial part concerns the number of failed login attempts
+    that we should allow before locking the account.
+  id: totrans-480
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 令人惊讶的是，这是另一个引发争议的话题。我的意思是，没有人否认自动锁定受攻击的用户账户的智慧。争议的部分在于我们应该允许多少次登录失败后再锁定账户。
+- en: 'Back in the stone age of computing, so long ago that I still had a full head
+    of hair, the early Unix operating systems only allowed users to create a password
+    with a maximum of eight lowercase letters. So in those days, it was possible for
+    early man to brute-force someone else''s password just by sitting down at the
+    keyboard and typing in random passwords. That''s when the philosophy started of
+    having user accounts get locked out after only three failed login attempts. Nowadays,
+    with strong passwords, or better yet, a strong passphrase, setting a lockout value
+    of three failed login attempts will do three things:'
+  id: totrans-481
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在计算机的石器时代，那时我还有一头浓密的头发，早期的Unix操作系统只允许用户创建一个最多包含八个小写字母的密码。所以在那个时候，早期的人只需坐在键盘前，随机输入密码，就能暴力破解他人的密码。那时的哲学就是，在三次登录失败后就将用户账户锁定。如今，随着强密码的使用，或者更好的是，强密码短语的使用，将登录失败的锁定值设为三次，将带来三个结果：
+- en: It will unnecessarily frustrate users.
+  id: totrans-482
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 这会不必要地让用户感到沮丧。
+- en: It will cause extra work for help desk personnel.
+  id: totrans-483
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 这将增加帮助台人员的额外工作量。
+- en: If an account really is under attack, it will lock the account before you've
+    had a chance to gather information about the attacker.
+  id: totrans-484
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 如果账户确实正在受到攻击，它将在你还未有机会收集攻击者信息之前锁定账户。
+- en: Setting the lockout value to something more realistic, such as 100 failed login
+    attempts, will still provide good security, while still giving you enough time
+    to gather information about the attackers. Just as importantly, you won't cause
+    undue frustration to users and help desk personnel.
+  id: totrans-485
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 将锁定值设置为更现实的数字，比如100次登录失败，仍然可以提供良好的安全性，同时还为你提供足够的时间收集有关攻击者的信息。同样重要的是，这样做不会给用户和帮助台人员带来不必要的沮丧。
+- en: Anyway, regardless of how many failed login attempts your employer allows you
+    to allow, you'll still need to know how to set it all up. On RHEL 7-type systems
+    and Ubuntu 18.04, you’ll do this by configuring the pam_tally2 Pluggable Authentication
+    Module (PAM). On RHEL 8/9-type systems and Ubuntu 20.04/22.04, you’ll instead
+    configure the pam_faillock PAM module. Let’s dig in and see how it’s done.
+  id: totrans-486
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 无论您的雇主允许多少次失败的登录尝试，您仍然需要知道如何配置它。在 RHEL 7 类型的系统和 Ubuntu 18.04 中，您将通过配置 pam_tally2
+    插件认证模块（PAM）来实现。而在 RHEL 8/9 类型的系统和 Ubuntu 20.04/22.04 中，您则需要配置 pam_faillock PAM
+    模块。让我们深入了解，看看如何操作。
+- en: Configuring the pam_tally2 PAM module on CentOS 7
+  id: totrans-487
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 在 CentOS 7 上配置 pam_tally2 PAM 模块
+- en: 'To make this magic work, we''ll rely on our good friend, PAM. The `pam_tally2`
+    module comes already installed on CentOS 7, but it isn''t configured. We''ll begin
+    by editing the `/etc/pam.d/login` file. Figuring out how to configure it is easy
+    because there''s an example at the bottom of the `pam_tally2` man page:'
+  id: totrans-488
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 为了让这个功能生效，我们将依赖我们的好朋友 PAM。`pam_tally2` 模块已经预装在 CentOS 7 上，但尚未配置。我们将首先编辑 `/etc/pam.d/login`
+    文件。配置它的方法很简单，因为 `pam_tally2` 手册页的底部有一个示例：
+- en: '[PRE121]'
+  id: totrans-489
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE121]'
+- en: 'In the second line of the example, we see that `pam_tally2` is set with the
+    following parameters:'
+  id: totrans-490
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在示例的第二行中，我们看到 `pam_tally2` 配置了以下参数：
+- en: '`deny=4`: This means that the user account under attack will get locked out
+    after only four failed login attempts.'
+  id: totrans-491
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`deny=4`：这意味着在仅四次失败的登录尝试后，受攻击的用户账户将被锁定。'
+- en: '`even_deny_root`: This means that even the root user account will get locked
+    if it''s under attack.'
+  id: totrans-492
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`even_deny_root`：这意味着即使是 root 用户账户也会在受到攻击时被锁定。'
+- en: '`unlock_time=1200`: The account will get automatically unlocked after 1,200
+    seconds, or 20 minutes.'
+  id: totrans-493
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`unlock_time=1200`：账户将在 1200 秒（或 20 分钟）后自动解锁。'
+- en: Now, if you look at the actual `login` file on either of your virtual machines,
+    you'll see that they don't look exactly like this example `login` file that's
+    in both of their man pages. That's okay, we'll still make it work.
+  id: totrans-494
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，如果您查看虚拟机上的实际 `login` 文件，您会发现它们看起来与手册页中的示例 `login` 文件并不完全相同。没关系，我们依然可以使它工作。
+- en: 'Once you''ve configured the `login` file and have had a failed login, you''ll
+    see a new file created in the `/var/log` directory. You''ll view information from
+    that file with the `pam_tally2` utility. You can also use `pam_tally2` to manually
+    unlock a locked account if you don''t want to wait for the timeout period:'
+  id: totrans-495
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 一旦您配置了 `login` 文件并进行了失败的登录，您将在 `/var/log` 目录中看到一个新文件的生成。您可以使用 `pam_tally2` 工具查看该文件中的信息。如果您不想等待超时期间，您还可以使用
+    `pam_tally2` 手动解锁被锁定的账户：
+- en: '[PRE122]'
+  id: totrans-496
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE122]'
+- en: Note that, after I did the reset on Charlie's account, I received no output
+    from doing another query.
+  id: totrans-497
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 请注意，在我重置 Charlie 账户后，我并没有收到任何来自另一次查询的输出。
+- en: Hands-on lab for configuring pam_tally2 on CentOS 7
+  id: totrans-498
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+  zh: 配置 pam_tally2 的实验室操作（CentOS 7）
+- en: 'Configuring `pam_tally2` is super easy because it only requires adding one
+    line to the `/etc/pam.d/login` file. To make things even easier, you can just
+    copy and paste that line from the example in the `pam_tally2` man page. In spite
+    of what I said earlier about bumping the number of failed logins up to 100, we''ll
+    keep that number at 4 for now, because I know that you don''t want to have to
+    do 100 failed logins in order to demo this:'
+  id: totrans-499
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 配置 `pam_tally2` 非常简单，因为它只需要在 `/etc/pam.d/login` 文件中添加一行。为了让事情更容易，您可以直接从 `pam_tally2`
+    手册页中的示例复制并粘贴那一行。尽管我之前说过要将失败登录次数提高到 100，但我们现在将失败次数保持在 4，因为我知道您不希望为了演示这一点而进行 100
+    次失败的登录尝试：
+- en: 'On the CentOS 7 virtual machine, open the `/etc/pam.d/login` file for editing.
+    Look for the line that invokes the `pam_securetty` module. (That should be around
+    line 2.) Beneath that line, insert this line:'
+  id: totrans-500
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在 CentOS 7 虚拟机中，打开 `/etc/pam.d/login` 文件进行编辑。找到调用 `pam_securetty` 模块的行。（应该在第
+    2 行左右。）在该行下面，插入以下内容：
+- en: '[PRE123]'
+  id: totrans-501
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE123]'
+- en: Save the file and exit the editor.
+  id: totrans-502
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 保存文件并退出编辑器。
+- en: For this step, you'll need to log out of your own account, because `pam_tally2`
+    doesn't work with `su`. So log out and, while purposely using the wrong password,
+    attempt to log in to the `samson` account that you created in the previous lab.
+    Keep doing that until you see the message that the account is locked. Note that
+    when the `deny` value is set to `4`, it will actually take five failed login attempts
+    to lock Samson out.
+  id: totrans-503
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 对于这一步，您需要退出自己的账户，因为 `pam_tally2` 无法与 `su` 一起使用。所以请退出并在故意使用错误密码的情况下，尝试登录您在上一个实验中创建的
+    `samson` 账户。继续这样做，直到看到账户被锁定的提示信息。请注意，当 `deny` 值设置为 `4` 时，实际上需要五次失败的登录尝试才能锁定 Samson
+    账户。
+- en: 'Log back in to your own user account. Run this command and note the output:'
+  id: totrans-504
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 重新登录到你的用户帐户。运行此命令并注意输出：
+- en: '[PRE124]'
+  id: totrans-505
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE124]'
+- en: 'For this step, you''ll simulate that you''re a help desk worker, and Samson
+    has just called to request that you unlock his account. After verifying that you
+    really are talking to the real Samson, enter the following two commands:'
+  id: totrans-506
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在此步骤中，你将模拟自己是帮助台工作人员，Samson刚刚打电话请求解锁他的帐户。确认你确实在和真正的Samson通话后，输入以下两个命令：
+- en: '[PRE125]'
+  id: totrans-507
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE125]'
+- en: Now that you've seen how this works, open the `/etc/pam.d/login` file for editing,
+    and change the `deny=` parameter from `4` to `100` and save the file. (This will
+    make your configuration a bit more realistic in terms of modern security philosophy.)
+  id: totrans-508
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 现在你已经了解了这个过程，打开`/etc/pam.d/login`文件进行编辑，将`deny=`参数从`4`改为`100`并保存文件。（这将使你的配置在现代安全理念方面更加真实。）
+- en: Next, let’s look at configuring pam_faillock on our AlmaLinux machines.
+  id: totrans-509
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 接下来，让我们看看如何在AlmaLinux机器上配置pam_faillock。
+- en: Configuring pam_faillock on AlmaLinux 8/9
+  id: totrans-510
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 在AlmaLinux 8/9上配置pam_faillock
+- en: The pam_faillock module is already installed on any RHEL 8 or RHEL 9-type of
+    Linux distro. Since the basic concepts of pam_faillock are pretty much the same
+    as they are for pam_tally2, we’ll dispense with the preliminary explanations and
+    jump right to the hands-on procedure.
+  id: totrans-511
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: pam_faillock模块已经安装在任何RHEL 8或RHEL 9类型的Linux发行版上。由于pam_faillock的基本概念与pam_tally2基本相同，我们将省略初步解释，直接进入操作步骤。
+- en: Hands-on lab for configuring pam_faillock on AlmaLinux 8 or AlmaLinux 9
+  id: totrans-512
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+  zh: 配置AlmaLinux 8或AlmaLinux 9上pam_faillock的实践实验
+- en: Although you can enable and configure pam_faillock by hand-editing the PAM configuration
+    files, the RHEL distros provide an easier method, which is called *authselect*.
+  id: totrans-513
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 虽然你可以通过手动编辑PAM配置文件来启用和配置pam_faillock，但RHEL系列发行版提供了一种更简单的方法，叫做*authselect*。
+- en: 'On either an AlmaLinux 8 or an AlmaLinux 9 VM, view the available authselect
+    profiles by doing:'
+  id: totrans-514
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在AlmaLinux 8或AlmaLinux 9虚拟机上，通过以下方式查看可用的authselect配置文件：
+- en: '[PRE126]'
+  id: totrans-515
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE126]'
+- en: 'For now, at least, we’re only dealing with local users. So, we’ll use the minimal
+    profile. View the features of this profile like this:'
+  id: totrans-516
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 至少目前，我们只处理本地用户。所以，我们将使用最小配置文件。像这样查看该配置文件的功能：
+- en: '[PRE127]'
+  id: totrans-517
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE127]'
+- en: Note that there are a lot of included features, but we’re only interested in
+    the with-faillock feature.
+  id: totrans-518
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 请注意，有许多包含的功能，但我们只对`with-faillock`功能感兴趣。
+- en: 'Enable the minimal profile, like this:'
+  id: totrans-519
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 启用最小配置文件，如下所示：
+- en: '[PRE128]'
+  id: totrans-520
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE128]'
+- en: 'After enabling a profile, we can now enable the pam_faillock module, like this:'
+  id: totrans-521
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 启用配置文件后，我们现在可以启用pam_faillock模块，如下所示：
+- en: '[PRE129]'
+  id: totrans-522
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE129]'
+- en: 'In the /etc/security/ directory, open the faillock.conf file in your favorite
+    text editor. Look for these four lines:'
+  id: totrans-523
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在`/etc/security/`目录下，在你喜欢的文本编辑器中打开`faillock.conf`文件。查找以下四行：
+- en: '[PRE130]'
+  id: totrans-524
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE130]'
+- en: Remove the preceding comment symbols from all four lines, and save the file.
+  id: totrans-525
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 从所有四行中删除前面的注释符号，并保存文件。
+- en: 'Create a user account, and deliberately have the user make three failed login
+    attempts. View the results, like this:'
+  id: totrans-526
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 创建一个用户帐户，并故意让该用户进行三次登录失败尝试。查看结果，如下所示：
+- en: '[PRE131]'
+  id: totrans-527
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE131]'
+- en: Wait until the ten-minute timer expires, and then have your user try to log
+    in with the correct password.
+  id: totrans-528
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 等待十分钟的计时器到期，然后让用户使用正确的密码尝试登录。
+- en: 'Have the user log out. Then, have the user again deliberately make three failed
+    login attempts. This time, reset the user’s account before the timer expires,
+    like this:'
+  id: totrans-529
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 让用户注销。然后，再次让用户故意进行三次登录失败尝试。这次，在计时器到期之前重置用户帐户，如下所示：
+- en: '[PRE132]'
+  id: totrans-530
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE132]'
+- en: Doing this on Ubuntu is a bit different, so let’s now look at that.
+  id: totrans-531
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在Ubuntu上执行此操作有些不同，所以让我们接下来看看如何在Ubuntu上配置。
+- en: Configuring pam_faillock on Ubuntu 20.04 and Ubuntu 22.04
+  id: totrans-532
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 在Ubuntu 20.04和Ubuntu 22.04上配置pam_faillock
+- en: Sadly, the authselect utility isn’t available for Ubuntu, so we’ll just have
+    to hand-edit the PAM configuration files. Here’s the procedure.
+  id: totrans-533
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 遗憾的是，`authselect`工具在Ubuntu上不可用，所以我们只能手动编辑PAM配置文件。以下是操作步骤。
+- en: Hands-on lab for configuring pam_faillock on Ubuntu 20.04 and Ubuntu 22.04
+  id: totrans-534
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+  zh: 配置Ubuntu 20.04和Ubuntu 22.04上pam_faillock的实践实验
+- en: 'Open the /etc/pam.d/common-auth file in your favorite text editor. At the top
+    of the file, insert these two lines:'
+  id: totrans-535
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在你喜欢的文本编辑器中打开`/etc/pam.d/common-auth`文件。在文件的顶部插入以下两行：
+- en: '[PRE133]'
+  id: totrans-536
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE133]'
+- en: 'Open the /etc/pam.d/common-account file in your text editor. At the bottom
+    of the file, add this line:'
+  id: totrans-537
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在文本编辑器中打开`/etc/pam.d/common-account`文件，在文件底部添加以下行：
+- en: '[PRE134]'
+  id: totrans-538
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE134]'
+- en: Configure the /etc/security/faillock.conf file the same way that I’ve shown
+    in Step 5 of the preceding lab for AlmaLinux.
+  id: totrans-539
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 按照我在前面的实验第5步中展示的方法，配置`/etc/security/faillock.conf`文件，步骤相同。
+- en: Test the setup as outlined in Steps 6 through 8 of the preceding AlmaLinux lab.
+  id: totrans-540
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 按照前面AlmaLinux实验的第6至第8步进行设置测试。
+- en: And, that’s all there is to it. Next, let’s look at how to manually lock a user’s
+    account.
+  id: totrans-541
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 就这样。接下来，让我们看看如何手动锁定用户账户。
+- en: Locking user accounts
+  id: totrans-542
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 锁定用户账户
+- en: 'Okay, you''ve just seen how to have Linux automatically lock user accounts
+    that are under attack. There will also be times when you''ll want to be able to
+    manually lock out user accounts. Let''s look at a few examples:'
+  id: totrans-543
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 好了，你刚刚看到如何让Linux在受到攻击时自动锁定用户账户。接下来，会有一些情况是你需要手动锁定用户账户的。让我们看看几个例子：
+- en: When a user goes on vacation and you want to ensure that nobody monkeys around
+    with that user's account while he or she is gone
+  id: totrans-544
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 当用户去度假，而你希望确保在他或她不在期间，没人擅自操作该用户账户时
+- en: When a user is under investigation for questionable activities
+  id: totrans-545
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 当一个用户因可疑活动而接受调查时
+- en: When a user leaves the company
+  id: totrans-546
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 当用户离开公司时
+- en: With regard to the last point, you may be asking yourself, *Why can't we just
+    delete the accounts of people who are no longer working here?* And, you certainly
+    can, easily enough. However, before you do so, you'll need to check with your
+    local laws to make sure that you don't get yourself into deep trouble. Here in
+    the United States, for example, we have the Sarbanes-Oxley law, which restricts
+    what files that publicly traded companies can delete from their computers. If
+    you were to delete a user account, along with that user's home directory and mail
+    spool, you just might be running afoul of Sarbanes-Oxley or whatever you may have
+    as the equivalent law in your own home country.
+  id: totrans-547
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 关于最后一点，你可能会问自己，*为什么我们不能直接删除那些已经不再在公司工作的人账户？* 当然，你可以这样做，轻而易举。不过，在这样做之前，你需要检查当地法律，以确保不会陷入麻烦。以美国为例，我们有萨班斯-奥克斯利法案，限制了公开上市公司从其计算机中删除哪些文件。如果你删除了一个用户账户，同时删除了该用户的主目录和邮件缓存，那么你可能就违反了萨班斯-奥克斯利法案，或者在你所在国家的类似法律。
+- en: 'Anyway, there are two utilities that you can use to temporarily lock a user
+    account:'
+  id: totrans-548
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 总之，你可以使用两个工具来临时锁定用户账户：
+- en: '`usermod`'
+  id: totrans-549
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`usermod`'
+- en: '`passwd`'
+  id: totrans-550
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`passwd`'
+- en: In apparent contradiction to what I just said, at some point you will need to
+    remove inactive user accounts. That's because malicious actors can use an inactive
+    account to perform their dirty deeds, especially if that inactive account had
+    any sort of administrative privileges. But when you do remove the accounts, make
+    sure that you do so in accordance with local laws and with company policy. In
+    fact, your best bet is to ensure that your organization has written guidelines
+    for removing inactive user accounts in its change management procedures.
+  id: totrans-551
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 与我刚才所说的表面上相矛盾的是，某些时候你确实需要删除非活跃的用户账户。这是因为恶意行为者可以利用非活跃账户进行不正当行为，尤其是当该账户具有某种管理权限时。但在删除账户时，一定要确保遵守当地法律和公司政策。事实上，你最好的做法是确保你的组织在变更管理程序中有书面指导方针来处理删除非活跃用户账户的事宜。
+- en: Using usermod to lock a user account
+  id: totrans-552
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 使用`usermod`来锁定用户账户
+- en: 'Let''s say that Katelyn has gone on maternity leave and will be gone for several
+    weeks. We can lock her account by doing:'
+  id: totrans-553
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 假设Katelyn已经开始休产假，将会离开好几个星期。我们可以通过执行以下命令来锁定她的账户：
+- en: '[PRE135]'
+  id: totrans-554
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE135]'
+- en: 'When you look at Katelyn''s entry in the `/etc/shadow` file, you''ll now see
+    an exclamation point in front of her password hash, like this:'
+  id: totrans-555
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 当你查看Katelyn在`/etc/shadow`文件中的条目时，你会看到她的密码哈希前面加了一个感叹号，如下所示：
+- en: '[PRE136]'
+  id: totrans-556
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE136]'
+- en: This exclamation point prevents the system from reading her password hash, which
+    effectively locks her out of the system.
+  id: totrans-557
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这个感叹号防止系统读取她的密码哈希，这实际上锁定了她的系统访问权限。
+- en: 'To unlock her account, just do this:'
+  id: totrans-558
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 要解锁她的账户，只需执行以下命令：
+- en: '[PRE137]'
+  id: totrans-559
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE137]'
+- en: You'll see that the exclamation point has been removed so that she can now log
+    in to her account.
+  id: totrans-560
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你会看到感叹号被移除，这样她就能登录她的账户了。
+- en: Using passwd to lock user accounts
+  id: totrans-561
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 使用`passwd`来锁定用户账户
+- en: 'You could also lock Katelyn''s account with this:'
+  id: totrans-562
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你还可以使用以下命令来锁定Katelyn的账户：
+- en: '[PRE138]'
+  id: totrans-563
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE138]'
+- en: 'This does the same job as `usermod -L`, but in a slightly different manner.
+    For one thing, `passwd -l` will give you some feedback about what''s going on,
+    whereas `usermod -L` gives you no feedback at all. On Ubuntu, the feedback looks
+    like this:'
+  id: totrans-564
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这与`usermod -L`的作用相同，只是方式略有不同。首先，`passwd -l`会给你一些关于发生了什么的反馈，而`usermod -L`则完全没有反馈。在Ubuntu上，反馈信息如下：
+- en: '[PRE139]'
+  id: totrans-565
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE139]'
+- en: 'On CentOS or AlmaLinux, the feedback looks like this:'
+  id: totrans-566
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在CentOS或AlmaLinux中，反馈信息如下：
+- en: '[PRE140]'
+  id: totrans-567
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE140]'
+- en: Also, on a CentOS or AlmaLinux machine, you'll see that `passwd -l` places two
+    exclamation points in front of the password hash, instead of just one. Either
+    way, the effect is the same.
+  id: totrans-568
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 此外，在 CentOS 或 AlmaLinux 系统上，你会发现 `passwd -l` 会在密码哈希前放置两个感叹号，而不是一个。不管怎样，效果是一样的。
+- en: 'To unlock Katelyn''s account, just do this:'
+  id: totrans-569
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 要解锁 Katelyn 的帐户，只需执行以下操作：
+- en: '[PRE141]'
+  id: totrans-570
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE141]'
+- en: In versions of Red Hat or CentOS prior to version 7, `usermod -U` would remove
+    only one of the exclamation points that `passwd -l` places in front of the `shadow`
+    file password hash, thereby leaving the account still locked. No big deal, though,
+    because running `usermod -U` again would remove the second exclamation point.
+  id: totrans-571
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 在 Red Hat 或 CentOS 版本 7 之前，`usermod -U` 只会移除 `passwd -l` 在 `shadow` 文件的密码哈希前放置的一个感叹号，从而导致帐户仍然被锁定。不过没什么大问题，因为再次运行
+    `usermod -U` 会移除第二个感叹号。
+- en: ''
+  id: totrans-572
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Ever since the introduction of the RHEL 7-type distros, this has been fixed.
+    The `passwd -l` command still places two exclamation points in the `shadow` file,
+    but `usermod -U` now removes both of them. (That's a shame, really, because it
+    ruined a perfectly good demo that I liked to do for my students.)
+  id: totrans-573
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 自从 RHEL 7 类型的发行版推出以来，这个问题已经得到修复。`passwd -l` 命令仍然会在 `shadow` 文件中放置两个感叹号，但 `usermod
+    -U` 现在会同时移除这两个感叹号。（这真是遗憾，因为它破坏了我一直很喜欢为学生做的一个很好的演示。）
+- en: Locking the root user account
+  id: totrans-574
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 锁定 root 用户帐户
+- en: 'The cloud is big business nowadays, and it''s now quite common to rent a virtual
+    private server from companies such as Rackspace, DigitalOcean, or Microsoft Azure.
+    These can serve a variety of purposes:'
+  id: totrans-575
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，云计算是一个大生意，租用像 Rackspace、DigitalOcean 或 Microsoft Azure 这样的虚拟私人服务器已经相当普遍。这些服务器可以用于各种用途：
+- en: You can run your own website, where you install your own server software instead
+    of letting a hosting service do it.
+  id: totrans-576
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 你可以运行自己的网站，安装自己的服务器软件，而不是让托管服务来安装。
+- en: You can set up a web-based app for other people to access.
+  id: totrans-577
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 你可以为其他人设置一个基于 Web 的应用程序以供访问。
+- en: Recently, I saw a YouTube demo on a crypto-mining channel that showed how to
+    set up a Proof of Stake master node on a rented virtual private server.
+  id: totrans-578
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 最近，我在一个加密货币挖矿频道的 YouTube 演示中看到，展示了如何在租用的虚拟私人服务器上设置一个股权证明（Proof of Stake）主节点。
+- en: One thing that these cloud services have in common is that when you first set
+    up your account and the provider sets up a virtual machine for you, they'll have
+    you log in to the root user account. (It even happens with Ubuntu, even though
+    the root account is disabled on a local installation of Ubuntu.)
+  id: totrans-579
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 这些云服务的一个共同点是，当你首次设置帐户时，服务提供商会为你设置一个虚拟机，并让你登录到 root 用户帐户。（即使是在 Ubuntu 上，虽然本地安装的
+    Ubuntu 会禁用 root 帐户，初次设置时也会让你登录 root 用户帐户。）
+- en: I know that there are some folk who just keep logging in to the root account
+    of these cloud-based servers and think nothing of it, but that's really a horrible
+    idea. There are botnets, such as the Hail Mary botnet, that continuously scan
+    the internet for servers that have their Secure Shell port exposed to the internet.
+    When the botnets find one, they'll do a brute-force password attack against the
+    root user account of that server. And yes, the botnets sometimes are successful
+    in breaking in, especially if the root account is set with a weak password.
+  id: totrans-580
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我知道有些人会一直登录到这些云服务器的 root 帐户，并认为这没什么，但其实这真是个糟糕的主意。有一些僵尸网络，比如 Hail Mary 僵尸网络，会不断扫描互联网，寻找开放了
+    SSH 端口的服务器。当这些僵尸网络找到一个目标时，它们会对该服务器的 root 用户帐户进行暴力破解攻击。是的，僵尸网络有时会成功入侵，尤其是当 root
+    帐户设置了弱密码时。
+- en: 'So, the first thing that you want to do when you set up a cloud-based server
+    is to create a normal user account for yourself and set it up with full `sudo`
+    privileges. Then, log out of the root user account, log in to your new account,
+    and do this:'
+  id: totrans-581
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 因此，当你设置基于云的服务器时，首先要做的就是为自己创建一个普通用户帐户，并赋予其完全的 `sudo` 权限。然后，退出 root 用户帐户，登录到你的新帐户，接着执行以下操作：
+- en: '[PRE142]'
+  id: totrans-582
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE142]'
+- en: I mean, really, why take the chance of getting your root account compromised?
+  id: totrans-583
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我的意思是，真的，为什么要冒着让你的 root 帐户被入侵的风险呢？
+- en: Setting up security banners
+  id: totrans-584
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 设置安全标语
+- en: Something that you really, really don't want is to have a login banner that
+    says something to the effect of *Welcome to our network*. I say that because,
+    quite a few years ago, I attended a mentored SANS course on incident handling.
+    Our instructor told us a story about how a company took a suspected network intruder
+    to court, only to get the case thrown out. The reason? The alleged intruder said,
+    "*Well, I saw the message that said Welcome to the network, so I thought that
+    I really was welcome there."* Yeah, supposedly, that was enough to get the case
+    thrown out.
+  id: totrans-585
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你绝对不希望出现的情况是，登录横幅上写着类似 *Welcome to our network* 这样的内容。我之所以这么说，是因为很多年前，我参加了一个由
+    SANS 主办的网络事件处理课程。我们的导师讲了一个故事，讲述一家公司的网络入侵嫌疑人被告上法庭，结果案件被驳回了。理由是什么？这位嫌疑人说，“*我看到了写着欢迎来到网络的消息，所以我以为我真的是被欢迎进入这里的*。”是的，显然，这个理由足以让案件被驳回。
+- en: A few years later, I related that story to the students in one of my Linux admin
+    classes. One student said, "*That makes no sense.* *We all have welcome mats at
+    our front doors, but that doesn't mean that burglars are welcome to come in.*"
+    I have to confess that he had a good point, and I now have to wonder about the
+    veracity of the story.
+  id: totrans-586
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 几年后，我将这个故事讲给我的 Linux 管理课程的学生们听。一位学生说，“*这完全没有道理。我们所有人家门口都有欢迎垫，但这并不意味着小偷可以随便进来*。”我不得不承认，他说的有道理，现在我不得不怀疑这个故事的真实性。
+- en: At any rate, just to be on the safe side, you do want to set up login messages
+    that make clear that only authorized users are allowed to access the system.
+  id: totrans-587
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 不管怎么说，为了安全起见，你应该设置登录消息，明确表示只有授权用户才能访问系统。
+- en: Using the motd file
+  id: totrans-588
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 使用 motd 文件
+- en: 'The `/etc/motd` file will present a message banner to anyone who logs in to
+    a system through Secure Shell. On your CentOS or AlmaLinux machine, an empty `motd`
+    file is already there. On your Ubuntu machine, the `motd` file isn''t there, but
+    it''s a simple matter to create one. Either way, open the file in your text editor
+    and create your message. Save the file and test it by remotely logging in through
+    Secure Shell. You should see something like this:'
+  id: totrans-589
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`/etc/motd` 文件会在任何通过安全外壳（Secure Shell）登录系统的用户面前显示消息横幅。在 CentOS 或 AlmaLinux
+    机器上，已经有一个空的 `motd` 文件。对于 Ubuntu 机器来说，`motd` 文件并不存在，但创建一个文件非常简单。无论哪种情况，打开该文件并在文本编辑器中创建你的消息。保存文件并通过安全外壳远程登录测试。你应该能看到类似这样的内容：'
+- en: '[PRE143]'
+  id: totrans-590
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE143]'
+- en: '`motd` stands for **Message of the Day**.'
+  id: totrans-591
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: '`motd` 代表 **Message of the Day**（每日信息）。'
+- en: 'Ubuntu comes with a dynamic MOTD system that displays messages from Ubuntu''s
+    parent company and messages about the operating system. When you create a new
+    `motd` file in the `/etc` directory, whatever message you put in it will show
+    up at the end of the dynamic output, like so:'
+  id: totrans-592
+  prefs: []
+  type: TYPE_NORMAL
+  zh: Ubuntu 配备了一个动态的 MOTD 系统，显示来自 Ubuntu 母公司以及操作系统的消息。当你在 `/etc` 目录中创建一个新的 `motd`
+    文件时，放入其中的任何消息都会显示在动态输出的末尾，如下所示：
+- en: '[PRE144]'
+  id: totrans-593
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE144]'
+- en: The `Warning!!! Authorized users only!` line is what I placed into the `/etc/motd`
+    file.
+  id: totrans-594
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`Warning!!! Authorized users only!` 这一行是我放入 `/etc/motd` 文件中的内容。'
+- en: Using the issue file
+  id: totrans-595
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 使用 issue 文件
+- en: 'The `issue` file, also found in the `/etc` directory, shows a message on the
+    local terminal, just above the login prompt. A default `issue` file would just
+    contain macro code that would show information about the machine. Here''s an example
+    from an Ubuntu machine:'
+  id: totrans-596
+  prefs: []
+  type: TYPE_NORMAL
+  zh: '`issue` 文件，位于 `/etc` 目录中，在本地终端的登录提示符上方显示消息。一个默认的 `issue` 文件会包含显示机器信息的宏代码。以下是来自
+    Ubuntu 机器的一个示例：'
+- en: '[PRE145]'
+  id: totrans-597
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE145]'
+- en: 'Or, on a Red Hat-type machine, it would look like this:'
+  id: totrans-598
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 或者，在一台类似 Red Hat 的机器上，它会像这样：
+- en: '[PRE146]'
+  id: totrans-599
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE146]'
+- en: 'On an Ubuntu machine, the banner would look something like this:'
+  id: totrans-600
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在一台 Ubuntu 机器上，横幅会像这样：
+- en: '![19501_02_03.png](img/file22.png)'
+  id: totrans-601
+  prefs: []
+  type: TYPE_IMG
+  zh: '![19501_02_03.png](img/file22.png)'
+- en: 19501_02_03.png
+  id: totrans-602
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 19501_02_03.png
+- en: 'On a a Red Hat-type machine, it would look something like this:'
+  id: totrans-603
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在一台类似 Red Hat 的机器上，它看起来会像这样：
+- en: '![19501_02_04.png](img/file23.png)'
+  id: totrans-604
+  prefs: []
+  type: TYPE_IMG
+  zh: '![19501_02_04.png](img/file23.png)'
+- en: 19501_02_04.png
+  id: totrans-605
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 19501_02_04.png
+- en: 'You could put a security message in the issue file, and it would show up after
+    a reboot:'
+  id: totrans-606
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你可以在 issue 文件中放置一个安全消息，重启后它会显示出来：
+- en: '![19501_02_05.png](img/file24.png)'
+  id: totrans-607
+  prefs: []
+  type: TYPE_IMG
+  zh: '![19501_02_05.png](img/file24.png)'
+- en: 19501_02_05.png
+  id: totrans-608
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 19501_02_05.png
+- en: In reality, is there really any point in placing a security message in the issue
+    file? If your servers are properly locked away in a server room with controlled
+    access, then probably not. For desktop machines that are out in the open, this
+    would be more useful.
+  id: totrans-609
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现实中，将安全消息放在 issue 文件里真的有意义吗？如果你的服务器被正确地锁在服务器机房，并且有严格的访问控制，那可能没有必要。对于那些暴露在外的桌面机器，这种做法就更有意义了。
+- en: Using the issue.net file
+  id: totrans-610
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 使用 issue.net 文件
+- en: Just don't. It's for `telnet` logins, and anyone who has `telnet` enabled on
+    their servers is seriously screwing up. However, for some strange reason, the
+    `issue.net` file still hangs around in the `/etc` directory.
+  id: totrans-611
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 还是别尝试了。那是`telnet`登录用的，任何在服务器上启用了`telnet`的人都在严重犯错。然而，不知道为什么，`issue.net`文件依然会出现在`/etc`目录中。
+- en: Detecting compromised passwords
+  id: totrans-612
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 检测泄露的密码
+- en: 'Yes, dear hearts, the bad guys do have extensive dictionaries of passwords
+    that either are commonly used or have been compromised. One of the most effective
+    ways of brute-forcing passwords is to use these dictionaries to perform a dictionary
+    attack. This is when the password-cracking tool reads in passwords from a specified
+    dictionary and tries each one until either the list has been exhausted, or until
+    the attack is successful. So, how do you know if your password is on one of those
+    lists? Easy. Just use one of the online services that will check your password
+    for you. One popular site is *Have I Been Pwned?*, which you can see here:'
+  id: totrans-613
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 是的，亲爱的们，坏人确实有广泛的密码字典，这些密码字典包含常用的密码或已经泄露的密码。进行暴力破解密码的最有效方式之一是使用这些字典进行字典攻击。这种攻击方式是当密码破解工具从指定的字典中读取密码并逐一尝试，直到字典中的密码被用尽，或者攻击成功为止。那么，你如何知道你的密码是否在这些字典中？很简单，只需使用一个在线服务来检查你的密码。一个流行的网站是*Have
+    I Been Pwned?*，你可以在这里看到：
+- en: '![19501_02_06.png](img/file25.png)'
+  id: totrans-614
+  prefs: []
+  type: TYPE_IMG
+  zh: '![19501_02_06.png](img/file25.png)'
+- en: 19501_02_06.png
+  id: totrans-615
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 19501_02_06.png
+- en: 'You can get to *Have I Been Pwned?* here:'
+  id: totrans-616
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 你可以在这里访问*Have I Been Pwned?*：
+- en: ''
+  id: totrans-617
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '[https://haveibeenpwned.com](https://haveibeenpwned.com)'
+  id: totrans-618
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: '[https://haveibeenpwned.com](https://haveibeenpwned.com)'
+- en: All you really have to do is to type in your password, and the service will
+    show if it's on any lists of compromised passwords. But think about it. Do you
+    really want to send your production password to somebody's website? Yeah, I thought
+    not. Instead, let's just send a hash value of the password. Better yet, let's
+    just send enough of the hash to allow the site to find the password in its database,
+    but not so much that they can figure out what your exact password is. We'll do
+    that by using the *Have I Been Pwned?* **Application Programming Interface** (**API**).
+  id: totrans-619
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你只需要输入你的密码，服务就会告诉你密码是否出现在任何泄露的密码列表上。但想想看，你真的想把你的生产密码发到某个网站上吗？是的，我也这么认为。那么我们干脆只发送密码的哈希值。更好的是，我们只发送足够的哈希值，让网站能够在它的数据库中找到密码，但不会发送太多信息，以至于他们能够知道你密码的确切内容。我们将通过使用*Have
+    I Been Pwned?* **应用程序编程接口**（**API**）来实现这一点。
+- en: 'To demonstrate the basic principle, let''s use `curl`, along with the API,
+    to see a list of password hashes that have `21BD1` as part of their values. (You
+    can do this on any of your virtual machines. I''ll just do it on the Fedora workstation
+    that I''m currently using to type this.) Just run this:'
+  id: totrans-620
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 为了演示基本原理，假设我们使用`curl`和 API，查看密码哈希中包含`21BD1`值的列表。（你可以在你的任何虚拟机上执行此操作。我将在我当前用来输入的
+    Fedora 工作站上执行它。）只需运行以下命令：
+- en: '[PRE147]'
+  id: totrans-621
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE147]'
+- en: 'You''re going to get a lot of output like this, so I''ll just show the first
+    few lines:'
+  id: totrans-622
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你将会看到很多类似的输出，所以我只展示前几行：
+- en: '[PRE148]'
+  id: totrans-623
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE148]'
+- en: 'Let''s pipe this into `wc -l`, a handy counting utility, to see how many matching
+    results we''ve found:'
+  id: totrans-624
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 让我们将其管道化到`wc -l`，这是一个方便的计数工具，用来查看我们找到了多少个匹配的结果：
+- en: '[PRE149]'
+  id: totrans-625
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE149]'
+- en: 'According to this, we''ve found 526 matches. But that''s not very useful, so
+    let''s fancy things up just a bit. We''ll do that by creating the `pwnedpasswords.sh`
+    shell script, which looks like this:'
+  id: totrans-626
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 根据这个，我们找到了 526 个匹配项。但这并没有什么实际用处，因此让我们稍微让事情变得更复杂一点。我们通过创建一个`pwnedpasswords.sh`的
+    shell 脚本来实现，这个脚本如下所示：
+- en: '[PRE150]'
+  id: totrans-627
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE150]'
+- en: 'Okay, I can''t try to turn you into a shell scripting guru at the moment, but
+    here''s the simplified explanation:'
+  id: totrans-628
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 好吧，我现在不能试图把你变成一个 shell 脚本大师，但这是简化后的解释：
+- en: '`candidate_password=$1`: This requires you to enter the password that you want
+    to check when you invoke the script.'
+  id: totrans-629
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`candidate_password=$1`：当你调用脚本时，需要输入你想检查的密码。'
+- en: '`full_hash=` , `prefix=`, `suffix=`: These lines calculate the SHA1 hash value
+    of the password, and then extract just the portions of the hash that we want to
+    send to the password-checking service.'
+  id: totrans-630
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`full_hash=`，`prefix=`，`suffix=`：这些行计算密码的 SHA1 哈希值，然后提取我们想要发送给密码检查服务的哈希部分。'
+- en: '`if curl`: We wrap up with an `if..then..else` structure that sends the selected
+    portions of the password hash to the checking service, and then tells us whether
+    or not the password has been compromised.'
+  id: totrans-631
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: '`if curl`：我们使用一个`if..then..else`结构，将选定的密码哈希部分发送到检查服务，然后告诉我们密码是否已被泄露。'
+- en: 'After saving the file, add the executable privilege for the user, like so:'
+  id: totrans-632
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 保存文件后，像这样为用户添加可执行权限：
+- en: '[PRE151]'
+  id: totrans-633
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE151]'
+- en: 'Now, let''s see if `TurkeyLips`, my all-time favorite password, has been compromised:'
+  id: totrans-634
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，让我们看看`TurkeyLips`，我最喜欢的密码，是否已经泄露：
+- en: '[PRE152]'
+  id: totrans-635
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE152]'
+- en: Yeah, it's been compromised, all right. So, I reckon that I don't want to use
+    that for a production password.
+  id: totrans-636
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 是的，它确实已经被破解了。所以，我觉得我不想用它作为生产环境的密码。
+- en: 'Now, let''s try it again, except with a random two-digit number tacked on at
+    the end:'
+  id: totrans-637
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 现在，让我们再试一次，不过这次在末尾加上一个随机的两位数字：
+- en: '[PRE153]'
+  id: totrans-638
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE153]'
+- en: Well, it says that this one is okay. Still though, you probably don't want to
+    use such a simple permutation of a password that's known to have been compromised.
+  id: totrans-639
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 好吧，它说这个密码是可以的。不过，尽管如此，你可能还是不想使用这样一个已知被破解的简单密码排列。
+- en: I'd like to take credit for the shell script that I've presented here, but I
+    can't. That was a creation of my buddy, Leo Dorrendorf of the former VDOO Internet
+    of Things security company, which has since been acquired by JFrog. (I've reproduced
+    the script here with his kind permission.)
+  id: totrans-640
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 我本想为我在这里展示的Shell脚本背书，但我做不到。那是我的朋友Leo Dorrendorf（前VDOO物联网安全公司成员，后来被JFrog收购）创作的。
+    （我已经在他的许可下复制了这个脚本。）
+- en: ''
+  id: totrans-641
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'If you''re interested in security solutions for your Internet of Things devices,
+    you can check them out here:'
+  id: totrans-642
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 如果你对物联网设备的安全解决方案感兴趣，可以在这里查看：
+- en: ''
+  id: totrans-643
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '[https://jfrog.com/security-and-compliance/?vr=1/](https://jfrog.com/security-and-compliance/?vr=1/)'
+  id: totrans-644
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: '[https://jfrog.com/security-and-compliance/?vr=1/](https://jfrog.com/security-and-compliance/?vr=1/)'
+- en: ''
+  id: totrans-645
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Full disclosure: the VDOO/JFrog company has been one of my clients.'
+  id: totrans-646
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 完全公开：VDOO/JFrog公司曾是我的客户之一。
+- en: Now, having said all of this, I still need to remind you that a passphrase is
+    still better than a password. Not only is a passphrase harder to crack, it's also
+    much less likely to be on anyone's list of compromised credentials.
+  id: totrans-647
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 话虽如此，我还是需要提醒你，使用密码短语总比使用密码好。密码短语不仅更难破解，而且也更不容易出现在任何泄露的凭证列表中。
+- en: Hands-on lab for detecting compromised passwords
+  id: totrans-648
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: 检测泄露密码的动手实验
+- en: 'In this lab, you''ll use the `pwnedpasswords` API in order to check your own
+    passwords:'
+  id: totrans-649
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在本实验中，你将使用`pwnedpasswords` API来检查你自己的密码：
+- en: 'Use `curl` to see how many passwords there are with the `21BD1` string in their
+    password hashes:'
+  id: totrans-650
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使用`curl`查看在密码哈希中包含`21BD1`字符串的密码数量：
+- en: '[PRE154]'
+  id: totrans-651
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE154]'
+- en: 'In the home directory of any of your Linux virtual machines, create the `pwnpassword.sh`
+    script with the following content:'
+  id: totrans-652
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在任何Linux虚拟机的主目录中，创建一个名为`pwnpassword.sh`的脚本，内容如下：
+- en: '[PRE155]'
+  id: totrans-653
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE155]'
+- en: 'Add the executable permission to the script:'
+  id: totrans-654
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 给脚本添加可执行权限：
+- en: '[PRE156]'
+  id: totrans-655
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE156]'
+- en: 'Run the script, specifying `TurkeyLips` as a password:'
+  id: totrans-656
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 运行脚本，指定`TurkeyLips`作为密码：
+- en: '[PRE157]'
+  id: totrans-657
+  prefs: []
+  type: TYPE_PRE
+  zh: '[PRE157]'
+- en: Repeat *Step 4* as many times as you like, using a different password each time.
+  id: totrans-658
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 重复*步骤4*多次，每次使用不同的密码。
+- en: The user management techniques that we've looked at so far work great on a small
+    number of computers. But what if you're working in a large enterprise? We'll look
+    at that next.
+  id: totrans-659
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 到目前为止，我们查看的用户管理技术在少量计算机上运行得非常好。但如果你在一个大型企业中工作呢？我们接下来会讨论这个问题。
+- en: Understanding centralized user management
+  id: totrans-660
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 理解集中式用户管理
+- en: In an enterprise setting, you'll often have hundreds or thousands of users and
+    computers that you need to manage. So, logging in to each network server or each
+    user's workstation to perform the procedures that we've just outlined would be
+    quite unworkable. (But do bear in mind that you still need those skills.) What
+    we need is a way to manage computers and users from one central location. Space
+    doesn't permit me to give the complete details about the various methods for doing
+    this. So for now, we'll just have to settle for a high-level overview.
+  id: totrans-661
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在企业环境中，你通常会有数百或数千个用户和计算机需要管理。所以，登录到每个网络服务器或每个用户的工作站来执行我们刚才概述的程序是非常不切实际的。（但请记住，你仍然需要具备这些技能。）我们需要的是一种从一个中心位置管理计算机和用户的方法。由于篇幅限制，我无法提供有关执行此操作的各种方法的完整细节。所以，现在我们只能先进行高层次的概述。
+- en: Microsoft Active Directory
+  id: totrans-662
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: Microsoft Active Directory
+- en: I'm not exactly a huge fan of either Windows or Microsoft. But when it comes
+    to Active Directory, I'll have to give credit where it's due. It's a pretty slick
+    product that vastly simplifies the management of very large enterprise networks.
+    And yes, it is possible to add Unix/Linux computers and their users to an Active
+    Directory domain.
+  id: totrans-663
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我并不是Windows或Microsoft的忠实粉丝。但在谈到Active Directory时，我得承认它确实很出色。它是一个相当流畅的产品，极大简化了非常大规模企业网络的管理。没错，确实可以将Unix/Linux计算机及其用户添加到Active
+    Directory域中。
+- en: I've been keeping a dark secret, and I hope that you won't hate me for it. Before
+    I got into Linux, I obtained my MCSE certification for Windows Server 2003\. Mostly,
+    my clients work with nothing but Linux computers, but I occasionally do need to
+    use my MCSE skills. Several years ago, a former client needed me to set up a Linux-based
+    Nagios server as part of a Windows Server 2008 domain, so that its users would
+    be authenticated by Active Directory. It took me a while to get it figured out,
+    but I finally did, and my client was happy.
+  id: totrans-664
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 我一直有一个不为人知的秘密，我希望你不会因此讨厌我。在接触 Linux 之前，我获得了 Windows Server 2003 的 MCSE 认证。大多数时候，我的客户仅使用
+    Linux 计算机，但我偶尔还是需要用到 MCSE 技能。几年前，一位前客户需要我将一个基于 Linux 的 Nagios 服务器设置为 Windows Server
+    2008 域的一部分，以便其用户可以通过 Active Directory 进行身份验证。我花了些时间才弄清楚，但最终完成了，客户也很满意。
+- en: Unless you wear many hats, as I sometimes have to do, you—as a Linux administrator—probably
+    won't need to learn how to use Active Directory. Most likely, you'll just tell
+    the Windows Server administrators what you need, and let them take care of it.
+  id: totrans-665
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 除非你像我一样经常需要身兼数职，否则作为一个 Linux 管理员，你可能不需要学习如何使用 Active Directory。你很可能只是告诉 Windows
+    Server 管理员你需要什么，让他们来处理。
+- en: I know, you've been chomping at the bit to see what we can do with a Linux server.
+    So, here goes.
+  id: totrans-666
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我知道，你已经迫不及待想看看我们能在 Linux 服务器上做些什么了。那么，现在开始吧。
+- en: Samba on Linux
+  id: totrans-667
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: Linux 上的 Samba
+- en: 'Samba is a Unix/Linux daemon that can serve three purposes:'
+  id: totrans-668
+  prefs: []
+  type: TYPE_NORMAL
+  zh: Samba 是一个 Unix/Linux 守护进程，可以实现三种功能：
+- en: Its primary purpose is to share directories from a Unix/Linux server with Windows
+    workstations. The directories show up in the Windows File Explorer as if they
+    were being shared from other Windows machines.
+  id: totrans-669
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 它的主要目的是将 Unix/Linux 服务器上的目录共享给 Windows 工作站。这些目录在 Windows 文件资源管理器中显示，就像是从其他 Windows
+    计算机共享的一样。
+- en: It can also be set up as a network print server.
+  id: totrans-670
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 它还可以设置为网络打印服务器。
+- en: It can also be set up as a Windows domain controller.
+  id: totrans-671
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 它还可以被设置为 Windows 域控制器。
+- en: You can install Samba version 3 on a Linux server, and set it up to act as an
+    old-style Windows NT domain controller. It's a rather complex procedure, and it
+    takes a while. Once it's done, you can join both Linux and Windows machines to
+    the domain and use the normal Windows user management utilities to manage users
+    and groups.
+  id: totrans-672
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 你可以在 Linux 服务器上安装 Samba 3 版本，并将其配置为充当旧式的 Windows NT 域控制器。这是一个相当复杂的过程，需要一些时间。一旦完成，你可以将
+    Linux 和 Windows 计算机都加入到域中，并使用正常的 Windows 用户管理工具来管理用户和组。
+- en: One of the Linux community's Holy Grails was to figure out how to emulate Active
+    Directory on a Linux server. That became something of a reality just a few years
+    ago, with the introduction of Samba version 4\. But setting it up is a very complex
+    procedure, and isn't something that you'll likely enjoy doing. So, perhaps we
+    should keep searching for something even better.
+  id: totrans-673
+  prefs: []
+  type: TYPE_NORMAL
+  zh: Linux 社区的一项“圣杯”任务就是弄清楚如何在 Linux 服务器上模拟 Active Directory。这个目标在几年前随着 Samba 4 版本的推出成为了一种现实。但其设置过程非常复杂，可能不是你愿意做的事情。所以，也许我们应该继续寻找更好的方案。
+- en: FreeIPA/Identity Management on RHEL-type distros
+  id: totrans-674
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+  zh: RHEL 类型发行版上的 FreeIPA/身份管理
+- en: 'Several years ago, the Red Hat company introduced FreeIPA as a set of packages
+    for Fedora. Why Fedora? It''s because they wanted to give it a thorough test on
+    Fedora before making it available for actual production networks. It''s now available
+    for RHEL 7 through RHEL 9 and all of their offspring, including CentOS and AlmaLinux.
+    This is what IPA stands for:'
+  id: totrans-675
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 几年前，Red Hat 公司将 FreeIPA 引入为 Fedora 的一组软件包。为什么是 Fedora 呢？因为他们希望在将其提供给实际生产网络之前，在
+    Fedora 上进行彻底的测试。现在，它已经可以在 RHEL 7 到 RHEL 9 以及所有它们的衍生版本中使用，包括 CentOS 和 AlmaLinux。这就是
+    IPA 的含义：
+- en: Identity
+  id: totrans-676
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 身份
+- en: Policy
+  id: totrans-677
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 策略
+- en: Audit
+  id: totrans-678
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 审计
+- en: 'It''s something of an answer to Microsoft''s Active Directory, but it still
+    isn''t a complete one. It does some cool stuff, but it''s still very much a work
+    in progress. The coolest part about it is how simple it is to install and set
+    up. All it really takes is to install the packages from the normal repositories,
+    open the proper firewall ports, and then run a setup script. Then, you''re all
+    set to start adding users and computers to the new domain via FreeIPA''s web interface.
+    Here, I''m adding Cleopatra, my gray-and-white tabby kitty:'
+  id: totrans-679
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 它在某种程度上是对微软的 Active Directory 的回应，但仍然不是一个完整的解决方案。它能做一些很酷的事情，但仍然处于不断发展中。它最酷的一点就是安装和配置的简单性。其实只需要从正常的软件源安装软件包，打开合适的防火墙端口，然后运行一个设置脚本。接着，你就可以通过
+    FreeIPA 的 web 界面开始向新域添加用户和计算机了。这里，我正在添加 Cleopatara，我那只灰白相间的虎斑猫：
+- en: '![19501_02_07.png](img/file26.png)'
+  id: totrans-680
+  prefs: []
+  type: TYPE_IMG
+  zh: '![19501_02_07.png](img/file26.png)'
+- en: 19501_02_07.png
+  id: totrans-681
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 19501_02_07.png
+- en: Although you can add Windows machines to a FreeIPA domain, it's not recommended.
+    But, starting with RHEL/CentOS 7.1, you can use FreeIPA to create cross-domain
+    trusts with an Active Directory domain.
+  id: totrans-682
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 尽管你可以将Windows机器添加到FreeIPA域中，但并不推荐这样做。不过，从RHEL/CentOS 7.1开始，你可以使用FreeIPA与Active
+    Directory域创建跨域信任。
+- en: The official name of this program is FreeIPA. But, for some strange reason,
+    the Red Hat folk refuse to mention that name in their documentation. They always
+    just refer to it as either Identity Management or IdM.
+  id: totrans-683
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+  zh: 这个程序的正式名称是FreeIPA。但是，出于某种奇怪的原因，Red Hat的开发人员在文档中拒绝提到这个名字，他们总是把它称为身份管理（Identity
+    Management）或IdM。
+- en: That's pretty much it for the user management topic. Let's summarize, and then
+    move on to the next chapter.
+  id: totrans-684
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 关于用户管理的话题就这些了。让我们总结一下，然后进入下一章。
+- en: Summary
+  id: totrans-685
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 总结
+- en: We covered a lot of ground in this chapter, and hopefully you found some suggestions
+    that you can actually use. We started out by showing you the dangers of always
+    logging in as the root user and how you should use `sudo` instead. In addition
+    to showing you the basics of `sudo` usage, we also looked at some good `sudo`
+    tips and tricks.
+  id: totrans-686
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在这一章中，我们涉及了许多内容，希望你能找到一些实际可用的建议。我们从展示总是以root用户身份登录的风险开始，并说明你应该使用`sudo`。除了展示`sudo`的基本用法，我们还探讨了一些有用的`sudo`技巧和窍门。
+- en: We moved on to user management by looking at how to lock down users' home directories,
+    how to enforce strong password policies, and how to enforce account and password
+    expiration policies. Then, we talked about a way to prevent brute-force password
+    attacks, how to manually lock out user accounts, how to set up security banners,
+    and how to check for compromised passwords. We wrapped things up with a brief
+    overview of central user management systems.
+  id: totrans-687
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 我们通过学习如何锁定用户的主目录，如何强制执行强密码策略，以及如何强制执行账户和密码过期策略，开始了用户管理的内容。然后，我们讨论了防止暴力破解密码攻击的方法，如何手动锁定用户账户，如何设置安全横幅，以及如何检查是否存在被破坏的密码。最后，我们简要回顾了中央用户管理系统。
+- en: In the next chapter, we'll look at how to work with various firewall utilities.
+    I'll see you there.
+  id: totrans-688
+  prefs: []
+  type: TYPE_NORMAL
+  zh: 在下一章中，我们将探讨如何使用各种防火墙工具。我在那里见。
+- en: Questions
+  id: totrans-689
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 问题
+- en: What is the best way to grant administrative privilege to users?
+  id: totrans-690
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 授予用户管理权限的最佳方式是什么？
+- en: Give every administrative user the root user password.
+  id: totrans-691
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为每个管理员用户提供root用户密码。
+- en: Add each administrative user to either the `sudo` group or the `wheel` group.
+  id: totrans-692
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 将每个管理员用户添加到`sudo`组或`wheel`组中。
+- en: Create `sudo` rules that only allow administrative users to do the tasks that
+    are directly related to their jobs.
+  id: totrans-693
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 创建`sudo`规则，只允许管理员用户执行与他们工作直接相关的任务。
+- en: Add each administrative user to the `sudoers` file and grant them full administrative
+    privileges.
+  id: totrans-694
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 将每个管理员用户添加到`sudoers`文件中，并授予他们完全的管理员权限。
+- en: Which of the following is true?
+  id: totrans-695
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 以下哪项是正确的？
+- en: When users log in as the root user, all the actions that they perform will be
+    recorded in the `auth.log` or the `secure` log file.
+  id: totrans-696
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 当用户以root用户身份登录时，他们执行的所有操作将会被记录在`auth.log`或`secure`日志文件中。
+- en: When users use `sudo`, all the actions that they perform will be recorded in
+    the `messages` or the `syslog` file.
+  id: totrans-697
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 当用户使用`sudo`时，他们执行的所有操作将会被记录在`messages`或`syslog`日志文件中。
+- en: When users log in as the root user, all the actions that they perform will be
+    recorded in the `messages` or the `syslog` file.
+  id: totrans-698
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 当用户以root用户身份登录时，他们执行的所有操作将会被记录在`messages`或`syslog`日志文件中。
+- en: When users use `sudo`, all the actions that they perform will be recorded in
+    the `auth.log` or the `secure` log file.
+  id: totrans-699
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 当用户使用`sudo`时，他们执行的所有操作将会被记录在`auth.log`或`secure`日志文件中。
+- en: In which file would you configure complex password criteria?
+  id: totrans-700
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在哪个文件中配置复杂的密码标准？
+- en: When using the `useradd` utility, what should the `UMASK` setting be in the
+    `/etc/login.defs` file?
+  id: totrans-701
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使用`useradd`工具时，`/etc/login.defs`文件中的`UMASK`设置应该是什么？
+- en: When using the `adduser` utility, how would you configure the `/etc/adduser.conf`
+    file so that new users' home directories will prevent other users from accessing
+    them?
+  id: totrans-702
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使用`adduser`工具时，如何配置`/etc/adduser.conf`文件，以确保新用户的主目录防止其他用户访问？
+- en: What change did the National Institute for Standards and Technology recently
+    make to their recommended password policy?
+  id: totrans-703
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 国家标准与技术研究院（NIST）最近对其推荐的密码政策做出了什么改变？
+- en: Which of the following methods would you use to create `sudo` rules for other
+    users?
+  id: totrans-704
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 你会使用以下哪种方法为其他用户创建`sudo`规则？
+- en: Open the `/etc/sudoers` file in your favorite text editor.
+  id: totrans-705
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 用你喜欢的文本编辑器打开`/etc/sudoers`文件。
+- en: Open the `/etc/sudoers` file with `visudo`.
+  id: totrans-706
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使用`visudo`打开`/etc/sudoers`文件。
+- en: Add a `sudoers` file to each user's home directory.
+  id: totrans-707
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为每个用户的主目录添加一个 `sudoers` 文件。
+- en: Open the `/var/spool/sudoers` file with `visudo`.
+  id: totrans-708
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使用 `visudo` 打开 `/var/spool/sudoers` 文件。
+- en: Which three of the following utilities can you use to set user account expiry
+    data?
+  id: totrans-709
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 以下哪三种工具可以用来设置用户账户的到期日期？
+- en: '`useradd`'
+  id: totrans-710
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`useradd`'
+- en: '`adduser`'
+  id: totrans-711
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`adduser`'
+- en: '`usermod`'
+  id: totrans-712
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`usermod`'
+- en: '`chage`'
+  id: totrans-713
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`chage`'
+- en: Why might you want to lock out the user account of a former employee, rather
+    than to delete it?
+  id: totrans-714
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 为什么您可能希望锁定前员工的用户账户，而不是删除它？
+- en: It's easier to lock an account than it is to delete it.
+  id: totrans-715
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 锁定账户比删除账户更容易。
+- en: It takes too long to delete an account.
+  id: totrans-716
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 删除账户需要花费太长时间。
+- en: It's not possible to delete a user account.
+  id: totrans-717
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 不可能删除一个用户账户。
+- en: Deleting a user account, along with the users' files and mail spool, might get
+    you into trouble with the law.
+  id: totrans-718
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 删除一个用户账户及其文件和邮件存储可能会使您陷入法律麻烦。
+- en: You've just created a user account for Samson, and you now want to force him
+    to change his password the first time that he logs in. Which two of the following
+    commands will do that?
+  id: totrans-719
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 您刚刚为 Samson 创建了一个用户账户，现在想强制他在第一次登录时更改密码。以下哪两个命令可以实现这一点？
+- en: '`sudo chage -d 0 samson`'
+  id: totrans-720
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`sudo chage -d 0 samson`'
+- en: '`sudo passwd -d 0 samson`'
+  id: totrans-721
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`sudo passwd -d 0 samson`'
+- en: '`sudo chage -e samson`'
+  id: totrans-722
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`sudo chage -e samson`'
+- en: '`sudo passwd -e samson`'
+  id: totrans-723
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`sudo passwd -e samson`'
+- en: Which one of the following represents best security practice?
+  id: totrans-724
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 以下哪项最能代表最佳的安全实践？
+- en: Always give the root user password to all users who need to perform administrative
+    tasks.
+  id: totrans-725
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 始终将 root 用户密码提供给所有需要执行管理任务的用户。
+- en: Always give full `sudo` privileges to all users who need to perform administrative
+    tasks.
+  id: totrans-726
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 始终向所有需要执行管理任务的用户授予完整的 `sudo` 权限。
+- en: Always just give specific, limited `sudo` privileges to all users who need to
+    perform administrative tasks.
+  id: totrans-727
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 始终仅向所有需要执行管理任务的用户授予特定的、有限的 `sudo` 权限。
+- en: Always edit the `sudoers` file in a normal text editor, such as nano, vim, or
+    emacs.
+  id: totrans-728
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 始终在常规文本编辑器（如 nano、vim 或 emacs）中编辑 `sudoers` 文件。
+- en: Which of the following statements is true?
+  id: totrans-729
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 以下哪项陈述是正确的？
+- en: '`sudo` can only be used on Linux.'
+  id: totrans-730
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`sudo` 只能在 Linux 上使用。'
+- en: '`sudo` can be used on Linux, Unix, and BSD operating systems.'
+  id: totrans-731
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`sudo` 可在 Linux、Unix 和 BSD 操作系统上使用。'
+- en: When a user performs a task using `sudo`, the task does not get recorded in
+    a security log.
+  id: totrans-732
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 当用户使用 `sudo` 执行任务时，该任务不会被记录在安全日志中。
+- en: When using `sudo`, users must enter the root user password.
+  id: totrans-733
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 使用 `sudo` 时，用户必须输入 root 用户的密码。
+- en: You want specific users to edit a specific system configuration file, but you
+    don't want them to use a shell escape that would allow them to perform other administrative
+    tasks. Which of the following would you do?
+  id: totrans-734
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 您希望特定用户编辑一个特定的系统配置文件，但不希望他们使用 shell 逃逸，这样就可以执行其他管理任务。以下哪项是您应该做的？
+- en: In the `sudoers` file, specify that the users can only use vim to open a specific
+    configuration file.
+  id: totrans-735
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在 `sudoers` 文件中，指定用户只能使用 vim 打开特定的配置文件。
+- en: In the `sudoers` file, specify that the users can use `sudoedit` to edit a specific
+    configuration file.
+  id: totrans-736
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在 `sudoers` 文件中，指定用户可以使用 `sudoedit` 编辑特定的配置文件。
+- en: In the `sudoers` file, specify the `no shell escape` option for these users.
+  id: totrans-737
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在 `sudoers` 文件中，为这些用户指定 `no shell escape` 选项。
+- en: In the `sudoers` file, place these users into a group that does not have shell
+    escape privileges.
+  id: totrans-738
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在 `sudoers` 文件中，将这些用户放入一个没有 shell 逃逸权限的组中。
+- en: Which one of the following is an advantage that the `adduser` utility has over
+    the traditional `useradd` utility?
+  id: totrans-739
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 以下哪项是 `adduser` 工具相较于传统的 `useradd` 工具的优势？
+- en: '`adduser` can be used in shell scripts.'
+  id: totrans-740
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`adduser` 可以在 shell 脚本中使用。'
+- en: '`adduser` is available for all Linux distributions.'
+  id: totrans-741
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`adduser` 可用于所有 Linux 发行版。'
+- en: '`adduser` has an option that allows you to encrypt a user''s home directory
+    as you create the user account.'
+  id: totrans-742
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`adduser` 有一个选项，允许您在创建用户账户时加密用户的主目录。'
+- en: '`adduser` is also available for Unix and BSD.'
+  id: totrans-743
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: '`adduser` 也可用于 Unix 和 BSD。'
+- en: In the newest Linux distributions, what is the name of the PAM that you would
+    use to enforce strong passwords?
+  id: totrans-744
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 在最新的 Linux 发行版中，您会使用哪种 PAM 来强制实施强密码？
+- en: cracklib
+  id: totrans-745
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: cracklib
+- en: passwords
+  id: totrans-746
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 密码
+- en: secure
+  id: totrans-747
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: 安全
+- en: pwquality
+  id: totrans-748
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+  zh: pwquality
+- en: Further reading
+  id: totrans-749
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+  zh: 进一步阅读
+- en: 'You might not need complex, alphanumeric passwords after all: [https://www.pcmag.com/news/355496/you-might-not-need-complex-alphanumeric-passwords-after-all](https://www.pcmag.com/news/355496/you-might-not-need-complex-alphanumeric-passwords-after-all)'
+  id: totrans-750
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 您可能不再需要复杂的字母数字密码：[https://www.pcmag.com/news/355496/you-might-not-need-complex-alphanumeric-passwords-after-all](https://www.pcmag.com/news/355496/you-might-not-need-complex-alphanumeric-passwords-after-all)
+- en: 'The new NIST Guidelines-We had it all wrong before: [https://www.riskcontrolstrategies.com/2018/01/08/new-nist-guidelines-wrong/](https://www.riskcontrolstrategies.com/2018/01/08/new-nist-guidelines-wrong/)'
+  id: totrans-751
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 新的NIST指南——我们之前完全搞错了：[https://www.riskcontrolstrategies.com/2018/01/08/new-nist-guidelines-wrong/](https://www.riskcontrolstrategies.com/2018/01/08/new-nist-guidelines-wrong/)
+- en: 'Linux Privilege Escalation exploiting sudo rights: [https://medium.com/schkn/linux-privilege-escalation-using-text-editors-and-files-part-1-a8373396708d](https://medium.com/schkn/linux-privilege-escalation-using-text-editors-and-files-part-1-a8373396708d)'
+  id: totrans-752
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 利用sudo权限进行Linux权限升级：[https://medium.com/schkn/linux-privilege-escalation-using-text-editors-and-files-part-1-a8373396708d](https://medium.com/schkn/linux-privilege-escalation-using-text-editors-and-files-part-1-a8373396708d)
+- en: 'sudo Main Page: [https://www.sudo.ws/](https://www.sudo.ws/)'
+  id: totrans-753
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: sudo主页：[https://www.sudo.ws/](https://www.sudo.ws/)
+- en: 'Granting sudo access: [https://www.golinuxhub.com/2013/12/how-to-give-permission-to-user-to-run.html](https://www.golinuxhub.com/2013/12/how-to-give-permission-to-user-to-run.html)'
+  id: totrans-754
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: 授予sudo权限：[https://www.golinuxhub.com/2013/12/how-to-give-permission-to-user-to-run.html](https://www.golinuxhub.com/2013/12/how-to-give-permission-to-user-to-run.html)
+- en: 'Linux user management: [https://www.youtube.com/playlist?list=PL6IQ3nFZzWfpy2gISpCppFk3UQVGf_x7G](https://www.youtube.com/playlist?list=PL6IQ3nFZzWfpy2gISpCppFk3UQVGf_x7G)'
+  id: totrans-755
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: Linux用户管理：[https://www.youtube.com/playlist?list=PL6IQ3nFZzWfpy2gISpCppFk3UQVGf_x7G](https://www.youtube.com/playlist?list=PL6IQ3nFZzWfpy2gISpCppFk3UQVGf_x7G)
+- en: 'The FreeIPA Project home page: [https://www.freeipa.org/page/Main_Page](https://www.freeipa.org/page/Main_Page)'
+  id: totrans-756
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: FreeIPA项目主页：[https://www.freeipa.org/page/Main_Page](https://www.freeipa.org/page/Main_Page)
+- en: RHEL 9 Documentation (Scroll down to the Identity Management section) [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9)
+  id: totrans-757
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: RHEL 9文档（向下滚动到身份管理部分）：[https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9)
+- en: 'RHEL 8 Documentation (Scroll down to the Identity Management section) : [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/)'
+  id: totrans-758
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: RHEL 8文档（向下滚动到身份管理部分）：[https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/)
+- en: 'RHEL 7 Documentation (Scroll down to the Identity Management section): [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/)'
+  id: totrans-759
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: RHEL 7文档（向下滚动到身份管理部分）：[https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/)
+- en: 'pam_faillock: Lock user account after X failed attempts: [https://www.golinuxcloud.com/pam-faillock-lock-user-account-linux/](https://www.golinuxcloud.com/pam-faillock-lock-user-account-linux/)'
+  id: totrans-760
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+  zh: pam_faillock：在X次失败尝试后锁定用户账户：[https://www.golinuxcloud.com/pam-faillock-lock-user-account-linux/](https://www.golinuxcloud.com/pam-faillock-lock-user-account-linux/)
