@@ -1,0 +1,1059 @@
+- en: Chapter 7. Choosing the Confinement Level
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following recipes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finding common resources
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Defining common helper domains
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Documenting common privileges
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Granting privileges to all clients
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a generic application domain
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Building application-specific domains using templates
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using fine-grained application domain definitions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'During the development of additional policies, developers can opt to use a
+    very fine-grained policy model, a domain-per-application model, or a coarse-grained,
+    functionality-based policy model. The relationship between these confinement models
+    is shown in the following diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Introduction](img/9669OS_07_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'In very fine-grained policies, multiple domains are defined, so functionally
+    different processes of the same application are all running in their own specialized
+    SELinux domain. A coarse-grained policy, on the other hand, allows to have different
+    applications with a similar functionality run with the same context. Application-level
+    policies are somewhere in the middle: they focus on one domain (or a very small
+    set of domains) for one application.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Most policies are developed using a **one domain per application** principle.
+    Still, the choice of development patterns in policy development reflects the confinement
+    level of an application, as shared, coarse-grained policies might allow for more
+    interaction between applications and resources than intended, whereas, a fine-grained
+    policy is much harder to develop and maintain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When we look at a functional level, we usually focus on shared resources or
+    resources that cannot be tied to a particular application. An example is the `mta`
+    SELinux policy, which manages the main infrastructure-related shared content such
+    as e-mail aliases (`etc_mail_t`), user mailboxes (`mail_home_rw_t`), e-mail spool
+    files (`mail_spool_t`), and more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finding common resources
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: During policy development, some of the resources used by the policy are or could
+    be shared with other policies. If that is the case, a functionality-driven policy
+    module is created in which those common resources are placed. This allows other
+    policies to use these resources and assign the right permissions through the interfaces
+    declared in the functionality-driven policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Most of the work in this recipe is to figure out what resources are shared.
+    This is done by completing the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Look for common files and directories that might be shared with other applications
+    and whose ownership is not specifically tied to an application, but is more functional
+    in nature. For these resources, declare them in a functionality-driven policy.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Check whether there are devices used that are functionally related to the policy
+    but not to a specific application in particular.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Validate if there is specific user-provided content that is functionally related
+    but not tied to a particular application, and where the default user content types
+    (such as `user_home_t`) are better not used. These resources need to be declared
+    in the functionality-driven policy and probably made customizable as well:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create the proper interfaces to handle or interact with these common resources:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Functionality-driven policy modules handle common resources for multiple applications
+    and policies. Some example policies that handle the functional resources for multiple
+    applications are the mail transfer agent policy (`mta`) and the web server policy
+    (`apache`). Although the web server policy was originally intended to be purely
+    for the Apache HTTPd, it has since evolved into a more functionality-driven policy
+    supporting a large amount of web server technologies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Shared file locations
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: A helpful method for finding out what resources are considered to be functional
+    in nature (rather than application-specific) is to imagine switching one application
+    in favor of another. What resource types would remain the same if we switch from
+    one system logger (say `syslog-ng`) to another (say `rsyslog`), or from Courier-IMAP
+    to Cyrus? Having knowledge of multiple similar applications helps in finding out
+    where (or what) the shared locations are.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, having similar functional requirements doesn''t necessarily make them
+    shared. The locations should also remain the same (or at least be consistent and
+    on well-known locations). Consider database files: the database files for PostgreSQL
+    and SQLite databases both have the same functional purpose, but it makes no sense
+    to label them both with the same label. Database files are specific to a particular
+    database implementation and require specific labels, so with every potential common
+    resource, make sure that the resource itself can be shared across multiple implementations.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Device nodes are a nice example to consider for a functionality-driven policy.
+    An example device type definition would look like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: Devices are usually shared across multiple applications. Most devices are defined
+    in the `devices.te` policy module with the proper interfaces being declared to
+    allow access to the device (such as `dev_rw_cachefiles` for read/write access
+    to the previously mentioned `cachefiles_device_t` type). Not all files in `/dev/`
+    are such device files though.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Consider the `/dev/log` socket, which is used to send log events to the system
+    logger. This socket, which is available regardless of the system logger being
+    used, is made available through the following logging SELinux policy module:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `mls_trusted_object` interface makes the device (labeled `devlog_t`) accessible
+    for all security levels in an MLS-enabled policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: User content and customizable types
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: User-provided content is also important to consider. For instance, for e-mail-related
+    daemons, a user's `.forward` file (which tells the system where to forward the
+    e-mails of the user) is available in his or her home directory and is definitely
+    not owned by a particular application. Hence, its label (`mail_home_t`) is tied
+    to a functionality-driven policy (`mta`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Don''t forget to mark user content as user content through the `userdom_user_home_content`
+    interface; otherwise, end users will not be able to label or manipulate these
+    files:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Some user content is also best marked as customizable. A **customizable type**,
+    when assigned to a resource, is ignored during standard relabel operations (usually
+    performed by the system administrator) and as such, the resource label will not
+    be changed back to what the SELinux configuration files have defined. This is
+    particularly useful for resources whose path is not a fixed location and usually
+    not made part of the SELinux file context definitions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If the administrator does a forced relabel operation, then the file context
+    is reset, even if the current type assigned to the resource is a customizable
+    type:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: In a modular policy development, there is no notation available to mark a type
+    as being a customizable type. To do this, the type needs to be added to the `customizable_types`
+    file in `/etc/selinux/mcs/contexts/`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Marking files with a customizable type is a solution when the path of the resource
+    isn't fixed. The `.forward` file has a fixed path, so there is no need for customizable
+    content. User content that should be publicly accessible, however, (marked as
+    `public_content_t` or `public_content_rw_t`) does not have a fixed path; hence,
+    those types are (by default) marked as customizable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When full policy development is done (for instance, through the Linux distribution
+    policy or because the developer controls the entire policy and not just additional
+    modules), then the `# customizable` comment can be placed behind the type declaration,
+    as can be seen from the following example of the CVS policy module:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: The reference policy build system will then automatically add the type to the
+    `customizable_types` file during the build process.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Other common resources that can be considered are the TCP and UDP ports. Indeed,
+    network-facing applications bind to one or more ports, which are usually the same
+    for applications sharing the same functionality.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, the TCP and UDP ports cannot be declared inside SELinux policy modules;
+    instead, they need to be labeled as part of the base policy. Updating a base policy,
+    however, is either done by the Linux distribution maintainers or the upstream
+    reference policy project. The basic rule is that the ports are named after the
+    service they are generally used by:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Defining common helper domains
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Next to the common resources, some applications share the same set of helper
+    commands. The `sendmail` command is a nice example of this, which is executed
+    by a large set of domains (usually, applications that need to send e-mails without
+    using the SMTP protocol themselves). The `sendmail` application is well understood
+    and most MTA applications support it for command-line e-mail sending operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Supporting such helper domains is usually done through a functionality-driven
+    policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Creating helper domains is similar to creating regular application domains,
+    but the use of attributes allows the policy to be very flexible and usable by
+    the application-specific policy modules developed further. Let''s look at the
+    MTA definition as an example of how this can be accomplished:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Define an attribute for the command type:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create a proper label type for the command, and assign it the `mta_exec_type`
+    attribute:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Configure an application domain for the command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'If the application is for system purposes, assign the domain to the `system_r`
+    role:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: If the application is meant to be executed by end users, do not forget to include
+    a `_run` or `_role` interface.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Make an interface callable by third-party application domains to allow them
+    to interact with the helper application:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Make another interface allowing specific policies to mark their own helper
+    executables usable for the same purpose (as they might not always use the same
+    type):'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Helper domains are meant to provide reusable functionality across multiple implementations.
+    To support the flexibility of having multiple implementations, attributes are
+    usually assigned to the types so that extensions can be easily created.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Consider the `sendmail` example again. Most implementations will have the command-line
+    `sendmail` application marked as `sendmail_exec_t`. However, there are implementations
+    whose `sendmail` binary has many more features, especially when called from the
+    implementation processes themselves. Some implementations even have the file as
+    a symbolic link to a more generic e-mail-handler application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The Exim implementation, for instance, uses `exim_exec_t` instead of using
+    `sendmail_exec_t`. With the use of the attributes, the Exim policy module can
+    just call the proper interface (`mta_agent_executable`, in this case), so third-party
+    applications can still execute the command (even though it is `exim_exec_t` and
+    not `sendmail_exec_t`) and have it behave as expected (that is, with a transition
+    to the `user_mail_t` or `system_mail_t` domain as expressed by the MTA policy):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Attributes allow other domains to interact with the newly defined type without
+    having to update the policy modules that define these domains. This is because
+    those domains are granted execute rights on all types that have the `mta_exec_type`
+    attribute assigned, and will invoke a domain transition to the `system_mail_t`
+    helper domain when they execute such a file. This privilege is provided through
+    the `mta_send_mail` interface, which is a good example of a helper domain interface
+    to be assigned to other domains:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Documenting common privileges
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Next to the helper domains, most functionality-driven policies also group privileges
+    that can be assigned to domains. Such privileges could be to not only manage the
+    common resources, but also to extend other domains with functional requirements
+    as managed by the common policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All e-mail daemons need to be able to bind to the proper TCP ports, handle user
+    mailboxes, and so on. By bundling these common privileges on the functional policy
+    level, any evolution pertaining to the policy can be immediately granted to all
+    domains inheriting privileges from the functional policy, rather than having to
+    update each domain individually.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Common privileges can be found in a wide variety. How common privileges are
+    assigned depends on the use case. The following method, based on the e-mail server
+    definition in the MTA policy, provides a flexible approach to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Create an attribute for the functional domain to which common privileges are
+    granted:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Define an interface where the attribute is assigned to a specified domain:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Build an interface that assigns the functionally related common privileges
+    to the specified argument. It should not assign attributes though! This is done
+    with the following code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Now, use the newly created interface to grant the proper permissions on the
+    attribute:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'If a specific application always has to inherit the privileges, assign the
+    attribute to it:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'If a specific application, however, optionally inherits the privileges, use
+    the domain interface:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'When assigning privileges to a domain, there are two approaches that can be
+    taken: either the privileges are assigned to an attribute (which is then associated
+    with a domain) or the privileges are directly assigned to the domain. Which one
+    to pick depends on how the policy is going to be used. Due to restrictions in
+    policy development, it is not possible to optionally (that is, triggered through
+    SELinux Booleans) assign attributes. Any attempt to do so will result in a build
+    failure, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: As a result, whenever permissions can be granted optionally (through SELinux
+    Booleans), policy developers will have to make sure that the permissions are granted
+    directly (instead of assigning an attribute to the domain).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, in most cases, using attributes for domains makes sense. The policy
+    itself does not increase in size that much (as rules remain on an attribute level)
+    and administrators can easily query which domains participate in the functional
+    approach:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Granting the permissions through an interface also allows us to quickly look
+    at the impact of assigning an attribute, as we can then use the `seshowif` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: The example given uses a server-domain approach, but the same can be done for
+    a client.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Granting privileges to all clients
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The approach of using interfaces to aggregate privileges not only benefits domains
+    that have the same functional purpose, but also clients. By combining the privileges
+    for the set of clients, it is possible to enhance client privileges by only updating
+    the interface rather than having to update all the clients' policy modules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Create a client interface that can be assigned to all clients of a particular
+    functional purpose. The following steps extend an example policy with antimalware
+    support:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the antimalware generic policy, create an `avcheck_client` attribute:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create the interface that assigns the attribute to a client domain:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create the interface that assigns the common privileges for client domains:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the created interface, add the privileges that need to be assigned to all
+    client domains. For instance, to enable a domain transition for the ClamAV `check`
+    command, the following code is used:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: All domains that act as a client are either assigned the `av_check_client` (if
+    the attribute can be assigned) or `av_check_client_privs` interface.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Suppose a new antimalware policy is developed for ClamAV, and we want the clients
+    to be able to execute the `clamav_check_exec_t` applications and transition them
+    to the `clamav_check_t` domain. Instead of updating all clients with a `clamav_domtrans_check`
+    call, we only do this in the generic antimalware policy''s `av_check_client_privs`
+    interface, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: This ensures that all proper domains— not only those with the `avcheck_client`
+    attribute—get the necessary privileges assigned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another example that uses this principle is the PulseAudio policy. An interface
+    called `pulseaudio_client_domain` is made available and should be used by PulseAudio
+    clients. Whenever the permissions for a PulseAudio client need to be updated,
+    then the policy developer only needs to update the `pulseaudio_client_domain`
+    interface instead of all client policy modules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Such an approach makes policy development much more flexible and efficient,
+    as developers do not need to update all possible client domains with the added
+    privileges.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a generic application domain
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In some situations, it makes sense to create a generic application domain, even
+    though multiple implementations exist for the same functionality. Examples are
+    the Java domain (which works for all the popular Java™ implementations) and init
+    domain. When this occurs, carefully consider whether the generic application domain
+    will always be sufficient, or whether specific application domains might come
+    into play later. When this isn't clear, make sure that the policy being developed
+    is flexible enough to cater both situations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In order to create a generic application policy that is still flexible with
+    respect to potential specific policies that would be developed later, follow the
+    upcoming set of steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identify the permissions that are (almost) always applicable to the functional
+    domain, regardless of the implementation.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Assign those permissions to a *base* implementation. For instance, for Java™
+    implementations, assign permissions as follows:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Add permissions that are applicable to at least one (or a few) of the implementations
+    to the standard type. In our example, this would be to `java_t`. This ensures
+    that `java_t` is generally usable for most Java™ implementations.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Add the proper file contexts to allow most implementations to benefit from
+    the generic application policy:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'With the given implementation, most Java™ implementations on an SELinux-enabled
+    system will run, when executed, in the generic `java_t` domain: their executables
+    are all marked as `java_exec_t` through generic file context expressions, and
+    the `java_t` domain holds not only the set of least privileges for Java™ domains
+    (as granted through the `javadomain` attribute that gets them from the `java_base_runtime_privs`
+    interface), but also those privileges that are common for quite a few implementations.
+    This means that the `java_t` domain has more privileges than needed in most cases,
+    as it has to support a broad set of Java™ implementations.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, when a specific implementation will be created with a different policy
+    profile than the existing `java_t` domain, policy developers can easily mark this
+    domain as a Java domain, inheriting the permissions that are necessary for every
+    Java™ implementation (for instance, because they are mandated through the specifications
+    of Java™) while staying clear from the other permissions that are granted to the
+    generic `java_t` domain:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'By creating a more specific file context definition, the executable of the
+    newly created type will get this label assigned (as the other expressions are
+    more generic, and the SELinux utilities use a *most specific definition first*
+    approach):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Building a proper set of least privilege rules is not easy and requires experience
+    in policy development. If uncertain, it might be a good idea to use SELinux Booleans,
+    such as used by the (generic) `cron` policy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: Through this approach, specific implementations can still benefit from the generic
+    policy declaration, if the amount of additional permissions is small. As the policy
+    is enhanced with other implementation details, the need for the `tunable_policy`
+    statement might be removed or a specific implementation for `fcron` can be developed
+    separately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building application-specific domains using templates
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Specific domains have the advantage that they can contain those privileges needed
+    by the domain, and no more. As there are no other application implementations
+    using the specific domain, the privileges can be tailored to the needs of the
+    application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In certain situations though, it might be beneficial to automatically generate
+    the types together with the basic permissions. Generating types is done through
+    templates (rather than interfaces, although the underlying implementation of interfaces
+    and templates is quite similar). The approach and development method is aligned
+    with interface definitions and should pose no difficulties for developers to understand.
+  prefs: []
+  type: TYPE_NORMAL
+- en: An example to consider with templates would be to automatically create system
+    `cron` job domains for individual applications. Through a template, we can automatically
+    create the domain, executable type, and temporary resource types as well as properly
+    document the interactions of that domain with the main `cron` daemon (which is
+    needed for communicating job failures or success, handling output, logging, and
+    so on).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Creating templates is similar to creating interfaces. To create templates,
+    the following approach can be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Start with a skeleton template inside the `.if` file, but call it `template`
+    instead of `interface`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Add in the following type declarations:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Grant the proper interactions between the main daemon and the newly defined
+    types that are still inside the template definition:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the application policy, call the template so that the new types are created.
+    For instance, to create the `cron` job domains for Puppet, add the following code
+    to `puppet.te`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Enhance the (now available) `puppet_cronjob_t` domain with the permissions
+    needed:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The use of templates has been discussed earlier in the chapter on web server
+    content. Indeed, the `apache_content_template` definition, too, is a template
+    that creates additional types and documents the interaction between the newly
+    created types and the (main) web server domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The use of templates allows for rapid policy development as well as properly
+    isolated permission handling. When the main application evolves and requires additional
+    permissions with respect to the specific application domains, or certain permissions
+    are no longer needed, then only the template needs to be adjusted. All that is
+    needed to apply the changes is to rebuild the SELinux policy modules, without
+    any need to alter their individual source files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It is a best practice to use prefix and/or suffix notations for template-provided
+    types and to end the name of the template with `_template`. In theory, it is perfectly
+    possible to create a template that creates the specified type(s) without any prefix
+    and postfix expressions, instead requiring the various types to be passed on one
+    at a time:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, this approach is inflexible under the following circumstances:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If additional types need to be supported, then the interface API itself (the
+    number of arguments passed to it and their meaning) needs to be altered, which
+    makes such changes incompatible with earlier releases. This is important because
+    there might be policy developers who are using this interface without their policy
+    being available in the repository that we're developing in, so we cannot refactor
+    this code ourselves.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If a type is no longer needed, then either the interface API itself needs to
+    be changed (making it incompatible with earlier releases) or the interface will
+    be made to ignore a particular type (which easily becomes a development nightmare).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Developers will continuously need to look at the order and meaning of the types
+    in order not to mistakenly have the executable type marked as a domain and vice
+    versa.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Such an approach would also make it possible to create confusing type definitions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: Through such an approach, developers and administrators would lose sight over
+    the relation between types.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using proper prefix and postfix notations allows for a simplified management.
+    The use of a template such as `cron_system_job_template` easily informs developers
+    that there will be several types matching `*_cronjob_t`, `*_cronjob_exec_t`, and
+    `*_cronjob_tmp_t`. Policy developers and system administrators easily learn that
+    these are related with each other.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using fine-grained application domain definitions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The use of templates earlier in this chapter is a start to support more fine-grained
+    application domain definitions. Instead of running a workload inside the same
+    domain as the main application, specific types are created that are meant to optimize
+    the interaction between one domain and another, ensuring that the permissions
+    granted to a particular domain remain small and manageable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using fine-grained application domains goes a step further, having processes
+    of the same application run inside their own specific domains. This is not always
+    possible (not all applications use multiple, distinct processes), but when it
+    is, using fine-grained domains provides an even more secure environment, where
+    each task runs with just the permissions needed for that individual task, even
+    though the application, in general, needs more permissions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: An example implementation of fine-grained application domain definitions is
+    the postfix policy, which will be used as an example in this recipe. The Postfix
+    e-mail server is well documented and its architecture has been quite stable, making
+    it a prime candidate for a fine-grained policy development approach.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, when fine-grained application domains are used, policy development
+    and maintenance itself becomes harder. Individual interaction changes between
+    processes (which might be the case with newer versions of an application) require
+    policy updates much more often than when all processes run within the same SELinux
+    domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The following checks can be taken to see whether fine-grained application domains
+    make sense or not:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Does the application architecture use multiple processes, with each process
+    having a distinct functional task? If not, then creating fine-grained application
+    domains will not help much as every domain will have the same permissions anyhow.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Are there processes with different access vectors (and thus are vulnerable to
+    different threats than others)? For instance, whether some processes are directly
+    accessible through the network whereas others are local? If so, then using fine-grained
+    application domains might make sense to reduce the impact in case of the vulnerability
+    exploitation.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Is there an interaction between a subset of the processes with other domains
+    (not managed through the same application), whereas the other processes do not
+    need to interact with these domains? If so, then using fine-grained application
+    domains might make sense to limit exposure of resources to other applications.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Does the application support different roles that might need to interact with
+    some (but not all) of the processes? A single full-application administrator might
+    still need administrative privileges to all processes and resources, but other
+    roles might not have this requirement. Using fine-grained application domains
+    allows for fine-grained roles as well.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Supporting fine-grained application domains is usually done for risk mitigation.
+    But besides risk mitigation, it also provides advantages in role management as
+    well as a more efficient approach to managing types that are inherited from the
+    domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Reducing exploit risks
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Consider a part of the Postfix architecture, as shown in the next diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Reducing exploit risks](img/9669OS_07_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The **smtpd** daemon handles the reception of an e-mail through the **network**,
+    and as such, is more prone to remote vulnerability exploits than to locally running
+    processes such as the **cleanup** process or even the **qmgr** process.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By limiting resource access of the **smtpd** daemon to just the resources it
+    needs, exploits that would attempt to access the queues (resources not usually
+    accessed by **smtpd** but used by **qmgr**) would fail as the least privilege
+    approach used in the **smtpd** domain (`postfix_smtpd_t`) disallows access to
+    the **maildrop** queues (`postfix_spool_maildrop_t`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Proper risk reduction is only possible if the resources of the application (such
+    as the specific queues) are also defined in a fine-grained manner. If the application
+    has multiple configuration files and these configuration files are read by different
+    functional processes, then the configuration files should be labeled more specifically
+    as well (for instance, configuration files for routing and configuration files
+    for network settings).
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the application resources are labeled in a generic fashion, we risk that
+    all fine-grained domains have the same rights towards the generic resources, making
+    it more plausible for a vulnerable application to be exploited with larger consequences
+    to the entire application architecture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Role management
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Using fine-grained application domains goes further than just mitigation of
+    exploits. With individual domains, role access can be granted to users allowing
+    them to take specific actions without requiring full application privileges.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For instance, operator roles can be created that allow manipulation of the
+    Postfix deferred queue and signaling of the `qmgr` process without granting those
+    users any specific rights towards the other processes. Assuming the user domain
+    for this role is `postoper_t`, this would be accomplished as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: Type inheritance and transitions
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: When a domain creates new resources, these resources are assigned a type based
+    on the label of the domain as well as the transitions defined in the SELinux policy.
+    A process that is launched by a domain by default (that is, when no transitions
+    are defined in the policy) inherits the label of the parent domain, while a file
+    created inside a directory by default inherits the type of that parent directory.
+    In the case of labeled network support, the packets are labeled based on the parent
+    socket label.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sometimes the creation of a resource cannot be tied to a parent domain or parent
+    resource, making it impossible for SELinux to deduce the label to assign to this
+    resource. For this reason, **initial SIDs** are provided by the SELinux policy.
+    These tell the SELinux subsystem what the default label is for such resources
+    if no label can be deduced.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For instance, the initial SIDs for a (TCP/UDP) port and for a file are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: The definition of initial SIDs is part of the base SELinux policy and cannot
+    be altered using SELinux policy modules. Luckily, there is little reason for SELinux
+    developers to ever touch the initial SID definitions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'These label inheritance rules are important in a fine-grained application domain
+    design. Applications that use multiple processes also tend to use resources such
+    as shared memory for **inter-process communication** (**IPC**). When all processes
+    run with the same domain, the shared memory is also labeled the same (such as
+    `postgresql_tmpfs_t` for the PostgreSQL managed shared memory) as a file transition
+    would be put in place:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: When using multiple domain definitions, it is possible that shared memory segments
+    are labeled differently as well (depending on which process creates the shared
+    memory segments, of course), so even IPC can then be properly governed. Separate
+    file transitions would be put in place depending on the domain that is creating
+    a shared memory segment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next to file transitions, policy developers can also introduce domain transitions
+    (which changes the label of the newly created process) using the `domtrans_pattern`
+    definition. Inside the Postfix policy, this is used to create the fine-grained
+    process architecture:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Such domain transitions can also be supported through the interfaces, as we''ve
+    seen in the earlier chapters, such as the `postfix_domtrans_smtp` interface:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'A third transition type that SELinux supports is the dynamic domain transition.
+    Such SELinux policy rules inform the SELinux subsystem that a process can change
+    its own type dynamically—without needing to execute a file. This does require
+    the application to be SELinux-aware (that is, be able to interact with the SELinux
+    subsystem itself). For instance, inside the FTP policy, the following interface
+    is made available to support domains dynamically transitioning to the `anon_sftpd_t`
+    domain:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In our Postfix example, we used the `/dev/shm/` shared memory, but there is
+    also POSIX shared memory, which is governed through the `shm` class. This shared
+    memory inherits the label from the domain itself, so if two applications (such
+    as `postfix_pickup_t` and `postfix_cleanup_t`) use POSIX shared memory, then the
+    target label is inherited from the process that creates the shared memory region:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: Without fine-grained access controls, this would all be handled by a single
+    domain (say `postfix_t`) and shared memory access controls would be very limited.
+  prefs: []
+  type: TYPE_NORMAL

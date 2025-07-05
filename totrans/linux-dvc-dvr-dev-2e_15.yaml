@@ -1,0 +1,793 @@
+- en: '*Chapter 12*: Abstracting Memory Access – Introduction to the Regmap API: a
+    Register Map Abstraction'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before the Regmap API was developed, there was redundant code for the device
+    drivers dealing with SPI, I2C, or memory-mapped devices. Many of these drivers
+    contained some very similar code for accessing hardware device registers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following figure shows how SPI, I2C, and memory-mapped related APIs were
+    used standalone before Regmap was introduced:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.1 – I2C, SPI, and memory-mapped access before Regmap'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/B17934_12_001.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 12.1 – I2C, SPI, and memory-mapped access before Regmap
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Regmap API was introduced in version v3.1 of the Linux kernel and proposes
+    a solution that factors out and unifies these similar register access codes, saving
+    code and making it much easier to share infrastructure. It is then just a matter
+    of how to initialize and to configure a `regmap` structure, and process any read/write/modify
+    operations fluently, whether it is SPI, I2C, or memory-mapped.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram depicts this API unification:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 12.2 - I2C, SPI, and memory-mapped access after Regmap'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/B17934_12_002.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 12.2 - I2C, SPI, and memory-mapped access after Regmap
+  prefs: []
+  type: TYPE_NORMAL
+- en: The previous figure shows how Regmap unified transactions between devices and
+    their respective bus frameworks. In this chapter, we will cover as much as possible
+    of the whole aspect of the APIs this framework offers, from initialization to
+    complex use cases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This chapter will walk through the Regmap framework via the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introduction to the Regmap data structures
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Handling Regmap initialization
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using Regmap register access functions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Regmap-based SPI driver example – putting it all together
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Leveraging Regmap from the userspace
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction to the Regmap data structures
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The Regmap framework, which is enabled via the `CONFIG_REGMAP` kernel configuration
+    option, is made of a few data structures, among which the most important are `struct
+    regmap_config`, which represents the Regmap configuration, and `struct regmap`,
+    which is the Regmap instance itself. That said, all of the Regmap data structures
+    are defined in `include/linux/regmap.h`. It then goes without saying that this
+    header must be included in all Regmap-based drivers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: Including the preceding header is sufficient to make the most out of the Regmap
+    framework. With this header, a lot of data structures will be made available,
+    among which, `struct regmap_config` is the most important, which we will describe
+    in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the struct regmap_config structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`struct regmap_config` stores the configuration of the register map during
+    the driver''s lifetime. What you set there affects the memory read/write operations.
+    This is the most important structure, which is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Don''t be afraid of how big this structure is. All the elements are self-explanatory.
+    However, for more clarity, let''s expand on their meanings here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`reg_bits` is a mandatory field, which is the number of valid bits in a register''s
+    address. This is the size in bits of register addresses.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`reg_stride` represents a value that valid register addresses must be a multiple
+    of. If set to `0`, a value of `1` will be used. If set to `4`, for example, an
+    address will be considered valid only if this address is a multiple of `4`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`pad_bits` is the number of bits of padding between the register and value.
+    This is the number of bits to (left) shift the register value when formatting.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`val_bits` represents the number of bits used to store a register''s value.
+    It is a mandatory field.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`writeable_reg` is an optional callback function. If provided, it is used by
+    the Regmap subsystem when a register needs to be written. Before writing into
+    a register, this function is automatically called to check whether the register
+    can be written to or not. The following is an example of using such a function:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`readable_reg` is the same as `writeable_reg` but for all register read operations.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`volatile_reg` is an optional callback function called every time a register
+    needs to be read or written through the Regmap cache. If the register is volatile,
+    the function should return true. A direct read/write is then performed on the
+    register. If false is returned, it means the register is cacheable. In this case,
+    the cache will be used for a read operation, and the cache will be written in
+    the case of a write operation:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`precious_reg`: Some devices are sensitive to reads on some of their registers,
+    especially for things such as clear on read interrupt status registers. With this
+    set, this optional callback must return true if the specified register falls in
+    this case, which will present the core (`debugfs`, for example) from internally
+    generating any reads of it. This way, only explicit reads by the driver will be
+    allowed.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`disable_locking` tells whether the following lock/unlock callbacks should
+    be used or not. If false, it means not to use any locking mechanisms. It means
+    this `regmap` object is either protected by external means or is guaranteed not
+    to be accessed from multiple threads.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lock`/`unlock` are optional lock/unlock callbacks, overriding default lock/unlock
+    functions of `regmap`, based on spinlock or mutex, depending on whether accessing
+    the underlying device may put the caller to sleep or not.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lock_arg` will be used as the only argument of lock/unlock functions (ignored
+    if regular lock/unlock functions are not overridden).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`reg_read`: Your device may not support simple I2C/SPI read operations. You''ll
+    then have no choice but to write your own customized read function. `reg_read`
+    should then point to that function. That said, most devices do not need that.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`reg_write` is the same as `reg_read` but for write operations.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`fast_io` indicates that the register IO is fast. If set, the `regmap` will
+    use a spinlock instead of a mutex to perform locking. This field is ignored if
+    custom lock/unlock (not discussed here) functions are used (see the fields `lock`/`unlock`
+    of `struct regmap_config` in the kernel sources). It should be used only for "nobus"
+    cases (MMIO devices), since accessing I2C, SPI, or similar buses may put the caller
+    to sleep.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`max_register`: This optional element specifies the maximum valid register
+    address above which no operation is permitted.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`wr_table`: Instead of providing a `writeable_reg` callback, you could provide
+    a `regmap_access_table` object, which is a structure holding a `yes_ranges` and
+    a `no_range` field, both pointers to `struct regmap_range`. Any register that
+    belongs to a `yes_range` entry is considered as writeable and is considered as
+    not writeable if belonging to `no_range`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`rd_table` is the same as `wr_table`, but for any read operation.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`volatile_table`: Instead of `volatile_reg`, you could provide `volatile_table`.
+    The principle is then the same as `wr_table` or `rd_table`, but for caching mechanisms.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`precious_table`: As above, for precious registers.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`reg_defaults` is an array of elements of type `reg_default`, where each `reg_default`
+    element is a `{reg, value}` structure that represents power-on reset values for
+    a register. This is used with the cache so that a read of an address that exists
+    in this array, and that has not been written since power-on reset, will return
+    the default register value in this array without performing any read transactions
+    on the device. An example of this is the IIO device driver, whose link is the
+    following: [https://elixir.bootlin.com/linux/v5.10/source/drivers/iio/light/apds9960.c](https://elixir.bootlin.com/linux/v5.10/source/drivers/iio/light/apds9960.c).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`num_reg_defaults` is the number of elements in `reg_defaults`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`cache_type`: The actual cache type, which can be either `REGCACHE_NONE`, `REGCACHE_RBTREE`,
+    `REGCACHE_COMPRESSED`, or `REGCACHE_FLAT`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`read_flag_mask`: This is the mask to be applied in the top bytes of the register
+    when doing a read. Normally, the highest bit in the top byte of a write or read
+    operation in SPI or I2C is set to differentiate write and read operations.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`write_flag_mask`: The mask to be set in the top bytes of the register when
+    doing a write.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`use_single_rw` is a Boolean that, if set, will instruct the register map to
+    convert any bulk write or read operation on the device into a series of single
+    write or read operations. This is useful for devices that do not support bulk
+    read or write, or either.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`can_multi_write` only targets write operations. If set, it indicates that
+    this device supports the multi-write mode of bulk write operations. If clear,
+    multi-write requests will be split into individual write operations.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'You should look at `include/linux/regmap.h` for more details on each element.
+    The following is an example of the initialization of `regmap_config`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding example shows how to build a basic register map configuration.
+    Though only a few elements are set in the configuration data structure, enhanced
+    configuration can be set up by learning about each element that we have described.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have learned about Regmap configuration, let's see how to use this
+    configuration with the initialization API that corresponds to our needs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Handling Regmap initialization
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As we said earlier, the Regmap API supports SPI, I2C, and memory-mapped register
+    access. Their respective support can be enabled in the kernel thanks to the `CONFIG_REGMAP_SPI`,
+    `CONFIG_REGMAP_I2C`, and `CONFIG_REGMAP_MMIO` kernel configuration options. It
+    can go far beyond that and managing IRQs as well, but this is out of the scope
+    of this book. Depending on the memory access method you need to support in the
+    driver, you will have to call either `devm_regmap_init_i2c()`, `devm_regmap_init_spi()`,
+    or `devm_ regmap_init_mmio()` in the probe function. To write generic drivers,
+    Regmap is the best choice you can make.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The Regmap API is generic and homogenous, and initialization only changes between
+    bus types. Other functions are the same. It is a good practice to always initialize
+    the register map in the probe function, and you must always fill the `regmap_config`
+    elements prior to initializing the register map using one of the following APIs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: These are resource-managed APIs whose allocated resources are automatically
+    freed when the device leaves the system or when the driver is unloaded. In the
+    preceding prototypes, the return value will be a pointer to a valid `struct regmap`
+    object or an `ERR_PTR()` error on failure. `regs` is a pointer to a memory-mapped
+    IO region (returned by `devm_ioremap_resource()` or any `ioremap*` family function).
+    `dev` is the device (`struct device`) to interact with in the case of a memory-mapped
+    `regmap`, and `spi` and `i2c` are respectively SPI or I2C devices to interact
+    with in the case of SPI- or I2C-based `regmap`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Calling one of these functions is sufficient to start interacting with the
+    underlying device. Whether the Regmap is an I2C, SPI, or a memory-mapped register
+    map, if it has not been initialized with a resource managed API variant, it must
+    be freed with the `regmap_exit()` function:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: This function simply releases a previously allocated register map.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that the register access method has been defined, we can jump to the device
+    access functions, which allow reading from or writing into device registers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using Regmap register access functions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Remap register access methods handle data parsing, formatting, and transmission.
+    In most cases, device accesses are performed with `regmap_read()`, `regmap_write()`,
+    and `regmap_update_bits()`, which are the three important APIs when it comes to
+    writing/reading data into/from the device. Their respective prototypes are the
+    following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`regmap_write()` writes data to the device. If set in `regmap_config`, `max_register`
+    will be used to check whether the register address that needs to be accessed is
+    greater or lower. If the register address passed is lower or equal to `max_register`,
+    then the next operation will be performed; otherwise, the Regmap core will return
+    an invalid I/O error (`-EIO`). Right after, the `writeable_reg` callback is called.
+    The callback must return true before going to the next step. If it returns false,
+    then `-EIO` is returned, and the write operation is stopped. If `wr_table` is
+    set instead of `writeable_reg`, then the following happens:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the register address lies in `no_ranges`, then `-EIO` is returned.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the register address lies in `yes_ranges`, the next step is performed.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the register address is not present in `yes_range` or `no_range`, then `-EIO`
+    is returned, and the operation is terminated.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If `cache_type != REGCACHE_NONE`, then caching is enabled. In this case, the
+    cache entry is first updated with the new value, and then a write to the hardware
+    is performed. Otherwise, no caching action is performed. If the `reg_write` callback
+    is provided, it is used to perform the write operation. Otherwise, the generic
+    Regmap's write function will be executed to write the data into the specified
+    register address.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`regmap_read()` reads data from the device. It works exactly like `regmap_write()`
+    with appropriate data structures (`readable_reg` and `rd_table`). Therefore, if
+    provided, `reg_read` is used to perform the read operation; otherwise, the generic
+    register map read function will be performed.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`regmap_update_bits()` is a three-in-one function. It performs a read/modify/write
+    cycle on the specified register address. It is a wrapper on `_regmap_update_bits`,
+    which looks like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: This way, the bits you need to update must be set to `1` in `mask`, and corresponding
+    bits should be set to the value you need to give to them in `val`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As an example, to set the first and third bits to `1`, `mask` should be `0b00000101`,
+    and the value should be `0bxxxxx1x1`. To clear the seventh bit, `mask` must be
+    `0b01000000` and the value should be `0bx0xxxxxx`, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Bulk and multiple registers reading/writing APIs
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`regmap_multi_reg_write()` is one of the APIs that allows you to write multiple
+    registers to the device. Its prototype looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In this prototype, `regs` is an array of elements of type `reg_sequence`, which
+    represents register/value pairs for sequences of writes with an optional delay
+    in microseconds to be applied after each write. The following is the definition
+    of this data structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding data structure, `reg` is the register address, `def` is the
+    register value, and `delay_us` is the delay to be applied after the register write
+    in microseconds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is a usage of such a sequence:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding, we have learned how to use our first multi-register write
+    API, which takes a set of registers along with their values.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are also `regmap_bulk_read()` and `regmap_bulk_write()`, which can be
+    used to read/write multiple registers from/to the device. Their usage fits for
+    large blocks of data and they are defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the parameters in the preceding functions, `map` is the register map to operate
+    on and `reg` is the register address from where the read/write operation must
+    start. In the case of the read, `val` will contain the read value; it must be
+    allocated to store at least the `count` value in the native register size for
+    the device. In the case of the write operation, `val` must point to the data array
+    to write to the device. Finally, `count` is the number of elements in `val`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the Regmap caching system
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Obviously, Regmap supports data caching. Whether the cache system is used or
+    not depends on the value of the `cache_type` field in `regmap_config`. Looking
+    at `include/linux/regmap.h`, accepted values are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: The cache type is set to `REGCACHE_NONE` by default, meaning that the cache
+    is disabled. Other values simply define how the cache should be stored.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Your device may have a predefined power-on reset value in certain registers.
+    Those values can be stored in an array so that any read operation returns the
+    value contained in the array. However, any write operation affects the real register
+    in the device and updates the content in the array. It is a kind of a cache that
+    we can use to speed up access to the device. That array is `reg_defaults`. Looking
+    at the source, its structure looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding data structure, `reg` is the register address and `def` is
+    the register default value. `reg_defaults` is ignored if `cache_type` is set to
+    none. If the `default_reg` element is not set but you still enable the cache,
+    the corresponding cache structure will be created for you.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It is quite simple to use. Just declare it and pass it as a parameter to the
+    `regmap_config` structure. Let''s have a look at the LTC3589 regulator driver
+    in `drivers/regulator/ltc3589.c`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Any read operation on any one of the registers present in the array will immediately
+    return the value in the array. However, a write operation will be performed on
+    the device itself and will update the affected register in the array. This way,
+    reading the `LTC3589_VRRCR` register will return `0xff` and write any value in
+    that register, and it will update its entry in the array so that any new read
+    operation will return the last written value directly from the cache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we are able to use the Regmap APIs to access the device registers whatever
+    the underlying bus is these devices sit on, the time has come for us to summarize
+    the knowledge we have learned so far in a practical example.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Regmap-based SPI driver example – putting it all together
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'All the steps involved in setting up Regmap, from configuration to device register
+    access, can be enumerated as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting up a `struct regmap_config` object according to the device characteristics.
+    Defining the register range if needed, default values if any, `cache_type` if
+    needed, and so on. If custom read/write functions are needed, pass them to the
+    `reg_read`/`reg_write` fields.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In the `probe` function, allocating a register map using `devm_regmap_init_i2c()`,
+    `devm_regmap_init_spi()`, or `devm_regmap_init_mmio()` depending on the connection
+    with the underlying device – I2C, SPI, or memory-mapped.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Whenever you need to read/write from/into registers, calling `remap_[read|write]`
+    functions.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: When done with the register map, assuming you used resource-managed APIs, you
+    have nothing else to do as devres core will take care of releasing the Regmap
+    resources; otherwise, you'll have to call `regmap_exit()` to free the register
+    map allocated in the probe.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let's now materialize these steps in a real driver example that takes advantage
+    of the Regmap framework.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A Regmap example
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To achieve our goal, let''s first describe a fake SPI device for which we can
+    write a driver using the Regmap framework. For understandability, let''s use the
+    following characteristics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The device supports 8-bit register addressing and 8-bit register values.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The maximum address that can be accessed in this device is `0x80` (it does not
+    necessarily mean that this device has `0x80` registers).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The write mask is `0x80`, and the valid address ranges are as follows:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`0x20` to `0x4F`'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`0x60` to `0x7F`'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Since the device supports simple SPI read/write operations, there is no need
+    to provide a custom read/write function.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now that we are done with the device and the Regmap specifications, we can start
+    writing the code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following includes the required header to deal with Regmap:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: Depending on the APIs needed in the driver, other headers might be included.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Then, we define our private data structure as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, we define a read/write register range, that is, registers that are allowed
+    to be accessed:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: However, it must be noted that if `writeable_reg` and/or `readable_reg` are
+    set, there is no need to provide `wr_table` and/or `rd_table`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After that, we define the callback that will be called any time a register
+    is accessed for a write or a read operation. Each callback must return true if
+    it is allowed to perform the specified operation on the register:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that all Regmap-related operations have been defined, we can implement
+    the driver''s `probe` method as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding `probe` method, there are even more commands than code. We
+    simply needed to demonstrate how the device specification could be translated
+    into a register map configuration and used as main access functions to the device
+    registers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we are done with Regmap from within the kernel, let's see how user
+    space can make the most out of this framework in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Leveraging Regmap from the user space
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Register maps can be monitored from the user space via the debugfs file system.
+    First, debugfs needs to be enabled via the `CONFIG_DEBUG_FS` kernel configuration
+    option. Then, debugfs can be mounted using the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: After that, the debugfs register map implementation can be found under `/sys/kernel/debug/regmap/`.
+    This debugfs view implemented by `drivers/base/regmap/regmap-debugfs.c` in kernel
+    sources contains a register cache (mirror) for drivers/peripherals based on the
+    Regmap API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'From the Regmap main debugfs directory, we can get the list of devices whose
+    drivers are based on the Regmap API using the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In each directory, there can be one or more of the following files:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`access`: An encoding of the various access permissions to each register in
+    respect of the pattern `readable writable volatile precious`:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'For example, the line `5e: y y y n` means that the register at address `5e`
+    is readable, writeable, volatile, but not precious.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`name`: The driver name associated with the register map. Check for the corresponding
+    driver. For example, the `702d3000.amx` register map entry:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'There are, however, Regmap entries starting with `dummy-` as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This kind of entry is set when there are no associated `/dev` entries (`devtmpfs`).
+    You can check this by printing the underlying device name, which will be `nodev`
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can look for the suffix name after `dummy-` to find the relevant node in
+    the device tree, for example, `dummy-avs-monitor@fd5d2000`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`cache_bypass`: Puts the register map into cache-only mode. If enabled, writes
+    to the register map will only update the hardware and not the cache directly:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'To enable cache bypassing, you should echo `Y` in this file as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: This will additionally print a message in the kernel log buffer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`cache_dirty`: Indicates that HW registers were reset to default values and
+    that hardware registers do not match the cache state. The read value can be either
+    `Y` or `N`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`cache_only`: Echoing `N` in this file will disable caching for this register
+    map and in the meantime, will trigger cache syncing, while writing `Y` will force
+    registers in this register map to be cached only. Reading this file value will
+    return `Y` or `N` according to the current caching enabled state. Any write happening
+    while this value is true will be cached (only the register cache will be updated,
+    no hardware changes will occur).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`range`: The valid register ranges of the register map:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`rbtree`: Provides how much memory overhead the `rbtree` cache adds:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`registers`: The file used to read and write the actual registers associated
+    with the register map:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In the preceding output, the register address is shown first, then its content
+    after.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This section is quite short but is a concise description of Regmap monitoring
+    from the user space. It allows reading and writing register content, and in some
+    circumstances, changing the behavior of the underlying Regmap.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: This chapter is all about register access related Regmap APIs. Its simplicity
+    should give you an idea of how useful and widely used it is. This chapter has
+    shown everything you need to know about the Regmap API. Now you should be able
+    to convert any standard SPI/I2C/memory-mapped driver into Regmap.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next chapter will cover IRQ management under Linux, however, two chapters
+    after, we will cover IIO devices, a framework for analog-to-digital converters.
+    Those kinds of devices always sit on top of SPI/I2C buses. It could be a challenge
+    for us, at the end of that chapter, to write an IIO driver using the Regmap API.
+  prefs: []
+  type: TYPE_NORMAL

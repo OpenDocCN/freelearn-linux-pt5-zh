@@ -1,0 +1,733 @@
+- en: Chapter 7. Configuring and Administering RBAC and Least Privileges
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring and using RBAC
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Playing with least privileges
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Role-based access control** (**RBAC**) is an amazing feature, which also
+    exists on Oracle Solaris 11 (its origin was in Oracle Solaris 8), that primarily
+    makes it possible to restrict the granted privileges to a normal user for executing
+    tasks. Putting this another way, RBAC makes it feasible to delegate only the necessary
+    privileges for a regular user to be able to accomplish administrative tasks in
+    a way similar to that of a sudo program. When compared with a sudo program, the
+    main difference is the fact that RBAC is completely integrated in the operating
+    system, and it is used during the user logon process to Oracle Solaris 11\. Moreover,
+    RBAC offers a more granular access to privileges than sudo does, and integration
+    with another great feature from Oracle Solaris 11 named least privilege, which
+    is used to cut out unnecessary privileges from processes and programs, allows
+    you to reduce the attack surface of a hacker.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring and using RBAC
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before explaining and implementing the RBAC feature, it is necessary to remember
+    why RBAC is necessary and, afterwards, to learn some fundamental concepts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'According to our previous study on Oracle Solaris 11, it would not be possible
+    for a normal user to reboot an Oracle Solaris 11 system, as shown in the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: A simple and completely inappropriate solution would be to give a password from
+    the `root` account to user `aborges`. However, this is unimaginable in a professional
+    company. Another and a recommended solution is to use RBAC, which is a security
+    feature that allows regular users to accomplish administrative tasks such as rebooting
+    a system, as we have tried previously.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The RBAC framework contains the following objects:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Role**: This is a special type of user that is created to execute administrative
+    tasks, although it isn''t possible to log in to a system and the correct procedure
+    is to log in as a user and to assume the role using the `su` command. As the role
+    is a kind of user, it is configured in the `/etc/passwd` file and it has a password
+    defined in the `/etc/shadow` file. However, different from a user, it isn''t possible
+    to log in to Oracle Solaris 11 using a role. The user must log in using a normal
+    account and then they can assume a role using the `su` command.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Profile**: This is a set of commands. Any role assigned to a profile can
+    execute any command from this profile. All system profiles are defined in the
+    `/etc/security/prof_attr.d/core-os` file, and local profiles can be defined in
+    the `/etc/security/prof_attr` file. To list all the profiles, use the following
+    command:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '**Authorization**: This represents a special form of privilege that is set
+    in order to accomplish specific tasks, such as accessing a CD-ROM and managing
+    the CUPS printing service, NTP service, Zones, SMF framework, and so on. Typically,
+    authorizations are created either from the Oracle Solaris installation or from
+    new installed software. All system authorizations are defined in the `/etc/security/auth_attr.d/core-os`
+    file, and local authorizations are defined in the `/etc/security/auth_attr` file.
+    To list all the authorizations, we run the following command:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '**Privilege**: This is a singular right that can be assigned to a user, role,
+    command, or even a system.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Execution attributes**: These are commands that are defined in the `/etc/security/exec_attr.d/core-os`
+    (system execution attributes) or `/etc/security/exec_attr` files (local definitions),
+    and they are assigned to one or more profiles. To list all the execution attributes,
+    we run the following command:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '**Profile shell**: This is a special kind of profile (`pfbash`, `pfsh`, `pfcsh`,
+    or `pfzsh`) assigned to users during a `su` command to assume a role or a login
+    shell that allows access to specific privileges. It is necessary to use any one
+    of these profile shells.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Security policy**: This defines default privileges and profiles for users.
+    The related configuration file is `/etc/security/policy.conf`, as shown in the
+    following command:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: There are two ways to use RBAC. The first method is simpler and more straightforward;
+    you can create and assign a profile directly to a user account in order to log
+    in as a normal user and use the `pfexec` command to execute additional commands
+    from the assigned profile.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The second method is to put all mentioned concepts about RBAC (commands, authorizations,
+    profiles, roles, and users) together following a schema as shown next (from right
+    to left):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: User <-- Role <-- Profile <-- Commands and/or Authorizations
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The second method is more complex, and the required steps to use RBAC, as described
+    in the previous sequence, are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a role using the `roleadd` command.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a profile, editing the `/etc/security/prof_attr` file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Assign commands to the created profile (step 2) in `/etc/security/exec_attr`
+    or assign authorizations (`/etc/security/auth_attr`) to the profile in the `/etc/security/prof_attr`
+    file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Assign the profile to the role using the `rolemod` command.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a password for the role using the `passwd` command.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Assign one or more users to the role using the `usermod` command.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When the user needs to use the assigned commands, execute `su - <rolename>`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: This is nice! This is a summary of the concepts required to manage RBAC. We
+    will learn how to execute a step-by-step procedure for both methods.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe requires a virtual machine (VirtualBox or VMware) running Oracle
+    Solaris 11 and with at least 2 GB RAM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We are going to learn both the methods to allow a regular user to be able to
+    reboot a system, that is, using the `pfexec` command (simpler) and RBAC's role
+    (more complex).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Using the `pfexec` command is easy. First, create the `aborges` regular user
+    with `hacker123!` as the password, as shown in the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The main idea is to associate a profile (that is, a set of commands) directly
+    to the user (`aborges`). In this case, the desired profile already exists; if
+    not, we have to create a new one. To avoid creating an unnecessary profile, verify
+    that there is a line in the `/etc/security/exec_attr.d/core-os` file with the
+    `reboot` command by executing the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This is excellent! There is one profile named `"Maintenance and Repair"` that
+    includes the reboot command. For accomplishing our task, associate this profile
+    (using the `–P` option) with the `aborges` user, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As we realized, it created an entry for the `aborges` user in the `/etc/ user_attr.d/local-entries`
+    file. However, even including this entry, which associates the `aborges` user
+    with the `"Maintenance and Repair"` profile, the user is still not able to reboot
+    the system, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Nonetheless, if the `aborges` user wants to execute the same command using
+    `pfexec`, the result will be different, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: It worked! The system will be rebooted as expected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The approach using the `pfexec` command is wonderful, but the mode chosen to
+    configure it (taking a ready profile) can bring about two little side effects:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `"Maintenance and Repair"` profile has other commands, and we have also
+    assigned these commands to the `aborges` user, as shown in the following command:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: To prevent this, it would be better to create a new profile and assign only
+    the reboot command to it.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: The second side effect is that the procedure using the `pfexec` command should
+    be done for each user that needs to use the `reboot` command, but it can take
+    additional time.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The second method to reach our goal is using roles, profiles, and/or authorizations
+    together. The advantage in this case is that privileges are not associated with
+    users directly, but they are assigned to roles instead. Then, if a regular user
+    needs to reboot the system (for example), it assumes the role using the `su` command
+    and executes the appropriate command.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Create another user (different from the previous one) to be used in this method
+    by running the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To confirm that the `brbactest` user can''t reboot the system, execute the
+    following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Create a role that will be configured later by running the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As we have mentioned previously, profiles are very important and are used during
+    RBAC configuration. The system already has some defined system profiles that are
+    configured in the `/etc/security/prof_attr.d/core-os` file, as shown in the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Therefore, according to the suggested steps in the introduction of this recipe,
+    create a profile named `Reboot` at the end of the profile configuration file,
+    as shown in the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: We know from this file that the profile name is `Reboot` and the `RO` (read-only)
+    characters indicate that it isn't modifiable by any tool that changes this database.
+    The lines that follow denote the description and the help file (it is unnecessary
+    to create it). It will be possible to bind authorizations (the `auths` key), other
+    profiles (the `profiles` key), and privileges (the `priv` key) to this `Reboot`
+    profile.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Following the profile creation, we have to assign one or more commands to this
+    profile, and local modifications occur by editing the `/etc/security/exec_attr`
+    file, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`Reboot`: This is the profile name.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`solaris`: This is the security policy associated with the `Reboot` profile.
+    This security policy is able to recognize privileges. Oracle Solaris 11 has another
+    possible value for this field named `suser` (not shown previously), which is very
+    similar to the `solaris` value, but it is not able to understand and recognize
+    privileges.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`cmd`: This is a type of object. In this case, it is a command to be executed
+    by a shell.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`RO`: This indicates that this line isn''t modifiable by any tool that changes
+    this file.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/usr/sbin/reboot`: This is the command to be executed by a user when they
+    assume the role that contains this `Reboot` profile.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Uid=0`: This command is run with the real ID of the user''s root (`uid=0`).
+    This is the case when a user has to run the command; the command will be executed
+    as run by a root user. Other good and useful possible keys are `euid` (effective
+    user ID, which is similar to running a command with `setuid` set as the executable)
+    and `privs` (privileges).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Again, it is very interesting to check the already existing system execute
+    attributes defined in the `/etc/security/exec_attr.d/core-os` file, as shown in
+    the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It''s time to bind the `r_reboot` role to the `Reboot` profile (the `–P` option)
+    by executing the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: According to the previous output, `r_reboot` is of type `role` and it is associated
+    with the `Reboot` profile.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `r_reboot` role does not have any password, so we should set a new password
+    for it by running the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The RBAC configuration is almost complete. To assume this `r_reboot` role,
+    the `rbactest` user must be assigned to it by using the `-R` option from the `usermod`
+    command, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To confirm every executed task until now, run the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: It is worth remembering that `rbactest` is a user while `r_reboot` is a role,
+    and as explained previously, it is not possible to log in to the system using
+    a role. Additionally, the existing profiles are `Basic Solaris User`, which enables
+    users to use the system according to the established security limits, and `All`,
+    which provides access to the commands that do not have any security attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Continuing the verification, we have to check the authorizations for the `r_reboot`
+    role and the `rbactest` user as well as for the assigned profiles to the `r_reboot`
+    role. These tasks are done by executing the following sequence of commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'There are a few points to be highlighted:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `rbactest` user is assigned to the `r_reboot` role.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: There is no authorization assigned either to the `rbactest` user or to the `r_reboot`
+    role.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The `All` profile grants unrestricted access to all unrestricted commands from
+    Oracle Solaris 11\. In this case, the `r_reboot` role is associated with three
+    profiles: `Reboot`, `Basic Solaris User`, and `All`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `Basic Solaris User` profile can execute some related CD-ROM commands using
+    specific privileges.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Finally, we can verify that the `rbactest` user is able to reboot the system
+    by executing the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: The system is reinitiated immediately. That's fantastic!
+  prefs: []
+  type: TYPE_NORMAL
+- en: RBAC allows you to integrate all the concepts that you have learned about (roles,
+    profiles, authorizations, and commands) with privileges; therefore, it offers
+    us a more fine-grained and integrated control than a sudo program does.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When working with Oracle Solaris 11, we can use RBAC with services from the
+    SMF framework. For example, the DNS client and DHCP server have the following
+    authorizations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Without these appropriate authorizations, the `rbactest` user isn''t able to
+    manage these services, as shown in the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It''s easy to solve these problems, assigning the respective authorization
+    to the `r_reboot` role, by executing the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To verify that the previous command has worked, check the altered file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'That''s nice! It''s time to test whether our modifications have worked by executing
+    the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: That's excellent! The integration of RBAC with SMF is perfect, and a normal
+    user such as `rbactest` is able to manage both the services (the DNS client and
+    the DHCP server) as it is the root user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we want to unbind the `r_reboot` role from the `rbactest` user to prevent
+    them from rebooting, or to perform any other action on the system, execute the
+    following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'A final and additional note: it is possible to configure default RBAC authorizations
+    and profiles for every user in the `/etc/security/policy.conf` file. In the same
+    way, there is the option to configure the default privilege and its limit, as
+    shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: An overview of the recipe
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In this section, we learned how to use RBAC in order to allow a regular user
+    to reboot the system. Furthermore, we have tested how to find and grant the necessary
+    authorization to manage services from the SMF framework. The same procedure should
+    be applied for any user and any number of commands.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Playing with least privileges
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Oracle Solaris 11, like other good UNIX-like operating systems, has a flaw in
+    its inception; there is a privileged account called root that has all special
+    privileges on a system and other accounts that have limited permissions such as
+    regular users. Under this model, a process either has all special privileges or
+    none. Therefore, if we grant permission for a regular user to run a program, usually
+    we are granting much more than is needed, and unfortunately, it could be a problem
+    if a hacker is to crack the application or the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In Oracle Solaris 10, developers have introduced a wonderful feature to make
+    the permissions more flexible; **least privilege**. The base concept is easy;
+    the recommendation is to only grant the necessary privilege for a process, user,
+    or program in order to reduce the damage in case of a serious security breach.
+    For example, when we manage the filesystem's security by applying read, write,
+    and execute rights, we usually grant much more privileges to a file than necessary,
+    and this is a big problem. It would be better if we could grant only a few privileges
+    (such as simple and individual rights) that were enough for a role, user, command,
+    or even a process.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are four sets of privileges for a process:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Effective** (**E**): This represents a set of privileges that are currently
+    in use.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Inherited** (**I**): This is the set of privileges that can be inherited
+    by a child process after a `fork()`/`exec()` call.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Permitted** (**P**): This is the set of privileges that are available to
+    be used.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Limited** (**L**): This represents all the available privileges that can
+    be made available to the permitted set.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Oracle Solaris 11 has several classes of privileges, such as file, sys, net,
+    proc, and ipc. Each one of these privilege classes (some people call categories)
+    have many different privileges, and some of them were chosen as being the basic
+    privileges that are assigned to any user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe requires a virtual machine (VirtualBox or VMware) running Oracle
+    Solaris 11 and with at least 2 GB RAM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'What are the existing privileges? This question is answered either by reviewing
+    the main pages (the `main privileges` command) or by running the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, from all existing privileges, only some of them are basic and essential
+    for process operations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When handling process privileges, we can manage them by using the `ppriv` command.
+    For example, to list privileges from the current shell, run the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We could get the same result by executing `ppriv 2590`, and in both cases,
+    a more comprehensive output could be obtained by using the `-v` option (`ppriv
+    –v 2590` or `ppriv –v $$`). Additionally, there are two common flags that could
+    appear here: `PRIV_AWARE` (the process is aware of the privileges framework) and
+    `PRIV_DEBUG` (the process is in the privilege debugging mode).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We have learned about the possible privileges, so it is time to apply these
+    concepts in real-world cases. For example, if a normal user (the `rbactest` user
+    from the last section) tries to read the `/etc/shadow` content, they are not going
+    to see anything, as shown in the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: It could present a serious problem for us if we didn't have a suitable solution,
+    because we don't want to grant any unnecessary rights to the `rbactest` user,
+    but we need to grant enough rights to accomplish this task of reading the `/etc/shadow`
+    file. If we grant the read rights (R) to the other right group in the `/etc/shadow`
+    file, we are allowing other users to read the file. A better situation arises
+    by using the **Access Control List** (**ACL**) because we can grant read rights
+    (R) on `/etc/shadow` for only the `rbactest` user, but it would be an excessive
+    and dangerous right for a valuable file like this.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The real solution for this problem is to use least privileges. In other words,
+    it is recommended that you assign only necessary privileges for the `rbactest`
+    user to be able to see the `/etc/shadow` content. However, which is the right
+    privilege? It is found by running the `ppriv` command with the `–De` option (debugging
+    and executing), as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The privilege missing is `file_dac_read` and it has the following description:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The system call that fails is shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It''s feasible to get more information about the `mkdirat` system call by executing
+    the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now we know the correct privilege, so there are two options to correct the
+    situation: either the `file_dac_read` privilege is granted to the `rbactest` user
+    directly, or it is assigned to a role (for example, `r_reboot` from the previous
+    section).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To assign the `rbactest` user and then to assign the privilege for a role,
+    execute the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'According to the previous step, we have associated the `rbactest` user with
+    the `r_reboot` role (if you have already made it previously) and have kept the
+    existing basic privileges. Furthermore, a new privilege (`file_dac_read`) was
+    appended. To verify that the configuration is correct, run the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It has worked! Another way to get the same result is to grant the `file_dac_read`
+    privilege directly to the `rbactest` user, but this is not the recommend method:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: This has worked too!
+  prefs: []
+  type: TYPE_NORMAL
+- en: An overview of the recipe
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In this section, we learned how to use the `pfexec` command, RBAC concepts,
+    and least privileges concepts. Moreover, we have seen examples that explain how
+    to apply these techniques in daily administration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: References
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '*RBAC Access Control* at [http://docs.oracle.com/cd/E23824_01/html/821-1456/rbac-1.html](http://docs.oracle.com/cd/E23824_01/html/821-1456/rbac-1.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Privileges* at [http://docs.oracle.com/cd/E23824_01/html/821-1456/prbac-2.html#scrolltoc](http://docs.oracle.com/cd/E23824_01/html/821-1456/prbac-2.html#scrolltoc)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Viewing and Using RBAC Defaults* at [http://docs.oracle.com/cd/E23824_01/html/821-1456/rbactask-new-1.html#scrolltoc](http://docs.oracle.com/cd/E23824_01/html/821-1456/rbactask-new-1.html#scrolltoc)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Customizing RBAC for Your Site* at [http://docs.oracle.com/cd/E23824_01/html/821-1456/rbactask-30.html#scrolltoc](http://docs.oracle.com/cd/E23824_01/html/821-1456/rbactask-30.html#scrolltoc)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Managing RBAC* at [http://docs.oracle.com/cd/E23824_01/html/821-1456/rbactask-4.html#scrolltoc](http://docs.oracle.com/cd/E23824_01/html/821-1456/rbactask-4.html#scrolltoc)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Using Privileges* at [http://docs.oracle.com/cd/E23824_01/html/821-1456/privtask-1.html#scrolltoc](http://docs.oracle.com/cd/E23824_01/html/821-1456/privtask-1.html#scrolltoc)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

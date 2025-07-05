@@ -1,0 +1,1187 @@
+- en: Chapter 8. Debugging SELinux
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will look at SELinux debugging through the following recipes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identifying whether SELinux is to blame
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Analyzing SELINUX_ERR messages
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Logging positive policy decisions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Looking through SELinux constraints
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Ensuring an SELinux rule is never allowed
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using strace to clarify permission issues
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using strace against daemons
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Auditing system behavior
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: On an SELinux-enabled system, the SELinux policy defines how applications should
+    behave. Any change in behavior might trigger SELinux denials for certain actions
+    of that application. As a result, end users can notice unexpected permission issues
+    or erratic application behavior.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Troubleshooting such situations is usually done through analysis of the AVC
+    events. Many resources already cover AVC events in great detail. The basic premise
+    is that an AVC event uses a set of key-value pairs, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In this example, we can deduce the following from the AVC event:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The event is a denial (`avc: denied`)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The operation that was denied is appending to a file (`{ append } … tclass=file`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The process that tried to append to the file has PID `1787` and name `syslog-ng`
+    (`pid=1787 comm="syslog-ng"`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The process' context is `syslogd_t` (`scontext=system_u:system_r:syslogd_t:s0`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The target file is called `oracle_audit.log` and has an inode number `65` on
+    the filesystem, stored on the `/dev/dm-18` metadevice (`name="oracle_audit.log"
+    dev=dm-18 ino=65`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The file's context is `usr_t` (`tcontext=system_u:object_r:usr_t:s0`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: However, sometimes it isn't sufficient to find out where the problem is. Luckily,
+    there are many more options available to debug the problem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identifying whether SELinux is to blame
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before blaming the SELinux subsystem and policies for a problem, it is important
+    to verify whether SELinux is to blame at all. Too often, hours of troubleshooting
+    are put in analyzing the SELinux policies and subsystem only to find out that
+    the problem also persists when SELinux is not enabled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In order to be confident that SELinux is (or isn''t) to blame, the following
+    set of steps can be taken:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Is it possible to get more information through the application''s internal
+    debugging system? Consider the following instance:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Is an AVC denial related to the problem shown in the audit logs? If not, try
+    disabling the `dontaudit` rules and try again:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Is the application that gives problems SELinux-aware? Most SELinux-aware applications
+    are linked with the `libselinux.so` library, so we can verify whether this is
+    the case using `ldd` or `scanelf`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Is the issue login related? If so, an application might not be SELinux-aware
+    but still behave differently, as it uses PAM under the hood, which calls the `pam_selinux.so`
+    library.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Does the problem still persist if the application domain is put in permissive
+    mode? To check this, issue the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'If the application domain is unknown, try putting the entire system in permissive
+    mode (if allowed) to see whether the problem is still showing up. If it is, then
+    SELinux might not be the cause after all:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Ensuring that SELinux is the cause of a problem is the first step to enlightenment.
+    Numerous hours of SELinux investigations to resolve issues are spent only to find
+    out that the problem was not with SELinux to begin with.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting more information from the application (or applications) involved is
+    the first step to troubleshooting issues. Many applications have command-line
+    flags that increase logging verbosity, and many daemons can be configured to log
+    more of their inner workings. The resulting debug information (or even trace information,
+    if the application supports it) will provide a massive help to the administrator
+    to troubleshoot a problem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If additional logging does not help, then it is important to verify whether
+    there are AVC denials in the audit logs. As some AVC denials can be hidden during
+    regular operations, disabling the `dontaudit` rules temporarily might be necessary.
+    Don't stare blindly at AVC denials though, and take a broader look at logfiles
+    and audit events. For instance, in the next recipe (*Analyzing SELINUX_ERR messages*),
+    a more in-depth analysis of a particular audit event type is discussed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Look through the various logs on the system as well. The output of `dmesg` is
+    important if the problem is kernel, hardware, or core-system related. The `messages`
+    logfile (in `/var/log/`) usually contains pointers when issues come up with system
+    daemons.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When no denials are shown and there is no specific logging that can assist with
+    the troubleshooting of an application, the next step is to assure ourselves that
+    the application is not SELinux-aware.
+  prefs: []
+  type: TYPE_NORMAL
+- en: SELinux-aware applications (applications that know they run on an SELinux-enabled
+    system and interact with the SELinux subsystem) can act differently based on the
+    SELinux policy that is loaded, without actually triggering any SELinux decision
+    in the SELinux subsystem. On account of their awareness, the in-kernel SELinux
+    subsystem access controls might not be called, so no logging will be shown even
+    though the problem is somewhat SELinux-related.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Although there is not any 100 percent certain method to check whether an application
+    is SELinux-aware, the two most common approaches are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Checking whether the application binary is linked with the `libselinux.so` library
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Checking whether the application uses PAM
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An application that is linked with the `libselinux.so` library is SELinux-aware
+    and will be able to query SELinux policies, possibly acting differently when SELinux
+    is enabled and often regardless of SELinux being in the enforcing or permissive
+    mode.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Besides the `ldd` command, it is also possible to use the `scanelf` application
+    as provided by the `pax-utils` package. This application does not need execute
+    privileges against the binary (which `ldd` requires) but has the downside that
+    it only shows the requirements for the binary, while `ldd` also includes the libraries
+    linked by the libraries themselves:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: Applications that use PAM can also be influenced by SELinux, since their PAM
+    configuration might call the `pam_selinux.so` library (or not call it, which can
+    be equally damaging for the functionality of the application as no transition
+    will occur then, having the user session still run with the context of the daemon).
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the application does not interact with the SELinux subsystem to query the
+    SELinux policy, and it also doesn't handle SELinux labels directly (that is, it
+    has no knowledge of SELinux labels and does not actively work with them code-wise),
+    then running the application in the permissive mode should show us whether SELinux
+    is to blame. In the permissive mode, the SELinux subsystem access controls do
+    not prevent any action. If a problem still persists in the permissive mode, chances
+    are that SELinux is not to blame at all.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: More information about SELinux-aware applications and how to write one is covered
+    in [Chapter 10](ch10.html "Chapter 10. Handling SELinux-aware Applications"),
+    *Handling SELinux-aware Applications*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Analyzing SELINUX_ERR messages
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When the SELinux subsystem is asked to perform an invalid SELinux-specific operation,
+    it will log this through the audit subsystem using the `SELINUX_ERR` message type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Make sure that the audit subsystem is up and running as we will be using the
+    `ausearch` application to (re)view audit events:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Analyzing `SELINUX_ERR` messages is done by viewing the entry in the audit
+    logs and understanding the individual fields; this is done by completing the following
+    steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Note the current date/time, or reload the SELinux policy, to have a clear point
+    in the audit logs from where to look:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Trigger the behavior in the application.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Ask the audit subsystem to show the last events of the `SELINUX_ERR` and `MAC_POLICY_LOAD`
+    types:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Look at the beginning of the message to find out what problematic situation
+    SELinux is informing us about.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The SELinux subsystem will log any incorrect request. If it is application behavior,
+    it is usually logged through the AVC type; but when the request is SELinux-specific
+    and incorrect, an `SELINUX_ERR` message type is displayed. In the example, we
+    also looked for the `MAC_POLICY_LOAD` type, so we know at which stage the SELinux
+    policy was reloaded, giving us a good starting point for the investigation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Some examples of the `SELINUX_ERR` messages are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`security_compute_sid`: Invalid context'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`security_validate_transition`: Denied'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`security_bounded_transition`: Denied'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Some other messages exist as well, although these are mostly for SELinux-internal
+    problems (related to the SELinux subsystem inside the Linux kernel, such as supported
+    netlink types), which need to be resolved by the SELinux maintainers themselves,
+    and not by policy developers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Invalid contexts
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'An invalid context is triggered when a context that is not valid according
+    to the RBAC and SELinux user rules is created. This is usually the case during
+    a domain transition, where the target type is not allowed for the role:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Another reason for an invalid context can be that a role transition is triggered,
+    but this role is not allowed for an SELinux user:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: In both cases, it is important to look at the presented context and the `scontext`
+    and `tcontext` fields. These show the contexts that SELinux finds invalid (presented
+    context) as well as the source (domain initiating the action) and the object context
+    (label through which the new context was decided upon). Based on these, it should
+    be fairly easy to deduce what the error is about.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first example shows an attempt to transition from the `logwatch_t` domain
+    (which is allowed for the `system_r` role) to the `logwatch_mail_t` domain (which
+    is not allowed for the `system_r` role). To solve this, `logwatch_mail_t` needs
+    to be allowed for the `system_r` role:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: The second example is triggered through a role transition. A database administrator
+    launches an `init` script, resulting in the `dbadm_u:dbadm_r:initrc_t` context.
+    This domain executes the `mysqld_safe` application (whose file is labeled `mysqld_safe_exec_t`)
+    that, through the SELinux policy, attempts to perform a role transition to the
+    `system_r` role. Although the `system_r:mysqld_safe_t` context is a valid set,
+    the database administration user itself is not allowed the `system_r` role.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The main issue in this second example is that the context to start from (`dbadm_u:dbadm_r:initrc_t`)
+    shouldn't be used. The `initrc_t` domain should only be allowed for the `system_r`
+    role. This, by itself, requires that the `dbadm_u` SELinux user is also allowed
+    the `system_r` role. So, even though allowing the `system_r` role is the right
+    resolution, the approach taken in the example is wrong (role transition from `initrc_t`
+    to `mysqld_safe_t` instead of role transitioning upon instantiating `initrc_t`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Denied transition validation
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Consider the following error message, which came up when an `init` script tried
+    to increase the sensitivity of a file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: Such a message occurs when a file transition is performed, but where the target
+    security context is not allowed. SELinux validates whether this is allowed; if
+    not allowed, it logs this through the message.
+  prefs: []
+  type: TYPE_NORMAL
+- en: AVC-like denials will be in place here, but the access vector cache system is
+    only able to validate pair-wise contexts (the source and target contexts), whereas
+    the transition validation needs to be done on three levels (old file context,
+    new file context, and process context).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The solution for the presented error will be to either allow `initrc_t` to raise
+    the security level of a file (through the `mls_file_upgrade` interface) or to
+    not have the `init` script domain try to update the MLS level of a file in the
+    first place.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Denied security-bounded transitions
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'An example where security-bounded transitions occur is when the `mod_selinux`
+    module is used with Apache (which uses bounded domains and transitions for individual
+    requests). When the target domain is not bounded by the source domain (that is,
+    the SELinux policy does not prevent the target domain from executing an action
+    not allowed by the source domain, as done through the `typebounds` statement),
+    then the following error is displayed:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: When this occurs, a bounded transition is requested by the main application
+    domain (such as when a transition is done for threads), but the target domain
+    is not marked as a bounded domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that this is different from when a bounded domain is given more privileges—in
+    such cases, SELinux will deny the specific permissions when they are invoked,
+    showing AVC denials.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: SELinux logging and audit logging is continuously being improved. Work is on
+    the way to make the audit logs easier to parse by scripts and to provide more
+    information. For instance, at the time of writing, a patch has just been accepted
+    to add permissive state information in the AVC logging.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'More in-depth analysis and explanation of AVC messages is handled in *SELinux
+    System Administration*, *Packt Publishing*. More resources related to SELinux
+    audit events are available at the following links:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://www.selinuxproject.org/page/NB_AL](http://www.selinuxproject.org/page/NB_AL)
+    (including an overview of all possible fields in AVC events)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[https://wiki.gentoo.org/wiki/SELinux/Tutorials/Where_to_find_SELinux_permission_denial_details](https://wiki.gentoo.org/wiki/SELinux/Tutorials/Where_to_find_SELinux_permission_denial_details)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Logging positive policy decisions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: On some occasions, the system performs actions that the administrator might
+    not expect, but which are allowed by the SELinux policy, making it harder to debug
+    potential problems. An application might be SELinux-aware, causing its own behavior
+    to depend on the SELinux policy, without actually using the SELinux subsystem
+    to enforce access. The SELinux policy might also be configured to behave differently
+    than expected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In such situations, it might be important to have SELinux log activities that
+    were actually allowed rather than denied; for instance, logging domain transitions
+    to make sure that a transition has indeed occurred.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In order to have domain transitions logged, create an SELinux policy by performing
+    the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identify the source and target domains to look out for.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Create an SELinux policy that calls the `auditallow` statement on the access
+    vector we want to log:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Build and load the SELinux policy and try to reproduce the situation.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Look at the audit logs and check whether an AVC granted message is displayed:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Of the many policy statements that SELinux supports, the `auditallow` statement
+    is interesting and does not alter the decisions made by SELinux: having an `auditallow`
+    statement does not allow the action, but rather has the SELinux subsystem log
+    it if it is allowed (through another `allow` statement).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: This makes it possible for SELinux policy developers and system administrators
+    to explicitly ask the SELinux subsystem to inform them about decisions taken if
+    the decision is to grant something rather than deny.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the `auditallow` statement, we can track SELinux policy decisions and
+    assist in the development of policies and debugging of application behavior, especially
+    when a process is invoked in a very short time frame, as this makes it difficult
+    for administrators to see whether the context of the process is correct (`ps -Z`
+    or by checking the `/proc/<pid>/` contexts).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some administrators might want to put in some additional logging inside the
+    scripts or commands that they invoke (such as to capture the output of `id -Z`).
+    However, it is very much possible that the SELinux policy does not allow the script
+    to execute the `id` command, let alone show its output or direct its output to
+    a specific logfile.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Enhancing the SELinux policy with additional log types, enabling terminal output,
+    allowing the execution of binaries, and more is quite some overhead just to find
+    out whether the context of the process is as it should be. Using the `auditallow`
+    statement is a great solution to this.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It goes beyond domain transitions, of course. If a file has been changed, and
+    the administrator or engineer is uncertain which process or which context is causing
+    the change, then it is possible to have SELinux audit writes on the file label,
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: Thanks to the additional information in the AVC log, we can see which process
+    (PID) running in a particular context (`scontext`) is responsible for writing
+    to the file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Looking through SELinux constraints
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Some denials are caused by SELinux constraints—additional restrictions imposed
+    by the SELinux policy that are not purely based on the SELinux types, but also
+    on the SELinux role and SELinux user. This is often not clear from the denial.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `audit2why` application helps in informing developers that a denial came
+    from a constraint violation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is, however, not always the case, so we need to find a way to investigate
+    whether denials come from constraint violations too.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Although SELinux constraints can be queried easily, they are currently difficult
+    to work with. The following approach helps in validating whether a constraint
+    is applicable for a particular AVC denial that is under investigation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Look through the SELinux policy to see whether the (denied) access has an AVC
+    allow rule or not:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Assuming there is an allow rule, see whether there are constraints applicable
+    to the operation. This takes into account the class (in the example, this is `file`)
+    and the permission (in the example, this is `read`):'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'If constraints might exist, look at the attributes of the source and target
+    contexts, as this is usually how constraints are documented in the policy:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Inside the SELinux policy, look through the `constraints` file (usually at `${POLICY_LOCATION}/policy/`)
+    and the `mcs` or `mls` file (if the policy uses MCS or MLS), and look for the
+    constraints on the class and permission requested, validating whether there are
+    any expressions concerning the attributes mentioned.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Constraints are currently difficult to validate. Luckily, there aren't many
+    constraints in place, but still, not being able to easily verify and look at the
+    constraints is a nuisance for developers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The complexity increases as the `seinfo --constrain` output, which is the only
+    available method to query constraints next to reading the sources, has the following
+    drawbacks:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It does not provide any name yet on the constraints (so referring to constraints
+    is difficult)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It uses **Reverse Polish Notation** (**RPN**), which isn't very user-friendly
+    (although it is powerful for computers, people do not generally read RPN fluently)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It shows expanded attributes, so we get huge lists of types, rather than a limited
+    set of attributes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The constraint definitions inside the `constraints`, `mcs`, and `mls` files
+    (which are only accessible through the policy source code) are easier to look
+    at. The following example is from the `constraints` file; constraints from `mcs`
+    and `mls` will use the `mlsconstrain` keyword:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: The controls shown use attributes, which are easier to map with a specific situation.
+    It also shows how flexible constraints can be. Next to pure type-oriented rules
+    (`t1` and `t2`), constraints also work with roles (`r1` and `r2`) and can deal
+    with SELinux users (`u1` and `u2`). The number is used to differentiate between
+    the subject (`1`) and object (`2`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As an example, in constraint language, saying that something is allowed if
+    the SELinux users are equal, or the SELinux user of the subject is `system_u`,
+    will be documented as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: The output of the `seinfo --constrain` command has the advantage that it is
+    easy for computer programs to interpret. Computer programs or scripts, which use
+    the output of `seinfo` to visualize constraint information in a tree-like manner,
+    can be created.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following GraphViz-generated graph shows the UBAC constraints applicable
+    to file reads, showing only the user domains and the `user_home_t` types (to not
+    overload the graph):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![How it works…](img/9669OS_08_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'This graph shows how the UBAC constraints are constructed. File reads are prohibited
+    (regardless of the type enforcement rules that are made in the policy), unless
+    they match one of the rules shown in the graph, which are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The SELinux user of the subject (domain) and object (resource) are the same
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The SELinux user of the subject is `system_u`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The SELinux user of the object is `system_u`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The SELinux type of the subject does not match any of the mentioned types (only
+    a subset is shown in the drawing)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The SELinux type of the object does not match any of the mentioned types (only
+    a subset is shown in the drawing)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The SELinux type of the subject is `sysadm_t`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'More information on SELinux constraints can be found at the following resources:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://wiki.gentoo.org/wiki/SELinux/Constraints](https://wiki.gentoo.org/wiki/SELinux/Constraints)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[http://www.selinuxproject.org/page/ConstraintStatements](http://www.selinuxproject.org/page/ConstraintStatements)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Ensuring an SELinux rule is never allowed
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: It is possible to include statements in the SELinux policy that ensure that
+    a particular access vector cannot be allowed, not even by enhancing the SELinux
+    policy later. This is done with the `neverallow` statement.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To include the `neverallow` statements in the policy and enforce them, go through
+    the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In `/etc/selinux/semanage.conf`, enable support for the `neverallow` statements
+    by setting the `expand-check` variable to `1`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create an SELinux policy in which the access vectors that should be explicitly
+    forbidden are listed. Consider the following instance:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Build and load the policy.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Generate another policy that will allow the statement and attempt to load it:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Not all distributions enable the assertion checks by default as they incur
+    some performance penalty during policy builds. Some distributions might even have
+    policy incompatibilities due to this, because if the assertions are disabled,
+    then the `neverallow` statements are never processed: the `neverallow` statement
+    isn''t really a policy decision, but more a rule that influences loading of new
+    policies, and is enforced by the policy linker (which combines the various policy
+    modules in one final policy binary). As can be deduced from the (failure) output,
+    the `neverallow` statements are implemented as assertions.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Some `neverallow` statements are available as part of the base policy. For
+    instance, the following statement ensures that only the domains with the `selinux_unconfined_type`
+    or `can_load_policy` attribute set can actually load an SELinux policy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: This example uses the negation operator (`~`), which means *all types except
+    those mentioned*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unlike constraints (that can also be used to implement restrictions), the `neverallow`
+    statements help by not accepting any policy that will violate the rule. It is
+    also possible to add the `neverallow` rules through modules, unlike constraints
+    that need to be part of the base SELinux policy (and as such, are governed by
+    Linux distribution, an upstream policy, or developers that manage complete policies
+    rather than individual SELinux policy modules).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `expand-check` variable in `/etc/selinux/semanage.conf` tells the SELinux
+    user space libraries that the assertion has to be checked. If this variable is
+    set to `0`, then the `neverallow` statements have no impact on the policy and
+    its loading whatsoever.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using strace to clarify permission issues
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `strace` application is a popular debugging application on Linux systems.
+    It allows developers and administrators to look at various system calls made by
+    an application. As SELinux often has access controls on specific system calls,
+    using `strace` can prove to be very useful in debugging permission issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To properly use `strace`, follow the next set of steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Enable the `allow_ptrace` Boolean:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Run the application with `strace`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In the resulting logfile, look for the error message that needs to be debugged.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `allow_ptrace` Boolean (on some distributions, the inverse Boolean called
+    `deny_ptrace` is available) needs to be toggled so that the domain that calls
+    `strace` can use `ptrace` (the method that `strace` uses to view system calls)
+    against the target domain. As the `ptrace` method can be a security concern (it
+    allows reading target process' memory, for instance), it is, by default, disabled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once an application has been executed through the `strace` application, the
+    logfile will contain all relevant system call information. Of course, on larger
+    applications, or on daemons, this logfile can become massive, so it makes sense
+    to limit the `strace` operation towards a particular subset of system calls, as
+    shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this example, only the `open` and `access` system calls are looked at.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the resulting logfile, the SELinux permission usually issues results in
+    failed system calls with an `EACCES (Permission denied)` error code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: Although an AVC denial will also be shown for most accesses, these denials often
+    do not give a complete picture as to at what stage a denial is in. By using `strace`,
+    we can follow the logic that the application performs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sometimes, it isn't obvious why a failure occurs. In this case, it might be
+    interesting to run the application twice—once in enforcing mode and once in permissive
+    mode—and look at the differences in the `strace` logs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using strace against daemons
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `strace` application not only makes sense for command-line applications
+    but also for daemons. A popular approach to debugging daemons is to start them
+    from the command line, possibly with a specific debug flag, so that the daemon
+    doesn''t detach and run in the background. However, this is often not possible
+    on SELinux: the policy will not allow the daemon to run as a command-line foreground
+    process.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The approach to use `strace` against daemons is similar as with command lines,
+    focusing on the process ID rather than the command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Find out what the process ID of the daemon is:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Use `strace` to attach to the running process:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Specify which system calls to watch out for. For instance, permission issues
+    while binding or connecting to ports or sockets can be filtered as follows:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Press *Ctrl* + *C* to interrupt the `strace` session; don't worry, the daemon
+    will continue to run in the background, unharmed.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'A popular approach to debugging daemons, which is to start the daemon in the
+    foreground from the command line, often does not work on SELinux systems:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: If a user has the rights to execute the daemon binary directly (which isn't
+    default either), then the daemon usually runs with the permissions of the user
+    domain—who hardly has the privileges needed to run the daemon—as there is no transition
+    from the user domain to the daemon domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By using `strace` against the daemons, it is possible to debug them in more
+    detail. The `strace` application will bind to the process (using the `ptrace`
+    method) and be notified of every system call that the daemon performs. The `-f`
+    option also ensures that new processes that the daemon launches (for instance,
+    worker processes) are also looked at by `strace`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To end the `strace` session, it is enough to kill the `strace` session or interrupt
+    it with *Ctrl* + *C*. The daemon itself is left untouched.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Many other system analysis tools, which can be used in a very similar manner,
+    exist. Some examples are SystemTap and Sysdig, with a port of DTrace to Linux
+    being actively developed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The following resources cover the use of `strace`, SystemTap, and Sysdig in
+    more detail:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://www.dedoimedo.com/computers/strace.html](http://www.dedoimedo.com/computers/strace.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[http://www.thegeekstuff.com/2011/11/strace-examples/](http://www.thegeekstuff.com/2011/11/strace-examples/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[http://www.sourceware.org/systemtap/](http://www.sourceware.org/systemtap/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[http://www.sysdig.org/wiki/](http://www.sysdig.org/wiki/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Auditing system behavior
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Another approach to debugging application behavior is through Linux auditing,
+    especially when it is not clear which process is responsible for performing a
+    specific action, as this might make SELinux development a lot more difficult.
+    When developers do not know which domain(s) they need to update privileges for,
+    or do not know how exactly a resource is created, then the Linux audit subsystem
+    can help.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the Linux auditing subsystem, administrators can enable rules to log activities.
+    In the audit log, the SELinux context of the subject (process) is shown as well,
+    allowing SELinux developers to properly identify the domain to work with.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let''s look at how we can ask the Linux audit subsystem which process is responsible
+    for creating a particular directory in a user''s home directory through the following
+    steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As the root Linux user (and in an SELinux role with sufficient privileges),
+    tell the audit subsystem to log all write- and attribute-changing operations inside
+    the user''s home directory:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Perform the necessary action(s) to trigger the behavior that needs to be debugged.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Query the audit subsystem for the recent audit events with the `policydev`
+    key:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Later, disable the audit rule again so that the audit logs are not cluttered
+    with development-related events:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The Linux audit subsystem uses audit rules to identify which activities need
+    to be logged to the audit log. The rules can be manipulated using the `auditctl`
+    command (audit control).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In our example, a rule was added for the `/home/john/` path (`-w /home/john`)
+    for which the write and attribute changes (`-p wa`) are logged. The events are
+    tagged, so to speak, with a key called `policydev`. Administrators can choose
+    this key freely. Its purpose is to structure audit events and simplify search
+    queries.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When the `auditctl` command is invoked, the rule is immediately active, so
+    after executing the test, audit events will be displayed as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: The logs show that it is a `java` process that is responsible for creating a
+    directory called `.dcinforc/` in the user's home directory. The important fields
+    to consider here are the `nametype=CREATE` (which tells us that an object was
+    created) and `syscall=83` (informing us which system call was trapped by the audit
+    subsystem—in this case, the `mkdir` system call) fields, and of course the `subj=`
+    and `obj=` parameters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'From the example, we can see that there are two distinct `obj=` parameters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first, `obj=user_u:object_r:user_home_t:s0`, is mentioned for the created
+    directory, and it tells us what label the newly created directory received
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The second, `obj=user_u:object_r:user_home_dir_t:s0`, is mentioned for the parent
+    directory (`nametype=PARENT`), informing us what the label of the directory in
+    which `.dcinforc/` is created is
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now, this is just an example of creating directories, but the audit system can
+    trap many types of activities. This is where the `syscall=` field becomes important.
+    This field tells us what specific system call was trapped and logged by the audit
+    subsystem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A list of system calls and their associated numbers can be found in the proper
+    `C` header file. For instance, the `/usr/include/asm/unistd_64.h` file (referenced
+    indirectly through `/usr/include/syscalls.h`) contains the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: Through this, we know that the directory was created using the `mkdir` system
+    call and not by any other means (such as creating the directory as a different
+    one first and then renaming it).
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The audit subsystem receives the rules it needs to follow up on at boot. Most
+    Linux distributions offer a file called `audit.rules` inside `/etc/audit/`, which
+    contains various commands, locations, and system calls that need to be trapped
+    and logged. This file is then read at boot time by the audit daemon `init` script.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we need to have certain rules loaded automatically—and not just for the duration
+    of a short test—then it is recommended to add the rules to this `audit.rules`
+    script, together with the appropriate comment explaining why this needs to be
+    trapped.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we only used path-based auditing capabilities in the example. The Linux
+    audit subsystem, however, can do much more than just that. For instance, it is
+    possible to audit particular system calls. This allows administrators to keep
+    a close eye on suspicious system call usages, such as the use of `unshare` (which
+    is used for Linux namespaces):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: A good set of default audit rules to work with is mentioned in the CISecurity
+    Benchmark for Red Hat Enterprise Linux, available at [https://benchmarks.cisecurity.org/](https://benchmarks.cisecurity.org/)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

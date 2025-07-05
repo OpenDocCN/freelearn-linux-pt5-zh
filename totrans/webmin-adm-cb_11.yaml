@@ -1,0 +1,1990 @@
+- en: Chapter 11. Running Web Applications
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Generating dynamic pages using CGI
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Installing PHP
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Changing PHP configuration settings
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Displaying PHP errors while debugging
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Logging in PHP
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Installing WordPress on your server
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Installing Drupal on your server
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Installing a Django-based application using `mod_wsgi`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Internet sites may be roughly divided into two categories: static and dynamic.
+    When a web server hosts a static site, its role is very limited. The server waits
+    for incoming requests, maps every request to a file on its disk, and sends contents
+    of the file as its response. All pages of such a site have to be prepared ahead
+    of time, and they don''t change automatically between visits. The functionality
+    of such sites may seem limited, but they do have a number of advantages. Since
+    the server doesn''t do any computational work, static sites can be very fast and
+    can serve large numbers of requests. Such sites are also easy to index by search
+    engines. The fact that a site is static does not mean that it can''t be interactive.
+    JavaScript components allow the browser to provide the user with a graphical interface,
+    through which he or she may interact with our website. In the end though, if the
+    user provides us with information we would like to store, we will need a dynamic
+    component to process incoming data.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: On a dynamic website, incoming requests are not mapped directly to files on
+    a disk; instead, they are handed over to programs that process each request and
+    produce a response. Processing usually involves interacting with a database to
+    look up or store information; the response is generated on the fly and may be
+    different each time. Dynamic websites are an essential component of the modern
+    Internet, and Apache is a server that can host most available dynamic technologies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In [Chapter 8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running
+    an Apache Web Server*, we demonstrated how Webmin can help you set up a web server
+    to host static websites. In this chapter, we will dive into topics related to
+    various dynamic website solutions. We will start with CGI, the classic way to
+    serve dynamic websites using programs written in any language. To illustrate the
+    point, we will demonstrate how to set up a simple dynamic website powered by a
+    Bash script. We will then proceed to demonstrate how more efficient language-specific
+    technologies can be hosted. Most of this chapter is focused on the PHP language,
+    but the final recipe demonstrates how applications written in Python may be hosted
+    using the Apache module `mod_wsgi`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Generating dynamic pages using CGI
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Since the earliest days of the World Wide Web, it was possible to generate web
+    pages dynamically using a standard method called the **Common Gateway Interface**
+    (**CGI**). With the use of CGI, an Apache web server can generate dynamic content
+    by executing any program installed on the same machine as long as that program
+    generates the text of a properly formatted HTTP response. The main advantage of
+    this method is its universality, as CGI scripts may be written in any programming
+    language. In this recipe, we will demonstrate how to write a simple Hello World
+    script in the shell scripting language, Bash, but the same principles would apply
+    to any other programming language.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The main disadvantage of the CGI protocol is the fact that the web server must
+    invoke a new process for each incoming request. This solution does not scale very
+    well and is therefore applicable to low traffic sites only. The other disadvantage
+    of using CGI directly is that the protocol is very basic and parsing of incoming
+    requests has to be done manually by your scripts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Basic CGI is superseded by technologies that do not require a new process to
+    be invoked for every incoming request but have a component loaded into memory,
+    ready to process requests. These solutions are usually language specific and may
+    come as Apache modules, for instance `mod_perl`, `mod_php` or `mod_python`. Some
+    of these technologies are described in subsequent recipes in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The method described in this recipe is still suitable for small tasks. If you
+    have a web server and wish to return a simple status page but don't want the overhead
+    (and potential security risks) associated with installing a technology such as
+    PHP, you could use this basic method of generating dynamic web pages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: CGI scripts are regular programs from the perspective of your Unix system, and
+    they have access to the underlying machine with the same privileges as the web
+    server process. If a CGI script accepts user input, great care should be taken
+    to verify and clean up incoming data. Mistakes in input handling often become
+    security vulnerabilities, which can be exploited.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe involves the configuration of an Apache web server. Information
+    about installing and configuring Apache can be found in [Chapter 8](ch08.html
+    "Chapter 8. Running an Apache Web Server"), *Running an Apache Web Server*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Checking what user and group Apache is running as
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The Apache web server accesses your system as a special user, usually called
+    `apache`, `www-data`, `wwwrun`, `httpd`, or something similar. In order to complete
+    this recipe, you''ll need to know the username and group of this Apache user.
+    This can be easily checked through Webmin, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Apache Webserver** | **Global configuration**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click on the **User and Group** icon. You will see the following screen:![Checking
+    what user and group Apache is running as](img/5849_11_01.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The Apache username will be displayed in the **Run as Unix user** field and
+    the group in the **Run as Unix group** field. Both values are set to `www-data`
+    in the preceding image. Make a note of your system's configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe will consist of two sections. First, we'll create a CGI script and
+    then the Apache configuration needed to display the web page it generates.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Follow these steps to create a CGI-compatible shell script:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create the directory that will contain your web-accessible CGI scripts, for
+    instance, in `/usr/lib/cgi-bin`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: It is not a good idea to store CGI scripts in the `DocumentRoot` directory from
+    which regular HTML pages are served. Incorrect configuration of the server could
+    expose the source code of your scripts, run scripts that should not be executed,
+    or make the directory writeable, which would constitute a serious security vulnerability.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Create a shell script file named `/usr/lib/cgi-bin/hello.sh`. Enter the following
+    code in this file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Set the group owner of the script to the name of the group that Apache runs
+    as. If Apache runs as `www-data` on your system, you can do this by executing
+    the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Allow the group read and execute privileges to the file, full access to the
+    owner, and no access to other users. You can do this by executing the following
+    command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Information about manipulating files and changing ownership and permissions
+    can be found in the *Manage files and directories on the server* recipe in [Chapter
+    6,](ch06.html "Chapter 6. Managing Files on Your System") *Managing Files on Your
+    System*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Follow these steps to create the Apache configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Apache Webserver**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click on the icon of the virtual server you wish to configure or click on **Default
+    Server**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click on the **CGI Programs** icon.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a CGI directory alias by setting the **From** value to `/cgi-bin/` and
+    the **To** value to `/usr/lib/cgi-bin/`:![How to do it...](img/5849_11_02.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Save** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Under **Create Per-Directory, Files or Location Options**, select **Directory**
+    and create a configuration for the path, `/usr/lib/cgi-bin`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the icon for the directory, `/usr/lib/cgi-bin`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Document Options** icon.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Under **Directory options**, choose **Selected below..**, set **Execute CGI
+    programs** to **Yes**, and set all other options to **No**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Under **Options file can override..**, set **Selected below...** and leave all
+    checkboxes unmarked. Consider the following screenshot:![How to do it...](img/5849_11_03.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Save** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Access Control** icon.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Under **Restrict access**, select **Allow then deny** and set only one entry,
+    as follows: **Action** to **Allow** and **Condition** to **All requests**. Consider
+    the following screenshot:![How to do it...](img/5849_11_04.jpg)'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Save** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: You may wish to restrict access to specific client IPs if the presented data
+    must not be made public. The location can also be protected with a password.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Click the **Apply Changes** link.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: To see the result, navigate to the URL, `http://your-server/cgi-bin/hello.sh`,
+    where `your-server` is the IP or domain name of your Apache server machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You should see a webpage with the words, **Hello World**, and the current date.
+    Your shell script executed by Apache through the common gateway interface generated
+    this text dynamically.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When a browser requests a URL with a path matching `/cgi-bin/hello.sh`, Apache
+    recognizes it as an alias to the script, `/usr/lib/cgi-bin/hello.sh`. Apache prepares
+    an execution environment in which various request parameters, such as HTTP headers
+    and the query string, are set as environment variables and then executes the script
+    in this environment. The body of the request is passed to the script over the
+    standard input stream.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The script we wrote creates the HTTP response, which will be sent back to the
+    browser. The response consists of two parts: headers and the response body. We
+    send only one header informing the browser that `Content-type` for our response
+    is `text/plain`. This tells the browser that the response should be displayed
+    as text rather than downloaded as a file. We then send an empty line to end the
+    headers section and proceed to send the response body, which consists of the words,
+    "Hello World!", and the current date.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The Apache configuration we created informs the server that all requests to
+    paths starting with `/cgi-bin/` should be treated as aliases to files in the directory,
+    `/usr/lib/cgi-bin/`. We also informed Apache to execute scripts found in the directory
+    and to allow access from all clients. This is equivalent to creating the following
+    configuration fragment:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: All CGI scripts must be executable and the Apache user must have the ability
+    to run them in order to use them. To achieve this, we gave the file to a group
+    that Apache belongs to and assigned read and execute permissions to this group.
+    Assigning permissions in this way allows Apache to run the script but not modify
+    it. If the Apache user were able to modify CGI scripts, a compromised server could
+    be used as a means of taking control of the server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Programs running over the CGI can output data as described earlier, but they
+    can also read incoming headers and content of submitted forms. The CGI protocol
+    was standardized and is described in the *RFC3875* document, which can be found
+    at [http://tools.ietf.org/html/rfc3875](http://tools.ietf.org/html/rfc3875).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Displaying incoming request headers
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Incoming HTTP request headers and many other useful pieces of information described
+    by the CGI protocol are available to the script as environment variables. In order
+    to display them, you could use the `printenv` command, as in the following script:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Displaying incoming request body
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The incoming request body (which contains, for example, values of `HTTP POST`
+    forms) is passed to the script over the standard input stream. In order to display
+    the body of the request, you could add the following code to your script:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We can also refer to the following sections:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The *Installing Apache on your system* recipe in [Chapter 8](ch08.html "Chapter 8. Running
+    an Apache Web Server"), *Running an Apache Web Server*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Creating a virtual host* recipe in [Chapter 8](ch08.html "Chapter 8. Running
+    an Apache Web Server"), *Running an Apache Web Server*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Setting options for directories, files, and locations* recipe in [Chapter
+    8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running an Apache Web
+    Server*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Installing PHP* recipe in this chapter
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Installing a Django-based application using mod_wsgi* recipe in this chapter
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Installing PHP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: PHP is currently among the most popular programming languages for the Web. Many
+    of the largest and most popular sites are powered by software written in PHP,
+    including Facebook, Yahoo!, Wikipedia, and Wordpress.com. PHP started as a set
+    of simple tools for designing dynamic personal home pages, but it quickly grew
+    in popularity and evolved into a modern, object-oriented programming language.
+    The open source community that grew around the language created many useful libraries
+    and added support for multiple platforms, databases, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: PHP is quite powerful, yet very easy to use. Deployment of a PHP application
+    usually boils down to placing source code files in a directory on a server. It's
+    also very easy to start programming with PHP—its code can be embedded directly
+    within standard HTML. PHP makes programming for the Web very simple by abstracting
+    away details of the HTTP protocol. For example, form values are available directly
+    as data structures inside scripts, simple functions allow headers to be read and
+    written, support for cookies and user sessions is built in, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: PHP's ease of use may in fact be too great as it has allowed many to develop
+    for the Web without fully understanding its underlying protocol. If you find a
+    PHP application ready to install on your server, make sure to read its reviews
+    to make sure it doesn't pose any serious security or stability issues.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we will demonstrate how to install PHP and then write and deploy
+    a simple Hello World script.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe involves the configuration of an Apache web server. Information
+    about installing and configuring Apache can be found in [Chapter 8](ch08.html
+    "Chapter 8. Running an Apache Web Server"), *Running an Apache Web Server*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Follow these steps to install PHP and verify that it works on your system:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Follow the instructions in the *Installing software packages* recipe in [Chapter
+    1](ch01.html "Chapter 1. Setting Up Your System"), *Setting Up Your System*, and
+    install the PHP package for your system. The package may simply be named `php`
+    or `php5`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Apache Webserver** | **Global configuration**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Configure Apache Modules** icon.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Mark the checkbox next to the `php5` module and click the **Enable Selected
+    Modules** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The **Configure Apache Modules** screen may not be present in your system. If
+    you installed PHP from a package, then in all likelihood, it enabled the module
+    for you already. Follow the rest of this recipe to test that.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Apache Webserver**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the icon of the virtual server you wish to configure, or the default server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Document Options** icon and note what the document root directory
+    of the server is.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a file named `hello.php` in the document root directory.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Enter the following code into this `hello.php` file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: To see the result, navigate to the URL, `http://your-server/hello.php`, where
+    `your-server` is the IP or domain name of your Apache server machine. You should
+    see a web page with the words **Hello World!** generated by PHP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If you end up seeing the PHP code instead of Hello World!, you will have to
+    enable the PHP module manually. Take a look at the *How it works section* for
+    information about instructions that you'll have to add to the Apache configuration
+    file, and read your package's documentation for directions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Practically all server OS distributions offer a PHP package for installation
+    from their repositories. There are a few different ways to install PHP, and it's
+    a good idea to install the standard system package as this will ensure that it
+    is optimized for your version of Apache and will be kept up to date by package
+    maintainers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Installation of the package not only places PHP executables and documentation
+    on your disk but also modifies configuration of the Apache web server. Introduced
+    changes include the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A line that loads the PHP interpreter module when Apache starts, such as this:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Lines that instruct Apache to pass PHP files to the interpreter, such as this:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Or
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'An instruction to use the `index.php` files for directory indexes:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We can also refer to the following sections.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The *Installing Apache on your system* recipe in [Chapter 8](ch08.html "Chapter 8. Running
+    an Apache Web Server"), *Running an Apache Web Server*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Creating a virtual host* recipe in [Chapter 8](ch08.html "Chapter 8. Running
+    an Apache Web Server"), *Running an Apache Web Server*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Setting options for directories, files, and locations* recipe in [Chapter
+    8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running an Apache Web
+    Server*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Changing PHP configuration settings* recipe in this chapter
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Viewing PHP error logs* recipe in this chapter
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Changing PHP configuration settings
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The PHP interpreter allows you to specify values of numerous settings, which
+    determine how PHP applications behave on your system. This configuration affects
+    how errors are logged or displayed, how input data is handled, what resources
+    are allocated to the interpreter, and settings for extension modules bundled with
+    PHP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'PHP''s configuration file is traditionally called `php.ini`, and its location
+    depends on your operating system distribution and version of PHP. Common locations
+    of the `php.ini` file include: `/etc/`, `/etc/php5/apache2/`, and `/usr/local/etc/`.
+    The `php.ini` file contains master setting values, but some settings may be overwritten
+    locally with a PHP script or Apache configuration for a directory.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we will demonstrate how to check values of currently used configuration
+    settings and how they can be modified.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Assuming you already have Apache and PHP installed, prepare a directory that
+    is exposed through the web server and ready to serve PHP scripts. We will refer
+    to this directory as the `DocumentRoot` directory in this recipe.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The first part of this recipe will check currently defined settings, which we
+    will then proceed to modify.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Follow these steps to check current PHP settings:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a file named `phpinfo.php` in the `DocumentRoot` directory of your web
+    server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Enter the following code into the `phpinfo.php` file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Navigate to the URL of the `phpinfo.php` file: `http://your-server/phpinfo.php`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Make a note of the location of the **Loaded Configuration File**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This informs us where the main PHP configuration file (`php.ini`) is located.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Make a note of the `memory_limit` value.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Note that there are two columns. They specify the local value and the master
+    value of this setting. The master value is specified in `php.ini`, but the local
+    value is currently in use. The local value may be different from the master value
+    if it is overridden. See the *There's more* section of this recipe.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Follow these steps to change the master PHP settings:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Find the location of the global PHP configuration (`php.ini`) file as described
+    earlier.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Others** | **PHP Configuration**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Manage** in the line corresponding to the global PHP configuration file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Resource Limits**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Change **Maximum memory allocation** to `260M`:![How to do it...](img/5849_11_08.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Apache Webserver**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Apply Changes** link.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate once again to the URL, `http://your-server/phpinfo.php`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Check the `memory_limit` value. Its master value should now be changed to `260M`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Leaving the `phpinfo.php` file on your server is a bad idea as it unnecessarily
+    exposes information about your system to the public. Delete the file when you're
+    done using it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Apache loads the global PHP configuration (`php.ini`) file every time the server
+    is started. In this recipe, we modified this file through Webmin. In particular,
+    we changed the line that determines how much memory the PHP interpreter will be
+    able to use to the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: After we modified the file, we went to Webmin's interface to apply the configuration
+    changes by restarting Apache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: PHP settings may be set locally in scripts and in Apache's per-directory configuration
+    files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Modifying PHP settings for a directory using .htaccess files
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'In order to modify PHP settings through `.htaccess` files, we must instruct
+    Apache to allow local option overrides for the directory that contains our PHP
+    script. Take a look at the *Setting options for directories, files, and locations*
+    recipe in [Chapter 8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running
+    an Apache Web Server*, for more information. Perform the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Apache Webserver**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the icon of the virtual server you wish to configure or the default server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click or create directory settings for the directory that contains your PHP
+    script.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Document Options**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the **Options file can override** section, mark **Selected below** and select
+    **Directory options**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'This is equivalent to adding the following line to Apache''s configuration
+    for the directory:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Click the **Save** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Apply Changes** link.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a file named `.htaccess` in the same directory.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Place the following instruction in the `.htaccess` file to locally change the
+    memory limit to 32MB:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The directive, `php_value`, is used to configure settings which accept parameter
+    values. Boolean parameters, which only accept the values on and off, are set with
+    the `php_flag` directive. More information can be found in PHP's online manual
+    at [http://php.net/manual/configuration.changes.php](http://php.net/manual/configuration.changes.php).
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Verify the change in local settings using the `phpinfo()` function, as described
+    earlier.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Modifying PHP settings dynamically inside script code
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Prepare a `phpinfo.php` file as described in this recipe, but add the following
+    code to it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Navigate to the URL of the `phpinfo.php` file to verify the change in local
+    settings.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Take a look at the *Setting options for directories, files, and locations* recipe
+    in [Chapter 8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running
+    an Apache Web Server*, for more information about changing Apache settings locally
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Displaying PHP errors while debugging
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: While writing code in PHP or installing a downloaded application, you may find
+    yourself staring at a blank browser screen with no hint as to why it isn't working
+    as expected. This is caused by the default PHP configuration that hides error
+    messages from prying eyes. Error messages could reveal information about your
+    server, so this is a good idea in production, but makes resolving problems more
+    difficult. During development, you can enable PHP's friendly error messages by
+    following this recipe.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Follow these steps to execute this recipe:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s start by writing a PHP script that will cause an error. The script could
+    contain the following broken code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Save the script to a file on your server and navigate to the file's public URL
+    on your web server. If error displaying is turned off, you should see a blank
+    screen.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Others** | **PHP Configuration**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Manage** in the line corresponding to the global PHP configuration file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Error Logging**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Display error messages?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Apache Webserver**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Apply Changes** link.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'After changing the setting, navigate to your broken script''s URL once again.
+    You should now see an error message like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Parse error: syntax error, unexpected ''!'' in /var/www/index.php on line
+    3**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: PHP's `display_errors` setting is responsible for whether the interpreter displays
+    error messages on the screen or hides them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this recipe, we enabled PHP''s error reporting globally by turning on the
+    `display_errors` configuration flag. To achieve this, we changed the `display_errors`
+    line in `php.ini` to the following and restarted Apache:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can also set the flag locally for a chosen directory by adding the following
+    line to a `.htaccess` file. Make sure that Apache allows local overrides in this
+    directory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: Don't use the `ini_set` function to turn on displaying errors, as some errors
+    will prevent the script from being parsed and the setting will not be able to
+    take effect.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The *Changing PHP configuration settings* recipe in this chapter
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Logging in PHP* recipe in this chapter
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Logging in PHP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Applications written in PHP generate log messages whenever an error occurs.
+    These messages may be saved to a log file, passed to syslog, or ignored, depending
+    on the configuration settings of the interpreter. Ignoring error messages is a
+    bad idea as it prevents you from detecting problems occurring on your server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the other hand, saving every message to a file can cause your logs to grow
+    very quickly, especially on high-traffic sites. Fortunately, PHP allows you to
+    configure which errors are logged quite precisely. All PHP errors are assigned
+    a level value; most severe errors are marked as `E_ERROR`, less severe as `E_WARNING`,
+    even less severe as `E_NOTICE`, and so on. A complete list of error levels can
+    be found in the PHP manual at [http://php.net/errorfunc.constants.php](http://php.net/errorfunc.constants.php).
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is recommended to log all errors during development, but in production, all
+    errors should be logged, except `E_DEPRECATED` (deprecation warnings) and `E_STRICT`
+    (code style suggestions). We will set this level of logging in this recipe.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: To complete this recipe, we will need to know what user and group Apache is
+    running as. You can find instructions on obtaining this information in the *Getting
+    ready* section of the *Generating dynamic pages using CGI* recipe of this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Instruct PHP to keep a log of error messages by following these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create an empty file to store your PHP error log in a location of your choosing,
+    for example, in `/var/log/php_errors.log`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Change the owner of the file to the Apache user. If your web server runs as
+    the `www-data` user, you can do this by issuing the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Information about manipulating files and changing ownership and permissions
+    can be found in the *Managing files and directories on the server* recipe in [Chapter
+    6](ch06.html "Chapter 6. Managing Files on Your System"), *Managing Files on Your
+    System*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Make sure that the owner (Apache) has write access to the file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Navigate to **Others** | **PHP Configuration**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Manage** in the line corresponding to the global PHP configuration file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Error Logging**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Display error messages?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Write error messages to log?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Expression for error types** to `E_ALL & ~E_DEPRECATED & ~E_STRICT`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Log file for errors** to **Other file** and enter `/var/log/php_errors.log`
+    in the text field, as shown in the following screenshot:![How to do it...](img/5849_11_09.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Apache Webserver**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Apply Changes** link.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: From now on, you should see error messages appear in PHP's log file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In order to enable PHP error logging, we set the following master values in
+    your `php.ini` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding settings turn on PHP's error logging (`log_errors`) and specify
+    which file the errors should be saved in (`error_log`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `error_reporting` instruction specifies which messages are saved and which
+    ones are ignored. This line accepts a complex syntax in which ampersand signs
+    (`&`) allow you to specify different levels of messages to log and tilde characters
+    (`~`) that negate a given class. This allows us to log errors of all levels (`E_ALL`),
+    but not deprecation warnings (`& ~E_DEPRECATED`) or style suggestions (`& ~E_STRICT`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Refer to the *Changing PHP configuration settings* recipe in this chapter for
+    more information about ways of changing the configuration of PHP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'PHP can also output error messages to the system log (syslog). If you wish
+    to use syslog, change the `error_log` line as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: PHP errors are output to the syslog facility named `user`, and unfortunately,
+    this cannot be changed through the PHP configuration at this time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Modern syslog implementations (such as rsyslog, syslog-ng) can filter messages
+    based on the command that generated them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Refer to the *Saving syslog messages to a file* recipe in [Chapter 5](ch05.html
+    "Chapter 5. Monitoring Your System"), *Monitoring Your System*, for more information
+    about syslog.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'For more information about using system logs, take a look at the following
+    recipes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The *Viewing and searching through system logfiles* recipe in [Chapter 5](ch05.html
+    "Chapter 5. Monitoring Your System"), *Monitoring Your System*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Adding other logfiles to Webmin* recipe in [Chapter 5](ch05.html "Chapter 5. Monitoring
+    Your System"), *Monitoring Your System*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The *Configuring logfile rotation* recipe in [Chapter 5](ch05.html "Chapter 5. Monitoring
+    Your System"), *Monitoring Your System*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Installing WordPress on your server
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: WordPress is a very popular open source blogging platform. The software is very
+    easy to use yet versatile enough to serve a variety of purposes, such as running
+    informational websites or even simple e-commerce shops. WordPress is written entirely
+    in PHP, which makes it quite easy to install.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This recipe pulls together strands from various preceding chapters. We will
+    demonstrate how to use the recipes provided in this book to set up a working web
+    server hosting a website powered by the WordPress blogging platform.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Package repositories of many operating system distributions host a package for
+    WordPress. You may choose to install the package if you don't intend to customize
+    your site or host multiple different versions of the software. Note that WordPress
+    may be updated more frequently than packages in your OS repository, which could
+    possibly lead you to use an insecure version of the software. Look for documentation
+    contained within the package for more information if you choose this route.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe is divided into a number of sections. We will prepare the server
+    first by installing the required software packages. You may skip these steps if
+    you have the software mentioned installed on your server already. We will then
+    create a MySQL database and user for our WordPress installation. Finally, we'll
+    create an Apache virtual host and install WordPress.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Please follow these steps to prepare the server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Install the Apache web server by following the *Installing Apache on your system*
+    recipe in [Chapter 8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running
+    an Apache Web Server*.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Install the MySQL database server by following the *Installing the MySQL database
+    server* recipe in [Chapter 9](ch09.html "Chapter 9. Running a MySQL Database Server"),
+    *Running a MySQL Database Server*.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Install PHP by following the *Installing PHP* recipe in this chapter.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In order for PHP applications to communicate with MySQL, you will need to install
+    an additional PHP module, which is available as a package on most OS distributions.
+    You can check to see if this module is already installed by looking at the output
+    of the `phpinfo()` function, as described in the *Changing PHP configuration settings*
+    recipe of this chapter. If you find an information section named **mysql**, then
+    the `php-mysql` module is installed.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Install the system package named `php-mysql`, `php5-mysql`, or something similar.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: More information about installing packages can be found in the *installing software
+    packages* recipe in [Chapter 1](ch01.html "Chapter 1. Setting Up Your System"),
+    *Setting Up Your System*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Install the `php-gd` module that allows PHP applications to manipulate graphic
+    images in common formats such as PNG and JPEG. Install a system package named
+    `php-gd`, `php5-gd`, or something similar.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Make sure that the rewrite module of Apache (`mod_rewrite`) is installed and
+    enabled. Take a look at the *Enabling Apache modules* recipe in [Chapter 8](ch08.html
+    "Chapter 8. Running an Apache Web Server"), *Running an Apache Web Server*, for
+    more information.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Creating a database
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'We will create a database and user named `wordpress`. You should probably use
+    a more informative name, especially if you plan to use more than one instance
+    of WordPress. Please follow these steps to create a database:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a new MySQL database and user, both named `wordpress`. The user should
+    use a strong password and be allowed to connect from the local machine (`localhost`).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Grant the `wordpress` user connecting from `localhost` all permissions on the
+    `wordpress` database.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Information about creating MySQL databases and granting permissions can be found
+    in the *Creating a new database* and *Creating users and granting permissions
+    to databases* recipes in [Chapter 9](ch09.html "Chapter 9. Running a MySQL Database
+    Server"), *Running a MySQL Database Server*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'If you are running a system with **Security Enhanced Linux** (**SELinux**),
+    you will have to allow Apache to connect to databases by setting the following
+    flag:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Creating a virtual host and installing WordPress
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'In order to create a virtual host and install WordPress, perform the following
+    steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Follow the *Creating a virtual host* recipe in [Chapter 8](ch08.html "Chapter 8. Running
+    an Apache Web Server"), *Running an Apache Web Server*, to create a website serving
+    files from the document root, `/var/www/blog.example.com`, with the server name,
+    `blog.example.com`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Download the latest version of WordPress from the following URL and extract
+    the archive into the `/var/www/blog.example.com` directory: [http://wordpress.org/latest.tar.gz](http://wordpress.org/latest.tar.gz)'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'When the extraction is complete, WordPress''s `index.php` file should have
+    the following path: `/var/www/blog.example.com/index.php`.'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Create an `.htaccess` file in the same directory and enter the following rewrite
+    rules to enable WordPress''s clean URLs:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Apache's virtual host or directory configuration must allow options to be overridden
+    by the `.htaccess` files (`AllowOverride All`). For more information, take a look
+    at the *Setting options for specific directories, files, and locations* recipe
+    in [Chapter 8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running
+    an Apache Web Server*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Navigate to the URL of your new WordPress site: `http://blog.example.com/`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: A setup screen will appear. Follow instructions there and enter the created
+    database name, username, and password, as shown in the following screenshot:![Creating
+    a virtual host and installing WordPress](img/5849_11_05.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: WordPress setup will generate the contents of a configuration file, which you
+    should save as `/var/www/blog.example.com/wp-config.php`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You can now navigate to the URL of your WordPress site and follow onscreen instructions
+    to finish setup and start using the site.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: WordPress uses technologies described throughout this book. In order to set
+    up our server for the application, we need to install Apache, MySQL, and PHP.
+    We also need a number of additional PHP modules to allow WordPress to communicate
+    with the database and manipulate image files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Every instance of WordPress requires access to a database. The table prefix
+    is added to the name of every database table, which allows multiple installations
+    of WordPress to share a single database. We left the prefix set at its default
+    value of `wp_`. Since we are running our own server, we can create as many databases
+    as we need; therefore, there is no need to share databases. In fact, we also created
+    a dedicated database user for this application with access to one database only.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The virtual host configuration we created allows us to run WordPress on one
+    subdomain (`blog.example.com`), leaving us free to run other software on the main
+    domain or other subdomains.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `.htaccess` file we created is designed to allow WordPress to use clean
+    URLs. Thanks to this function, pages may have URLs such as `http://blog.example.com/hello-world/`
+    instead of `http://blog.example.com/?p=1`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: More information about clean URLs, called permalinks in WordPress, is available
+    in its documentation at [http://codex.wordpress.org/Using_Permalinks](http://codex.wordpress.org/Using_Permalinks).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We finished the installation by allowing WordPress to create the contents of
+    its main configuration file (`wp-config.php`) for us. We needed to provide database
+    connection details into a form, and WordPress prepared the configuration file
+    itself. In addition to storing database connection details, the installer also
+    generated pseudo-random cryptographic salt strings, which help keep WordPress
+    secure. Salt strings are also stored in the configuration file and should be kept
+    secret and changed occasionally.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To keep the WordPress configuration file safe, make sure its permissions are
+    set correctly. It has to be readable for Apache, but not anyone else. Take a look
+    at the *Getting ready* section of the *Generating dynamic pages using CGI* recipe
+    in this chapter to find the name of the Apache user, as well as the *Managing
+    files and directories on the server* recipe in [Chapter 6](ch06.html "Chapter 6. Managing
+    Files on Your System"), *Managing Files on Your System*, for information about
+    setting permissions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Also, make sure that any backup copies of this file are stored in a safe way.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: More information about the process of installing WordPress can be found in its
+    manual at [http://codex.wordpress.org/Installing_WordPress](http://codex.wordpress.org/Installing_WordPress)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Installing Drupal on your server
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Drupal is a powerful open source **content management system** (**CMS**). It
+    is highly modular, which means it can be customized to perform nearly any task
+    by installation of additional plugins. Drupal is written entirely in PHP, which
+    makes it quite easy to install.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This recipe pulls together strands from various preceding chapters. We will
+    demonstrate how to use recipes provided in this book to set up a working web server
+    hosting a website powered by the Drupal CMS platform.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Package repositories of many operating system distributions host a package for
+    Drupal. You may choose to install the package if you don't intend to host multiple
+    different versions of the software. Note that Drupal may be updated more frequently
+    than packages in your OS repository, which could possibly lead to using an insecure
+    version of the software. Look for documentation contained within the package for
+    more information if you choose this route.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: To complete this recipe, we will need to know what user and group Apache is
+    running as. You can find instructions on obtaining this information in the *Getting
+    ready* section of the *Generating dynamic pages using CGI* recipe in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe is divided into a number of sections. We will prepare the server
+    first by installing required software packages. You may skip these steps if you
+    already have the software mentioned installed on your server. We will then create
+    a MySQL database and user for our Drupal installation. Finally, we'll create an
+    Apache virtual host and install Drupal.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Follow these steps to prepare the server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Install the Apache web server by following the *Installing Apache on your system*
+    recipe in [Chapter 8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running
+    an Apache Web Server*.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Install the MySQL database server by following the *Installing the MySQL database
+    server* recipe in [Chapter 9](ch09.html "Chapter 9. Running a MySQL Database Server"),
+    *Running a MySQL Database Server*.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Install PHP by following the *Installing PHP* recipe in this chapter.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In order for PHP applications to communicate with MySQL, you will need to install
+    an additional PHP module, which is available as a package on most OS distributions.
+    Install the system package named `php-mysql`, `php5-mysql`, or something similar.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: More information about installing packages can be found in the *Installing software
+    packages* recipe in [Chapter 1](ch01.html "Chapter 1. Setting Up Your System"),
+    *Setting Up Your System*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Install the `php-gd` module that allows PHP applications to manipulate graphic
+    images in common formats such as PNG and JPEG. Install a system package named
+    `php-gd`, `php5-gd`, or something similar.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Make sure that the rewrite module of Apache (`mod_rewrite`) is installed and
+    enabled. Take a look at the *Enabling Apache modules* recipe in [Chapter 8](ch08.html
+    "Chapter 8. Running an Apache Web Server"), *Running an Apache Web Server*, for
+    more information.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Creating a database
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'We will create a database and user named `drupal`. You should probably use
+    a more informative name, especially if you plan to use more than one instance
+    of Drupal. Please follow these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a new MySQL database and user, both named `drupal`. The user should use
+    a strong password and be allowed to connect from the local machine (`localhost`).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Grant the `drupal` user connecting from `localhost` all permissions on the `drupal`
+    database.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Information about creating MySQL databases and granting permissions can be found
+    in the *Creating a new database* and *Creating users and granting permissions
+    to databases* recipes in [Chapter 9](ch09.html "Chapter 9. Running a MySQL Database
+    Server"), *Running a MySQL Database Server*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'If you are running a system with **Security Enhanced Linux** (**SELinux**),
+    you will have to allow Apache to connect to databases by setting the following
+    flag:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Creating a virtual host and installing WordPress
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Follow these steps to create a virtual host and install Drupal:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Follow the *Creating a virtual host* recipe in [Chapter 8](ch08.html "Chapter 8. Running
+    an Apache Web Server"), *Running an Apache Web Server*, to create a website serving
+    files from the document root, `/var/www/cms.example.com`, with the server name,
+    `cms.example.com`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Find and download the latest version of WordPress from the following URL and
+    extract the archive into the `/var/www/cms.example.com` directory: [https://drupal.org/download](https://drupal.org/download).'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'When the extraction is complete, Drupal''s `index.php` file should have this
+    path: `/var/www/cms.example.com/index.php`.'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Drupal comes bundled with an `.htaccess` file. Make sure that the file was properly
+    extracted to `/var/www/cms.example.com/.htaccess`.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Apache's virtual host or directory configuration must allow options to be overridden
+    by `.htaccess` files (`AllowOverride All`). For more information, take a look
+    at the *Setting options for specific directories, files, and locations* recipe
+    in [Chapter 8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running
+    an Apache Web Server*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Create a directory (`sites/default/files`) in which Drupal will store uploaded
+    and temporary files. The directory is relative to the root Drupal directory, so
+    its full path in our case would be `/var/www/cms.example.com/sites/default/files`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Change the owner of the `sites/default/files` directory to the Apache user and
+    make sure the owner has read and write permissions for the directory.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Information about manipulating files and changing ownership and permissions
+    can be found in the *Managing files and directories on the server* recipe in [Chapter
+    6](ch06.html "Chapter 6. Managing Files on Your System"), *Managing Files on Your
+    System*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Create Drupal's configuration file in `sites/default/settings.php` by making
+    a copy of the default settings file, `sites/default/default.settings.php`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Temporarily allow all users to write to the `settings.php` file by changing
+    its permissions to `666`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Visit the URL of your new Drupal site: `http://cms.example.com/`.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: A setup screen will appear. Follow the instructions on this screen and enter
+    the created database, username, and password.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When the installer is finished modifying your settings file, it will inform
+    you that you should now change permissions to remove write access to the `settings.php`
+    file:![Creating a virtual host and installing WordPress](img/5849_11_06.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You can now navigate to the URL of your Drupal site and follow onscreen instructions
+    to finish setup and start using the site.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Drupal uses technologies described throughout this book. In order to set up
+    our server for the application, we need to install Apache, MySQL, and PHP. We
+    also need a number of additional PHP modules to allow Drupal to communicate with
+    the database and manipulate image files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After the initial server setup was complete, we created a virtual host, which
+    allows us to run a Drupal site on a subdomain (`cms.example.com`), leaving us
+    free to run other software on the main domain or other subdomains.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With everything prepared, we copied Drupal files to the domain directory, created
+    the files and folder that Drupal needs for installation, and then allowed Drupal's
+    installer to guide us through the remaining steps. Drupal filled its settings
+    file with the information necessary to connect to the database and initialized
+    the website. After installation, it's important to remove write permissions from
+    the settings file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: More information about the process of installing Drupal can be found in its
+    manual at [https://drupal.org/documentation/install](https://drupal.org/documentation/install)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Installing a Django-based application using mod_wsgi
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Django is a versatile web development framework written in the Python programming
+    language. The framework allows for rapid development while encouraging good coding
+    practices. Applications written in Django can be hosted on Apache with the use
+    of the `mod_wsgi` module.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This recipe will demonstrate how to set up your server to host a Django application.
+    Other Python applications supporting `mod_wsgi` can be set up in a similar fashion.
+    This includes applications such as MoinMoin, PyBlosxom, Trac, and other frameworks
+    such as CherryPy, Pylons, TurboGears, Pyramid, web.py, Werkzeug, Web2Py, and Zope.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Install the Apache web server by following the *Installing Apache on your system*
+    recipe in [Chapter 8](ch08.html "Chapter 8. Running an Apache Web Server"), *Running
+    an Apache Web Server*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Install Python Version 2.7 using a system package. The package will be named
+    `python`, `python2.7`, `python-2.7`, or something similar.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: As of Version 1.5, Django supports Python 3, and setup is the same as in the
+    newer version. You just need to substitute Python 2.7 with Python 3, and packages
+    for `pip` and `mod_wsgi` with their Python 3 equivalents.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Install `pip`—the Python package installer—from a system package. The package
+    will be named `python-pip` or something similar.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: On some systems, you may need to add an additional repository to install the
+    package. For instance, if you're running a Linux distribution from the RedHat
+    family (RHEL, CentOS, Fedora, and so on), you should add the **Extra Packages
+    for Enterprise Linux** (**EPEL**) repository. Information about setting up EPEL
+    can be found in the *Giving users access to your server via FTP* recipe in [Chapter
+    6](ch06.html "Chapter 6. Managing Files on Your System"), *Managing Files on Your
+    System*.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Install `mod_wsgi`, a module that enables Apache to host Python applications,
+    from a system package. The package will be named `mod_wsgi`, `apache2-mod_wsgi`,
+    `libapache2-mod-wsgi`, or something similar.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Follow the steps in the *Enabling Apache modules* recipe in [Chapter 8](ch08.html
+    "Chapter 8. Running an Apache Web Server"), *Running an Apache Web Server*, to
+    enable the `mod_wsgi` module (`wsgi`).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Install Django using `pip` by issuing the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'You can modify the preceding command to install a particular version of Django.
+    For instance, to install Django 1.6.2, use the following command:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Make a directory for web applications in `/srv/webapps/`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Create a project structure for your application by issuing the following command.
+    This will create a directory in `/srv/webapps/hello` to store your application.
+    Execute the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Instead of starting a new project in `hello`, you can upload a Django application
+    to another directory. Make a note of the application path and substitute it for
+    `/srv/webapps/hello` in subsequent steps.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Make directories for static and media files used by your application, for instance,
+    in `/srv/webapps/hello/static/` and `/srv/webapps/hello/media/`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In Webmin, navigate to **Servers** | **Apache Webserver** and click **Create
+    virtual host**. You don't need to specify a document root; just set **Server Name**
+    to `hello.example.com`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: More information about setting up virtual servers can be found in the *Createing
+    virtual host* recipe in [Chapter 8](ch08.html "Chapter 8. Running an Apache Web
+    Server"), *Running an Apache Web Server*. This recipe also explains how to set
+    up a mock DNS record in `/etc/hosts` if you don't have another way to point subdomains
+    to your server.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Click the icon for the newly created virtual server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Edit Directives** icon.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Enter the following configuration directives in the text area and click **Save**:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Consider the following screenshot:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '![How to do it...](img/5849_11_07.jpg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: Click the **Apply Changes** link.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Now, when you navigate to [http://hello.example.com](http://hello.example.com),
+    you should be greeted by Django's welcome screen served by Apache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'If you''re using SELinux, you may run into problems because the location `/srv/webapps`
+    is not accessible to Apache. Disable SELinux temporarily to see if that solves
+    your problem, and then refer to the following documentation page for information
+    on how to fix the issue:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[https://code.google.com/p/modwsgi/wiki/ApplicationIssues#Secure_Variants_Of_UNIX](https://code.google.com/p/modwsgi/wiki/ApplicationIssues#Secure_Variants_Of_UNIX)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '**Web Server Gateway Interface** (**WSGI**) is a low-level interface between
+    web servers and web applications or frameworks written in Python. Apache is able
+    to serve such applications through a module named `mod_wsgi`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The configuration we created instructs Apache to create a number of daemon processes
+    (`processes=3`) that reside in memory ready to process HTTP requests coming from
+    the web server. The number of processes and threads started within each process
+    determines how much of the system's resources are assigned to the application,
+    which in turn decides how many requests it can handle simultaneously. These parameters
+    should be tweaked to your specific needs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `python-path` parameter tells Python where it can find additional application
+    modules. Our application is placed in `/srv/webapps/hello/`, which is not on the
+    standard list of places Python searches when it looks for modules; therefore,
+    we specify its location explicitly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `WSGIScriptAlias` directive instructs Apache to serve all requests coming
+    in to the root URL of the domain (`/`) to be handled by Django. `Alias` directives
+    instruct Apache that requests to places such as `/static/` should be served directly
+    from disk. You can combine the `Alias` and `WSGIScriptAlias` directives to specify
+    which parts of a domain are served by an application and which parts Apache should
+    serve directly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: More information about serving Django through mod_wsgi can be found in its manual
+    at [https://docs.djangoproject.com/en/dev/howto/deployment/wsgi/modwsgi/](https://docs.djangoproject.com/en/dev/howto/deployment/wsgi/modwsgi/).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Even more detailed information can be found in the `mod_wsgi` documentation
+    at [https://code.google.com/p/modwsgi/wiki/InstallationInstructions](https://code.google.com/p/modwsgi/wiki/InstallationInstructions).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

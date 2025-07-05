@@ -1,0 +1,1096 @@
+- en: Chapter 6. Setting Up Separate Roles
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Managing SELinux users
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Mapping Linux users to SELinux users
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Running commands in a specified role with sudo
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Running commands in a specified role with runcon
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Switching roles
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a new role
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Initial role based on entry
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Defining role transitions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Looking into access privileges
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Roles provide a flexible, manageable approach to grant multiple users the proper
+    rights. Instead of assigning privileges to individual users, roles are created
+    to which privileges are granted. Users are then granted the role and inherit the
+    privileges associated with this role.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In SELinux, roles are used to grant access to domains. An application domain
+    that is used to manage certificates on a system is assigned to one or more roles,
+    thus allowing users with that role to possibly transition into that application
+    domain. If the user role does not have this privilege, then the necessary permissions
+    to manage certificates through that application domain are not accessible for
+    the user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram shows the relation between Linux logins (regular Linux
+    accounts), SELinux users, SELinux roles, and SELinux domains:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Introduction](img/9669OS_06_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: To assign roles to users, Linux accounts are first mapped to an SELinux user.
+    An SELinux user defines which roles are accessible (as users can have multiple
+    roles assigned) as well as which security clearance the user can have at most
+    (although lower security clearances can be assigned to users individually as well).
+  prefs: []
+  type: TYPE_NORMAL
+- en: On systems where SELinux is primarily meant to confine network-facing services
+    and not the users, this chapter will have little value. All users on these systems
+    are mapped to the `unconfined_u` SELinux user, which has a default user domain
+    of `unconfined_t` and is meant to be almost unrestricted—hence, the name, unconfined.
+    When this is applicable, most distributions call the SELinux policy store **targeted**
+    to reflect that the confinement is targeting specific applications and not the
+    entire system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Managing SELinux users
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In order to grant a Linux login the right set of roles, we first need to create
+    an SELinux user that has just those roles assigned. Existing SELinux users can
+    be modified easily, and if an SELinux user was added previously, it can be removed
+    from the system as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Managing SELinux users is done as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Use `semanage user` to list the currently available SELinux users:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'If no SELinux user exists yet, with the right set of roles, create it with
+    `semanage user`. For instance, to create a database administration SELinux user,
+    run the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Existing users can be modified as follows:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'An SELinux user can also be removed from the system:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When an SELinux user is created, SELinux will update its configuration files
+    at `/etc/selinux/` to include support for this SELinux user. It is a general best
+    practice to name SELinux users after their functional purpose, so a **database
+    administrator** (**DBA**) is called `dbadm_u`, whereas a website administrator
+    is called `webadm_u`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The set of roles that are available to the administrator can be obtained using
+    `seinfo`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Existing SELinux users can be modified. However, it is important that logged-in
+    users are logged out (and perhaps temporarily locked) from the system during the
+    change. Otherwise, the SELinux policy could suddenly mark their session as having
+    an invalid context and interrupt those users in their operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When an SELinux user is removed from the system, it is also important that all
+    the remaining files that have this SELinux user in their context are relabeled.
+    Otherwise, these files (and other resources) are labeled with an invalid context,
+    making the files and resources inaccessible to others.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once an SELinux user is created, it is ready to be assigned to one or more Linux
+    users.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'With SELinux users, MLS settings can be provided as well. For instance, to
+    set a specific security clearance, the following command is used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: For an SELinux user, this is the upper limit of the security clearance that
+    a users' context can be in. When we assign users to an SELinux user, it is possible
+    to force a lower security clearance individually so that there is no need to create
+    separate SELinux users for every difference in security clearance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Mapping Linux users to SELinux users
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: With the SELinux users available, we can now map Linux users to SELinux users.
+    This will ensure that the users, when logged in to the system, are assigned a
+    default context aligned with this SELinux user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In order to map Linux users to SELinux users, the following steps can be taken:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'List the existing mappings with `semanage login`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'For an individual user account, map the account to an SELinux user with `semanage
+    login`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'It is also possible to assign a group of users to an SELinux user through their
+    primary Linux group. For instance, if a `dba` group exists, it can be assigned
+    to an SELinux user as follows:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Mappings can be modified easily:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'If a mapping is no longer needed, it can be removed as well:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `semanage login` application manages the `seusers` file in `/etc/selinux/`.
+    This file is used by SELinux's `pam_selinux.so` authentication library that is
+    called when a user logs in to a system. Upon invocation, SELinux will check the
+    `seusers` file to see which SELinux user a Linux account is mapped to. It will
+    then perform an SELinux context switch so that the rest of the login process (including
+    the shell or graphical environment that is launched) will have the right SELinux
+    context assigned to it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Creating login mappings does not influence the existing sessions, so if a user
+    is already logged in, it is wise to have the user log out first. Also, any files
+    created by the user in the past might have a wrong SELinux user associated with
+    them. Any login that isn''t specifically mentioned will be assigned a default
+    SELinux user. If the SELinux user changes, then the files owned by this Linux
+    login will suddenly have a wrong SELinux user set. If the user-based access control
+    feature in SELinux is enabled, then these files will not be accessible anymore
+    by the user. In this case, the administrator will need to relabel the files forcefully
+    (which includes resetting the SELinux user):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: In case of both user mappings and group-based mappings, the first mapping that
+    is mentioned in the `seusers` file that matches a particular login is used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When a user logs in and no mapping matches the login itself (either through
+    a direct match against a Linux account name or through a group membership), then
+    SELinux will look at the login mapping for the `__default__` user. This is a special
+    rule that acts as a fallback rule. On systems with unconfined users, the `__default__`
+    user is usually mapped to the `unconfined_u` SELinux user. On systems without
+    unconfined users, `__default__` usually maps to the (unprivileged) `user_u` SELinux
+    user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Running commands in a specified role with sudo
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When a user has been assigned multiple roles, they usually work with their primary
+    role (such as `staff_r`) and only selectively execute commands with the other
+    role. This can be accomplished through the `sudo` command, as these commands usually
+    also require a different Linux user (which can be `root` or the `postgresql` account
+    for DBA tasks on the PostgreSQL database server).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In order to configure `sudo` to perform the right role and type transition,
+    execute the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Open up the `sudoers` file through `visudo`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Define the commands that the user(s) are allowed to execute. For instance,
+    to allow all users in the `dba` group to call `initdb` in the `dbadm_r` role,
+    define the commands as follows:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'The users in the `dba` group can now call `initdb`, and `sudo` will automatically
+    switch to the `dbadm_r` role and the `dbadm_t` user domain when `initdb` is called:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The regular user domains that users run with are, by default, not that privileged.
+    Although it is possible to extend the privileges of the role and user domains
+    directly, the best segregation is provided through different roles. Such an approach
+    allows unprivileged user domains, such as `staff_t`, to be used by multiple, different
+    organizational roles (and thus, SELinux users).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once a privileged command needs to be executed, users will need to switch their
+    active role. If this is only needed for a small set of commands, which also require
+    switching the Linux user itself (such as switching to the `postgres` runtime account),
+    then privilege delegation tools such as `sudo` are often used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `sudo` command is an SELinux-aware application that can be configured to
+    assist in switching the SELinux context as well. This can be done through the
+    command line directly if the user wants:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: However, most administrators will want to configure this in the `sudoers` file.
+    This is more user friendly as the end user does not need to continuously pass
+    the role and type parts of the context in which commands need to be executed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Of course, this requires that the SELinux user that is calling `sudo` has the
+    privilege to run commands in the `dbadm_r` role. If not, then even if the `sudoers`
+    file mentions that the user can execute the command, the transition (and thus,
+    the command) will fail, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'For more information on `sudo` and the `sudoers` file, check out their associated
+    manual pages:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: The main project site for the `sudo` application is at [https://www.sudo.ws](https://www.sudo.ws).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Running commands in a specified role with runcon
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Using `sudo` is not mandatory. SELinux also provides a command called `runcon`
+    that allows users to run a command in a different context. Of course, SELinux
+    restrictions still apply—the user must have the proper privileges to execute commands
+    with a different context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Running a command using a specified role and type is done by completing the
+    following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Identify the domain in which the command should run, usually by checking the
+    executables'' context and searching for the `entrypoint` definition:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Call the command, passing along the role and target type:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The `runcon` application tells SELinux that the invocation of the command should
+    result in a type and role transition towards the specified type (`auditctl_t`)
+    and role (`secadm_r`). SELinux will perform multiple checks and validations before
+    this will actually succeed. These checks are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Does the current user have the right to execute `auditctl` (execute rights on
+    `auditctl_exec_t`)?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Is a role switch from the current role (say `staff_r`) to the new role (`secadm_r`)
+    allowed?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Is there a policy in place that allows transition from the current type (say
+    `staff_t`) to the selected type (`auditctl_t`)?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Is `auditctl_t` a valid target domain if the executed file is `auditctl_exec_t`
+    (which is the `entrypoint` check)?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Is the target context (such as `staff_u:secadm_r:auditctl_t`) a valid context
+    (which implies that the current SELinux user has access to the given role)?
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `runcon` application can be used when no Linux user transition needs to
+    occur (although this doesn't exclude the use of `sudo`). In the example of `auditctl`,
+    this means that the regular access controls on Linux still apply—if the current
+    user does not have the rights to access the files used by `auditctl`, then using
+    `runcon` will not suffice.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Switching roles
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When a role transition is needed for more than just a couple of commands, it
+    is necessary to open a shell with the new role. This will ensure that the entire
+    session is now running with the new role assigned to it. Every activity performed
+    from within this session will then run with the target role.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Switching roles with `sudo` or `newrole` is done as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Switching a role can be done using `sudo -i` or `sudo -s` if allowed by the
+    `sudoers` file. If the `ROLE` and `TYPE` attributes are set, then the target shell
+    will have the proper context assigned:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Switching roles can also be done using `newrole`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Getting a shell after switching roles is not all that different from executing
+    commands. However, the SELinux policy might not allow running shells and regular
+    binaries in the target domain. For instance, a user who is allowed the `puppetca_t`
+    domain through some role will not be able to run a shell in this domain, as `puppetca_t`
+    is not allowed to be used through a shell—it is a domain for a particular set
+    of commands.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Most user roles have a default user domain associated with them. The default
+    user domain for a `dbadm_r` role is `dbadm_t`; the default domain for a `webadm_r`
+    role is `webadm_t`. These user domains do have the privileges to be used through
+    a shell.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `newrole` command only requires the target role, as it will check the default
+    type of a role (which is documented in the `default_type` file inside `/etc/selinux/mcs/contexts/`)
+    and use this as the target type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a new role
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Roles are part of SELinux policies. In order to create a new role, it isn't
+    possible to just invoke a few `semanage` commands. Instead, an SELinux policy
+    module will need to be created.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The SELinux policy needs to be updated in order to create a new role. The following
+    steps can be used to do just that:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a new policy module named after the role to be created, such as `pgsqladm`
+    (for a PostgreSQL administration role).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In the policy module, call the `userdom_login_user_template` interface:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Assign the proper privileges to the `pgsqladm_r` role and `pgsqladm_t` type:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Edit the `default_type` file in `/etc/selinux/mcs/contexts/` to make `pgsqladm_t`
+    the default type for the `pgsqladm_r` role:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Edit the `default_contexts` file in `/etc/selinux/mcs/contexts/` to inform
+    the system to which types a transition has to be made when a user switch is triggered
+    by an application. For instance, for a local login session, the following code
+    can be used for this purpose:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Now, build and load the policy, and verify that the new role is available:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Creating new roles for an SELinux system requires changes on multiple levels.
+    Updating the SELinux policy is just one of these.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Defining a role in the policy
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The first step is to create a new role and user domain through the SELinux
+    policy. There are a couple of templates available in the reference policy to easily
+    build new roles. The relation between these templates is visualized in the following
+    diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Defining a role in the policy](img/9669OS_06_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The various blocks in the diagram represent the following templates:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In `userdom_base_user_template`, the basic rules and privileges for roles and
+    user domains are documented, regardless of their future use. If a role needs to
+    be declared with an absolute minimum of privileges, the use of this template is
+    preferred.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Inside `userdom_login_user_template`, `userdom_base_user_template` is called
+    and extended with privileges related to interactive logins. When a role is created
+    that is meant to be logged on directly (without the need to call `newrole` or
+    `sudo`), then this interface is needed.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Within `userdom_restricted_user_template`, the `userdom_login_user_template`
+    interface is called, but the user domain is also associated with the `unpriv_userdomain`
+    attribute, meant for end user domains that have little security impact on the
+    system.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `userdom_common_user_template` interface adds privileges and rules that
+    are common for both unprivileged and privileged roles.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `userdom_unpriv_user_template` interface calls both `userdom_common_user_template`
+    and `userdom_restricted_user_template` and is meant to declare unprivileged roles
+    and user domains with interactive logon and general system access.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `userdom_admin_user_template` interface calls both `userdom_common_user_template`
+    and `userdom_login_user_template`, and creates a role and user domain that is
+    meant to be used for administrative purposes.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Whenever such an appropriate interface is called, the proper role and type is
+    created and can be used in the remainder of the policy module.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Extending the role privileges
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In the example, we assigned PostgreSQL administrative rights to the `pgsqladm_t`
+    user domain and allowed the `pgsqladm_r` role the proper PostgreSQL domains (if
+    any).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The reference policy tends to provide two types of interfaces that can be assigned
+    to new roles:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Administrative roles, whose interface name usually ends with `_admin`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: End user roles, whose interface name usually ends with `_role` or `_run`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Administrative roles allow for rights on all resources related to a particular
+    domain. In case of the `postgresql_admin` interface, the role and user domain
+    (which are passed on to the interface) are allowed to send signals to the PostgreSQL
+    services, execute the `init` script (to launch or shut down the service), and
+    manage the various resources of the domain (such as the database files, configuration
+    files, and logs).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Services almost always have an `_admin` interface. These are called after the
+    domain, such as `puppet_admin` for Puppet administration and `samba_admin` for
+    Samba administration. Sometimes, an SELinux policy module has multiple administrative
+    interfaces when there are different domains involved. An example would be the
+    `logging_admin_audit` and `logging_admin_syslog` interfaces, as both auditing
+    and system logging are provided by the same SELinux policy module, but the administration
+    of these two services can be segregated.
+  prefs: []
+  type: TYPE_NORMAL
+- en: End user roles allow the user to execute client applications or interact with
+    services. Such interfaces, such as `puppet_run_puppetca` (which allows a user
+    domain to run the `puppetca` application and transition to it) and `openvpn_run`
+    (which allows users to run OpenVPN services), can still be somewhat administrative
+    in nature, so make sure to validate the content of the interface. However, most
+    of the time, this is governed through the application side and not infrastructure
+    side—being able to launch VPN services does not mean that the user can manipulate
+    routing tables as they see fit, even though the VPN service domain (`openvpn_t`)
+    can.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is important to review the interfaces before blindly granting them to new
+    roles and users. In case of PostgreSQL, the `postgresql_role` role, for instance,
+    does not allow the user to interact with the PostgreSQL service; instead, the
+    interface is used to support SEPostgreSQL (SELinux-enabled PostgreSQL), which
+    provides additional access controls in PostgreSQL based on SELinux policies. When
+    users are assigned the `postgresql_role` role, they are granted basic privileges
+    inside a PostgreSQL environment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To allow users to interact with PostgreSQL, the `postgresql_stream_connect`
+    and `postgresql_tcp_connect` interfaces can be used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Default types and default contexts
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The `default_types` file informs SELinux what the default type is if no context
+    is specified otherwise, and it is used by commands such as `newrole` to know what
+    the default type is for a user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `default_contexts` file (which can be overridden through SELinux user-specific
+    files in the `users/` subdirectory) informs the SELinux libraries and subsystem
+    what specific SELinux type to transition to when a user and role switch has occurred
+    from within a specified domain. For instance, a `cron` daemon runs in the `system_r:crond_t`
+    context, but when it executes the user `cron` jobs, these jobs themselves need
+    to run in a different SELinux role and SELinux type. The following `default_contexts`
+    configuration snippet would have the jobs of a user (whose role is `pgsqladm_r`)
+    run as `cronjob_t` (rather than `pgsqladm_t`):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: These files are generated as part of the base policy. Sadly, there are no `default_types.local`
+    or `default_contexts.local` files that can be used to provide system-specific
+    changes. As a result, updates on the base SELinux policy might overwrite these
+    files depending on how the Linux distribution treats these files. If the files
+    are seen as configuration files (such as with Gentoo Linux), then they are not
+    altered by system updates; instead, the system administrator is informed that
+    an update on these files might be needed, keeping the manual changes made by the
+    administrator in the past.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Initial role based on entry
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Users will often have multiple roles associated with them. Depending on how
+    they interact with the system, a different initial role (and a user domain) might
+    be needed. Consider a user who interacts with a system locally (through the console),
+    remotely through SSH (for administrative purposes), and through FTP (as an end
+    user), as depicted in the following diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Initial role based on entry](img/9669OS_06_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: We want to make sure that the default role in which the user session starts
+    on the system depends on the entry point on the system. Direct console logon can
+    be in the administrative role, `sysadm_r`, whereas remote logon is first in the
+    `staff_r` role (to ensure a stolen SSH key cannot be used to perform administrative
+    tasks on the system without knowing the users' system password). The use of the
+    FTP server should result in an unprivileged role, `ftp_shell_r`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The `ftp_shell_r` role is a nondefault role and will not be available by default.
+    Using SELinux with an FTP server in this setup requires that the FTP server is
+    either SELinux aware (and supports context transitions) or uses PAM for its authentication
+    rather than internal user accounts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To configure the role to be used when a user logs on or starts a session, execute
+    the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First of all, make sure that the user is assigned the various roles:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Edit the `default_contexts` file by reordering the contexts, making sure that
+    the right role is always mentioned before the others (or that the others are not
+    mentioned at all):'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Check whether the domains have support for specific Booleans that explicitly
+    enable or disable transitioning into particular domains. For instance, consider
+    the SSH daemon:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'When applications call PAM to set up the user context, the PAM configuration
+    will invoke methods provided by the `pam_selinux.so` file. These methods will
+    check the `default_contexts` file to see what the context should be for a user.
+    When `pam_selinux.so` is loaded through a daemon in the `system_r:sshd_t` context,
+    for instance, then the lines for that particular daemon are interpreted:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: For the given user, the set of supported roles is obtained. In our case, this
+    is `staff_r sysadm_r ftp_shell_r`. The entries in the `default_contexts` file
+    are then looked at one by one, and the first role that is mentioned in the `default_contexts`
+    file, that is also an allowed role for the user, will be used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the given example, as `user_r` is not an allowed role, `staff_r` is the next
+    one on the list. This role is allowed, so when the user logs on through SSH, then
+    its default role will be the `staff_r` role (and its associated user domain will
+    be `staff_t`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Some domains are also configured to allow or disallow direct logins into administrative
+    roles. The SSH policy, for instance, uses an SELinux Boolean called `ssh_sysadm_login`,
+    which allows transitioning into any user (`ssh_sysadm_login=on`) or only to unprivileged
+    users (`ssh_sysadm_login=off`), specified policy-wise as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: A similar approach can easily be built into custom policies. Note that the use
+    of `userdom_spec_domtrans_unpriv_users` will only allow using the daemon for roles
+    and types created through `userdom_unpriv_user_template`, as this interface assigns
+    the `unpriv_userdomain` attribute that is used by the `userdom_spec_domtrans_unpriv_users`
+    interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Defining role transitions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: It is possible to have SELinux automatically switch roles when a certain application
+    is executed. The usual checks still apply (such as if the role is a valid one
+    for the user, does the current user domain have execute rights, and many more),
+    but then, there is no longer a need to call `runcon` or `sudo` to switch the role.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Role transitions can be configured as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Identify the executable type on which a role transition has to occur:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In the SELinux policy, create an interface that includes the role transitions:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Assign the newly created interface to the user:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The first rule that is activated is a role-allow rule. Such a rule tells SELinux
+    what role switch is allowed and in which direction. The set of allowed role switches
+    can be queried using `sesearch`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Consider the following role-allow rule(s) for the `puppetadm_r` role:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, *only* the `staff_r` role is allowed to switch to the `puppetadm_r`
+    role. Switching from the `puppetadm_r` role back to the `staff_r` role is not
+    allowed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The second rule tells SELinux that if a `puppetca_exec_t` labeled file is executed
+    by the selected role (`staff_r`, in our case), then the role should switch to
+    `puppetadm_r`. Of course, this is only done when the SELinux user is allowed the
+    target role.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The third rule will perform a domain transition from `staff_t` to `puppetca_t`
+    if `staff_t` executes a `puppetca_exec_t` labeled file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It should be noted though that a forced role transition (that is, through the
+    SELinux policy) is not a preferred method in the majority of cases, as it doesn't
+    provide any flexibility to the administrator. If this is implemented, then using
+    multiple roles is more difficult as some domains are hardcoded to a particular
+    role.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Looking into access privileges
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: To finish off, let's look at how to verify access privileges granted to users.
+    Specifying roles and privileges allows users to do their job, but from a security
+    point of view, it is also important to verify if (and which) users can manipulate
+    certain resources. Auditors will want to have an overview of who is able to, say,
+    manipulate SELinux policies or read private keys.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To properly investigate access rights, the following approach can help in identifying
+    users (and processes) that have the permissions we want to be informed about:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Verify file permissions that are not related to SELinux.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Verify direct access to the resource (such as read rights on private keys).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Look at who (users or applications) has the right to manipulate the SELinux
+    policy.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Check users and domains that are granted direct access to filesystems and raw
+    devices.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: See when memory can be accessed directly.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Review who can update authentication files.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Analyze who can boot the system.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Reviewing access is a lengthy process. It isn't sufficient to just look into
+    file ownership (user and group) and look at the permissions of the file to find
+    out who is actually able to read or modify the file (assuming that the privilege
+    looked into is file access). Privilege delegation tools such as `sudo` (through
+    the `sudoers` file or the `sudo` configuration in an LDAP server) need to be checked
+    as well, together with the `setuid` application access, backup file access (when
+    read access is to be examined), and more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the mandatory access controls that SELinux provides, checking the policy
+    for access rights is an important part of such an evaluation. The `sesearch` application
+    can assist in this quest.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Direct access inspection
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To check direct access, we need to query both the access rights (such as write
+    privileges on the resource) as well as relabeling rights. After all, a domain
+    that is allowed to change the SELinux context of a file to another resource can
+    theoretically switch the context, modify the file, and reset the context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This code shows not only the user domains that have the privileges, but also
+    the application domains. In a review of permissions, it is necessary to also validate
+    who can access and manipulate processes that run in these domains. This can be
+    done by checking the transition permission:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: For each of the domains, studying who can manipulate these processes is a time-consuming
+    process and requires intimate knowledge of the application(s) that run in the
+    given domain. For instance, the `restorecond` daemon will only reset file contexts
+    to the context known by the SELinux tools (so, modifying the context temporarily
+    is not possible through `restorecond`) and only on those locations that are configured
+    in the `restorecond` configuration file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Policy manipulation
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Checking the SELinux policy isn''t sufficient as the policy can be manipulated
+    as well. Loading a new policy is governed through, among various other privileges,
+    the `load_policy` permission:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: Similarly, the access towards the selected domains (and the `load_policy_t`
+    domain in particular) needs to be verified.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As can be seen from the output, manipulating the SELinux policy can also be
+    controlled through an SELinux Boolean called `secure_mode_policyload`. When this
+    Boolean is enabled, loading a new policy is no longer possible. If this Boolean
+    is enabled and persisted, then even rebooting a system will not help unless the
+    system is booted in the permissive mode.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Similarly, checking who can put the system in the permissive mode can be verified
+    as well:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is governed through the same SELinux Boolean though.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another way to manipulate the SELinux policy would be to boot the system in
+    the permissive mode or even with SELinux disabled. This means that reviewing access
+    to the boot files is also important (the `boot_t` type).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Indirect access
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: It is also possible to access resources indirectly, for instance, by manipulating
+    the raw devices (such as disk devices or memory). Access to device files is already
+    quite privileged on Linux systems. With SELinux, additional controls might be
+    put in place.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Disk devices are usually labeled as `fixed_disk_device_t`. Access to these files
+    should only be granted to application domains, although some privileged user domains
+    might be able to relabel such device nodes or manipulate application domains to
+    perform actions not granted to the regular user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: Users who are able to manipulate files related to system authentication can
+    grant themselves different user roles, for instance, by logging on to the system
+    as a different user (who does have the rights needed). This includes access to
+    `/etc/pam.d/` (usually labeled as `etc_t`) or the authentication libraries themselves
+    in `/lib/security/` (usually labeled as `lib_t`).
+  prefs: []
+  type: TYPE_NORMAL

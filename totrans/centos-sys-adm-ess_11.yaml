@@ -1,0 +1,556 @@
+- en: Chapter 11. Graduation Day
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We have reached the last chapter of *CentOS System Administration Essentials*,
+    and you are nearly a Linux Ninja; however, before you can pass with flying colors,
+    you will learn some best practices in the deployment of CentOS Linux. This chapter
+    will cover the subjects that we have specifically looked at and some other more
+    generic CentOS best practices to consider when administering your systems. Additionally,
+    we will take a quick peek at the new features that you will find in Enterprise
+    Linux 7 from Red Hat and CentOS.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Securing remote access to your system**: Here, we take a look at OpenSSH
+    and some considerations that you may want to review'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**OpenLDAP best practices**: Here, we ensure that your directory service is
+    kept running the way that you want'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Nginx best practices**: A quick guide to some dos and don''ts when configuring
+    the web server'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Mastering Puppet**: A checklist on what and how to secure on your Linux server.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**What''s new in CentOS 7**: This guide is predominately aimed at CentOS 6.5,
+    but Enterprise Linux 7 is now available for both Red Hat and CentOS, and we will
+    take a quick look at the highlights'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Securing remote access to your system
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Using **Secure Shell** (**SSH**) is a command method to gain remote access to
+    your server. The security is implemented at one level using data encryption, but
+    is augmented by server authentication, by default. Clients can compare the public
+    key presented by the server against a list of trusted hosts, or as SSH names them,
+    `known_hosts`. This is a little like using your web browser to visit HTTPS sites;
+    occasionally, we may get warnings saying that the remote host is not trusted or
+    cannot be identified. With SSH, instead of the browser holding the public key
+    of the server, we have the `~/.ssh/known_hosts` file to store the SSH public key
+    of hosts we connect to.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The SSH public key
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The default behavior of the SSH client on CentOS and most Linux distributions
+    is to prompt the user to accept the remote host's public SSH key when they first
+    connect to that host. Unless the key is already present and perhaps preshared,
+    on acceptance, the public key from the remote SSH host will be stored in the SSH
+    client store for that user. Any subsequent times that the same user connects to
+    the same remote host, the client will connect without the prompt as the host is
+    already trusted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Analyzing the risks of default settings
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The default settings provide for a convenient, and mostly secure, mechanism
+    in which we can obtain the public keys of remote hosts. Potentially, we have an
+    issue where the remote host we connect to in the first instance is not the trusted
+    host that we wish to connect to. As there is no authentication mechanism in place,
+    we have to rely on trust and probability that in the first instance, the connection
+    will be made to the correct host and not an imposter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To work more securely, we can adjust the client settings so that it may only
+    connect to hosts that are already trusted or, in other words, have their public
+    key stored in the local keystore. To make this adjustment, we will need to edit
+    the `/etc/ssh/ssh_config` file. The `StrictHostKeyChecking` directive is set to
+    `ask` by default and should be edited to read `yes` to ensure we only connect
+    when we have a preshared key.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Populating the keystore
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: If we choose the latter method where we wish the key to be already preshared,
+    we need to address the method of populating the keystore. We can copy the server's
+    public key to the client store manually or more easily, using the `ssh-keyscan`
+    command. The command, although convenient, carries the same risks that are inherent
+    to the client prompting to accept the key. If there is a malicious server during
+    the scan, we will store the incorrect key. The reality is that the only secure
+    method is sending a physical copy of the key to the client. Being able to centralize
+    the client keystore would certainly make life much easier, and this can be achieved
+    using the `/etc/ssh/ssh_known_hosts` file. This then does allow much easier manual
+    population, as we only need the one client file rather than one per user on the
+    client machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Public key authentication
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Potentially, user passwords pose another security risk to your SSH servers.
+    Although the password is encrypted over the wire, users, yes, we all know and
+    love them, do share passwords, and perhaps use simple passwords when they should
+    not. The settings for this are which authentication types are allowed are controlled
+    on the server using the /`etc/ssh/sshd.conf` file. We can disable password-based
+    authentication so that users have to use client keys. To disable passwords being
+    used by our users for authentication, you will need to edit this file on the remote
+    host; look for the `PasswordAuthentication` directive and ensure that it is set
+    to `no`; the setting for `PubKeyAuthentication` should be set to `yes`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With this in place, users will need to generate their own public and private
+    key pairs on their client devices, using the `ssh-keygen` command. Their public
+    keys should be copied to the `~/.ssh/authorized_keys` file on the server; this
+    can be achieved using the `ssh-copy-id` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: Root logins
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Root logins to an SSH server should never be allowed; I do not feel this is
+    debatable at all on a production server. Users who need to administer the device
+    can log in as a standard user and use `sudo` or `su` to gain privileges. This
+    again is a controller in the `/etc/ssh/sshd.conf` file and the `PermitRootLogin`
+    directive.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Conclusion
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: SSH provides a secure encryption mechanism to maintain data security across
+    the network. Implementing `StrictHostKeyChecking` on the client will also allow
+    for host authentication so we can be sure that we are sending our secure information
+    to the correct server. To enhance client authentication, disable root logins to
+    the server and allow only authentication from clients with preshared user keys.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Best practices of OpenLDAP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'We have seen during the course of this book that we can centralize user accounts
+    on an OpenLDAP server or, if we want to ease some administration features on CentOS,
+    we can use the 389-ds. Either way, the underlying directory is OpenLDAP. Now,
+    of course, if the user accounts exits from the directory, then so do our authentication
+    tokens (passwords). We need to ensure that this is secure and effective. OpenLDAP
+    supports different mechanisms for authentication; each, of course, has advantages
+    and disadvantages as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Simple bind**: Using the simple bind authentication mechanism, clients pass
+    a clear text password to authenticate themselves to the server. This carries three
+    potential threats: the password can be collected from a network capture, the password
+    can be collected by a host spoofing the server''s address, and the password can
+    be obtained through a malicious attack on the server. Using LDAPS will protect
+    against the first two threats, but not the third. It is best to avoid simple bind
+    authentication, if possible.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Simple Authentication and Security Layer** (**SASL**) **external**: This
+    allows the use of external authentication such as client X.509 certificates (TLS
+    public keys) to authenticate users, and can overcome inherent password issues.
+    If the LDAP client and LDAP server are on the same machine, it is also possible
+    to use the **LDAP over IPC** (**LDAPI**) method of the SASL authentication, where
+    the Linux credentials of the user are used to access the directory.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**SASL passwords**: It is possible to use password-based authentication with
+    SASL, but the threats then are similar to simple bind.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you use password-based authentication, it is often thought prudent to implement
+    a lockout of accounts after so many failed attempts. Although this is possible
+    in an OpenLDAP password policy, the reality is that password attacks are often
+    more subtle than this in today's environment, and all this provides a mechanism
+    for attackers to lock accounts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is also becoming more common to allow users to reset their own password if
+    they do not remember it. Although this does alleviate a load from the help desk,
+    it is often a weak leak in your security chain as the challenge response questions
+    often proffered are too easily known or guessed by potential attackers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In any directory system, there is a schema that describes each object that can
+    be created, such as a user or group, and the attributes are properties that can
+    exist for that object. Although it is possible to edit the schema for any given
+    object or attribute, it is best to create your own definitions if additional attributes
+    are required for an object rather than add them directory to the existing schema.
+    In the long run, altering existing objects can cause issues with replication to
+    other servers if the schema is not identical on all servers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Best practices of Nginx
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If you choose to implement the Nginx web server, there are few things that we
+    should take a look at to endure the longevity of your web service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'From a security perspective, your web server could be accessible to the whole
+    world, everyone. For this reason, we should ensure that some basic security threats
+    are protected:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**SELinux**: Ensure that we have set SELinux to `Enforcing` on our CentOS system
+    that hosts Nginx.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**DocumentRoot**: Mount the DocumentRoot structure independently as its own
+    filesystem, ensuring that malicious writes will not crash the Linux host if the
+    disk fills, and secondly the partition or disk can be mounted with minimal rights,
+    for example, `LABEL=web /var/www ext4 ro,nosuid,noexec,nodev,noatime 0 2`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Use a host-based firewall**: Allow only incoming TCP ports `80` and `443`.
+    Often, only outgoing UDP port `123` along with outgoing dynamic TCP ports need
+    to be open, with port `123` being for time synchronization.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Restrict HTTP methods available to Nginx**. The RFC 2616 allows many HTTP
+    access methods; most will not be needed on your server. We can add code similar
+    to the following to check for matches that are not equal to GET, HEAD, and POST.
+    The code will then disallow other access methods that we do not require, such
+    as DELETE, SEARCH, and others:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '**User Agents**: We may also choose to block certain user agents, browsers
+    that are often associated with scanners, bots, or spammers. The `$httpd_user_agent`
+    variable in an HTTP header will show what the browser is, for example Internet
+    Explorer, Mozilla, and so on. Other than these normal browsers, there are also
+    automated browsers that can access your site through scripts such as `wget` and
+    `BBBike`. Try adding this to your `nginx.conf` file to prevent these agents:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '**Limit access by IP**: If a particular directory should only be accessible
+    to the internal network, then you can use code similar to this in your host configuration:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '**Limit file ownership**: The Nginx web server will run as a named user, `nginx`.
+    The temptation is to add the Nginx user as the owner of the DocumentRoot directory
+    and all web content therein. This is ill advised as the document owner, user,
+    or group can gain additional privileges such as deleting a document that you cannot
+    write to. Typically, the `nginx` user should gain access via `others`, and we
+    limited `others` to `r-x` on directories and `r--` on files. Typical file permissions
+    should be similar to the following:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Mastering Puppet
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When using the Puppet server to manage your configuration centrally, it is worth
+    remembering a few pertinent facts in the setup of the Puppet master.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Use modules**: The `/etc/puppet/modules` directory allows the creation of
+    modules. Modules are subdirectories created within the Puppet `ModulePath` directive,
+    and contains files and configurations that need to be distributed to the client
+    as part of its desired state. This simplifies the Puppet configuration, as related
+    files are all within the module directory.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Use version control**: Puppet itself does not have version control, but we
+    can use something like GIT or **subversion** (**svn**) to maintain the previous
+    copies of configurations.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Style**: When writing Puppet configuration, standardizing the syntax style
+    helps in maintenance and readability. The Puppet Labs style guide can be found
+    at [http://docs.puppetlabs.com/guides/style_guide.html](http://docs.puppetlabs.com/guides/style_guide.html).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: What's new in CentOS 7
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: CentOS 7 was released in June 2014, along with the earlier release of Red Hat
+    Enterprise Linux 7\. Along with the introduction of the Linux kernel 3.10 in this
+    release, there are other significant updates to the distribution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Locale
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The system locale information can be conveniently set and displayed using the
+    `localectl` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The output can be seen in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Locale](img/5920OS_11_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Time and date information
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Similar to the locale information, CentOS 7 includes a simple command to display
+    and manage time and date settings on the host system: `/usr/bin/timedatectl`.
+    This really is a godsend to us as administrators; even if we only use the command
+    to display the output, this one command will display the time, timezone, and NTP
+    settings. Take a look at the output of the `timedatectl` command without options
+    in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Time and date information](img/5920OS_11_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Staying with the `timedatectl` command, we can change the date using the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The time can be set using the same option with time as the argument, shown
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'NTP time synchronization can be enabled and disabled with the following command;
+    though, it uses the news system service manager to enable and disable the time
+    service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is really a Swiss Army knife of a command; you will get to learn very quickly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Managing services
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`Systemd` is now the system and service manager in CentOS 7 and replaces Upstart
+    as the default init system. This not only replaces Upstart, but is backwards compatible
+    with the traditional System V init scripts. For us as administrators, the main
+    command to become familiar with is `/usr/bin/systemctl`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Starting with the `status` subcommand, we can immediately see how `systemctl`
+    works well for us. Here, we look at the status of the SSH service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: The output is quite extensive and includes the **Process ID** (**PID**) and
+    recent logfile activity. You can view this in the following screenshot.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Managing services](img/5920OS_11_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'We can stop the service using the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To disable the autostart of the service, we will use the `disable` subcommand:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'A service that is disabled can still be started by the administrator; the term
+    disabled just means that the autostart of the service is disabled. A new feature
+    that `systemd` brings is the ability to prevent a service from being started manually:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Even if an administrator tried to start the service while it is masked, the
+    service will not start. If it is required to re-enable the service, then an administrator
+    would need to use the `unmask` subcommand:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: Additional ways to repair your machine than just using the single user mode
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In traditional environments, we are perhaps used to using run level 1, or the
+    single mode, as the mechanism to place the system into the maintenance mode. The
+    concept of run levels has changed with system, and we now have targets rather
+    than run levels. To place a running system in maintenance, we can use the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You will be prompted for the root user password to complete the operation.
+    If this still does not allow you to repair your system, then there is an emergency
+    target that starts even fewer services, again allowing only root access:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The emergency target is much more similar to starting a CentOS 6.5 machine
+    with the kernel argument `init=/bin/bash`. You may also have guessed from some
+    of these commands that we can also power off and reboot systems with `systemctl`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: Of course, the `shutdown` command is still here and can be used for this purpose
+    too.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Remote management
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The management of remote systems is possible with system too, which also uses
+    the same `systemctl` command. If we need to see the status of the `atd` service
+    on the host `s1.tup.com`, we can issue the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: This simply makes use of an SSH connection to the remote host, so port `22`
+    and SSHD must be accessible on the remote host that we monitor.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Systemd and nonstandard subcommands
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The subcommands that are available from `systemctl` through `systemd` are now
+    standardized, whereas with System V init scripts, it was possible to have any
+    argument or subcommands added to the script. For example, with the Apache HTTPD
+    service in CentOS 6.5, we could issue the `service httpd graceful` command. The
+    `graceful` argument is unique to the web server, so it is not built as a subcommand
+    within `systemctl`; however, the same result can be achieved through the use of
+    the `apachectl graceful` command. While on the subject of the Apache web server,
+    the default DocumentRoot has changed from `/var/www` to `/usr/share/httpd`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Samba 4.1 package
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: For the Windows domain, file, and print services, Samba 4.1 replaces the aged
+    Samba 3, which was supplied with CentOS 6.5 and earlier systems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Filesystem changes
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The default filesystem is now XFS, replacing ext4\. XFS has been around for
+    a long time, but is obviously catching the attention of the Enterprise Linux community
+    now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Password policies
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The PAM module that enforces password quality now defaults to `pam_pwquality`,
+    replacing the older `pam_cracklib`. Editing the `/etc/security/pwquality.conf`
+    file will allow you to specify the minimum password length and password complexity.
+    The password complexity consists of:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**minclass**: This is the minimum number of character class types, uppercase,
+    lowercase, numeric, and non-alphanumeric'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**maxsequence**: This limits the number of consecutive characters of the same
+    class, such as `12345` or `bcfag`; both have a sequence of five characters, whereas
+    `bcafG` only has a sequence of four characters from the same class (lowercase)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**maxrepeat**: This limits the number of repeating characters'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The existing file can act as an example, or we can use the manual using the
+    `man 5 pwqulality.conf` command for more detailed information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You are now ready to walk out into the world and declare your new-found knowledge
+    of CentOS. I have been able to help you through some simple best practice goals
+    to manage the services we looked at throughout this book as well as introduce
+    some new elements of CentOS 7\. Of course, for a long time, you will still come
+    across plenty of CentOS 6 systems to keep you busy, and most elements are consistent
+    from Version 6 to Version 7, but keeping up to date with the latest enhancements
+    is always useful.
+  prefs: []
+  type: TYPE_NORMAL

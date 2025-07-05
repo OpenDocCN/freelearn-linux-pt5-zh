@@ -1,0 +1,892 @@
+- en: Chapter 7. Redundancy
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When building a proper VDI, it's imperative to understand all of the possible
+    failure points within the solution so redundancy can be built in to mitigate any
+    failures. While sizing a VDI incorrectly will cause a slow response time or poor
+    end user experience, failing to build proper redundancy could render the solution
+    unreachable. In a VDI solution there are physical failure points to consider such
+    as network switches, power supplies, and hard drives. There are also software
+    failure points such as the VMware vCenter Server, VMware View Connection Server,
+    and the database server(s) to take into consideration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This chapter analyzes the potential points of failure within a VDI and offers
+    up suggestions to provide redundancy for each component.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Physical infrastructure
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In-depth coverage of designing a highly available virtual infrastructure is
+    outside the scope of this book. However, understanding and utilizing the following
+    VMware vSphere features are important to implement a robust VDI.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware High Availability
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '**VMware High Availability (HA)** can be used to monitor and protect against
+    physical host failures and can also be used to monitor and protect vDesktops themselves.
+    VMware HA works by monitoring physical hosts in a given cluster. If a host is
+    unable to communicate to the specific default gateway on a service console interface
+    for 15 continuous seconds, an HA failover event is triggered. vSphere 5 also introduced
+    Datastore Heartbeating, which is used when a network heartbeat failure has occurred.
+    Datastore heartbeats provide an additional level of host isolation verification.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: For more information on VMware HA, please refer to the *HA Deepdive* article
+    by Duncan Epping at [http://www.yellow-bricks.com/vmware-high-availability-deepdiv/](http://www.yellow-bricks.com/vmware-high-availability-deepdiv/).
+    You can also check it in his book *vSphere 5 Clustering Technical Deepdive*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A host is determined to be isolated when a host has stopped receiving heartbeats
+    from other hosts in the cluster and the specified isolation address cannot be
+    pinged.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the Isolation Response for the HA cluster is set to **Leave Power On**, the
+    vDesktops and other virtual machines on the host will remain powered on. Just
+    because a host has lost network connectivity on its service console interface
+    does not necessarily mean that the vDesktops have lost network connectivity.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the Isolation Response for the HA cluster is set to **Power Off**, the vDesktops
+    and other virtual machines on the host will be powered off. This setting avoids
+    the possibility of a split-brain scenario.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the advancements in vSphere 5, the host isolation events are highly verified
+    and accurate and very likely indicate an actual host problem. Therefore, in VMware
+    View solutions, it's preferred to set the Isolation Response to **Power Off**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If a specific host containing vDesktops has been isolated from the cluster,
+    it will perform the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: All virtual machines and vDesktops will be powered off.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Users with active connections will be disconnected from their vDesktops.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the vDesktop is part of a persistent desktop pool, the user will be able
+    to log back in once their specific vDesktop has been powered up and is online.
+    The estimated outage time is 2 minutes.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the vDesktop is part of a non-persistent desktop pool, the user will be able
+    to log back in immediately to a vDesktop, assuming that there is an available
+    vDesktop in the pool on a host that is currently online. The estimated outage
+    time is less than or equal to 30 seconds.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Do you even need VMware HA?
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: VMware HA provides a level of protection for host failures, whereby vDesktops
+    residing on a host that has failed will automatically be powered up without intervention
+    from the virtual infrastructure administrator.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Do you even need VMware HA?](img/1124EN_07_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: If admission control is set to **strict**, the vDesktops will only be powered
+    on if there are available resources on another host in the cluster.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware HA works by determining the slot size, or minimum amount of CPU and memory
+    to support a failover of the most intensive virtual machine (or vDesktop).
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, if vDesktop_A has 4 GHz of CPU and 2 GB of RAM while vDesktop_B
+    has 1 GHz of CPU and 6 GB of RAM, the slot size will be 4 GHz of CPU and 6 GB
+    of RAM (with additional calculations taken into consideration for memory overheard).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In VMware View environments, there will likely be large quantities of vDesktops
+    with identical specifications (for example, a Windows XP vDesktop with 2 GHz of
+    CPU and 2 GB of RAM), therefore a concept known as **slot fragmentation** is primarily
+    avoided. Slot fragmentation requires the collective availability of sufficient
+    resources in a cluster to support virtual machines being powered on during an
+    HA event, but the lack of sufficient resources on an individual physical host
+    to support a virtual machine's requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For more information on slot fragmentation, please see Duncan Epping''s very
+    thorough article at the same URL: [http://www.yellow-bricks.com/vmware-high-availability-deepdiv/](http://www.yellow-bricks.com/vmware-high-availability-deepdiv/),
+    as mentioned earlier.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Do you even need VMware HA?](img/1124EN_07_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: As of vSphere 4.1, HA also works in conjunction with DRS to free resource slots
+    should slot fragmentation occur within a cluster. This would involve a failed
+    server having to wait for virtual machines to be vMotion'd across hosts in the
+    cluster until enough slots exist to power on necessary virtual machine(s).
+  prefs: []
+  type: TYPE_NORMAL
+- en: With a VMware View solution based on persistent vDesktops, HA should be used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Do you even need VMware HA?](img/1124EN_07_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the preceding diagram, the end user is connected to a vDesktop on Host1\.
+    Both Host1 and Host2 are part of the same cluster and can see the same shared
+    storage. As illustrated in the diagram, the actual virtual disk files for the
+    vDesktop reside on the shared storage and not on local storage within Host1.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Do you even need VMware HA?](img/1124EN_07_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: As illustrated in the preceding diagram, when Host1 fails, the end user is disconnected
+    from the vDesktop. In a persistent vDesktop solution, the end user is assigned
+    to a specific vDesktop. In this case, the vDesktop is unavailable as it resides
+    on Host1, which has just failed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The end user will be unable to work until the vDesktop is back online or the
+    end user is manually assigned to another (available) vDesktop resource.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Do you even need VMware HA?](img/1124EN_07_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: As illustrated in the preceding diagram, VMware HA has powered the end user's
+    vDesktop up on Host2, an available host in the cluster. By default, there is no
+    notification to the end user that his/her vDesktop is now available, so the end
+    user will need to try repeatedly for the time it takes vDesktop to come online
+    on Host2\. This typically takes between 1 and 3 minutes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: An advanced solution concept for persistent vDesktop environments is to monitor
+    for individual vDesktop outages. If a user's persistent vDesktop is determined
+    to be offline, an e-mail can be sent to the end user (who would likely receive
+    it on his/her mobile device) letting him/her know that his/her vDesktop is currently
+    unavailable but that the resolution is in progress. The same concept can then
+    be used to detect when the vDesktop is back online and available (for example,
+    by adding a 2 minute wait when a vDesktop enters the VMware Tool's OK state) and
+    then notify the user that his/her vDesktop is now available.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Do you even need VMware HA?](img/1124EN_07_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: For solutions using non-persistent vDesktops, the use of VMware HA is the topic
+    of greater debate. While non-persistent solutions rely on a pool of vDesktops
+    spread across multiple hosts in a cluster, end users are not assigned to an individual
+    vDesktop. When a host fails in a non-persistent solution, any end users connected
+    to vDesktops on that specific host lose their connectivity. The end users can
+    then reconnect to the VMware View environment, and, as long as another vDesktop
+    is available, that user will successfully connect to a resource. This is because
+    vDesktop assignment is done randomly at the time of log in when using non-persistent
+    vDesktops.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Non-persistent example
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'For this example, Company_A has 60 end users and has created a non-persistent
+    vDesktop pool with the following settings:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Numbers of end users = 60
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Desktop pool size (maximum number of desktops) = 60
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Number of spare (powered on) desktops = 0
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Power setting = Always On
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Provision all desktops up front
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: With these settings, when the pool is initially built, it will automatically
+    provision 60 vDesktops and power them on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The count is authoritatively held by VMware View in the ADAM database. If the
+    pool's power settings are set to **Always On**, VMware View will create a pool
+    of 60 vDesktops and immediately power all of them on. No matter what load exists
+    from the end user community, 60 vDesktops will always be powered on. If 61 end
+    users try to log in concurrently, 1 end user will be unable to access a resource.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Imagine a scenario where Host1 hosts 30 vDesktops and Host2 hosts 30 vDesktops.
+    The desktop pool is configured to host 60 vDesktops.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this environment, if Host1 suddenly fails, the 30 vDesktops being hosted
+    on Host1 enter an "Agent Unreachable" state. While the VMware View Connection
+    Server has recognized that there are now 30 vDesktops that are unreachable, it
+    does not provision 30 new vDesktops on the available hosts in the cluster (for
+    example, Host2).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Therefore, without using HA to restart the vDesktops on another host, the pool's
+    total number of vDesktops will be reduced. By using VMware HA, the pool's total
+    number of vDesktops will not be reduced, although there could be a decrease in
+    overall performance (if the ability to exceed available resources is allowed).
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are two design paths for non-persistent vDesktop solutions. The first
+    is to simply use VMware HA to ensure that any vDesktops that reside on a failed
+    host are restarted on another available host in the cluster. This is likely the
+    easiest configuration and results in 5 10 minutes of downtime (as vDesktops power
+    up and enter a useable state).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The second design path is to design the desktop pool(s) with enough vDesktops
+    to sustain a host failure. It is important to ensure that the number of used vDesktops
+    does not exceed the legally licensed amount from VMware. However, by building
+    a desktop pool with additional capacity (for example, extra 30 vDesktops), and
+    outage of one host has minimal impact on the end user environment. For those users
+    that were connected to a vDesktop on the failed host, they simply log back into
+    the VMware View environment and connect to one of the already provisioned, already
+    available, extra vDesktops.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Non-persistent example](img/1124EN_07_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Using local storage
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: We have added a note about using local storage in this section. As will be covered
+    later in this book, local storage is a viable option for certain VDI solutions.
+    If the end user's vDesktop resides on local storage to Host1, during a host failure
+    VMware HA would not be able to bring the vDesktop up on another host (for example,
+    Host2) as other hosts would not have access to the virtual disk files residing
+    on the local storage on Host1.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Using local storage](img/1124EN_07_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: As illustrated in the preceding diagram, both Host1 and Host2 have a local **Virtual
+    Machine File System (VMFS)** data store as well as access to a shared VMFS data
+    store on the **Storage Area Network (SAN)**. If Host1 has an outage, any vDesktops
+    or templates that were stored on the local VMFS data store on Host1 would be unavailable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If a persistent solution was in use and vDesktops were placed on the local VMFS
+    data store, end users would not have access to their vDesktops during a host outage.
+    VMware HA would not matter as the vDesktops were not on shared storage, but instead
+    on the local VMFS data store of the host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Therefore, it is imperative to use a non-persistent solution when placing core
+    virtual disks of a vDesktop on local storage as end users are not specifically
+    assigned to a unique vDesktop. If the physical server hosting vDesktop_17 a persistent
+    vDesktop assigned to employee User_LL were to fail, User_LL would not be able
+    to connect to a desktop resource.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware Distributed Resource Scheduling
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: While **VMware Distributed Resource Scheduling (DRS)** does not provide resilience,
+    it does minimize the potential impact during an unpredicted physical host failure.
+    By balancing the processing load across all of the available hosts in a cluster,
+    a host failure will have approximately the minimum impact possible. This is true
+    for both virtual machines running a server OS and vDesktops. In a VMware View
+    solution with virtualized VMware vCenter Server(s) and/or VMware View Connection
+    Server(s), it is prudent to use VMware DRS to balance the load in the cluster
+    and minimize the impact. For additional considerations, please refer to the *Anti-affinity*
+    section explained next.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware Distributed Resource Scheduling](img/1124EN_07_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the example given in the preceding diagram, there are three hosts in a cluster
+    without VMware DRS enabled. On the first host in the cluster, there are 70 vDesktops.
+    On the second one, there are 10 vDesktops, and on the third host, there are 20
+    vDesktops. As VMware DRS is not enabled, the load (and therefore the number of
+    vDesktops) is not balanced across all of the available hosts in the cluster.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware Distributed Resource Scheduling](img/1124EN_07_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Continuing the example, if the first host were to have an unpredicted outage,
+    70 vDesktops would be impacted. If DRS was enabled and all vDesktops had roughly
+    the same CPU consumption, approximately 34 vDesktops would be placed on each host.
+    This will drastically reduce the number of end users that would experience an
+    outage should a physical host fail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Anti-affinity
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '**Affinity** and **Anti-affinity** are settings within VMware DRS that determine
+    how virtual machines in a given cluster react to one another.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Anti-affinity](img/1124EN_07_11.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the preceding diagram, DRS is enabled for the four-host cluster and set to
+    **Automatic**. There are no affinity or anti-affinity rules set. The VMware View
+    solution requires two View Connection Servers, both of which have been virtualized
+    and placed in the aforementioned cluster.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Through normal DRS activities, both View Connection Servers find themselves
+    on Host1\. If Host1 were to have an outage, no new connections would be permitted
+    into the VDI.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Anti-affinity](img/1124EN_07_12.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the previous illustration, the two View Connection Servers, View1 and View2
+    have been placed in an anti-affinity rule, and they have opposing polarity. This
+    rule states that the two View Connection Servers are never to reside on the same
+    host as long as there are available hosts in the cluster.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With anti-affinity in place, a single host outage would not have the potential
+    to bring down the entire VMware View Connection Server environment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware vCenter Server
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: VMware View uses VMware vCenter for all provisioning tasks. Without a functioning
+    VMware vCenter Server, it is impossible to create, refresh, recompose, rebalance,
+    or delete vDesktops. Therefore, utmost importance must be placed on protecting
+    the VMware vCenter Server(s) used in the solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are two primary components to the VMware vCenter Server service. They
+    are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware vCenter Server service
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Backend database
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The VMware vCenter Server service should be protected in a way that eliminates
+    downtime or provides a **recovery time objective (RTO)** of less than one minute.
+    For extremely active VDI, a prolonged downtime can result in an inability to provide
+    desktop resources to requesting end users. The most robust way to protect the
+    VMware vCenter Server service is VMware vCenter Server Heartbeat (more on this
+    is mentioned next).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The backend database used by VMware vCenter can reside on the same server (physical
+    or virtual) or can reside on a separate database.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Component | Option 1 | Option 2 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| vCenter Server | **Virtual** | Physical |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Database location | On vCenter Server | **On one or more separate servers**
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Database protection | Backup solution | **Clustering solution** |'
+  prefs: []
+  type: TYPE_TB
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The words in the preceding table that appear bold are the recommendations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Cooperation from an organization's database team is important in VMware View
+    solutions as a vCenter outage, which is typically database related, could wreak
+    havoc on the VDI. Therefore, engaging with an organization's database team is
+    a recommended part of the design process.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware vCenter Server Heartbeat
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '**VMware vCenter Server Heartbeat (vCSH)** is a product from VMware that is
+    powered by Neverfail. vCSH monitors and protects all of the necessary components
+    of a functioning VMware vCenter Server infrastructure, including:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Server:** vCSH protects from a physical or virtual server failure or operating
+    system fault (for example, Blue Screen of Death)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Network:** vCSH protects the network identity including IP address and DNS
+    name of the vCenter Server'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Application:** vCSH protects the application environment specific to VMware
+    vCenter Server service, and required files and registry entries'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Performance:** vCSH monitors the performance of the underlying physical or
+    virtual server'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Data:** vCSH monitors all data and relevant applications, and maintains a
+    copy of the data, including database (if local)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: VMware vCenter Server Heartbeat requires two instances of VMware vCenter Server
+    that are joined into a vCSH pair. The vCSH pair functions as a single VMware vCenter
+    Server instance and shares the hostname, IP address, and other relevant information
+    and configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware vCenter Server Heartbeat](img/1124EN_07_13.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: vCSH replicates data asynchronously from the primary vCenter Server in the pair
+    to the secondary vCenter Server in the pair. VMware vCenter is also aware of the
+    VMware View Composer service to ensure that it's protected as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Why VMware vCenter Server Heartbeat should be used
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: For production environments, sizable deployments, or solutions with high criticality,
+    VMware vCenter Server Heartbeat should always be used as it protects the most
+    vulnerable component of the VDI.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The storage array typically has high availability built-in with RAID, multiple
+    storage processors, power supplies, fans, extra disks, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The physical hosts are protected by multiple NICs, multiple power supplies,
+    and VMware functionality, such as VMware HA.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The networking layer is protected by redundancy in hardware and network paths.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The View Connection Server is protected by duplicate instances, load balancing,
+    and potentially by VMware Fault Tolerance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, as a single instance of VMware vCenter Server can be responsible for
+    over a dozen physical hosts and potentially many hundreds of vDesktops, the protection
+    of its state is of paramount importance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware vCenter Server Heartbeat has the ability to protect not only the VMware
+    vCenter Server service, but also the vCenter database (if local) and the VMware
+    View Composer service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware View
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: VMware View is responsible for processing incoming requests for vDesktops, interacting
+    with VMware vCenter Server to provision, recompose, and delete vDesktops; as well
+    as a variety of other tasks necessary for a properly functioning VDI.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Replica
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'When installing the VMware View Connection Server, there are four installation
+    types. They are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Standard
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Replica
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Security
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Transfer
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For the first VMware View Connection Server instance in a View Connection Server
+    pool, the standard installation should be selected. However, to eliminate the
+    View Connection Server as a single point of failure, a second (and additional)
+    View Connection Server can be installed. Once a View Connection Server exists
+    in the infrastructure, additional View Connection Servers can be joined to the
+    original, forming a View Connection Server pool. To join a new View Connection
+    Server to an existing View Connection Server or View Connection Server pool, select
+    the **replica** installation mode.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When a replica View Connection Server instance is created, it copies the VMware
+    View LDAP configuration from the existing View Connection Server instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Load balancing
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The VMware View Connection Servers are responsible for brokering the connection
+    between an authorized end user and a vDesktop in the VDI. Therefore, if there
+    are no available VMware View Connection Servers, no new connections can be made
+    to the VDI. However, the existing connections will not be affected if there are
+    no available VMware View Connection Servers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Load balancing](img/1124EN_07_14.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Therefore, it is important to protect the available View Connection Server(s)
+    in the VDI. It is best practice to have a minimum of two VMware View Connection
+    Server(s) (or potentially one protected by VMware Fault Tolerance). The easiest
+    way to accomplish resilience for the VMware View Connection Servers is to use
+    a load balancing solution. There are various load balancing solutions available,
+    including **Microsoft Network Load Balancer (NLB)** and hardware appliances from
+    companies like F5 (preferred).
+  prefs: []
+  type: TYPE_NORMAL
+- en: A load balancing solution will create a virtual IP address that will be used
+    by end users to connect to the VDI. Behind the virtual IP address will be the
+    actual IP addresses of all of the VMware View Connection Servers in the load balancing
+    pool. If a VMware View Connection Server is not responsive to a ping (for example),
+    it will be removed from the load balancing pool to ensure that incoming end user
+    requests are not routed to an unavailable View Connection Server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Many load balancing solutions also offer the ability to monitor availability
+    via HTTP GET and similar commands to ensure that not only is the server online
+    but that it is also responsive to web-based requests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware Fault Tolerance
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '**VMware Fault Tolerance (FT)** can be used as an additional layer of protection
+    for the VMware View Connection Server(s). VMware FT protects a VM by creating
+    and maintaining a secondary VM that is identical to the primary one. The secondary
+    VM is continuously available to replace the primary VM in case of failure of the
+    host where the primary VM resides.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In VMware FT, there is no downtime (unlike VMware HA). VMware FT does have several
+    limitations including supported hardware, number of vCPUs (currently 1), and so
+    on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware FT takes inputs and events that occur on the primary VM and transfer
+    them to the secondary VM, which is running on a separate host in the cluster.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware FT does impact the virtual infrastructure design, as it requires a separate
+    and dedicated NIC for FT Logging. The FT Logging and vMotion NICs must reside
+    on separate subnets. Also, no more than four VMware FT-enabled virtual machine
+    primaries or secondaries can reside on any single ESX host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Design impact when using VMware FT
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To properly illustrate the design impact of using VMware FT, the following example
+    will be used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Through a thorough analysis, it has been determined that CustomerA requires
+    four VMware View Connection Servers to satisfy the demand of incoming requests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Design impact when using VMware FT](img/1124EN_07_15.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: As part of the solution, four VMware View Connection Servers are installed and
+    configured, and placed behind a load balancer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Design impact when using VMware FT](img/1124EN_07_16.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: If a VMware View Connection Server has a critical fault (for example, Blue Screen
+    of Death), only three connection servers are available to the end users. There
+    is a possibility that the three remaining connection servers cannot handle the
+    load and some end users are unable to connect to the VDI.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Design impact when using VMware FT](img/1124EN_07_17.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The only way to restore connectivity for a failed View Connection Server that's
+    had a critical fault is to either restore from a previous backup or build a new
+    View Connection Server, and add it to the load balanced pool, as illustrated in
+    the preceding diagram.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If a VMware View Connection Server resides on a host that has a failure, VMware
+    HA will power the virtual machine up on an available host in the cluster. There
+    may be several minutes of downtime for some end users (if the remaining three
+    View Connection Servers are unable to handle the load). However, after 3 to 5
+    minutes, full connectivity should be restored.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Design impact when using VMware FT](img/1124EN_07_18.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: By leveraging VMware FT to protect the View Connection Servers, there will be
+    zero impact should a physical host failure occur in this solution (assuming anti-affinity
+    has separated primary and secondary VMs).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Design impact when using VMware FT](img/1124EN_07_19.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the event of a physical host failure that impacts a View Connection Server,
+    VMware FT immediately makes the secondary (shown in bottom row in the preceding
+    diagram) active. Through technology from VMware vLockstep, the secondary is an
+    identical copy of the primary that resided on the failed host. Once the failover
+    has successfully occurred, the secondary is now marked as the primary. In addition,
+    a new secondary is spawned from the newly appointed primary.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: However, VMware FT does not protect against guest operating system failures
+    (for example, Blue Screen of Death). Therefore, coupling VMware FT with VM Monitoring
+    via VMware HA is the most robust solution possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While VMware FT is a useful technology in protecting VMware View Connection
+    Servers, most virtualization architects would prefer to simply add an additional
+    View Connection Server to the original design instead of adding the complexity
+    of VMware FT.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Parent vDesktop and templates
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Virtual machine templates are used by VMware View when deploying vDesktops with
+    the **full virtual machine** option selected. Standard virtual machines (not templates)
+    are used by VMware View when deploying vDesktops with the **View Composer linked
+    clones** option selected. For a virtual machine to be seen by View Composer, it
+    must have at least one snapshot. View Composer deploys all vDesktops in the pool
+    from the selected snapshot.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is important to understand that if the parent vDesktop (for Linked Clone
+    pools) or the gold vDesktop template (for Full Desktop pools) are not available,
+    then new vDesktops cannot be provisioned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Templates
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Virtual machine templates are a bit confusing to protect. When creating a virtual
+    machine template or adding a virtual machine template to the inventory, the administrator
+    must select a specific host within a cluster. According to the **graphical user
+    interface (GUI)**, "Choose a specific host within the cluster. On high-availability
+    clusters and fully-manual dynamic workload management clusters, each template
+    must be assigned to a specific host."
+  prefs: []
+  type: TYPE_NORMAL
+- en: Therefore, if the gold template for vDesktops resides on Host1 and if Host1
+    experiences a failure, VMware HA will not recover this template. Instead, the
+    original template will be shown as unavailable within vCenter. From this point,
+    the original inventory entry in vCenter for the template can be removed and then
+    the template can be re-added. This is possible because while the host is unavailable,
+    the virtual machine template actually resides on shared storage (assuming that
+    best practice was followed).
+  prefs: []
+  type: TYPE_NORMAL
+- en: When assisting an organization with operational readiness, the preceding recovery
+    process should be listed in a Standard Operating Procedure manual.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Parent vDesktops with snapshots
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: To protect the parent vDesktop and its snapshot, a simple clone virtual machine
+    task will not suffice. This is because the clone task consolidates the snapshot
+    tree and thus removes all snapshots associated with the base virtual machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Parent vDesktops with snapshots](img/1124EN_07_20.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Therefore, it is imperative that VMware HA should be used to protect the parent
+    vDesktop. As the parent vDesktop is simply a virtual machine with snapshots (as
+    opposed to a virtual machine template in the preceding scenario), VMware HA will
+    change the ownership of the parent vDesktop to an available host in the cluster
+    during a host outage.
+  prefs: []
+  type: TYPE_NORMAL
+- en: User personas
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: For environments that leverage a user persona solution, such as Liquidware Labs
+    ProfileUnity™, placing the user personas on a highly available network share is
+    critical to ensure end user data is always available. By using the **Distributed
+    File System (DFS)** service or **Distributed File System Replication (DFS-R)**
+    service, a file share storing user personas will still be available in the event
+    of a file server failure. In addition, with DFS-R, user personas can be replicated
+    to other servers in the same site or other sites. DFS-R enables a VDI to provide
+    **Continuity of Operations (COOP)** by ensuring that the file share containing
+    the user personas has its data replicated offsite.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Microsoft DFS also leverages Active Directory sites to ensure that an end user
+    is retrieving their persona from the nearest server participating in the DFS/DFS-R
+    group. In addition, site costing­ can be used to state which is the least expensive
+    target selection for end users attempting to retrieve their user persona from
+    a network share.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following table shows a summary of the types of failures for all components:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Component | Type of failure | Protected by | Downtime | Notes |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- | --- | --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| vCenter Server | Underlying physical host | VMware HA | Approximately 10
+    minutes | During the outage, vDesktop tasks such as provision, Recompose, and
+    so on are unavailable. vCenter may take longer to start (as opposed to View Connection
+    Server) because of the database actions that are performed during an initial service
+    start. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| vCenter Server | Underlying physical host | vCenter Server Heartbeat | Less
+    than 1 minute | It requires a second vCenter Server instance. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| vCenter Server | Operating system (Blue Screen of Death) | vCenter Server
+    Heartbeat | Less than 1 minute | It requires a second vCenter Server instance.
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '| vCenter Database | Any | Clustering solution | Less than 1 minute | It requires
+    two database servers. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| vCenter Database | Database corruption | Backup/restore/snapshots | Varies
+    | The time to restore depends on the solution used, speed of media, and throughput
+    available. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| View Connection Server | Underlying physical host | VMware HA | Approximately
+    5 minutes | It requires multiple View Connection Servers behind a load balancer
+    to mitigate impact to the end users. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| View Connection Server | Underlying physical host | Load balancer | 0 minutes
+    | It requires multiple View Connection Servers behind a load balancer to mitigate
+    impact to the end users. Without VMware HA, the total number of inbound connections
+    may be impacted. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| View Connection Server | Underlying physical host | VMware FT | 0 minutes
+    | It does not protect against guest operating system failures (see VM Monitoring
+    with VMware HA). |'
+  prefs: []
+  type: TYPE_TB
+- en: '| View Connection Server | View Connection Server service | Load balancer |
+    0 minutes | It requires multiple View Connection Servers behind a load balancer
+    to mitigate impact to the end users. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| View Connection Server | Operating system (Blue Screen of Death) | VM Monitoring
+    with VMware HA | Approximately 5 minutes | It requires multiple View Connection
+    Servers behind a load balancer to mitigate impact to the end users. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| View Composer | Underlying physical host | VMware HA | Approximately 10 minutes
+    | During the outage, vDesktop tasks such as provision, Recompose, and so on are
+    unavailable. vCenter may take longer to start (as opposed to View Connection Server)
+    because of the database actions that are performed during an initial service start.
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '| View Composer | Underlying physical host | vCenter Server Heartbeat | Less
+    than 1 minute | It requires a second vCenter Server instance. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| View Composer | Operating system (Blue Screen of Death) | vCenter Server
+    Heartbeat | Less than 1 minute | It requires a second vCenter Server instance.
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Thus far, some of the most important design considerations (for example, persistent
+    or non-persistent) have been addressed, as well as proper sizing of the overall
+    VDI. Designing a VMware View solution that is highly resilient is also paramount
+    to a production-quality solution. In the next chapter, the last major hurdle,
+    storage design, will be discussed. An improperly sized VDI can result in a poor
+    end user experience. A VDI without redundancy can result in unexpected outages
+    and downtime. A VDI with improperly designed storage can not only result in poor
+    end user experience but also significantly add to the overall cost of the VDI
+    solution. As storage is often one of the expensive components, (if not the most
+    expensive component) of a VDI solution, judicious sizing that will still meet
+    the requirements is key.
+  prefs: []
+  type: TYPE_NORMAL

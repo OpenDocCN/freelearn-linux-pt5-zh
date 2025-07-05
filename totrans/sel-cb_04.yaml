@@ -1,0 +1,1150 @@
+- en: Chapter 4. Creating a Desktop Application Policy
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Researching the application's logical design
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating a skeleton policy
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting context definitions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Defining application role interfaces
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Testing and enhancing the policy
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Ignoring permissions we don't need
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Creating application resource interfaces
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Adding conditional policy rules
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Adding build-time policy decisions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Up until now, we've modified and enhanced existing policies and interacted with
+    the SELinux subsystem through the available administrative commands. But, in order
+    to truly benefit from the protection measures that SELinux provides, we need to
+    create our own policies for applications that would otherwise run with either
+    too many privileges, or not run at all.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Desktop applications are a good example. The end user domains (`unconfined_t`
+    for policies which support unconfined domains, and `user_t`, `staff_t`, and the
+    like for the other policies) have many privileges assigned to them to allow generic
+    applications to be executed while remaining in the user domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This has a huge downside: vulnerabilities within desktop applications or malfunctioning
+    applications can create havoc with the users'' files and resources, potentially
+    exposing information to malicious users. If all end user applications run within
+    the same domain, then we cannot talk about a least privilege environment. After
+    all, this single user domain then has to have the sum of all privileges needed
+    by various applications.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we will create a desktop application policy for Microsoft Skype™,
+    a popular text messaging, voice, and video call application, which also runs on
+    Linux systems, but is proprietary and thus its code cannot be reviewed to find
+    what it might do. Confining this application ensures that the application can
+    only perform the actions we allow it to do.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Researching the application's logical design
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Before embarking on a policy development spree, we need to look at the application's
+    behavior and logical design. We will get to know the application and its interactions
+    as we begin to model this into the SELinux policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To prepare an SELinux policy for the application, let''s first look at how
+    the application behaves:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Look into the files and directories that the application will interact with
+    and write down the privileges that the application needs. Try to structure access
+    based on the functionalities of the application.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Figure out which network resources are required by the application, which ports
+    does the application bind (listen) to (if any), and which ports does it need to
+    connect to.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If the application needs to interact with other SELinux domains (processes),
+    how does this interaction look (or what is it for)?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Does the application require specific hardware access or other kernel-provided
+    resources?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Gathering information on at least these four resources (files, network, applications,
+    and hardware/kernel) helps us to start with a skeleton policy file. In the end,
+    we might have a schematic representation of these resources, as shown in the following
+    diagram:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![How it works…](img/9669OS_04_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Let's look at how this works out for our example.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Files and directories
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: There are three main file accesses needed for the Skype™ application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first is its own, user-specific configuration, which is stored at `~/.Skype/`.
+    This will contain all settings for the application, including contact list, chat
+    history, and more. In SELinux, user-specific configuration entries are labeled
+    as `*_home_t` and marked as user home content, allowing the end user to still
+    manage these resources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The second consists of the generic user files, which our application needs access
+    to in order to upload or download files. This can be any end user file, although
+    some distributions create specific support for this (such as through a `~/Downloads/`
+    location).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The third consists of the general resources of the Unix system that are available
+    for the application. This access is needed for the application to load the necessary
+    libraries. During application policy development, this is often not mentioned,
+    as it is a default access provided to all applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Network resources
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The application needs to interact with network resources through its messaging,
+    voice, and video chat functionality.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In general, we know that the application needs to connect to the central Skype™
+    infrastructure for all centrally managed services, such as authentication, directory
+    searches, and more. This connection will be through TCP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next to the central infrastructure, the application will also connect to the
+    Skype™ instances of other users for direct communication. This connection will
+    be through both TCP and UDP (as UDP is more common for video and voice).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Processes
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: As the application is a graphical application, we know that it needs to interact
+    with the X11 server running on the workstation. As we will see in the recipes
+    in this chapter, this automatically requires a set of types and permissions to
+    be assigned to the application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Other than that, there are no specific interactions with other domains.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hardware and kernel resources
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Finally, on the hardware level, the application will need access to the video
+    and sound devices (for the webcam and voice call functionality, respectively).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The application will also need to use the user terminals in case of errors (so
+    that the error message can be displayed).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a skeleton policy
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: With the logical setup now in place, we can draft a skeleton policy. This policy
+    will be a translation from the logical setup we encountered to SELinux policy
+    rules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The entire policy is written in a `myskype.te` file. The final result of this
+    set of recipes is also available through the download pack of this book as a reference.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'We start with a base skeleton that we can enhance later. This skeleton is developed
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We start with the declaration of the various types. From the design, we can
+    deduce four types:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`skype_t` as the main process domain'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`skype_exec_t` as the label for the Skype executable(s)'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`skype_home_t` for the user configuration files and directories of the `skype_t`
+    domain'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`skype_tmpfs_t` is needed for shared memory and the X11 interaction'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The code to deduce these four types is as follows:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Next, we write up the policy rules for accessing the various types, starting
+    with the manage rights on `~/.Skype/`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'We enable the `X11` access and shared memory. This is a common set of privileges
+    that need to be assigned to X11-enabled applications:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Next, we write down the network access rules, as follows:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Finally, we have the device accesses:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In the skeleton policy, we start with the SELinux policy rules that we know
+    will be necessary. If we are somewhat uncertain about one or more rules, it is
+    perfectly fine to comment them out for starters and enable those as we move on
+    to the testing phase in the *Testing and enhancing the policy* recipe later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The skeleton starts off with the type declarations, which focus on the resources
+    of the application. We then enhance the application domain with the proper privileges
+    towards these resources. After the resource access, we look at the X11 privileges
+    and finish with the network interaction of the application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Type declarations
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The first part of any policy is the declaration of types and roles. We first
+    create a role attribute called `skype_roles` to which the `skype_t` SELinux domain
+    is granted. This role attribute will then be assigned to the users who are allowed
+    to call the application. Next, we list the various SELinux types that the policy
+    will provide and also give those types a specific meaning. For instance, the `skype_t`
+    and `skype_exec_t` types are given the proper meaning through the `userdom_user_application_domain`
+    template. This template looks like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `application_domain` template, which is called from within `userdom_user_application_domain`,
+    has the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: This results in the `skype_t` domain to be marked as an application type (a
+    true domain), whereas `skype_exec_t` is an executable file, which can be used
+    as an entry point to the `skype_t` domain. Finally, `skype_t` is marked as `ubac_constrained`,
+    which is used in case of **User-based access control** (**UBAC**), where access
+    to resources is not only governed through the types and its access vectors, but
+    also through the SELinux user. In other words, if the SELinux user, `userX_u`,
+    would somehow be able to access the processes of another SELinux user (`userY_u`),
+    then the `skype_t` domain will not be reachable as the UBAC constraints would
+    come in action, preventing any interaction between the two.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All `userdom_user_*` templates mark the associated resources as UBAC constrained,
+    together with the true file type association, so `userdom_user_tmpfs_file` marks
+    the file not only as a `tmpfs_t` file (the type used for shared memory), but also
+    makes it UBAC constrained.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Managing files and directories
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Next, we provide the access rights to files and resources. In the example, we
+    limit access to `~/.Skype/` only and automatically mark `~/.Skype/` as `skype_home_t`
+    when it is created inside a user home directory (through `userdom_user_home_dir_filetrans`),
+    even though we identified the need to manage user content files as well. This
+    is because we need to make a policy design decision here—do we want the application
+    to have full access to all user resources or would we rather limit the access?
+    And inversely, do we want other applications that can access user content to access
+    Skype™ user (configuration) data?
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we do not want the application to access any user content, then we do not
+    need to add any rules: the policy will only allow search rights through the user
+    home directory (in order to locate `~/.Skype/`) and deny everything else.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we would like to grant the application access to the user content, we can
+    add in the following calls:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: This will grant full manage rights on user files and directories to the `skype_t`
+    domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the Gentoo Linux policy, additional types have been made available to provide
+    a finer-grained access control to user files. These types map to the **XDG Base
+    Directory Specification** (**XDGBDS**) as provided by the Free Desktop community,
+    and include the `xdg_downloads_home_t` type. End users can mark files and directories
+    as `xdg_downloads_home_t` and allow applications to have selective access to user
+    files, without risking that these applications have access to the more private
+    files of that user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In Gentoo, this means that the following call can be added to the policy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: X11 and shared memory
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: When an application needs to interact with the X11 server (as a client application),
+    much of this interaction is done through shared memory. In Linux, shared memory
+    can be interpreted as files on a tmpfs mount (think `/dev/shm/`) although other
+    shared memory constructions are still possible without tmpfs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In SELinux, policy developers want to make sure that this shared memory is labeled
+    specifically for the domain. For this, they create a type with `_tmpfs_t` as the
+    suffix. In our example, this is `skype_tmpfs_t`. Of course, we need to grant manage
+    rights on the shared memory (for all classes that will be used) to the `skype_t`
+    domain. In case of X11 interaction, these are files, symbolic links, FIFOs, and
+    sockets.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next to the manage rights, we also include a file transition: whenever `skype_t`
+    creates a file, symbolic link, FIFO, or socket in a `tmpfs_t` labeled location,
+    then this resource should be automatically labeled `skype_tmpfs_t`. This is done
+    through the `fs_tmpfs_filetrans` call.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we use `xserver_user_x_domain_template` that contains all the SELinux
+    privileges necessary for both the X11 client as well as X11 server to interact
+    with each other. This template uses a prefix argument (the first argument, which
+    we provided as `skype`), which will be used to create an X11 resource type called
+    `skype_input_xevent_t`. Similar to what we've seen for web servers (where an `apache_content_template`
+    call was used), this template gives an easy approach to automatically build additional
+    types and enable the X11 support.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next to the prefix, the domain itself is passed (`skype_t`) and the label used
+    for the shared memory (`skype_tmpfs_t`) are passed on as those are needed for
+    the X11 server support.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The network access
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: For the network access, we start by providing the `skype_t` domain with bind
+    privileges on a TCP socket and its IP address (which is represented by `node_t`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, we allow the `skype_t` domain to connect to the central Skype™ services,
+    which are available on HTTPS port `443` (authentication) and various seemingly
+    random high TCP ports (network nodes). The HTTP target port is identified as an
+    `http_port_t` type, the others are for the unreserved ports.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, we allow the `skype_t` domain to listen for incoming communications.
+    By default, this is on a high TCP port for messages and state information, while
+    for voice and video chat, this is through UDP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A simple way to identify the necessary types is to look at the `netstat` output,
+    as it shows us what ports a process is listening on, the protocol family (TCP
+    or UDP), as well as which ports it is connecting to:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The access to the sound and video devices is trivial, but during the design,
+    it is very well possible that many more accesses are already identified (as ours
+    is just an example). As we continue developing policies, writing a skeleton policy
+    will become more trivial.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A great source for learning more about the policies is to look for an existing
+    policy of a similar application, or an application that has certain functionalities
+    that resemble the functionalities offered by the application we're writing a policy
+    for. For Skype™, we could look at the policy of Gift (a peer-to-peer file sharing
+    application), which is an end user, graphical application with peer-to-peer communication
+    flows, supporting uploading and downloading files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After all, SELinux policies are a write-down of what the expected behavior is
+    of a domain. If another application has the same or similar behavior, then its
+    policy will be very similar too.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the previous example, we grouped the permissions together based on the functional
+    need. However, the coding style for SELinux policy files, as mentioned by the
+    reference policy, uses a different grouping, so make sure that if the policy would
+    be sent upstream, this coding style is followed instead.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: For more information about the XDGBDS, see [http://standards.freedesktop.org/basedir-spec/latest/](http://standards.freedesktop.org/basedir-spec/latest/)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting context definitions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The next step in the policy development is to mark its resources with the proper
+    file contexts. This will label the files of the application correctly, making
+    sure that the SELinux policy makes the right decisions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To update the file context definitions, follow the next set of steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Create the `myskype.fc` file and add in the definition for `~/.Skype/`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Next, add in the definitions for the `skype` binaries:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The definitions for the binaries are standard, path-based context declarations.
+    The one for the user home directory, however, is special.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As can be seen from the example, the path starts with `HOME_DIR`. This is a
+    special variable used by SELinux libraries, which automatically maps to all Linux
+    users' home directories. Rather than creating a `/home/[^/]*/\.Skype(/.*)?` context
+    directly, which has the design problem that home directories on other locations
+    (such as `/export/home/user/`) will not match, the SELinux libraries will check
+    the home directories of all real users (with a user ID starting at `500`, although
+    this is configurable) and for each different home root directory (`/home/` is
+    the most commonly used one), it will generate the proper contexts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The result of this operation is stored as the `file_contexts.homedirs` file
+    inside `/etc/selinux/mcs/contexts/files/` and is automatically created during
+    policy build (through the `genhomedircon` command).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next to `HOME_DIR`, other supported variables are `HOME_ROOT` (which represents
+    the home root path) and `ROLE` (which is the first role associated with a user).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Defining application role interfaces
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Finally, before testing the policy, we need to create a role interface and assign
+    it to the user domain that will be used to test (and run) the application. If
+    we don't create a role interface and assign it to a user domain, then the user
+    domain will either have no privileges to execute the application at all, or the
+    application will run with the user context rather than the newly defined `skype_t`
+    domain. If the user domain isn't unconfined, then chances are that the application
+    will fail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Role interfaces are the gateways of a policy. They ensure that domains and SELinux
+    users can interact with the application and that the set of privileges for a particular
+    application are coherent.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We create such an interface in the `.if` file and then assign this interface
+    to a user domain in order to test the interface:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Create the `myskype.if` file with the following interface in it:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create a policy for the user domain (for instance, `myunprivuser.te`) that
+    grants regular users access to the `skype_t` domain, by assigning the user domain
+    the `skype_role` call:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Build both policies and load them. Then, relabel the `skype` binary files (and
+    possibly preexisting `~/.Skype/` locations):'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Although we have defined all the rules for the `skype_t` domain that we think
+    are needed (in the next recipe, the policy will be extended until it really works),
+    we have not defined the rules yet to allow a user domain to actually execute the
+    `skype_exec_t` binaries and have the process run in the `skype_t` domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To accomplish that, we need to ensure that a domain transition occurs to the
+    `skype_t` domain when the user executes `skype_exec_t`. This is handled by the
+    `domtrans_pattern` call. But before we allow the domain transition, we first need
+    to allow the `skype_t` domain for the user role, which is done through the `roleattribute`
+    call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Until now, we focused primarily on type enforcement rules (that is, granting
+    privileges to SELinux domains based on the label of the target resource). In order
+    to allow certain users to run an application, the application domain itself needs
+    to be granted to the user role. This is supported through SELinux's **role-based
+    access control** **(RBAC**) model. This RBAC model ensures that a certain domain
+    (`skype_t`, in our example) can only be used by the roles we configure it for
+    (`user_r`, in our example). Other roles, such as DBA roles (`dbadm_r`) might have
+    no need for running the Skype™ application, so they will not be granted access
+    to the `skype_t` domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Not granting a domain does not necessarily prevent the application from executing
+    within the user domain itself. To accomplish that, we need to make sure that the
+    executable file type cannot be executed by other roles. Instead of using `userdom_user_application_domain`
+    for the `skype_t` and `skype_exec_t` types (which would assign a generic executable
+    attribute to the `skype_exec_t` type), we would use something similar to the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: As the user domain, which needs to be able to execute Skype™, also needs to
+    manage the `skype_home_t` files (in case, manual intervention in `~/.Skype/` is
+    needed or to make backups), we grant it both manage privileges as well as relabel
+    privileges. The relabel privileges are needed when, for instance, a backup is
+    restored.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the user domain, we then call the `skype_role` interface we just created.
+    In the example, we used the `optional_policy` statement. This allows policy modules
+    to be loaded even when one of the calls cannot be resolved or is not supported.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Suppose we need to unload the `myskype` module. Without the `optional_policy`
+    statement, the `myunprivuser` module would need to be unloaded as well, even though
+    this policy module might contain other rules that are important for the user domain
+    to work correctly (in the example, we only called the `skype_role` interface,
+    but after some time, the module might call many other interfaces as well). If
+    we don't unload the module and no `optional_policy` statements are used, then
+    SELinux will warn the administrator about unresolved dependencies between the
+    modules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the `optional_policy` statement, the SELinux tools know that the call might
+    become unresolvable, in which case, the entire block (everything inside the `optional_policy`
+    block) will be ignored while the module remains loaded.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: At the beginning of the recipe, we mentioned that unconfined user domains will
+    be able to execute the application without a domain transition. This is to be
+    expected, as the entire idea behind unconfined domains is that they are, well,
+    unconfined.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is considered a bad practice to, in general, create domain transitions from
+    an unconfined domain to confined domains. Only in very specific circumstances
+    do domain transitions from an unconfined domain to confined domains make sense
+    (such as when the target domain is used to confine potentially vulnerable applications,
+    such as a sandbox domain).
+  prefs: []
+  type: TYPE_NORMAL
+- en: From a security perspective, it makes more sense to confine users immediately
+    and use the proper domain transitions between (confined) user domains and the
+    application domains.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Testing and enhancing the policy
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: With the policy ready and loaded, it is time to start testing the application
+    from a user's perspective, while keeping an eye on the audit logs (for denials)
+    and application output.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Testing the application is an important phase of policy development and will
+    also be the most time consuming task. During testing, several functional features
+    of the application will be tried and the resulting permissions (SELinux-wise)
+    will need to be added to the policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In previous recipes, such as *Creating a skeleton policy*, we enabled a set
+    of permissions based on other policies and common sense. However, these permissions
+    have not been validated and tested yet. In this recipe, we will assert that the
+    permissions are truly needed, as we do not want to create a policy with too many
+    rights associated with it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Testing policies is a repetitive task. Every try-out means that the AVC denials
+    leading up to the start need to be discarded (as we do not want to include privileges
+    not related to the test) after which the application is tested and the results
+    are documented. Depending on how the application acts, new policy rules are added
+    to the policy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Write down the current timestamp or create a reference point inside the audit
+    logs (for instance, by reloading the SELinux policy), so we know from which point
+    in the audit logs we need to look at the audit events:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: As an end user, start the application (from a terminal window) and watch what
+    happens.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Write down the error that is displayed (if any):'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Look into the denials as displayed in the audit logs:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: For each first denial or denial related to the error shown earlier, try to enhance
+    the policy with the proper call and try again.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In this phase, we are enhancing the policy step by step. Some policy developers
+    like to run the application in permissive mode (either by running the entire system
+    in permissive mode or by marking this particular domain as a permissive domain),
+    registering all accesses performed (through the AVC denials) and enhancing the
+    policy based on that information. Although this might give a faster working policy,
+    these developers will also risk that they add too many privileges to a policy,
+    something that is very difficult to challenge and change later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead, we let SELinux prevent accesses and look at how the application reacts.
+    Based on the error logging of the application or the behavior of the application
+    and the AVC denial(s) seen through the logs, we can have a good picture of what
+    privileges are really needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For instance, simultaneously with the error presented in the example, the following
+    denial occurred:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: It is important that we focus on the first set of denials that occur and not
+    on all denials shown. It is very likely that denials shown after the first set
+    of denials are from error handling routines, either by the application or the
+    system in general, which would never be triggered in the first place if the proper
+    permissions are granted to the domain. Trying to grant those privileges as well
+    would result in a too broadly defined set of permissions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The preceding denial shown would result in the following addition to the policy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: Ignoring permissions we don't need
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: After repeated testing, we will have a policy that works, even though denials
+    might still show up in the audit logs. In order not to alarm any administrator,
+    we might want to disable auditing of those specific denials (while, of course,
+    ensuring that critical access vectors are still logged by the audit daemon).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In order to disable logging of certain denials that do not influence an application''s
+    behavior, trigger the denial and then register the `dontaudit` statements as explained
+    in the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For each denial shown in the audit logs, we need to find the corresponding
+    `dontaudit` rule set. Consider the following instance:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Search through the SELinux policies for `dontaudit` statements on this matter:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Add in the interface call to the policy, rebuild the policy, and then reload
+    it. Repeat until all cosmetic denials are no longer visible.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Many operations performed by applications can be seen as cosmetic—although in
+    the example, the application really performs the searches through the user files,
+    they are not needed for the application to function correctly. For instance, it
+    might be searching through the entire directory until it finds its own files,
+    which it does have access to.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By adding the `dontaudit` statements for these operations, we ensure that the
+    audit logs stay clean.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In case of problems, the administrator can still disable the `dontaudit` statements
+    in the policy, revealing every denial that SELinux has triggered (even those that
+    are explicitly marked as `dontaudit`):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To re-enable the `dontaudit` statements, rebuild and reload the policy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: In certain situations, there might not be an interface related to `dontaudit`
+    available. In that case, create a new interface (as part of an SELinux policy
+    module) with the `dontaudit` rules defined in it. For instance, for a `dontaudit`
+    rule set to ignore getting the attributes of `mozilla_home_t` content, we would
+    create a `mymozilla` policy module with the `mozilla_dontaudit_getattr_home` interface
+    declared in it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating application resource interfaces
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Our application policy is almost ready for deployment. However, it currently
+    is mainly end user focused, and there are no ways of interacting with the `skype_t`
+    domain (or other resources managed by the `skype` module) except through the `skype_role`
+    interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we'll add an interface for reading `skype_home_t`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Alongside the `skype_role` interface that we created in the *Defining application
+    role interfaces* recipe, we need to create additional resource interfaces so that
+    other domains can easily interact with the newly created policy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Open the `myskype.if` file and add in the following content:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The recipe itself is simple—for each interaction with resources managed by the
+    `skype` module, we need to create an interface that can be called by other modules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Each interface should be complete. For instance, in order to read the `skype_home_t`
+    content, a domain will first need to be able to search through the user's home
+    directory (`user_home_dir_t`, which is not the same as `user_home_t` as the former
+    is the type for the home directory while the latter is for its contents); hence,
+    the call to `userdom_search_user_home_dirs`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, the necessary privileges are assigned to the domain. As we do not provide
+    any class identifier in the interface name, the interface will grant read access
+    to all (significant) classes related to the `skype_home_t` type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If we only want to grant read access to files (and not to the `directory` class),
+    then the interface would be called `skype_read_home_files`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding conditional policy rules
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We can further fine-tune our policy with conditionals. Some of the access vectors
+    identified earlier might not be necessary in all circumstances, so it makes sense
+    to make them optional and configurable through SELinux Booleans.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Two of the identified access vectors that are candidates for configurable policies
+    are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Accessing the video and sound devices (in order to reduce the risk of malware
+    or vulnerabilities in the application to access the webcam or sound device and
+    spy on the unsuspecting users)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Accessing all user content (instead of only the `skype_home_t` content)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The following set of steps allows us to make the policy more flexible for the
+    administrators to handle by introducing Booleans. These Booleans modify the behavior
+    of the policy and are added to a policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Inside `myskype.te`, create the definitions for both Booleans. This is usually
+    done before the type declarations:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Inside the policy, group the statements that we want to trigger through the
+    Booleans:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `gen_tunable` declarations will generate Booleans that administrators can
+    toggle on the system. The first argument of each declaration is the name of the
+    Boolean to be created, while the second argument sets the default value of the
+    Boolean.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once Booleans are defined, the `tunable_policy` statements allow for grouping
+    the statement calls that need to be made configurable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It is possible to have rules enabled when a Boolean is disabled as well. For
+    instance, for the `skype_manage_user_content` one, the following code can be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Booleans can also be combined, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: In such situations, the policy group rules will only take effect if both the
+    Booleans are enabled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It is also possible to only enable rules if a Boolean is not set, as shown
+    in the next line of code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Tunable policies are a powerful extension to SELinux. However, there are some
+    caveats to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is not simple to make the description of SELinux Booleans available to the
+    administrator. The descriptions are defined through in-policy comments, but this
+    is not used for custom modules—a full policy build needs to be made in order to
+    generate the `policy.xml` file that contains all descriptions.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It is not possible to assign attributes within a `tunable_policy` group. Instead,
+    policy developers will need to make the permissions related to the attribute configurable
+    (if possible) or not assign the attribute at all.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It is not possible to use named file transitions within a `tunable_policy` group.
+    In general, that doesn't matter that much—there are a few situations where a named
+    file transition would depend on a Boolean, but these situations do occur.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It is not possible to have the `optional_policy` statements within a `tunable_policy`
+    group. Instead, wrap the `tunable_policy` call with an `optional_policy` statement
+    first. It might be needed to create multiple blocks if a single Boolean would
+    trigger multiple policy calls that warrant the use of an `optional_policy` block.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Efforts are being made to remove these shortcomings from the SELinux subsystem
+    though.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding build-time policy decisions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The last enhancement we might want to look at is build-time policy decisions.
+    Unlike SELinux Booleans, these are policy blocks that are enabled (or disabled)
+    based on build parameters. We have encountered a few of these in the past already,
+    namely `enable_mcs`, `enable_mls` as well as distribution selection parameters,
+    such as `distro_gentoo` or `distro_redhat`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we will enable the `xdg_manage_downloads_home` call but only
+    when the policy is built for a Gentoo system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Build-time decisions are added to the policy using the `ifdef` statements,
+    as can be seen through the next set of steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Open `myskype.te` and add in the following block of code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Rebuild the policy. On a Gentoo system, we can confirm that the access is now
+    granted through `sesearch`, whereas other distributions probably don''t even know
+    the `xdg_downloads_home_t` type:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The reference policy build system automatically defines a couple of parameters
+    that can be used by the `ifdef` macros. The build system uses definitions inside
+    the `build.conf` file available at `/usr/share/selinux/mcs/include/` or `/usr/share/selinux/devel/include/`
+    to generate such parameters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For instance, the distribution parameter in `build.conf` is set as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Inside `Makefile`, this is converted into an `M4PARAM` setting:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: Through these `M4` parameters, we can then use the `ifdef` statements to query
+    the existence of these parameters and make build-time decisions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: It is possible to add our own set of parameters. For this, we set the `M4PARAM`
+    environment variable before we call the `make` command (used while building the
+    policy modules).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For instance, to support the `debug` statements, we could set the following
+    in the policy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'During policy build, we can enable these statements as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE

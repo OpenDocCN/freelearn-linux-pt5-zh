@@ -1,0 +1,1126 @@
+- en: Containers, Virtual Machines, and the Cloud
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using Linux Containers
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using Docker
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using Virtual Machines in Linux
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Linux in the cloud
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Modern Linux applications can be deployed on dedicated hardware, containers,
+    Virtual Machines (VMs), or the cloud. Each solution has strengths and weaknesses,
+    and each of them can be configured and maintained with scripts as well as GUIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A container is ideal if you want to deploy many copies of a single application
+    where each instance needs its own copy of data. For example, containers work well
+    with database-driven web servers where each server needs the same web infrastructure
+    but has private data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, the downside of a container is that it relies on the host system's
+    kernel. You can run multiple Linux distributions on a Linux host, but you can't
+    run Windows in a container.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using a VM is your best bet if you need a complete environment that is not the
+    same for all instances. With VMs, you can run Windows and Linux on a single host.
+    This is ideal for validation testing when you don't want a dozen boxes in your
+    office but need to test against different distributions and operating systems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The downside of VMs is that they are huge. Each VM implements an entire computer-operating
+    system, device drivers, all the applications and utilities, and so on. Each Linux
+    VM needs at least one core and 1 GB RAM. A Windows VM may need two cores and 4
+    GB RAM. If you wish to run multiple VMs simultaneously, you need enough RAM to
+    support each one of the VMs; otherwise, the host will start swapping and performance
+    will suffer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The cloud is like having many computers and lots of bandwidth at your fingertips.
+    You may actually be running on a VM or container in the cloud, or you might have
+    your own dedicated system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The biggest advantage of the cloud is that it can scale. If you think your application
+    might go viral or your usage is cyclic, the ability to scale up and down quickly
+    without needing to buy or lease new hardware new connectivity is necessary. For
+    example, if your system processes college registrations, it will be overworked
+    for about two weeks, twice a year, and almost dormant for the rest of the time.
+    You may need a dozen sets of hardware for those two weeks, but you don't want
+    to have them sitting idle for the rest of the year.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The downside of the cloud is that it's not something you can see. All of the
+    maintenance and configuration has to be done remotely.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using Linux containers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Linux Container** (**lxc**) packages provide the basic container functionality
+    used by Docker and LXD container deployment systems.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A Linux container uses kernel level support for **Control Groups** (**cgroups**)
+    and the `systemd` tools described in [Chapter 12](5c74c943-1155-4720-a3cb-f4740f691f8c.xhtml),
+    *Tuning a Linux System*. The cgroups support provides tools to control the resources
+    available to a group of programs. This informs kernel control about the resources
+    that are available to the processes running in a container. A container may have
+    limited access to devices, network connectivity, memory, and so on. This control
+    keeps the containers from interfering with each other or potentially damaging
+    the host system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Container support is not provided in stock distributions. You'll need to install
+    it separately. The level of support across distributions is inconsistent. The
+    **lxc** container system was developed by Canonical, so Ubuntu distributions have
+    complete container support. Debian 9 (Stretch) is better than Debian 8 (Jessie)
+    in this regard.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Fedora has limited support for lxc containers. It is easy to create privileged
+    containers and a bridged Ethernet connection, but as of Fedora 25, the `cgmanager`
+    service required for unprivileged containers is unavailable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: SuSE supports limited use of lxc. SuSE's `libvirt-lxc` package is similar but
+    not identical to lxc. SuSE's `libvirt-lxc` package is not covered in this chapter.
+    A privileged container with no Ethernet is easy to create under SuSE, but it does
+    not support unprivileged containers and bridged Ethernet.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here's how to install `lxc` support on major distributions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For Ubuntu, use the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next we have Debian. Debian distributions may only include the security repositories
+    in `/etc/apt/sources.list`. If so, you''ll need to add `deb http://ftp.us.debian.org/debian
+    stretch main contrib` to `/etc/apt/sources.list` and then perform `apt-get update
+    before`, loading the `lxc` package:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For OpenSuSE, use the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For Red Hat/Fedora-based systems, add the following `Epel` repository:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once you''ve done this, install the following packages before you install lxc support:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `libvirt` package provides networking support, and `debootstrap` is required
+    to run Debian-based containers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `lxc` package adds several commands to your system. These include:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`lxc-create`: This is to create an lxc container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lxc-ls`: This is a list of the available containers'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lxc-start`: This is to start a container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lxc-stop`: This is to stop a container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lxc-attach`: This is to connect to the root shell of a container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lxc-console`: This is to connect to a login session in a container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: On Red Hat-based systems, you may need to disable SELinux while testing. On
+    OpenSuSE systems, you may need to disable **AppArmor**. You'll need to reboot
+    after disabling AppArmor via `yast2`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Linux containers come in two basic flavors: privileged and unprivileged. Privileged
+    containers are created by the root and the underlying system has root privileges.
+    An unprivileged container is created by a user and only has user privileges.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Privileged containers are easier to create and more widely supported since they
+    don't require `uid` and `gid` mapping, device permissions, and so on. However,
+    if a user or application manages to escape from the container, they'll have full
+    privileges on the host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a privileged container is a good way to confirm that all the required
+    packages are installed on your system. After you create a privileged container,
+    use unprivileged containers for your applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a privileged container
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The easiest way to get started with Linux containers is to download a prebuilt
+    distribution in a privileged container. The `lxc-create` command creates a base
+    container structure and can populate it with a predefined Linux distribution.
+    The syntax of the `lxc-create` command is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `-n` option defines a name for this container. This name will be used to
+    identify this container when it is started, stopped, or reconfigured.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `-t` option defines the template to be used to create this container. The
+    type `download` connects your system to a repository of prebuilt containers and
+    prompts you for the container to download.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This is an easy way to experiment with other distributions or create an application
+    that needs a distribution other than the host''s Linux distribution:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The download template retrieves a list of the available predefined containers
+    from the Internet and populates the container from the network archive. The create
+    command provides a list of the available containers and then prompts for the **Distribution**,
+    **Release**, and Architecture. You can only run a container if your hardware supports
+    this Architecture. You cannot run an Arm container if your system has an Intel
+    CPU, but you can run a 32-bit i386 container on a system with a 64-bit Intel CPU:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can create a container based on your current distribution by selecting
+    a template that matches the current installation. The templates are defined in
+    `/usr/share/lxc/templates`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To create a container for your current distribution, select the appropriate
+    template and run the `lxc-create` command. The download process and installation
+    takes several minutes. The following example skips most of the installation and
+    configuration messages:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding command populates the new container from the repositories defined
+    in your package manager. Before you can use a container, you must start it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Starting a container
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `lxc-start` command starts a container. As with other lxc commands, you
+    must provide the name of the container to start:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The boot sequence may hang and you may see errors similar to the following
+    one. These are caused by the container''s boot sequence trying to perform graphics
+    operations, such as displaying a splash screen without graphics support in the
+    client:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can wait for these errors to time out and ignore them, or you can disable
+    the splash screen. Disabling the splash screen varies between distributions and
+    releases. The files may be in `/etc/init`, but that's not guaranteed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are two ways to work within a container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`lxc-attach`: This attaches directly to a root account on a running container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lxc-console`: This opens a console for a login session on a running container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The first use of a container is to attach directly to create user accounts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After you''ve created a user account, log in as an unprivileged user or root
+    with the `lxc-console` application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: Stopping a container
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `lxc-stop` command stops a container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Listing known containers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `lxc-ls` command lists the container names that are available for the current
+    user. This does not list all the containers in a system, only those that the current
+    user owns:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: Displaying container information
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `lxc-info` command displays information about a container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This command will only display information about a single container, though.
+    Using a shell loop, as described in [Chapter 1](195d920d-33c2-41d6-bd33-37d75f9c37f1.xhtml), *Shell
+    Something Out*, we can display information about all the containers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: If the container is stopped, there is no status information available. Running
+    containers record their CPU, memory, disk (block), I/O, and network usage. This
+    tool lets you monitor your containers to see which ones are most active.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating an unprivileged container
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Unprivileged containers are recommended for normal use. There is potential for
+    a badly configured container or badly configured application to allow control
+    to escape from the container. Since containers invoke system calls in the host
+    kernel, if the container is running as the root, the system calls will also run
+    as the root. However, unprivileged containers run with normal user privileges
+    and are thus safer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To create unprivileged containers, the host must support Linux Control Groups
+    and uid mapping. This support is included in basic Ubuntu distributions, but it
+    needs to be added to other distributions. The `cgmanager` package is not available
+    in all distributions. You cannot start an unprivileged container without this
+    package:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Start `cgmanager`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Debian systems may require that clone support be enabled. If you receive a
+    `chown` error when creating a container, these lines will fix it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The username of an account that''s allowed to create containers must be included
+    in the `etc` mapping tables:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: These commands add the user to the User ID and Group ID mapping tables `(/etc/subuid`
+    and `/etc/subgid`) and assign UIDs from `100000 -> 165536` to the user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, set up the configuration file for your containers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Add the following lines to `~/.config/lxc/default.conf`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If the containers support network access, add a line to `/etc/lxc/lxc-usernet`
+    to define the users who will have access to the network bridge:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, `USERNAME` is the name of the user who owns the container. `veth` is
+    the usual name for the virtual Ethernet device. `BRIDGENAME` is the name that''s
+    displayed by `ifconfig`. It is usually either `br0` or `lxcbro`. `COUNT` is the
+    number of simultaneous connections that will be allowed:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: Creating an Ethernet bridge
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'A container cannot access your Ethernet adapter directly. It requires a bridge
+    between the Virtual Ethernet and the actual Ethernet. Recent Ubuntu distributions
+    create an Ethernet bridge automatically when you install the lxc package. Debian
+    and Fedora may require that you manually create the bridge. To create a bridge
+    on Fedora, use the `libvirt` package to create a virtual bridge first:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, edit `/etc/lxc/default.conf` to reference `virbr0` instead of `lxcbr0`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: If you've already created a container, edit the config file for that container
+    as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To create a bridge on Debian systems, you must edit the network configuration
+    and the container configuration files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Edit `/etc/lxc/default.conf`. Comment out the default empty network and add
+    a definition for the lxc bridge:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, create the networking bridge:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: Containers created after these steps are performed will have networking enabled.
+    Network support can be added to the existing containers by adding the `lxc.network`
+    lines to the container's config file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The container created by the `lxc-create` command is a directory tree that
+    includes the configuration options and root filesystem for the container. Privileged
+    containers are constructed under `/var/lib/lxc`. Nonprivileged containers are
+    stored under `$HOME/.local/lxc`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can examine or modify a container''s configuration by editing the config
+    file in the container''s top directory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `rootfs` folder contains a root filesystem for the container. This is the
+    root (`/`) folder of a running container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can populate a container by adding, deleting, or modifying files in the
+    `rootfs` folder. For instance, to run web services, a container might have basic
+    web services installed via the package manager and the actual data of each service
+    installed by copying files to the `rootfs`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using Docker
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `lxc` containers are complex and can be difficult to work with. These issues
+    led to the Docker package. Docker uses the same underlying Linux functionalities
+    of `namespaces` and `cgroups` to create lightweight containers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Docker is only officially supported on 64-bit systems, making `lxc` the better
+    choice for legacy systems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The major difference between a Docker container and an lxc container is that
+    a Docker container commonly runs one process, while an lxc container runs many.
+    To deploy a database-backed web server, you need at least two Docker containers–one
+    for the web server and one for the database server–but only one lxc container.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Docker philosophy makes it easy to construct systems from smaller building
+    blocks, but it can make it harder to develop blocks since so many Linux utilities
+    are expected to run inside a full Linux system with `crontab` entries to carry
+    out operations such as cleanup, log rotation, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once a Docker container is created, it will run exactly as expected on other
+    Docker servers. This makes it very easy to deploy Docker containers on cloud clusters
+    or remote sites.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Docker is not installed with most distributions. It is distributed via Docker's
+    repositories. Using these requires adding new repositories to your package manager
+    with new checksums.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Docker has instructions for each distribution and different releases on their
+    main page, which is available at [http://docs.docker.com](http://docs.docker.com).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'When Docker is first installed, it is not running. You must start the server
+    with a command such as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The Docker command has many subcommands that provide functionality. These commands
+    will find a Docker container and download and run it. Here''s a bit about the
+    subcommands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`# docker search`: This searches Docker archives for containers with names
+    that match a key'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`# docker pull`: This pulls the named container to your system'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`# docker run`: This runs an application in a container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`# docker ps`: This lists the running Docker containers'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`# docker attach`: This attaches to a running container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`# docker stop`: This stops a container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`# docker rm`: This removes a container'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The default Docker installation requires that the `docker` command be run either
+    as a `root` or using `sudo`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Each of these commands have a `man` page. This page is named by combining the
+    command and subcommand with a dash. To view the `docker search` man page, use
+    `man docker-search`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next recipe demonstrates how to download a Docker container and run it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finding a container
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `docker search` command returns a list of Docker containers that match
+    a search term:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here TERM is an alphanumeric string (no wild cards). The search command will
+    return up to 25 containers that include the string in their name:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here STARS represent a rating for the container. The containers are ordered
+    with the highest rating first.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Downloading a container
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `docker pull` command downloads a container from the Docker registry. By
+    default, it pulls data from Docker''s public registry at `registry-1.docker.io`.
+    The downloaded container is added to your system. The containers are commonly
+    stored under /`var/lib/docker`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: Starting a Docker container
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `docker run` command starts a process in a container. Commonly, the process
+    is a `bash` shell that allows you to attach to the container and start other processes.
+    This command returns a hash value that defines this session.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When a Docker container starts, a network connection is created for it automatically.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The syntax for the run command is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `docker run` command supports many options, including:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`-t`: Allocate a pseudo tty (by default, false)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-i`: Keep an interactive session open while unattached'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-d`: Start the container detached (running in the background)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`--name`: The name to assign to this instance'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'This example starts the bash shell in the container that was previously pulled:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: Listing the Docker sessions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `docker p`s command lists the currently running Docker sessions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `-a` option will list all the Docker containers on your system, whether
+    they are running or not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Attaching your display to a running Docker container
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `docker attach` command attaches your display to the `tty` session in a
+    running container. You need to run as the root within this container.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To exit an attached session, type `^P^Q`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This example creates an HTML page and starts the Apache web server in the container:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: Browsing to `172.17.0.5` will show the `It's Alive` page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Stopping a Docker session
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `docker stop` command terminates a running Docker session:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: Removing a Docker instance
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `docker rm` command removes a container. The container must be stopped
+    before removing it. A container can be removed either by name or identifier:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Alternatively, you can use this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The Docker containers use the same `namespace` and `cgroup` kernel support as
+    that of the `lxc` containers. Initially, Docker was a layer over `lxc`, but it
+    has since evolved into a unique system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The main configuration files for the server are stored at /`var/lib/docker`
+    and `/etc/docker`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using Virtual Machines in Linux
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: There are four options for using VMs in Linux. The three open source options
+    are KVM, XEN, and VirtualBox. Commercially, VMware supplies a virtual engine that
+    can be hosted in Linux and an executive that can run VMs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware has been supporting VMs longer than anyone else. They support Unix, Linux,
+    Mac OS X, and Windows as hosts and Unix, Linux, and Windows as guest systems.
+    For commercial use, VMware Player or VMWare Workstation are the two best choices
+    you have.
+  prefs: []
+  type: TYPE_NORMAL
+- en: KVM and VirtualBox are the two most popular VM engines for Linux. KVM delivers
+    better performance, but it requires a CPU that supports virtualization (Intel
+    VT-x). Most modern Intel and AMD CPUs support these features. VirtualBox has the
+    advantage of being ported to Windows and Mac OS X, allowing you to move a virtual
+    machine to another platform easily. VirtualBox does not require VT-x support,
+    making it suitable for legacy systems as well as modern systems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: VirtualBox is supported by most distributions, but it may not be part of these
+    distributions' default package repositories.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To install VirtualBox on Debian 9, you need to add the virtualbox.org repository
+    to the sites that apt-get will accept packages from:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `curl` package is required to install the proper keys. If this is not already
+    present, install it before adding the key and updating the repository information:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once the repository is updated, you can install VirtualBox with `apt-get`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When VirtualBox is installed, it creates an item in the start menu. It may be
+    under System or Applications/System Tools. The GUI can be started from a terminal
+    session as `virtualbox` or as `VirtualBox`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The VirtualBox GUI makes it easy to create and run VMs. The GUI has a button
+    named New in the upper-left corner; this is used to create a new, empty VM. The
+    wizard prompts you for information such as memory and disk limits for the new
+    VM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once the VM is created, the Start button is activated. The default settings
+    connect the virtual machine's CD-ROM to the host's CD-ROM. You can put an installation
+    disk in the CD-ROM and click on Start to install the operating system on a new
+    VM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Linux in the cloud
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: There are two primary reasons to use a cloud server. Service providers use a
+    commercial cloud service, such as Amazon's AWS, because it lets them easily ramp
+    up their resources when demand is higher and ramp down their costs when demand
+    is lower. Cloud storage providers, such as Google Docs, allow users to access
+    their data from any device and share data with others.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The OwnCloud package transforms your Linux server into a private cloud storage
+    system. You can use an OwnCloud server as a private corporate file sharing system
+    to share files with friends or as a remote backup for your phone or tablet.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The OwnCloud project forked in 2016\. The NextCloud server and applications
+    are expected to use the same protocol as that of OwnCloud and to be interchangeable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Running the OwnCloud package requires a **LAMP** (**Linux, Apache, MySQL, PHP**)
+    installation. These packages are supported by all Linux distributions, though
+    they may not be installed by default. Administering and installing MySQL is discussed
+    in [Chapter 10](20129291-0a5b-43a8-ad0c-54c74992d0e3.xhtml), *Administration Calls*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Most distributions do not include the OwnCloud server in their repositories.
+    Instead, the OwnCloud project maintains repositories to support the distributions.
+    You'll need to attach OwnCloud to your RPM or apt repository before you download.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Ubuntu 16.10
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The following steps will install the LAMP stack on a Ubuntu 16.10 system. Similar
+    commands will work for any Debian-based system. Unfortunately, package names sometimes
+    vary between releases:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'OwnCloud requires security beyond default settings. The `mysql_secure_installation`
+    script will configure MySQL properly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Configure the `OwnCloud` repository:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once the repository is in place, apt will install and start the server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: OpenSuSE Tumbleweed
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Install the **LAMP** stack with **Yast2**. Open `yast2`, select Software Management,
+    and install `apache2`, `mysql`, and `owncloud-client`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, select the `System` tab, and from this tab, select the `Services Manager`
+    tab. Confirm that the `mysql` and `apache2` services are enabled and active.
+  prefs: []
+  type: TYPE_NORMAL
+- en: These steps install the OwnCloud client that will let you synchronize your workspace
+    to an OwnCloud server and the system requirements for a server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'OwnCloud requires security beyond default settings. The `mysql_secure_installation`
+    script will configure MySQL properly:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following commands will install and start the OwnCloud server. The first
+    three commands configure `zypper` to include the OwnCloud repository. Once these
+    repositories are added, the Owncloud package is installed like any other package:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Once OwnCloud is installed, you can configure an admin account, and from there,
+    add user accounts. The NextCloud Android app will communicate with the OwnCloud
+    server as well as the NextCloud server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring OwnCloud
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Once `owncloud` is installed, you can configure it by browsing to your local
+    address:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: The initial screen will prompt you for an admin username and password. You can
+    log in as the user to create backups and copy files between phones, tablets, and
+    computers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The bare installation process we just discussed is suitable for testing. OwnCloud
+    and NextCloud will use HTTPS sessions if HTTPS support is available. Enabling
+    HTTPS support requires an X.509 security certificate.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can purchase a security certificate from one of the dozens of commercial
+    providers, self-sign a certificate for your own use, or create a free certificate
+    with **Let's Encrypt** (http://letsencrypt.org).
+  prefs: []
+  type: TYPE_NORMAL
+- en: A self-signed certificate is adequate for testing, but most browsers and phone
+    apps will flag this as an untrusted site. Let's Encrypt is a service of the Internet
+    Security Research Group (ISRG). The certificates they generate are fully registered
+    and all applications can accept them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first step in acquiring a certificate is verifying that your site is what
+    you claim it is. Let's Encrypt certificates are validated using a system called
+    Automated Certificate Management Environment (ACME). The ACME system creates a
+    hidden file on your web server, tells the **Certificate Authority** (**CA**) where
+    that file is, and the CA confirms that the expected file is there. This proves
+    that you have access to the web server and that DNS records point to the proper
+    hardware.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you are using a common web server, such as Nginx or Apache, the simplest
+    way to set up your certificates is with the `certbot` created by EFF:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: This robot will add new packages and install your new certificate in the proper
+    place.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you are using a less common server or have a non-standard installation, the
+    `getssl` package is more configurable. The `getssl` package is a bash script that
+    reads two configuration files to automate the creation of the certificate. Download
+    the package from here and unzip from `https://github.com/srvrco/getssl`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unzipping `getssl.zip` creates a folder named `getssl_master`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Generating and installing the certificates requires three steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create the default configuration files with `getssl -c DOMAIN.com`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Edit the configuration files.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create the certificates.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Start by `cd-ing` to the `getssl_master` folder and creating the configuration
+    files:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: Replace `DOMAIN` with the name of your domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This step creates the `$HOME/.getssl` and `$HOME/.getssl/DOMAIN.com` folders
+    and creates a file named `getssl.cfg` in both of these. Each of these files must
+    be edited.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Edit `~/.getssl/getssl.cfg` and add your email address:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: The default values in the rest of the fields are suitable for most sites.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, edit `~/.getssl/DOMAIN.com/getssl.cfg`. There are several fields to modify
+    in this file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The main change is to set the Acme Challenge Location (ACL) field. The ACME
+    protocol will try to find a file in [http://www.DOMAIN.com/.well-known/acme-challenge](http://www.DOMAIN.com/.well-known/acme-challenge).
+    The ACL value is the physical location of that folder on your system. You must
+    create the `.well-known` and .`well-known/acme-challenge` folders and set ownership
+    if they don't exist.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If your web pages are kept in `/var/web/DOMAIN`, you could create new folders
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE58]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The ACL lines would resemble the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE59]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You must also define where the certificates are to be placed. This location
+    must match the configuration option in your web server. For instance, if certificates
+    are kept in `/var/web/certs`, the definitions will resemble this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You must set the type of test that the ACME protocol will use. These are commented
+    out at the bottom of the configuration file. Using the default values are usually
+    best:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After these edits are complete, test them by running this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs: []
+  type: TYPE_PRE
+- en: This command resembles the first one, but it does not include the `-c` (create)
+    option. You can repeat this command until you've corrected any errors and are
+    happy with the results.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The default behavior of the `getssl` script is to generate a test certificate
+    that's not really valid. This is done because Let's Encrypt limits the number
+    of actual certificates it will generate for a site to avoid abuse.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once the configuration files are correct, edit them again and change the server–from
+    the Staging server to the actual Let''s Encrypt server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, rerun the `getssl` script one last time with the `-f` option to force
+    it to rebuild and replace the previous files:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs: []
+  type: TYPE_PRE
+- en: You may need to restart your web server or reboot your system before the new
+    files are recognized.
+  prefs: []
+  type: TYPE_NORMAL

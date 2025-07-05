@@ -1,0 +1,658 @@
+- en: Tracing the Clues
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing packets with `tcpdump`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Finding packets with `ngrep`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tracing network routes with `ip`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tracing system calls with `strace`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tracing dynamic library functions with `ltrace`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Nothing happens without a trace. On a Linux system, we can trace events via
+    the log files discussed in [Chapter 9](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml),
+    *Put On The Monitor's Cap*. The `top` command shows which programs use the most
+    CPU time, and `watch`, `df`, and `du` let us monitor disk usage.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This chapter will describe ways to get more information about network packets,
+    CPU usage, disk usage, and dynamic library calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing packets with tcpdump
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Just knowing which applications are using a given port may not be sufficient
+    information to trace down a problem. Sometimes you need to check the data that
+    is being transferred as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'You need to be a root user to run `tcpdump`. The `tcpdump` application may
+    not be installed in your system by default. So install it with your package manager:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `tcpdump` application is the frontend to Wireshark and other network sniffer
+    programs. The GUI interface supports many of the options we'll describe shortly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This application''s default behavior is to display every packet seen on the
+    primary Ethernet link. The format of a packet report is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The name-value pairs include:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Flags`: The flags associated with this packet are as follows:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The term `S` stands for **SYN** (**Start Connection**)
+  prefs:
+  - PREF_UL
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The term `F` stands for **FIN** (**Finish Connection**)
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The term `P` stands for **PUSH** (**Push data**)
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The term `R` stands for **RST** (**Reset Connection**)
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The period `.` means there are no flags
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`seq`: This refers to the sequence number of the packet. It will be echoed
+    in an ACK to identify the packet being acknowledged.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ack`: This refers to the acknowledgement that indicates a packet is received.
+    The value is the sequence number from a previous packet.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`win`: This indicates the size of the buffer at the destination.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`options`: This refers to the TCP options defined for this packet. It is reported
+    as a comma-separated set of key-value pairs.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following output shows requests from a Windows computer to the SAMBA server
+    intermingled with a DNS request. The intermingling of different packets from different
+    sources and applications makes it difficult to track a specific application or
+    traffic on a given host. However, the `tcpdump` command has flags that make our
+    life easier:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `-w` flag sends the `tcpdump` output to a file instead of the terminal.
+    The output format is in binary form, which can be read with the `-r` flag. Sniffing
+    packets must be done with root privileges, but displaying the results from a previously
+    saved file can be done as a normal user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By default, `tcpdump` runs and collects data until it is killed using Ctrl-C
+    or **SIGTERM**. The `-c` flag limits the number of packets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: As a rule, we want to examine the activity on a single host, perhaps a single
+    application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The last values of the `tcpdump` command line form an expression that helps
+    us filter packets. The expression is a set of key-value pairs with modifiers and
+    Boolean operators. The next recipes demonstrate using filters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Displaying only HTTP packets
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `port` key displays only the packets sent to or from a given port:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Displaying only HTTP packets generated by this host
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'If you are trying to track web usage on your network, you may only need to
+    see the packets generated on your site. The `src` modifier specifies only these
+    packets, with given values, in the source file. The `dst` modifier specifies only
+    the destination:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: Viewing the packet payload as well as headers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: If you need to track down the host that's swamping the network, all you need
+    is headers. If you are trying to debug a web or database application, you probably
+    need to see the contents of the packets as well as the headers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `-X` flag will include the packet data in the output.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The host keyword can be combined with port information to limit the report to
+    data to and from a given host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The two tests are connected with **and** to perform the Boolean **and** operation,
+    and they report only those packets that are to or from noucorp.com and/or the
+    `HTTP` server. The sample output shows the start of a `GET` request and the server''s
+    reply:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `tcpdump` application sets a promiscuous flag that causes the NIC to pass
+    all the packets to the processor. It does this instead of filtering only the ones
+    that pertain to this host. This flag allows the recording of any packet on the
+    physical network that the host is connected to, not just the packets intended
+    for this host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This application is used to trace issues with overloaded network segments, hosts
+    that generate unexpected traffic, network looping, faulty NICs, malformed packets,
+    and more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the `-w` and `-r` option, `tcpdump` saves data in raw format, allowing
+    you to examine it later as a regular user. For example, if there are excessive
+    network packet collisions at 3:00 A.M., you can set up a `cron` job to run `tcpdump`
+    at 3:00 A.M. and then examine the data during normal working hours.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finding packets with ngrep
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ngrep` application is a cross between `grep` and `tcpdump`. It watches
+    network ports and displays packets that match a pattern. You must have root privileges
+    to run `ngrep`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'You may not have the `ngrep` package installed. However, it can be installed
+    with most package managers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ngrep` application accepts a pattern to watch for (such as `grep`), a filter
+    string (such as `tcpdump`), and many command-line flags to fine-tune its behavior.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following example watches the traffic on port `80` and reports any packets
+    with the string `Linux` in them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `-q` flag directs `ngrep` to only print the headers and payloads.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `-c` flag defines the number of columns to use for payload data. By default,
+    the number is four, which is not useful for text-based packets.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After the flags is the match string (Linux), followed by a filter expression
+    using the same filter language as `tcpdump`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ngrep` application also sets the promiscuous flag, allowing it to sniff
+    all the visible packets, whether they relate to the host or not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The previous example displayed all of the HTTP traffic. If the host system is
+    on a wireless network or wired via a hub (instead of a switch), it will display
+    all of the web traffic caused by all the active users.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `-x` option in `ngrep` displays a hex dump as well as a printable form.
+    Combining this with `-X` allows you to search for a binary string (perhaps a virus
+    signature or some known pattern).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This example watches for a binary stream from an HTTPS connection:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: The hash marks indicate the packets that were scanned; they do not include the
+    target pattern. There are many more options to `ngrep`; read the `man` page for
+    the complete list.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing network routes with ip
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ip` utility reports information about the state of your network. It can
+    tell you how many packets are being sent and received, what types of packets are
+    being sent, how the packets are being routed, and more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `netstat` utility described in [Chapter 8](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml),
+    *The Old-Boy Network* is standard in all Linux distributions; however, it is now
+    being replaced by more efficient utilities, such as `ip`. These new utilities
+    are included in the `iproute2` package, which is already installed on most modern
+    distributions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ip` utility has many features. This recipe will discuss a few that are
+    useful for tracing network behavior.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Reporting routes with ip route
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When packets don't reach their destination (`ping` or `traceroute` fail), the
+    first thing an experienced user checks is the cables. The next thing to check
+    is the routing tables. If a system lacks a default gateway (`0.0.0.0`), it will
+    only find machines on its physical network. If you have multiple networks running
+    on the same wires, you'll need to add routes to allow machines attached to one
+    network to send packets to another.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `ip route` command reports known routes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `ip route` report is space-delimited. After the first element, it consists
+    of a set of keys and values.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first line in the preceding code describes the `10.8.0.2` address as a tunnel
+    device that uses a kernel protocol, and this address is only valid on this tunnel
+    device. The second line describes the `192.168.87.x` network used to communicate
+    with virtual machines. The third line is the primary network of this system, which
+    is connected to `/dev/eth0`. The last line defines the default route, which routes
+    to `192.168.1.1` through `eth0`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The keys reported by `ip route` include the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`via`: This refers to the address of the next hop.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`proto`: This is the protocol identifier of the route. The kernel protocol
+    is a route installed by the kernel, while static routes are defined by an administrator.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`scope`: This refers to the scope where the address is valid. A link scope
+    is only valid on this device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`dev`: This is the device associated with the address.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tracing recent IP connections and the ARP table
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `ip neighbor` command reports known relationships between the IP address,
+    device, and hardware MAC address. It reports whether the relationship was reestablished
+    recently or has gone stale:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: The output of the `ip neighbor` command shows that there has been no recent
+    activity between either this system and the default gateway, or this system and
+    the host at `192.168.1.4`. It also shows that there has been no recent activity
+    in the virtual machines and the host at `192.168.1.2` is connected recently.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The current status of `REACHABLE` in the preceding output means that the `arp`
+    table is up to date and the host thinks it knows the MAC address of the remote
+    system. The value of `STALE` here does not indicate that the system is unreachable;
+    it merely means the values in the `arp` table have expired. When your system tries
+    to use one of these routes, it sends an ARP request first to verify the MAC address
+    associated with the IP address.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The relationship between the MAC address and the IP address should only change
+    when the hardware is changed or devices are reassigned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If devices on a network show intermittent connectivity, it may mean that two
+    devices have been assigned the same IP address. It could also be possible that
+    two DHCP servers are running or someone has manually assigned an address that's
+    already in use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the case of two devices with the same IP address, the reported MAC address
+    for a given IP address will change in intervals, and the `ip neighbor` command
+    will help track down the misconfigured device.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing a route
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `traceroute` command discussed in [Chapter 8](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml),
+    *The Old-Boy Network* traces a packet''s entire path from the current host to
+    its destination. The `route get` command reports the next hop from the current
+    machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding return shows that the route to the virtual machine is through
+    the vmnet8 interface located at `172.16.183.1`. The packets sent to this site
+    will be split if they are larger than 1,500 bytes and discarded after 64 hops:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: To reach an address on the Internet, a packet needs to leave the local network
+    via the default gateway, and the link to this gateway is the host's `eth0` device
+    at `192.168.1.3`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ip` command runs in the user space and interfaces in the kernel tables.
+    Using this command, a normal user can examine the network configuration whereas
+    a superuser can configure the network.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing system calls with strace
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A GNU/Linux computer may have hundreds of tasks running at a time, but it will
+    possess only one Network Interface, one disk drive, one keyboard, and so on. The
+    Linux kernel allocates these limited resources and controls how tasks access them.
+    This prevents two tasks from accidently intermingling data in a disk file, for
+    example.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When you run an application, it uses a combination of **User-Space libraries**
+    (functions such as `printf` and `fopen`) and System-Space Libraries (functions
+    such as `write` and `open`). When your program calls `printf` (or a script invokes
+    the `echo` command), it invokes a user-space library call to `printf` to format
+    the output string; this is followed by a system-space call to the `write` function.
+    The system call makes sure only one task can access a resource at a time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In a perfect world, all computer programs would run with no problems. In an
+    almost perfect world, you'd have the source code, the program would be compiled
+    with debugging support, and it would fail consistently.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the real world, you sometimes have to cope with programs where you don't
+    have the source, and it fails intermittently. Developers can't help you unless
+    you give them some data to work with.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Linux `strace` command reports the system calls that an application makes;
+    this can help us understand what it's doing even if we don't have the source code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `strace` command is installed as part of the Developer package; it can
+    be installed separately as well:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: One way to understand `strace` is to write a short C program and use `strace`
+    to see what system calls it makes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This test program allocates memory, uses the memory, prints a short message,
+    frees the memory, and exits.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `strace` output shows the system functions this program calls:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The first lines are standard start up commands for any application. The `execve`
+    call is the system call to initialize a new executable. The `brk` call returns
+    the current memory address, and the `mmap` call allocates 4,096 bytes of memory
+    for dynamic libraries and other applications that load housekeeping.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The attempt to access `ld.so.preload` fails because `ld.so.preload` is a hook
+    to preload the libraries. It is not required on most production systems.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `ld.so.cache` file is the memory-resident copy of `/etc/ld.so,conf.d`, which
+    contains the paths for loading dynamic libraries. These values are kept in memory
+    to reduce the overhead in starting programs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The next lines with `mmap`, `mprotect`, `arch``_``prctl`, and `munmap` calls
+    continue to load the libraries and mapping devices to memory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The two calls to `brk` are invoked by the program's `malloc` call. This allocates
+    100 bytes from the heap.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `strcat` call is a user-space function that doesn't generate any system
+    calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `printf` call doesn't generate a system call to format the data, but it
+    makes calls to send the formatted string to `stdout`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `fstat` and `mmap` calls load and initialize the `stdout` device. These
+    calls occur only once in a program that generates output to `stdout`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `write` system call sends the string to `stdout`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, the `exit_group` call exits the program, frees resources, and terminates
+    all the threads associated with the executable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that there is no `brk` call associated with freeing memory. The `malloc`
+    and `free` functions are user-space functions that manage a task's memory. They
+    only invoke the `brk` function if the program's overall memory footprint changes.
+    When your program allocates *N* bites, it needs to add that many bytes to its
+    available memory. When it frees that block, the memory is marked available, but
+    it remains a part of this program's memory pool. The next `malloc` uses memory
+    from the pool of available memory space until it's exhausted. At this point, another
+    `brk` call adds more memory to the program's memory pool.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing dynamic library functions with ltrace
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Knowing the user-space library functions being called is as useful as knowing
+    the system functions being invoked. The `ltrace` command provides a similar function
+    to `strace`; however, it tracks user-space library calls instead of system calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Have the `ltrace` command installed using the Developer tools.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'To trace user-space dynamic library calls, invoke the `strace` command, followed
+    by the command you want to trace:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The next example is a program with a subroutine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the `ltrace` output, we see the call to the dynamically linked `strcat`;
+    however, we do not see the statically linked local function, namely `print`. The
+    call to `printf` was simplified to a call to `puts`. The calls to `malloc` and
+    `free` are shown since they are user-space function calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ltrace` and `strace` utilities use the `ptrace` function to rewrite the
+    **Procedure Linkage Table** (**PLT**) which maps between dynamic library calls
+    and the actual memory address of the called function. This means that `ltrace`
+    can trap any dynamically linked function call but not a statically linked function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `ltrace` and `strace` commands are useful, but it would be really nice
+    to trace both user-space and system-space function calls. The `-S` option to `ltrace`
+    will do this. The next example shows the `ltrace -S` output from the previous
+    executable:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: This shows the same type of startup call (`sbrk`, `mmap`, and so on) as the
+    `strace` example.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When a user-space function invokes a system-space function (as with the `malloc`
+    and puts calls), the display shows that the user-space function was interrupted
+    (`malloc(100 <unfinished...>)` and then resumed `(<... malloc resumed>)` after
+    the system call was completed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that the `malloc` call needed to pass control to `sbrk` to allocate more
+    memory for the application. However, the `free` call does not shrink the application;
+    it just frees the memory for future use by this application.
+  prefs: []
+  type: TYPE_NORMAL

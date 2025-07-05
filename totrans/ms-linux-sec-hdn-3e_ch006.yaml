@@ -1,0 +1,1665 @@
+- en: 5 Securing Your Server with a Firewall - Part 2
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Join our book community on Discord
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '[https://packt.link/SecNet](https://packt.link/SecNet)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/file35.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: In *Chapter 4*, *Securing Your Server with a Firewall - Part 1*, we covered
+    iptables and nftables, which are management utilities that directly interface
+    with netfilter. Although it’s helpful to be familiar with iptables and nftables
+    commands in order to create advanced firewall configurations, having to use these
+    commands all the time can become a bit unwieldy for performing normal day-to-day
+    operations. In this chapter, we’ll look at ufw and firewalld, which are helper
+    utilities that can simplify the process of working with either iptables or nftables.
+  prefs: []
+  type: TYPE_NORMAL
+- en: First, we'll look at ufw. We'll look at its structure, its commands, and its
+    configuration. Then, we'll do the same for firewalld. In both cases, you'll get
+    plenty of hands-on practice.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We will cover the following topics in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**ufw** for Ubuntu systems'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**firewalld** for Red Hat systems'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The code files for this chapter are available here: [https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition.](https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition.)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Uncomplicated firewall for Ubuntu systems
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The ufw is already installed on Ubuntu 20.04 and Ubuntu 22.04\. It still uses
+    the iptables backend on Ubuntu 20.04, and the nftables backend on Ubuntu 22.04\.
+    For normal operations, it offers a vastly simplified set of commands. Perform
+    just one simple command to open the desired ports and another simple command to
+    activate it, and you have a good, basic firewall. Whenever you perform a `ufw`
+    command, it will automatically configure both the IPv4 and the IPv6 rules. This
+    alone is a huge time-saver, and much of what we've had to configure by hand with
+    with either iptables or nftables is already there by default. Although our two
+    versions of Ubuntu use different backends, ufw configuration is identical for
+    both of them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ufw is also available for Debian and other Debian-based distros, but it might
+    not be installed. If that's the case, install it by issuing the `sudo apt install
+    ufw` command.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Configuring ufw
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'On both Ubuntu 20.04 and Ubuntu 22.04, the ufw service is already enabled by
+    default, but the firewall itself isn''t activated. In other words, the system''s
+    service is running, but it isn''t enforcing any firewall rules yet. (I''ll show
+    you how to activate it in just a bit, after we go over how to open the ports that
+    you need to open.) Check the ufw status with these two commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: The systemctl command should show you that the service is enabled, and the ufw
+    command should show you that the firewall is inactive.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first thing we want to do is open port `22` to allow it to connect to the
+    machine via Secure Shell, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Okay, that looks good. Let’s now activate the firewall, like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'By using `sudo iptables -L` on Ubuntu 20.04, you''ll see that the new Secure
+    Shell rule shows up in the `ufw-user-input` chain:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On Ubuntu 22.04, use the `sudo nft list ruleset` command to see the new rule
+    in the `ufw-user-input` chain:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: You'll also see that the total output of both of these commands is quite lengthy
+    because so much of what we had to do with bare iptables or nftables has already
+    been done for us with ufw. In fact, there's even more here than what we did with
+    iptables and nftables. For example, with ufw, we already have rate limiting rules
+    that help protect us against **Denial-of-Service** (**DoS**) attacks, and we also
+    have rules that record log messages about packets that have been blocked. It's
+    almost the no fuss, no muss way of setting up a firewall. (I'll get to that *almost*
+    part in a bit.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the preceding `sudo ufw allow 22/tcp` command, we had to specify the TCP
+    protocol because TCP is all we need for Secure Shell. We can also open a port
+    for both TCP and UDP just by not specifying a protocol. For example, if you''re
+    setting up a DNS server, you''ll want to have port `53` open for both protocols.
+    (You''ll see the entries for port `53` listed as domain ports). On either version
+    of Ubuntu, do:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On Ubuntu 20.04, view the results by doing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On Ubuntu 22.04, view the results by doing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: If you do `sudo ip6tables -L` on the 20.04 machine,you'll see that a rule for
+    IPv6 was also added for both of the two preceding examples. And, again, you'll
+    see that most of what we had to do with the ip6tables commands has already been
+    taken care of. (It's especially nice that we don't have to mess around with setting
+    up all of those pesky ICMP rules.) On the 22.04 machine, the `sudo nft list ruleset`
+    command that you did previously will show the IPv6 configuration in the `ufw6-user-input`
+    stanza.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To see just a quick summary of your firewall configuration, use the `status`
+    option. The output should look something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: Next, we will look at the ufw configuration files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Working with the ufw configuration files
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'You can find the ufw firewall rules in the `/etc/ufw/` directory. As you can
+    see, the rules are stored in several different files:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: At the bottom of the list, you'll see the `user6.rules` and `user.rules` files.
+    You can't hand-edit either of these two files. You'll be able to save the files
+    after you've made the edits, but when you use `sudo ufw reload` to load the new
+    changes, you'll see that your edits have been deleted. Let's look into the `user.rules`
+    file to see what we can see there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: As you’ll soon see, all of the files for both Ubuntu 20.04 and 22.04 contain
+    firewall rules that are in the iptables format, even though 22.04 uses nftables
+    as its backend. That’s because Ubuntu 22.04 can automatically translate iptables
+    rules into nftables rules. So, the files for both 20.04 and 22.04 are identical,
+    which makes things very easy for us.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'At the top of the file, you''ll see the definition for the iptables filter
+    table, as well as the list of its associated chains:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, in the `### RULES ###` section, we have the list of rules that we created
+    with the `ufw` command. Here''s what our rules for opening the DNS ports look
+    like:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: As you can see, ufw use iptables syntax for its configuration files, even on
+    Ubuntu 22.04.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Below the `### RULES ###` section, we see the rules for logging messages about
+    any packets that the firewall has blocked:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: These messages get sent to the `/var/log/kern.log` file. So that we don't overwhelm
+    the logging system when lots of packets are getting blocked, we'll only send three
+    messages per minute to the log file, with a burst rate of 10 messages per minute.
+    Most of these rules will insert a `[UFW BLOCK]` tag in with the log message, which
+    makes it easy for us to find them. The last rule creates messages with a `[UFW
+    ALLOW]` tag, and curiously enough, the `INVALID` rule doesn't insert any kind
+    of tag.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Lastly, we have the rate-limiting rules, which allow only three connections
+    per user, per minute:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: Any packets that exceed that limit will be recorded in the `/var/log/kern.log`
+    file with the `[UFW LIMIT BLOCK]` tag.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `/etc/ufw user6.rules` file looks pretty much the same, except that it's
+    for IPv6 rules. Any time you create or delete a rule with the `ufw` command, it
+    will modify both the `user.rules` file and the `user6.rules` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To store rules that will run before the rules in the `user.rules` and `user6.rules`
+    files, we have the `before.rules` file and the `before6.rules` file. To store
+    rules that will run after the rules in the `user.rules` and `user6.rules` files,
+    we have – you guessed it – the `after.rules` file and the `after6.rules` file.
+    If you need to add custom rules that you can't add with the `ufw` command, just
+    hand-edit one of these pairs of files. (We'll get to that in a moment.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you look at the `before` and `after` files, you'll see where so much has
+    already been taken care of for us. This is all the stuff that we had to do by
+    hand with either iptables/ip6tables or nftables.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, as you might know, there is one slight caveat to all this ufw goodness.
+    You can perform simple tasks with the ufw utility, but anything more complex requires
+    you to hand-edit a file. (This is what I meant when I said that ufw is *almost*
+    no fuss, no muss.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'To see more examples of what you can do with the ufw command, view its man
+    page by doing:'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For example, in the `before` files, you''ll see that one of the rules for blocking
+    invalid packets has already been implemented. Here''s the code snippet from the
+    `before.rules` file, which you''ll find near the top of the file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The second of these two rules actually drops the invalid packets, and the first
+    rule logs them. But as we''ve already seen in the *An overview of iptables* section
+    of *Chapter 4*, *Securing your server with a firewall-Part 1*, this one particular
+    `DROP` rule doesn''t block all of the invalid packets. And, for performance reasons,
+    we''d rather have this rule in the mangle table, instead of in the filter table
+    where it is now. To fix that, we''ll edit both of the `before` files. Open the
+    `/etc/ufw/before.rules` file in your favorite text editor and look for the following
+    pair of lines at the very bottom of the file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Just below the `COMMIT` line, add the following code snippet to create the
+    mangle table rules:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we''ll repeat this process for the `/etc/ufw/before6.rules` file. Then,
+    we''ll reload the rules by doing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: By using the `iptables -L` and `ip6tables -L` commands on Ubuntu 20.04 or the
+    `nft list ruleset` command on Ubuntu 22.04, you'll see the new rules show up in
+    the mangle table, just where we want them to be.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab for basic ufw usage
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'You''ll need to complete this lab on a clean snapshot of either an Ubuntu 20.04
+    or an Ubuntu 22.04 virtual machine. Let''s get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Shut down your Ubuntu virtual machine and restore the snapshot to get rid of
+    all of the iptables or nftables stuff that you just did. (Or, if you prefer, just
+    start with a fresh virtual machine.)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'When you''ve restarted the virtual machine, verify that the iptables rules
+    are now gone. On Ubuntu 20.04 do:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'View the status of `ufw`. Open port `22/TCP` and then enable `ufw`. Then, view
+    the results:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This time, open port `53` for both TCP and UDP:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`cd` into the `/etc/ufw/` directory. Familiarize yourself with the contents
+    of the files that are there.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Open the `/etc/ufw/before.rules` file in your favorite text editor. At the
+    bottom of the file, below the `COMMIT` line, add the following code snippet:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: Repeat s*tep 6* for the `/etc/ufw/before6.rules` file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Reload the firewall with this command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On Ubuntu 20.04, observe the rules by doing:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Take a quick look at the `ufw` status:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: That's the end of the lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: I think you’ll agree that `ufw` is pretty cool technology. Its commands for
+    doing basic things are easier to remember than the equivalent iptables or nftables
+    commands, and it takes care of both IPv4 and IPv6 with just a single command.
+    On either of our Ubuntu versions, you can still do some fancy stuff just by hand-editing
+    the ufw configuration files. But, ufw isn’t the only cool firewall manager that’s
+    available. In the next section, we’ll take a look at what the Red Hat folk have
+    given us.
+  prefs: []
+  type: TYPE_NORMAL
+- en: firewalld for Red Hat systems
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: For our next act, we turn our attention to **firewalld**, which is the default
+    firewall manager on Red Hat Enterprise Linux 7 through 9 and all of their offspring.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we just saw with ufw on Ubuntu, firewalld can be a frontend for either iptables
+    or nftables. On RHEL/CentOS 7, firewalld uses the iptables engine as its backend.
+    On the RHEL 8 and 9-type distros, firewalld uses nftables as its backend. Either
+    way, you can't create rules with normal iptables or nftables commands while firewalld
+    is enabled because firewalld stores the rules in an incompatible format.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Until very recently, firewalld was only available for the newer RHEL versions
+    and their offspring. Now, however, firewalld is also available in the Ubuntu repositories.
+    So, if you want to run firewalld on Ubuntu, you finally have that choice. Also,
+    the combination of firewalld and nftables now comes already installed and activated
+    on the SUSE distros.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: If you're running Red Hat, CentOS, or AlmaLinux on a desktop machine, you'll
+    see that there is a GUI frontend for firewalld in the applications menu. On a
+    text-mode server, though, all you have is the firewalld commands. For some reason,
+    the Red Hat folk haven't created an ncurses-type program for text-mode servers
+    as they did for iptables configuration on older versions of Red Hat.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A big advantage of firewalld is the fact that it's dynamically managed. That
+    means that you can change the firewall configuration without restarting the firewall
+    service, and without interrupting any existing connections to your server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before we look at the differences between the RHEL 7/CentOS 7 and the RHEL/AlmaLinux
+    8 and 9 versions of firewalld, let's look at the stuff that's the same for both.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Verifying the status of firewalld
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'For this section, you can use a CentOS 7, AlmaLinux 8, or AlmaLinux 9 virtual
+    machine. Let''s start by verifying the status of firewalld. There are two ways
+    to do this. The first way is to use the `--state` option of `firewall-cmd`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Alternatively, if we want a more detailed status, we can just check the daemon,
+    the same as we would for any other daemon on a systemd machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: Next, let's have a look at firewalld zones.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Working with firewalld zones
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '`firewalld` is a rather unique animal, in that it comes with several pre-configured
+    zones and services. If you look in the `/usr/lib/firewalld/zones/` directory of
+    any of your CentOS or AlmaLinux machines, you''ll see the zones files, all in
+    `.xml` format:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Each zone file specifies which ports are to be open and which ones are to be
+    blocked for various given scenarios. Zones can also contain rules for ICMP messages,
+    forwarded ports, masquerading information, and rich language rules. For example,
+    the `.xml` file for the public zone, which is set as the default, looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the `service name` lines, you can see that the only open ports are for Secure
+    Shell access and for DHCPv6 discovery. If you look at the `home.xml` file, you''ll
+    see that it also opens the ports for Multicast DNS, as well as the ports that
+    allow this machine to access shared directories from either Samba servers or Windows
+    servers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `firewall-cmd` utility is what you would use to configure `firewalld.`
+    You can use it to view the list of zone files on your system, without having to
+    `cd` into the zone file directory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'A quick way to see how each zone is configured is to use the `--list-all-zones`
+    option:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Of course, this is only a portion of the output because the listing for all
+    zones is more than we can display here. It''s more likely that you''ll only want
+    to see information about one particular zone:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: So, the `internal` zone allows the `ssh`, `mdns`, `samba-client`, and `dhcpv6-client`
+    services. This is handy for setting up client machines on your internal LAN.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Any given server or client will have one or more installed network interface
+    adapters. Each adapter in a machine can be assigned one, and only one, firewalld
+    zone. To see the default zone, do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This is great, except that it doesn''t tell you anything about which network
+    interface is associated with this zone. To see that information, do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When you install Red Hat, CentOS, or AlmaLinux for the first time, the firewall
+    will already be active with the public zone as the default. Now, let''s say that
+    you''re setting up your server in the DMZ and you want to make sure that its firewall
+    is locked down for that. You can change the default zone to the `dmz` zone. Let''s
+    take a look at the `dmz.xml` file to see what that does for us:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, the only thing that the DMZ allows through is Secure Shell. Okay; that''s
+    good enough for now, so let''s set the `dmz` zone as the default:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s verify it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: And we're all good. However, an Internet-facing server in the DMZ probably needs
+    to allow more than just SSH connections. This is where we'll use the firewalld
+    services. But before we look at that, let's consider one more important point.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: You don’t need to use the `--permanent` option when setting the default zone.
+    In fact, you’ll get an error message if you do.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'You never want to modify the files in the `/usr/lib/firewalld/` directory.
+    Whenever you modify the firewalld configuration, you''ll see the modified files
+    show up in the `/etc/firewalld/` directory. So far, all we''ve modified is the
+    default zone. So, we''ll see the following files in `/etc/firewalld/`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can do a `diff` on those two files to see the difference between them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: So, the newer of the two files shows that the dmz zone is now the default.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: To find out more about firewalld zones, enter the `man firewalld.zones` command.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Adding services to a firewalld zone
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Each service file contains a list of ports that need to be opened for a particular
+    service. Optionally, the service files may contain one or more destination addresses,
+    or call in any needed modules, such as for connection tracking. For some services,
+    all you need to do is open just one port. Other services, such as the Samba service,
+    require that multiple ports be opened. Either way, it's sometimes handier to remember
+    the service name that goes with each service, rather than the port numbers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The services files are in the `/usr/lib/firewalld/services/` directory. You
+    can look at them by using the `firewall-cmd` command, just as you could with the
+    list of zones:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Before we add any more services, let''s check which ones are already enabled:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, ssh and dhcpv6-client are all we have.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `dropbox-lansync` service would be very handy for us Dropbox users. Let''s
+    see which ports this opens:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: It looks like Dropbox uses port `17500` on UDP and TCP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s say that we have our web server set up in the DMZ, with the `dmz`
+    zone set as its default:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As we saw previously, the Secure Shell port is the only one that''s open. Let''s
+    fix that so that users can actually access our website:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When we look at the information for the `dmz` zone once more, we''ll see the
+    following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, we can see that the `http` service is now allowed through. But look what
+    happens when we add the `--permanent` option to this `info` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: Oops! The `http` service isn't here. What's going on?
+  prefs: []
+  type: TYPE_NORMAL
+- en: For pretty much every command-line alteration of either zones or services, you
+    need to add the `--permanent` option to make the change persistent across reboots.
+    But without the `--permanent` option, the change takes effect immediately. With
+    the `--permanent` option, you'll have to reload the firewall configuration for
+    the change to take effect. To demonstrate this, I'm going to reboot the virtual
+    machine to get rid of the `http` service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Okay, I''ve rebooted, and the `http` service is now gone:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This time, I''ll add two services with just one command and specify that the
+    change will be permanent:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can add as many services as you need to with a single command, but you
+    have to separate them with commas and enclose the whole list within a pair of
+    curly brackets. Also, unlike what we just saw with nftables, we can''t have blank
+    spaces within the curly brackets. Let''s look at the results:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Since we decided to make this configuration permanent, it hasn''t taken effect
+    yet. However, if we add the `--permanent` option to the `--info-zone` command,
+    we''ll see that the configuration files have indeed been changed:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we need to reload the configuration so that it will take effect:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, if you run the `sudo firewall-cmd --info-zone=dmz` command again, you'll
+    see that the new configuration is in effect.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To remove a service from a zone, just replace `--add-service` with `--remove-service`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Note that we never specified which zone we're working with in any of these service
+    commands. That's because if we don't specify a zone, firewalld just assumes that
+    we're working with the default zone. If you want to add a service to something
+    other than the default zone, just add the `--zone=` option to your commands.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Adding ports to a firewalld zone
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Having the service files is handy, except that not every service that you''ll
+    need to run has its own predefined service file. Let''s say that you''ve installed
+    Webmin on your server, which requires port `10000/tcp` to be open. A quick grep
+    operation will show that port `10000` isn''t in any of our predefined services:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, let''s just add that port to our default zone, which is still the `dmz`
+    zone:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Again, this isn''t permanent, because we didn''t include the `--permanent`
+    option. Let''s do this again and reload:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can also add multiple ports at once by enclosing the comma-separated list
+    within a pair of curly brackets, just as we did with the services. (I purposely
+    left out the `--permanent` option. You''ll see why in a moment):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: And of course, you can remove ports from a zone by substituting `--remove-port`
+    for `--add-port`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you don''t want to type `--permanent` every time you create a new permanent
+    rule, just leave it out. Then, when you''re done creating rules, make them all
+    permanent at once by typing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now's, let's turn our attention to controlling ICMP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Blocking ICMP
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Let''s take another look at the status of the default public zone:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE58]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Toward the bottom, we can see the `icmp-block` line, with nothing beside it.
+    This means that our public zone allows all ICMP packets to come through. This
+    isn''t ideal, of course, because there are certain types of ICMP packets that
+    we want to block. Before we block anything, let''s look at all of the ICMP types
+    that are available to us:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE59]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As we did with zones and services, we can view information about the different
+    ICMP types. In this example, we''ll look at one ICMPv4 type and one ICMPv6 type:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We''ve already seen that we''re not blocking any ICMP packets. We can also
+    see if we''re blocking any specific ICMP packets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We''ve already established that redirects can be a bad thing since they can
+    be exploited. So, let''s block host-redirect packets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, let''s check the status:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Cool – it worked. Now, let''s see if we can block two ICMP types with just
+    one command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As before, we''ll check the status:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE65]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This also worked, which means that we have achieved coolness. However, since
+    we didn''t include `--permanent` with these commands, these ICMP types will only
+    be blocked until we reboot the computer. So, let''s make them permanent:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE66]'
+  prefs: []
+  type: TYPE_PRE
+- en: And with this, we've achieved even more coolness. (Of course, all of my cats
+    already think that I'm pretty cool.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using panic mode
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: You've just seen evidence that bad people are trying to break into your system.
+    What do you do? Well, one option is to activate `panic` mode, which cuts off all
+    network communications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I can just see this now in the Saturday morning cartoons when some cartoon character
+    yells, *Panic mode, activate!*
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'To activate `panic` mode, use this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE67]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Of course, your access will be cut off if you''re logged in remotely, and you''ll
+    have to go to the local terminal to get back in. To turn `panic` mode off, use
+    this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE68]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If you''re logged in remotely, there''s no need to check the status of `panic`
+    mode. If it''s on, you''re not accessing the machine. But if you''re sitting at
+    the local console, you might want to check it. Just do:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE69]'
+  prefs: []
+  type: TYPE_PRE
+- en: That's all there is to `panic` mode.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Logging dropped packets
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Here''s another time-saver that you''re sure to like. If you want to create
+    log entries whenever packets get blocked, just use the `--set-log-denied` option.
+    Before we do that, let''s see if it''s already enabled:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE70]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It''s not, so let''s turn it on and check the status again:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE71]'
+  prefs: []
+  type: TYPE_PRE
+- en: We've set it up to log all denied packets. However, you might not always want
+    that. Your other choices are `unicast`, `broadcast`, and `multicast`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, for example, if all you want is to log blocked packets that are going to
+    multicast addresses, do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE72]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So far, we''ve just set the runtime configuration, which will disappear once
+    we reboot the machine. To make this permanent, we can use any of the methods that
+    we''ve already used. For now, let''s just do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE73]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Unlike what we saw with the Debian/Ubuntu distros, there''s no separate `kern.log`
+    file for our packet-denied messages. Instead, the RHEL-type distros log the packet-denied
+    messages in the `/var/log/messages` file, which is the main log file in the RHEL
+    world. Several different message tags are already defined, which will make it
+    easier to audit the logs for dropped packets. For example, here''s a message that
+    tells us about blocked broadcast packets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE74]'
+  prefs: []
+  type: TYPE_PRE
+- en: The tag is `FINAL_REJECT`, which tells us that this message was created by the
+    catch-all, final `REJECT` rule that's at the end of our input chain. The `DST=255.255.255.255`
+    part tells us that this was a broadcast message.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here''s another example, where I did an Nmap NULL scan against this machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE75]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, I triggered the rule that blocks `INVALID` packets, as indicated
+    by the `STATE_INVALID_DROP` tag.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, now you're saying, *But wait. These two rules that we just tested aren't
+    anywhere to be found in the firewalld configuration files that we've looked at
+    so far. What gives?* And you're right. The location of these default, pre-configured
+    rules is something that the Red Hat folk apparently want to keep hidden from us.
+    However, in the following sections that are specific to RHEL/CentOS 7 and RHEL/AlmaLinux
+    8 and 9, we'll spoil their fun, because I can show you where these rules are.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using firewalld rich language rules
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: What we've looked at so far might be all you'll ever need for general use scenarios,
+    but for more granular control, you'll want to know about **rich language rules**.
+    (Yes, that really is what they're called.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Compared to iptables rules, rich language rules are a bit less cryptic and
+    are closer to plain English. So, if you''re new to the business of writing firewall
+    rules, you might find rich language a bit easier to learn. On the other hand,
+    if you''re already used to writing iptables rules, you might find some elements
+    of the rich language a bit quirky. Let''s look at one example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE76]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, we''re adding a rich rule that blocks website access from an entire geographic
+    block of IPv4 addresses. Note that the entire rule is surrounded by a pair of
+    single quotes, and the assigned value for each parameter is surrounded by a pair
+    of double quotes. With this rule, we''re saying that we''re working with IPv4
+    and that we want to silently block the `http` port from accepting packets from
+    the `200.192.0.0/24` network. I used the `--permanent` option here, because AlmaLinux
+    9 is a bit quirky if I don’t use it. Let''s see what our zone looks like with
+    this new rule:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE77]'
+  prefs: []
+  type: TYPE_PRE
+- en: The rich rule shows up at the bottom.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You could just as easily write a rule for IPv6 by replacing `family="ipv4"`
+    with `family="ipv6"` and supplying the appropriate IPv6 address range.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Some rules are generic and apply to either IPv4 or IPv6\. Let''s say that we
+    want to log messages about **Network Time Protocol** (**NTP**) packets for both
+    IPv4 and IPv6 and that we want to log no more than one message per minute. The
+    command to create that rule would look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE78]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'There is, of course, a lot more to firewalld rich language rules than we can
+    present here. But for now, you know the basics. For more information, consult
+    the man page:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE79]'
+  prefs: []
+  type: TYPE_PRE
+- en: If you go to the official documentation page for Red Hat Enterprise Linux 8,
+    you'll see no mention of rich rules. However, I've just tested them on an RHEL
+    8-type machine and a RHEL 9-type machine, and they work fine.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: To read about rich rules, you'll need to go to the documentation page for Red
+    Hat Enterprise Linux 7\. What's there also applies to RHEL 8/9\. But even there,
+    there's not much detail. To find out more, see the man page on either RHEL/CentOS
+    7 or RHEL/CentOS 8, or RHEL/AlmaLinux 9.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'To make the rule permanent, just use any of the methods that we''ve already
+    discussed. When you do, the rule will show up in the `.xml` file for the default
+    zone. In my case, the default zone is still set to public. So, let''s look in
+    the `/etc/firewalld/zones/public.xml` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE80]'
+  prefs: []
+  type: TYPE_PRE
+- en: Our rich rule shows up in the `rule family` block at the bottom of the file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we've covered what's common between the RHEL/CentOS 7 and the RHEL/CentOS/AlmaLinux
+    8/9 versions of firewalld, let's look at what's particular to each different version.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Looking at iptables rules in RHEL/CentOS 7 firewalld
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'RHEL 7 and its offspring use the iptables engine as the firewalld backend.
+    You can''t create rules with the normal iptables commands as long as firewalld
+    is enabled. However, every time you create a rule with a `firewall-cmd` command,
+    the iptables backend creates the appropriate iptables rule and inserts it into
+    its proper place. You can view the active rules with `iptables -L`. Here''s the
+    first part of a very long output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE81]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As was the case with ufw on Ubuntu, a lot has already been configured for us.
+    At the top, in the `INPUT` chain, we see that the connection state rule and the
+    rule to block invalid packets are already there. The default policy for the chain
+    is `ACCEPT`, but the final rule of the chain is set to `REJECT` what isn''t specifically
+    allowed. In between these, we can see rules that direct other packets to other
+    chains for processing. Now, let''s look at the next portion:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE82]'
+  prefs: []
+  type: TYPE_PRE
+- en: Toward the bottom of the very long output, we can see the `IN_public_allow`
+    chain, which contains the rules that we created for opening firewall ports. Just
+    below that is the `IN_public_deny` chain, which contains the `REJECT` rule for
+    blocking unwanted ICMP types. In both the `INPUT` chain and the `IN_public_deny`
+    chain, the `REJECT` rules return an ICMP message to inform the sender that the
+    packets were blocked.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, keep in mind that there's a lot of this `IPTABLES -L` output that we haven't
+    shown. So, look at it for yourself to see what's there. When you do, you may ask
+    yourself, *Where are these default rules stored? Why am I not seeing them in the*
+    `/etc/firewalld/` *directory?*
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To answer that question, I had to do some rather extensive investigation. For
+    some truly bizarre reason, the Red Hat folk have left this completely undocumented.
+    I finally found the answer in the `/usr/lib/python2.7/site-packages/firewall/core/`
+    directory. Here, there''s a set of Python scripts that set up the initial default
+    firewall:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE83]'
+  prefs: []
+  type: TYPE_PRE
+- en: The script that does most of the work is the `ipXtables.py` script. If you look
+    in it, you'll see that its list of iptables commands matches up with the `iptables
+    -L` output.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating direct rules in RHEL/CentOS 7 firewalld
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: As we've seen, any time we do anything with the normal `firewall-cmd` commands
+    on RHEL/CentOS 7, firewalld automatically translates those commands into iptables
+    rules and inserts them into the proper place. (Or, it deletes the rules, if you've
+    issued some sort of delete command.) However, there are some things that we can't
+    do with the normal `firewalld-cmd` commands. For example, we can't use normal
+    `firewall-cmd` commands to place rules in a specific iptables chain or table.
+    To do things like that, we need to use the direct configuration commands.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `firewalld.direct` man page and the documentation at the Red Hat site both
+    warn you to only use direct configuration as an absolute last resort when nothing
+    else will work. That's because, unlike the normal `firewall-cmd` commands, the
+    direct commands won't automatically place your new rules into the proper places
+    so that everything works correctly. With the direct commands, you can break the
+    whole firewall by placing a rule into the wrong spot.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the example output of the previous section, in the default ruleset, you saw
+    that there's a rule in the filter table's `INPUT` chain that blocks invalid packets.
+    In the *Blocking invalid packets with iptables* section of *Chapter 4*, *Securing
+    your server with a firewall-Part 1*, you saw that this rule misses certain types
+    of invalid packets. So, we'd like to add a second rule to block what the first
+    rule misses. We'd also like to place these rules into the `PREROUTING` chain of
+    the mangle table in order to enhance firewall performance. To do this, we need
+    to create a couple of direct rules. (This isn't hard if you're familiar with normal
+    iptables syntax.) So, let's get to it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, let''s verify that we don''t have any effective direct rules, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE84]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You should get no output for either command. Now, let''s add our two new rules,
+    for both IPv4 and IPv6, with the following four commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE85]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `direct` command syntax is very similar to that of normal iptables commands.
+    So, I won't repeat the explanations that I've already presented in the iptables
+    section. However, I do want to point out the `0` and the `1` that come after `PREROUTING`
+    in each of the commands. Those represent the priority of the rule. The lower the
+    number, the higher the priority, and the higher up the rule is in the chain. So,
+    the rules with the `0` priority are the first rules in their respective chains,
+    while the rules with the `1` priority are the second rules in their respective
+    chains. If you give the same priority to each rule you create, there's no guarantee
+    that the order will remain the same upon each reboot. So, be sure to assign a
+    different priority to each rule.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s verify that our rules are in effect:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE86]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can see that they are. When you use the `iptables -t mangle -L` command
+    and the `ip6tables -t mangle -L` command, you''ll see that the rules show up in
+    the `PREROUTING_direct` chain. (I''m only showing the output once since it''s
+    the same for both commands.):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE87]'
+  prefs: []
+  type: TYPE_PRE
+- en: To show that it works, we can perform some Nmap scans against the virtual machine,
+    just like how I showed you to in the *Blocking invalid packets with iptables*
+    section of *Chapter 4*, *Securing your server with a firewall-Part 1*. (Don't
+    fret if you don't remember how to do it. You'll see the procedure in the upcoming
+    hands-on lab.) Then, we can use `sudo iptables -t mangle -L -v` and `sudo ip6tables
+    -t mangle -L -v` to see the packets and bytes that these two rules blocked.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We didn''t use the `--permanent` option with these commands, so they''re not
+    permanent yet. Let''s make them permanent now:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE88]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, let''s take a look in the `/etc/firewalld/` directory. Here, you''ll see
+    a `direct.xml` file that wasn''t there before:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE89]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Look inside the file; you''ll see the new rules:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE90]'
+  prefs: []
+  type: TYPE_PRE
+- en: The official Red Hat 7 documentation page does cover direct rules, but only
+    briefly. For more detailed information, see the `firewalld.direct` man page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Looking at nftables rules in RHEL/AlmaLinux 8 and 9 firewalld
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'RHEL 8/9 and their offspring use nftables as the default firewalld backend.
+    Every time you create a rule with a `firewall-cmd` command, the appropriate nftables
+    rule is created and inserted into its proper place. To look at the ruleset that''s
+    currently in effect, we''ll use the same nft command that we used with nftables
+    on Ubuntu:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE91]'
+  prefs: []
+  type: TYPE_PRE
+- en: Again, we can see a very lengthy list of default, pre-configured firewall rules.
+    (To see the whole list, run the command for yourself.) You'll find these default
+    rules in the `/usr/lib/python3.6/site-packages/firewall/core/nftables.py` script
+    on RHEL 8-type machines, and in the `/usr/lib/python3.9/site-packages/firewall/core/nftables.py`
+    script on RHEL 9-type machines. This script runs every time you boot up the machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating direct rules in RHEL/AlmaLinux firewalld
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Okay, here's where things get downright weird. Even though the direct rule commands
+    create iptables rules and the RHEL 8/9 distros use nftables for the firewalld
+    backend, you can still create direct rules. Just create and verify them the same
+    way that you did in the *Creating direct rules in RHEL/CentOS 7 firewalld* section.
+    Apparently, firewalld allows these iptables rules to peacefully coexist with the
+    nftables rules. However, if you need to do this on a production system, be sure
+    to thoroughly test your setup before putting it into production.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's nothing about this in the Red Hat 8/9 documentation, but there is the
+    `firewalld.direct` man page if you want to find out more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab for firewalld commands
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'By completing this lab, you''ll get some practice with basic firewalld commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Log into your CentOS 7 virtual machine or either of the AlmaLinux virtual machines
+    and run the following commands. Observe the output after each one:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE92]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Briefly view the man pages that deal with `firewalld.zones`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE93]'
+  prefs: []
+  type: TYPE_PRE
+- en: (Yes, there are two of them. One explains the zone configuration files, while
+    the other explains the zones themselves.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Look at the configuration information for all of the available zones:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE94]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Look at the list of predefined services. Then, look at the information about
+    the `dropbox-lansync` service:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE95]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Set the default zone to `dmz`. Look at the information concerning the `zone`,
+    add the `http` and `https` services, and then look at the `zone` information again:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE96]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Reload the **firewall** configuration and look at `zone` information again.
+    Also, look at the list of services that are being allowed:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE97]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Permanently open port `10000/tcp` and view the results:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE98]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Remove the port that you just added:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE99]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Add a rich language rule to block a geographic range of IPv4 addresses:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE100]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Block the `host-redirect` and `network-redirect` ICMP types:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE101]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Add the directive to log all dropped packets:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE102]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'View both the `runtime` and `permanent` configurations and note the differences
+    between them:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE103]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Make the `runtime` configuration `permanent` and verify that it took effect:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE104]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On CentOS 7, view the complete list of effective firewall rules by doing:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE105]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On AlmaLinux 8 or 9, view the complete list of effective firewall rules by
+    doing:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE106]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Create the `direct` rules in order to block invalid packets from the mangle
+    table''s `PREROUTING` chain:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE107]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Verify that the **rules** took effect and make them **permanent**:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE108]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'View the contents of the `direct.xml` file that you''ve just created:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE109]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Perform XMAS Nmap scans for both IPv4 and IPv6 against the virtual machine.
+    Then, observe which rule was triggered by the scan:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE110]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Repeat *step 19*, but this time with a Windows scan:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE111]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'View the list of main pages for firewalld:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE112]'
+  prefs: []
+  type: TYPE_PRE
+- en: That's the end of the lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In this chapter, we looked at two helper utilities that can simplify using either
+    iptables or nftables. We started with ufw, which is available for the Debian and
+    Ubuntu families. Then, we looked at firewalld, which used to be specific to Red
+    Hat-type distros, but is now also available in Ubuntu repositories and comes already
+    installed and activated on the SUSE distros.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the space that I've been allotted, I've presented the basics of using these
+    technologies to set up single-host protection. I've also presented some details
+    about the innards of firewalld that you won't find documented anywhere else, including
+    in the official Red Hat documentation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we'll look at the various encryption technologies that
+    can help keep your data private. I'll see you there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: What is the major difference between firewalld on RHEL 7-type distros and firewalld
+    on RHEL 8/9-type distros?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In which of the following formats does firewalld store its rules?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`.txt`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`.config`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`.html`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`.xml`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following commands would you use to list all of the firewalld zones
+    on your system?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo firewalld --get-zones
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo firewall-cmd --list-zones
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo firewall-cmd --get-zones
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo firewalld --list-zones
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With ufw, everything you'll ever need to do can be done with the ufw utility.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'True'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'False'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Your system is set up with firewalld and you need to open port `10000/tcp`.
+    Which of the following commands would you use?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo firewall-cmd --add-port=10000/tcp
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo firewall-cmd --add-port=10000
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo firewalld --add-port=10000
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo firewalld --add-port=10000/tcp
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following ufw commands would you use to open the default Secure
+    Shell port?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo ufw allow 22
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo ufw permit 22
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo ufw allow 22/tcp
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo ufw permit 22/tcp
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Rate-limiting with ufw: [https://45squared.com/rate-limiting-with-ufw/](https://45squared.com/rate-limiting-with-ufw/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'firewalld documentation for RHEL 7: [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/security_guide/sec-using_firewalls](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/security_guide/sec-using_firewalls)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'firewalld documentation for RHEL 8: [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/securing_networks/using-and-configuring-firewalls_securing-networks](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/securing_networks/using-and-configuring-firewalls_securing-networks)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The firewalld home page: [https://firewalld.org/](https://firewalld.org/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'UFW Community Help Wiki: [https://help.ubuntu.com/community/UFW](https://help.ubuntu.com/community/UFW)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'How to set up a Linux firewall with UFW on Ubuntu 18.04: [https://linuxize.com/post/how-to-setup-a-firewall-with-ufw-on-ubuntu-18-04/](https://linuxize.com/post/how-to-setup-a-firewall-with-ufw-on-ubuntu-18-04/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Answers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: RHEL 7 distros use iptables as the firewalld backend, and RHEL 8/9 distros use
+    nftables as the firewalld backend.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: D
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: C
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: B
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: A
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: C
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

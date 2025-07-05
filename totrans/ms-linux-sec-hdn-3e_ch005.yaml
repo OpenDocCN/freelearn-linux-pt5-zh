@@ -1,0 +1,2240 @@
+- en: 4 Securing Your Server with a Firewall - Part 1
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Join our book community on Discord
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '[https://packt.link/SecNet](https://packt.link/SecNet)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/file33.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Security is one of those things that's best done in layers. Security-in-depth,
+    we call it. So, on any given corporate network, you will find a firewall appliance
+    separating the Internet from the **demilitarized zone** (**DMZ**), where your
+    Internet-facing servers are kept. You will also find a firewall appliance between
+    the DMZ and the internal LAN, and firewall software installed on each individual
+    server and client. We want to make it as tough as possible for intruders to reach
+    their final destinations within our networks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Interestingly, though, of all the major Linux distros, only the SUSE distros
+    and the Red Hat type distros come with a firewall already set up and enabled.
+    Newer versions of Ubuntu come with a pre-configured firewall, but you need to
+    activate it by running a couple of simple commands.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Since the focus of this book is on hardening our Linux servers, we''ll focus
+    this chapter on that last level of defense: the firewalls on our servers and clients.
+    We''ll cover both of the command-line netfilter interfaces, which are **iptables**
+    and **nftables**.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we''ll cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: An overview of the Linux firewall
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An overview of iptables
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An overview of nftables
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In the next chapter, we'll cover **ufw** and **firewalld**, which are handy
+    front-ends for iptables and nftables.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The code files for this chapter are available here: [https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition](https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-Second-Edition).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: An overview of the Linux firewall
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In a typical business setting, especially in larger enterprises, you may encounter
+    various types of firewalls in various places that can provide various types of
+    functionality. Here are some examples:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Edge devices that separate the Internet from an internal network translate routable
+    public IP addresses to non-routable private IP addresses. They can also provide
+    various types of access control to keep out unauthorized people. By also providing
+    various types of packet inspection services, they can help prevent attacks on
+    the internal network, keep out malware, and prevent leakage of sensitive information
+    from the internal network to the Internet.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Large enterprise networks are normally divided into subnetworks, or *subnets*,
+    with each corporate department having a subnet to call its own. Best practice
+    dictates separating the subnets with firewalls. This helps ensure that only authorized
+    personnel can access any given subnet.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: And, of course, you also have firewalls running on the individual servers and
+    workstations. By providing a form of access control, they can help prevent an
+    intruder who has compromised one machine from performing a lateral movement to
+    another machine on the network. They can be also configured to prevent certain
+    types of port scanning and **denial-of-service** (**DoS**) attacks.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For the first two items in the preceding list, you would likely see dedicated
+    firewall appliances and teams of firewall administrators taking care of them.
+    The third item in the list is where you, the Linux professional, come into the
+    picture. In this chapter and the next, we'll look at the firewall technologies
+    that come packaged with your Linux server and Linux workstation distros.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The name of the Linux firewall is **netfilter**. This netfilter code is compiled
+    into the Linux kernel, and is what performs the actual packet filtering. There’s
+    no way for human users to directly interface with netfilter, which means that
+    we need some sort of helper program to interface with netfilter for us. There
+    have been three helper programs, which are:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**ipchains**: This was the first one, and was part of the Linux kernel up through
+    kernel version 2.4\. It’s now ancient history, so we won’t say any more about
+    it.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**iptables**: This replaced ipchains in Linux kernel version 2.6\. It’s still
+    used in a lot of Linux distros, but is rapidly disappearing.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**nftables**: This is the new kid on the block, and is rapidly replacing iptables.
+    As we’ll see later, it has a lot of advantages over the older iptables.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'All three of these helper programs do two things for us:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: They provide a command-line interface for human users.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: They take the commands that human users input and inject them into netfilter.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Making things even more interesting is that we also have helper programs for
+    our helper programs. The **Uncomplicated Firewall** (**ufw**) was created by Ubuntu
+    developers, and is a front-end for either iptables or nftables. Ubuntu comes with
+    ufw already installed, and you can install ufw yourself on Debian and other Debian-type
+    distros. On the Red Hat side, we have firewalld, which is also a front-end for
+    either iptables or nftables. Note that firewalld is installed and active by default
+    on all Red Hat-type distros, as well as the SUSE distros. It’s available as an
+    option for Ubuntu and Debian. Both ufw and firewalld can vastly simplify the process
+    of setting up a proper firewall. Still though, it’s sometimes helpful to know
+    how to work with either bare iptables or bare nftables. So, let’s begin by looking
+    at iptables.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An overview of iptables
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'As I’ve mentioned, iptables is one of two command-line utilities that we can
+    currently use to directly manage netfilter. It was originally introduced as a
+    feature of Linux kernel version 2.6, so it''s been around for a long time. With
+    iptables, you do have a few advantages:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It's been around long enough that most Linux admins already know how to use
+    it.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It's easy to use iptables commands in shell scripts to create your own custom
+    firewall configuration.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It has great flexibility in that you can use it to set up a simple port filter,
+    a router, or a virtual private network.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It still comes pre-installed on some Linux distros, although it’s rapidly getting
+    replaced by nftables.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It's very well documented and has free of charge, book-length tutorials available
+    on the Internet.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'However, as you might know, there are also a few disadvantages:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: IPv4 and IPv6 each require their own special implementation of iptables. So,
+    if your organization still needs to run IPv4 while in the process of migrating
+    to IPv6, you'll have to configure two firewalls on each server and run a separate
+    daemon for each. (One for IPv4, the other for IPv6.)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you need to do MAC bridging, that requires **ebtables**, which is the third
+    component of iptables, with its own unique syntax.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**arptables**, the fourth component of iptables, also requires its own daemon
+    and syntax.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Whenever you add a rule to a running iptables firewall, the entire iptables
+    ruleset has to be reloaded, which can have an impact on performance.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Until recently, just plain iptables was the default firewall manager on every
+    Linux distro. It still is on some distros, but Red Hat Enterprise Linux 7 and
+    all of its offspring now use the new firewalld as an easier-to-use frontend for
+    configuring iptables rules. Ubuntu comes with **Uncomplicated Firewall** (**ufw**),
+    which is also an easy to use frontend for iptables on all Ubuntu versions up through
+    20.04.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we'll discuss setting up iptables firewall rules for both IPv4
+    and IPv6.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Mastering the basics of iptables
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'iptables consists of five tables of rules, each with its own distinct purpose:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Filter table**: For basic protection of our servers and clients, this might
+    be the only table that we use.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Network Address Translation (NAT) table**: NAT is used to connect the public
+    Internet to private networks.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Mangle table**: This is used to alter network packets as they go through
+    the firewall.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Raw table**: This is for packets that don''t require connection tracking.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Security table**: The security table is only used for systems that have SELinux
+    installed.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Since we're currently only interested in basic host protection, we will only
+    look at the filter table for the time being. (In a few moments, I'll show you
+    a couple of fancy tricks that we can do with the mangle table.) Each table consists
+    of chains of rules, and the filter table consists of the `INPUT`, `FORWARD`, and
+    `OUTPUT` chains. Let’s look at this on an Ubuntu 20.04 virtual machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Ubuntu 20.04 LTS comes with iptables, and Ubuntu 22.04 comes with nftables.
+    However, even if you’re running Ubuntu 22.04 or newer, you’ll still want to learn
+    how to work with iptables commands. The first reason is that Ubuntu 22.04 includes
+    a cool feature that automatically translates iptables commands to nftables commands.
+    This allows you to use any iptables scripts that you might already have without
+    worrying about converting them to nftables format. The second reason is that once
+    we start talking about Ubuntu’s **Uncomplicated Firewall** (**ufw**), you’ll see
+    that you’ll still need to know iptables commands in order to configure it, regardless
+    of which Ubuntu version that you’re using.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'First, we''ll look at our current configuration by using the `sudo iptables
+    -L` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Remember that we said that you need a separate component of iptables to deal
+    with IPv6\. Here, we''ll use the `sudo ip6tables -L` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In both cases, you can see that there are no rules and that the machine is
+    wide open. (Understand that Ubuntu actually does come with a pre-configured Uncomplicated
+    Firewall and you’ll also see some output that is specific to it, but we’ll ignore
+    that for the time-being so that we can work directly with iptables.) We''ll start
+    by creating a rule that will allow us to pass incoming packets from servers that
+    our host has requested a connection to:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown of this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**-A INPUT**: `-A` places a rule at the end of the specified chain, which in
+    this case is the `INPUT` chain. We would have used `-I` had we wanted to place
+    the rule at the beginning of the chain.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**-m**: This calls in an iptables module. In this case, we''re calling in the
+    `conntrack` module to track connection states. This module allows `iptables` to
+    determine whether our client has made a connection to another machine, for example.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**--ctstate**: The `ctstate`, or connection state, portion of our rule is looking
+    for two things. First, it''s looking for a connection that the client established
+    with a server. Then, it looks for the related connection that''s coming back from
+    the server in order to allow it to connect to the client. So, if a user were to
+    use a web browser to connect to a website, this rule would allow packets from
+    the web server to pass through the firewall to get to the user''s browser.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**-j**: This stands for jump. Rules jump to a specific target, which in this
+    case is `ACCEPT`. (Please don''t ask me who came up with this terminology.) So,
+    this rule will accept packets that have been returned from the server to which
+    the client has requested a connection.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Our new ruleset looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, we''ll open up port `22` so that we can connect through Secure Shell:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**-A INPUT**: As before, we want to place this rule at the end of the `INPUT`
+    chain with `-A`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**-p tcp**: `-p` indicates the protocol that this rule affects. This rule affects
+    the TCP protocol, of which Secure Shell is a part.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**--dport ssh**: When an option name consists of more than one letter, we need
+    to precede it with two dashes, instead of just one. The `--dport` option specifies
+    the destination port on which we want this rule to operate. (Note that we could
+    have also listed this portion of the rule as `--dport 22` since `22` is the number
+    of the SSH port.)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**-j ACCEPT**: If we put this all together with `-j ACCEPT`, then we have a
+    rule that allows other machines to connect to this one through Secure Shell.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Now, let''s say that we want this machine to be a DNS server. For that, we
+    need to open port `53` for both the TCP and the UDP protocols:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, we have an almost complete, usable ruleset for our `INPUT` chain:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, this is only *almost* complete, because there''s still one little
+    thing that we forgot. That is, we need to allow traffic for the loopback interface.
+    This is okay because it gives us a good chance to see how to insert a rule where
+    we want it if we don''t want it at the end. In this case, we''ll insert the rule
+    at `INPUT 1`, which is the first position of the `INPUT` chain:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Before you inserted the `ACCEPT` rule for the `lo` interface, you may have
+    noticed that `sudo` commands were taking a long time to complete and that you
+    were getting sudo: unable to resolve host. . .Resource temporarily unavailable
+    messages. That''s because `sudo` needs to know the machine''s hostname so that
+    it can know which rules are allowed to run on a particular machine. It uses the
+    loopback interface to help resolve the hostname. If the `lo` interface is blocked,
+    it takes longer for `sudo` to resolve the hostname.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Our ruleset now looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Note how port `53` is listed as the domain port. To see port numbers instead
+    of port names, we can use the `-n` switch:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, as things currently stand, we're still allowing *everything* to get through,
+    because we still haven't created a rule that blocks what we haven't specifically
+    allowed. Before we do that, though, let's look at a few more things that we might
+    want to allow.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Blocking ICMP with iptables
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The conventional wisdom that you may have heard for most of your career is
+    that we need to block all the packets from the **Internet Control Message Protocol**
+    (**ICMP**). The idea you may have been told is to make your server invisible to
+    hackers by blocking ping packets. Of course, there are some vulnerabilities that
+    are associated with ICMP, such as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: By using a botnet, a hacker could inundate your server with ping packets from
+    multiple sources at once, exhausting your server's ability to cope.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Certain vulnerabilities that are associated with the ICMP protocol can allow
+    a hacker to either gain administrative privileges on your system, redirect your
+    traffic to a malicious server, or crash your operating system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By using some simple hacking tools, someone could embed sensitive data in the
+    data field of an ICMP packet in order to secretly exfiltrate it from your organization.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, while blocking certain types of ICMP packets is good, blocking all
+    ICMP packets is bad. The harsh reality is that certain types of ICMP messages
+    are necessary for the proper functionality of the network. Since the *drop all
+    that''s not allowed* rule that we''ll eventually create also blocks ICMP packets,
+    we''ll need to create some rules that allow the types of ICMP messages that we
+    have to have. So, here goes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**-m conntrack**: As before, we''re using the `conntrack` module to allow packets
+    that are in a certain state. This time, though, instead of just allowing packets
+    from a host to which our server has connected (`ESTABLISHED,RELATED`), we''re
+    also allowing `NEW` packets that other hosts are sending to our server.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**-p icmp**: This refers to the ICMP protocol.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**--icmp-type**: There are quite a few types of ICMP messages, which we''ll
+    outline next.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Here are the three types of ICMP messages that we want to allow:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**type 3**: These are the destination unreachable messages. Not only can they
+    tell your server that it can''t reach a certain host, but they can also tell it
+    why. For example, if the server has sent out a packet that''s too large for a
+    network switch to handle, the switch will send back an ICMP message that tells
+    the server to fragment that large packet. Without ICMP, the server would have
+    connectivity problems every time it tries to send out a large packet that needs
+    to be broken up into fragments.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**type 11**: Time exceeded messages let your server know that a packet that
+    it has sent out has either exceeded its **Time-to-Live** (**TTL**) value before
+    it could reach its destination, or that a fragmented packet couldn''t be reassembled
+    before the TTL expiration date.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**type 12**: Parameter problem messages indicate that the server had sent a
+    packet with a bad IP header. In other words, the IP header is either missing an
+    option flag, or it''s of an invalid length.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Three common message types are conspicuously absent from our list:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**type 0** and **type 8**: These are the infamous ping packets. Actually, `type
+    8` is the echo request packet that you would send out to ping a host, while `type
+    0` is the echo reply that the host would return to let you know that it''s alive.
+    Of course, allowing ping packets to get through could be a big help with troubleshooting
+    network problems. If that scenario ever comes up, you could just add a couple
+    of `iptables` rules to temporarily allow pings.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**type 5**: Now, we have the infamous redirect messages. Allowing these could
+    be handy if you have a router that can suggest more efficient paths for the server
+    to use, but hackers can also use them to redirect you to someplace that you don''t
+    want to go. So, just block them.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: There are lots more ICMP message types than I've shown here, but these are the
+    only ones that we need to worry about for now.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When we use `sudo iptables -L`, we''ll see our new ruleset, as things currently
+    stand:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: Looks good, eh? Well, not really. We haven't blocked anything with this ruleset
+    yet. So, let's take care of that.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Blocking everything that isn't allowed with iptables
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To start blocking stuff that we don't want, we have to do one of two things.
+    We can set a default `DROP` or `REJECT` policy for the `INPUT` chain, or we can
+    leave the policy set to `ACCEPT` and create a `DROP` or `REJECT` rule at the end
+    of the `INPUT` chain. Which one you choose is really a matter of preference. (Of
+    course, before you choose one over the other, you might want to check your organization's
+    policy manual to see if your employer has a preference.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: The difference between `DROP` and `REJECT` is that `DROP` blocks packets without
+    sending any message back to the sender. `REJECT` blocks packets, and then sends
+    a message back to the sender about why the packets were blocked. For our present
+    purposes, let's say that we just want to `DROP` packets that we don't want to
+    get through.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: There are times when `DROP` is better, and times when `REJECT` is better. Use
+    `DROP` if it's important to make your host invisible. (Although, even that isn't
+    that effective, because there are other ways to discover hosts.) If you need your
+    hosts to inform other hosts about why they can't make a connection, then use `REJECT`.
+    The big advantage of `REJECT` is that it will let connecting hosts know that their
+    packets are being blocked so that they will know to immediately quit trying to
+    make a connection. With `DROP`, the host that's trying to make the connection
+    will just keep trying to make the connection until it times out.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'To create a `DROP` rule at the end of the `INPUT` chain, use this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To set a default `DROP` policy instead, we can use the this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: The big advantage of setting up a default `DROP` or `REJECT` policy is that
+    it makes it easier to add new `ACCEPT` rules if need be. This is because if we
+    decide to keep the default `ACCEPT` policy and create a `DROP` or `REJECT` rule
+    instead, that rule has to be at the bottom of the list.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since `iptables` rules are processed in order, from top to bottom, any `ACCEPT`
+    rules that come after that `DROP` or `REJECT` rule would have no effect. You would
+    need to insert any new `ACCEPT` rules above that final `DROP` or `REJECT` rule,
+    which is just a tiny bit less convenient than just being able to append them to
+    the end of the list. For now, in order to illustrate my next point, I've just
+    left the default `ACCEPT` policy and added the `DROP` rule.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When we look at our new ruleset, we''ll see something that''s rather strange:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The first rule and the last rule of the `INPUT` chain look the same, except
+    that one is a `DROP` and the other is an `ACCEPT`. Let''s look at it again with
+    the `-v` (verbose) option:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, we can see that `lo`, for loopback, shows up under the `in` column of the
+    first rule, and that `any` shows up under the `in` column of the last rule. We
+    can also see that the `-v` switch shows the number of packets and bytes that have
+    been counted by each rule. So, in the preceding example, we can see that the `ctstate
+    RELATED,ESTABLISHED` rule has accepted 828 packets and 52,354 bytes. The `DROP
+    all` rule has blocked 251 packets and 40,763 bytes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This all looks great, except that if we were to reboot the machine right now,
+    the rules would disappear. The final thing that we need to do is make them permanent.
+    There are several ways to do this, but the simplest way to do this on an Ubuntu
+    machine is to install the `iptables-persistent` package:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'During the installation process, you''ll be presented with two screens that
+    ask you whether you want to save the current set of `iptables rules`. The first
+    screen will be for IPv4 rules, while the second will be for IPv6 rules:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![19501_04_01.png](img/file34.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 19501_04_01.png
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You''ll now see two new rules files in the `/etc/iptables/` directory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: If you were to reboot the machine now, you'd see that your iptables rules are
+    still there and in effect. The only slight problem with `iptables-persistent`
+    is that it won't save any subsequent changes that you make to the rules. That's
+    okay, though. I'll show you how to deal with that in just a bit.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab for basic iptables usage
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'You''ll complete this lab on your Ubuntu 20.04 virtual machine. Follow these
+    steps to get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Shut down your Ubuntu virtual machine and create a snapshot. After you boot
+    it back up, look at your iptables rules, or lack thereof, by using this command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'With a default Ubuntu setup, the Uncomplicated Firewall (ufw) service is already
+    running, albeit with an unactivated firewall configuration. We want to disable
+    it to work directly with iptables. Do that now with this command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Create the rules that you need for a basic firewall, allowing for Secure Shell
+    access, DNS queries and zone transfers, and the proper types of ICMP. Deny everything
+    else:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Use this command to view the results:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Oops – it looks like you forgot about that loopback interface. Add a rule for
+    it at the top of the list:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'View the results by using the following two commands. Note the difference between
+    the output of each:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Install the `iptables-persistent` package and choose to save the IPv4 and IPv6
+    rules when prompted:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: Reboot the virtual machine and verify that your rules are still active.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Keep this virtual machine; you'll be adding more to it in the next hands-on
+    lab.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: That's the end of this lab—congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Blocking invalid packets with iptables
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If you've been in the IT business for any length of time, you're most likely
+    familiar with the good old TCP three-way handshake. If you're not, no worries.
+    Here's the simplified explanation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s say that you''re sitting at your workstation, and you pull up Firefox
+    to visit a website. To access that website, your workstation and the web server
+    have to set up the connection. Here''s what happens:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Your workstation sends a packet with only the `SYN` flag set to the web server.
+    This is your workstation's way of saying, "Hello, Mr. Server. I'd like to make
+    a connection with you."
+  prefs: []
+  type: TYPE_NORMAL
+- en: After receiving your workstation's `SYN` packet, the web server sends back a
+    packet with the `SYN` and `ACK` flags set. With this, the server is saying, "Yeah,
+    bro. I'm here, and I'm willing to connect with you."
+  prefs: []
+  type: TYPE_NORMAL
+- en: Upon receipt of the `SYN-ACK` packet, the workstation sends back a packet with
+    only the `ACK` flag set. With this, the workstation is saying, "Cool deal, dude.
+    I'm glad to connect with you."
+  prefs: []
+  type: TYPE_NORMAL
+- en: Upon receipt of the `ACK` packet, the server sets up the connection with the
+    workstation so that they can exchange information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This sequence works the same way for setting up any kind of TCP connection.
+    This includes connections that involve Secure Shell, telnet, and the various mail
+    server protocols, among other things.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, clever people can use a variety of tools to craft TCP packets with
+    some very weird combinations of flags. With these so-called *invalid* packets,
+    a few things could happen:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The invalid packets could be used to elicit responses from the target machine
+    in order to find out what operating system it's running, what services are running
+    on it, and which versions of the services are running.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The invalid packets could be used to trigger certain sorts of security vulnerabilities
+    on the target machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Some of these invalid packets require more processing power than what normal
+    packets require, which could make them useful for performing Denial-of-Service
+    (DoS) attacks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, in truth, the `DROP all` rule at the end of the filter table's `INPUT`
+    chain will block some of these invalid packets. However, there are some things
+    that this rule might miss. And even if we could count on it to block all the invalid
+    stuff, this still isn't the most efficient way of doing things. By depending on
+    this `DROP all` rule, we're allowing these invalid packets to travel through the
+    entire `INPUT` chain, looking for a rule that will let them through. When no `ALLOW`
+    rule is found for them, they'll finally get blocked by the `DROP all` rule, which
+    is the last rule in the chain. So, what if we could find a more efficient solution?
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Ideally, we''d like to block these invalid packets before they travel through
+    the entire `INPUT` chain. We could do that with a `PREROUTING` chain, but the
+    filter table doesn''t have a `PREROUTING` chain. Therefore, we need to use the
+    `PREROUTING` chain of the mangle table instead. Let''s start by adding these two
+    rules:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The first of these rules will block most of what we would consider *invalid*.
+    However, there are still some things that it misses. Due to this, we added the
+    second rule, which blocks all `NEW` packets that are not `SYN` packets. Now, let''s
+    see what we have:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: Hmm...
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can''t see our new rules, can we? That''s because, by default, `iptables
+    -L` only shows rules for the filter table. We need to see what we''ve just placed
+    into the mangle table, so let''s do this, instead:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, we used the `-t mangle` option to indicate that we want to see the configuration
+    for the mangle table. Something rather curious that you may have noticed is how
+    iptables renders the rule that was created by the `sudo iptables -t mangle -A
+    PREROUTING -p tcp ! --syn -m conntrack --ctstate NEW -j DROP` command. For some
+    reason, it renders like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: It looks strange, but don't let that throw you. It still means that it's blocking
+    `NEW` packets that aren't `SYN` packets.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Previously, I mentioned that the `iptables-persistent` package won''t save
+    subsequent changes to your `iptables` rules. So, as things stand now, the mangle
+    table rules that we just added will disappear once I reboot this virtual machine.
+    To make these changes permanent, I''ll use the `iptables-save` command to save
+    a new file in my own home directory. Then, I''ll copy the file over to the `/etc/iptables`
+    directory, replacing the original one:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: To test this, we'll use a handy utility called Nmap. It's a free utility that
+    you can install on your Windows, Mac, or Linux workstation. Or, if you don't want
+    to install it on your host machine, you can install it on one of your Linux virtual
+    machines. It's in the normal repositories of Debian/Ubuntu, RHEL/CentOS 7, and
+    RHEL/AlmaLinux 8\. So, just install the Nmap package with the appropriate install
+    command for your distro. If you want to install Nmap on your Windows or Mac host
+    machine, you'll need to download it from the Nmap website.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can download Nmap from the official website, which can be found here: [https://nmap.org/download.html](https://nmap.org/download.html).'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'With our new mangle table rules in place, let''s perform an XMAS scan of our
+    Ubuntu machine. I have Nmap installed here on the Fedora workstation that I''m
+    currently using, so I''ll just use this for now. I can do this like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'By default, Nmap only scans the most commonly used 1,000 ports. The XMAS scan
+    sends invalid packets that consist of the FIN, PSH, and URG flags. The fact that
+    all 1,000 scanned ports show as `open|filtered` means that the scan was blocked,
+    and that Nmap can''t determine the true state of the ports. (In reality, port
+    `22` is open.) We can view the result to see which rule did the blocking. (To
+    simplify things a bit, I''ll only show the output for the `PREROUTING` chain since
+    it''s the only mangle table chain that''s doing anything):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, you can see that the first rule – the `INVALID` rule – blocked 2,000
+    packets and 80,000 bytes. Now, let''s zero out the counter so that we can do another
+    scan:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This time, let''s do a Window scan, which bombards the target machine with
+    `ACK` packets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As before, the scan was blocked, as indicated by the message that all 1,000
+    scanned ports have been filtered. Now, let''s view what we have on the target
+    Ubuntu machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: This time, we can see that our invalid packets got past the first rule, but
+    were blocked by the second rule.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, just for fun, let''s clear out the mangle table rules and do our scans
+    again. We''ll use the `-D` option to delete the two rules from the mangle table:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When you delete a rule, you have to specify the rule number, just like you
+    do when you insert a rule. Here, I specified rule 1 twice, because deleting the
+    first rule moved the second rule up to first place. Now, let''s verify that the
+    rules are gone:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Yes, they are. Cool. Now, let''s see what we get when we perform another XMAS
+    scan:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: Even without the mangle table rules, it shows that my scan is still blocked.
+    What's up with that? This is happening because I still have the `DROP all` rule
+    at the end of the `INPUT` table. Let's disable that and see what we get with another
+    scan.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, I need to see what the rule number is:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Counting down, I can see that it''s rule number 4, so I''ll delete it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, for the XMAS scan:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: This time, the scan shows that 999 ports are closed and that port `22`, the
+    SSH port, is either open or filtered. This shows that the scan is no longer being
+    blocked by anything.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Restoring the deleted rules
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'When I used the `iptables -D` commands, I only deleted the rules from the runtime
+    configuration, and not from the `rules.v4` configuration file. To restore the
+    rules that I deleted, I can either reboot the machine or restart the `netfilter-persistent`
+    service. The latter choice is quicker, so I''ll activate it like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `iptables -L` and `iptables -t mangle -L` commands will show that all the
+    rules are now back in effect.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab for blocking invalid IPv4 packets
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'For this lab, you''ll use the same virtual machine that you used for the previous
+    lab. You won''t replace any of the rules that you already have. Rather, you''ll
+    just add a couple. Let''s get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Look at the rules for the filter and the mangle tables. (Note that the `-v`
+    option shows you statistics about packets that were blocked by `DROP` and `REJECT`
+    rules.) Then, zero out the blocked packets counter:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'From either your host machine or another virtual machine, perform the NULL
+    and Windows Nmap scans against the virtual machine:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Repeat *Step 1*. You should see a large jump in the number of packets that
+    were blocked by the final `DROP` rule in the `INPUT` chain of the filter table:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Make the firewall work more efficiently by using the `PREROUTING` chain of
+    the mangle table to drop invalid packets, such as those that are produced by the
+    two Nmap scans that we just performed. Add the two required rules with the following
+    two commands:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Save the new configuration to your own home directory. Then, copy the file
+    to its proper location and zero out the blocked packet counters:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Perform only the NULL scan against the virtual machine:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Look at the `iptables` ruleset and observe which rule was triggered by the
+    Nmap scan:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This time, perform just the Windows scan against the virtual machine:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Observe which rule was triggered by this scan:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: That's the end of this lab—congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Protecting IPv6
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: I know, you're used to having all networking based on IPv4, with its nice, short,
+    easy to use IP addresses. However, that can't last forever, considering that the
+    world is now out of new IPv4 addresses. IPv6 offers a much larger address space
+    that will last for a long time to come. Some organizations, especially wireless
+    carriers, are either in the process of switching over to IPv6 or have already
+    switched to it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So far, all we''ve covered is how to set up an IPv4 firewall with iptables.
+    But remember what we said before. With iptables, you need one daemon and one set
+    of rules for the IPv4 network, and another daemon and set of rules for IPv6\.
+    This means that when using iptables to set up a firewall, protecting IPv6 means
+    doing everything twice. Most Linux distros come with IPv6 networking enabled by
+    default, so you either need to protect it with a firewall or disable it. Otherwise,
+    your IPv6 address will still be open for attack since the IPv4 firewall that you''ve
+    just configured won''t protect it. This is true even if your server or device
+    is facing the IPv4 Internet because there are ways to tunnel IPv6 packets through
+    an IPv4 network. Fortunately, the commands for setting up an IPv6 firewall are
+    mostly the same as what we''ve just covered. The biggest difference is that instead
+    of using the `iptables` command, you''ll use the `ip6tables` command. Let''s start
+    with our basic setup, just like what we did for IPv4:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The other big difference between IPv4 and IPv6 is that with IPv6, you must
+    allow more types of ICMP messages than you need to for IPv4\. This is due to the
+    following reasons:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: With IPv6, new types of ICMP messages have replaced the **Address Resolution
+    Protocol** (**ARP**).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: With IPv6, dynamic IP address assignments are normally done by exchanging ICMP
+    discovery messages with other hosts, rather than by DHCP.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: With IPv6, echo requests and echo replies, the infamous ping packets, are required
+    when you need to tunnel IPv6 packets through an IPv4 network.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'And of course, we still need the same types of ICMP messages that we need for
+    IPv4\. So, let''s start with them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'These message types are as follows, in order of appearance:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Destination unreachable
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Packet too big
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Time exceeded
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Parameter problem with the packet header
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Next, we''ll enable echo requests (type 128) and echo responses (type 129)
+    so that IPv6 over IPv4 tunneling will work:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: The Teredo protocol is one of a few different ways to tunnel IPv6 packets across
+    an IPv4 network. This protocol is what requires echo requests and echo replies,
+    the infamous ping packets, to be allowed through a firewall. However, if you search
+    through your distro repositories for a Teredo package, you won't find it. That's
+    because the Linux implementation of the Teredo protocol is called miredo. So,
+    when installing the Teredo protocol on a Linux machine, you'll need to install
+    the `miredo` and `miredo-server` packages.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'The next four ICMP message types that we need are for the Link-local Multicast
+    Receiver Notification messages:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'These are as follows, in order of appearance:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Listener query
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Listener report
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Listener done
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Listener report v2
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Next up is our neighbor and router discovery message types:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'These are as follows, in order of appearance:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Router solicitation
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Router advertisement
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Neighbor solicitation
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Neighbor advertisement
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Inverse neighbor discovery solicitation
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Inverse neighbor discovery advertisement
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Space doesn't permit me to go into the details of these message types. So, for
+    now, let's just say that they're required in order for IPv6 hosts to dynamically
+    assign themselves an IPv6 address.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For times when you''re using security certificates to authenticate the routers
+    that are attached to your network, you''ll also need to allow **Secure Neighbor
+    Discovery** (**SEND**) messages:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Are your fingers tired yet? If so, have no fear. This next group of ICMP rules
+    is the last one. This time, we need to allow Multicast Router Discovery messages:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, we''ll add our `DROP` rule to block everything else:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE58]'
+  prefs: []
+  type: TYPE_PRE
+- en: I know you're thinking, “Wow, that's a lot of hoops to jump through just to
+    set up a basic firewall”. And yeah, you're right, especially when you also need
+    to configure rules for IPv6\. Soon, I'll show you what the Ubuntu folk came up
+    with to make things simpler.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can get the whole scoop on how to use iptables on Ubuntu here: [https://help.ubuntu.com/community/IptablesHowTo](https://help.ubuntu.com/community/IptablesHowTo).'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Hands-on lab for ip6tables
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'For this lab, you''ll use the same Ubuntu virtual machine that you used in
+    the previous iptables labs. You''ll leave the IPv4 firewall setup that''s already
+    there as-is and create a new firewall for IPv6\. Let''s get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'View your IPv6 rules, or lack thereof, with this command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE59]'
+  prefs: []
+  type: TYPE_PRE
+- en: Create the IPv6 firewall. Due to formatting constraints, I can't list the entire
+    code block of commands here. You can find the respective commands in this chapter's
+    directory, in the code file that you can download from the Packt Publishing website.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'View the new ruleset by using the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, set up the mangle table rules for blocking invalid packets:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Save the new ruleset to a file in your own home directory, and then transfer
+    the rules file to the proper location:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Obtain the IPv6 address of the virtual machine with this command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On the machine on which you installed Nmap, perform a Windows scan of the virtual
+    machine''s IPv6 address. The command will look like this, except with your own
+    IP address:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On the virtual machine, observe which rule was triggered with this command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE65]'
+  prefs: []
+  type: TYPE_PRE
+- en: You should see non-zero numbers for the packet counters for one of the rules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'On the machine on which you installed Nmap, perform an XMAS scan of the virtual
+    machine''s IPv6 address. The command will look like this, except with your own
+    IP address:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE66]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As before, on the virtual machine, observe which rule was triggered by this
+    scan:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE67]'
+  prefs: []
+  type: TYPE_PRE
+- en: Shut down the virtual machine, and restore it from the snapshot that you created
+    at the beginning of the *Hands-on lab for basic iptables usage*.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: That's the end of this lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: So far, you've seen the good, the bad, and the ugly of `iptables`. It's very
+    flexible, and there's a lot of power in the `iptables` commands. If you're clever
+    at shell scripting, you can create some rather complex shell scripts that you
+    can use to deploy firewalls on the machines all across your network.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the other hand, getting everything right can be quite complex, especially
+    if you need to consider that your machines have to run both IPv4 and IPv6, and
+    that everything you do for IPv4 has to be done again for IPv6\. (If you're a masochist,
+    you might actually enjoy it.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: nftables – a more universal type of firewall system
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Now, let''s turn our attention to nftables, the new kid on the block. So, what
+    does nftables bring to the table? (Yes, the pun was intended.):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can forget about needing separate daemons and utilities for all of the different
+    networking components. The functionality of iptables, ip6tables, ebtables, and
+    arptables is now all combined in one neat package. The nft utility is now the
+    only firewall utility that you'll need.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: With nftables, you can create multi-dimensional trees to display your rulesets.
+    This makes troubleshooting vastly easier because it's now easier to trace a packet
+    all the way through all of the rules.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: With iptables, you have the filter, NAT, mangle, and security tables installed
+    by default, whether or not you use each one.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: With nftables, you only create the tables that you intend to use, resulting
+    in enhanced performance.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Unlike iptables, you can specify multiple actions in one rule, instead of having
+    to create multiple rules for each action.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Unlike iptables, new rules get added atomically. (That's a fancy way of saying
+    that there's no longer a need to reload the entire ruleset in order to just add
+    one rule.)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: nftables has its own built-in scripting engine, allowing you to write scripts
+    that are more efficient and more human-readable.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you already have lots of iptables scripts that you still need to use, you
+    can install a set of utilities that will help you convert them into nftables format.
+    (That is, unless you’re running Ubuntu 22.04, which can automatically translate
+    iptables commands for you.)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Although nftables was created by Red Hat, Ubuntu was the first enterprise-grade
+    Linux distro to offer it as an option, beginning with Ubuntu 16.04\. It’s now
+    the default option for Ubuntu 22.04, SUSE, OpenSUSE, and the RHEL 8/9-type distros.
+    Let’s begin by looking at some basic nftables concepts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Learning about nftables tables and chains
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'If you''re used to iptables, you might recognize some of the nftables terminology.
+    The only problem is that some of the terms are used in different ways, with different
+    meanings. Let''s go over some examples so that you’ll know what I''m talking about:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Tables**: Tables in nftables refer to a particular protocol family. The table
+    types are ip, ip6, inet, arp, bridge, and netdev.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Chains**: Chains in nftables roughly equate to tables in iptables. For example,
+    in nftables, you could have filter, route, or NAT chains.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Getting started with nftables
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: Let's start with a clean snapshot of our Ubuntu 22.04 virtual machine, since
+    it comes with nftables already installed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'You can use Ubuntu 20.04 if you really want to, but you’ll first have to install
+    nftables by doing:'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '[PRE68]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, let''s take a look at the list of installed tables:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE69]'
+  prefs: []
+  type: TYPE_PRE
+- en: You didn't see any tables, did you? So, let's load some up.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring nftables on Ubuntu
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: On the Ubuntu virtual machine that we'll be using, the default `nftables.conf`
+    file is nothing more than a meaningless placeholder. The file you need, which
+    you'll copy over to replace the default `nftables.conf` file, is elsewhere. Let's
+    check it out.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, we''ll go into the directory where the sample configurations are stored
+    and list the sample configuration files:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE70]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You should see something similar to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE71]'
+  prefs: []
+  type: TYPE_PRE
+- en: If you view the contents of the `workstation.nft` file, you'll see that it's
+    the one we need.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we''ll copy the workstation file over to the `/etc` directory, changing
+    its name to `nftables.conf`. (Note that this will overwrite the old `nftables.conf`
+    file, which is what we want.):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE72]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown of what you''ll see in the `/etc/nftables.conf` file
+    that you''ll be using:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**#!/usr/sbin/nft -f**: Although you can create normal Bash shell scripts with
+    nftables commands, it''s better to use the built-in scripting engine that''s included
+    with nftables. That way, we can make our scripts more human-readable, and we don''t
+    have to type `nft` in front of everything we want to execute.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**flush ruleset**: We want to start with a clean slate, so we''ll flush out
+    any rules that may have already been loaded.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**table inet filter**: This creates an inet family filter, which works for
+    both IPv4 and IPv6\. The name of this table is `filter`, but it could just as
+    well have been something a bit more descriptive.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**chain input**: Within the first pair of curly brackets, we have a chain called
+    `input`. (Again, the name could have been something more descriptive.)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**type filter hook input priority 0;**: Within the next pair of curly brackets,
+    we define our chain and list the rules. This chain is defined as a `filter` type.
+    `hook input` indicates that this chain is meant to process incoming packets. Because
+    this chain has both a `hook` and a `priority`, it will accept packets directly
+    from the network stack.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Finally, we have the standard rules for a very basic host firewall, starting
+    with the **Input Interface** (**iif**) rule, which allows the loopback interface
+    to accept packets.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next is the standard connection tracking (`ct`) rule, which accepts traffic
+    that's in response to a connection request from this host.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Then, there's a commented-out rule to accept Secure Shell and both secure and
+    nonsecure web traffic. `ct state` new indicates that the firewall will allow other
+    hosts to initiate connections to our server on these ports.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `meta nfproto ipv6` rule accepts neighbor discovery packets, allowing IPv6
+    functionality.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `counter drop` rule at the end silently blocks all other traffic and counts
+    both the number of packets and the number of bytes that it blocks. (This is an
+    example of how you can have one nftables rule perform multiple different actions.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If all you need on your Ubuntu server is a basic, no-frills firewall, your
+    best bet is to just edit this `/etc/nftables.conf` file so that it suits your
+    own needs. For starters, let''s set this up to match the setup that we created
+    for the iptables section. In other words, let''s say that this is a DNS server,
+    and we need to allow connections to port `22` and port `53`. Remove the comment
+    symbol from in front of the `tcp dport` line, get rid of ports `80` and `443`,
+    and add port `53`. The line should now look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE73]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note how you can use one nftables rule to open multiple ports.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'DNS also uses port `53/udp`, so let''s add a line for it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE74]'
+  prefs: []
+  type: TYPE_PRE
+- en: When you're only opening one port, you don't need to enclose that port number
+    within curly brackets. When opening multiple ports, just include the comma-separated
+    list within curly brackets, with a blank space after each comma, before the first
+    element, and after the last element.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Load the configuration file and view the results:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE75]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `counter drop` rule is another example of how an nftables rule can do multiple
+    things. In this case, the rule drops and counts unwanted packets. So far, the
+    rule has blocked one packet and 32 bytes. To demonstrate how this works, let''s
+    say that we want to make a log entry when packets are dropped. Just add the `log`
+    keyword to the `drop` rule, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE76]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To make these messages easier to find, add a tag to each log message, like
+    this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE77]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, when you need to peruse the `/var/log/kern.log` file to see how many dropped
+    packets you've had, just search for the `Dropped packet` text string.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s say that we want to block certain IP addresses from reaching the
+    Secure Shell port of this machine. To do this, we can edit the file, placing a
+    `drop` rule above the rule that opens port `22`. The relevant section of the file
+    would look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE78]'
+  prefs: []
+  type: TYPE_PRE
+- en: After we reload the file, we'll be blocking SSH access from two different IPv4
+    addresses. Any attempts to log in from either of those two addresses will create
+    a `/var/log/kern.log` message with the `Blocked SSH packets` tag. Note that we've
+    placed the `drop` rule ahead of the `accept` rule because if the `accept` rule
+    gets read first, the `drop` rule won't have an effect.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we need to allow the desired types of ICMP packets, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE79]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, you need separate rules for ICMPv4 and ICMPv6.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, we''ll block invalid packets by adding a new prerouting chain to the
+    filter table, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE80]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, we can save the file and close the text editor.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Due to formatting constraints, I can't show the entire completed file here.
+    To see the whole file, download the code file from the Packt website, and look
+    in the `Chapter 4` directory. The example file you seek is the `nftables_example_1.conf`
+    file.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Now, let''s load up the new rules:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE81]'
+  prefs: []
+  type: TYPE_PRE
+- en: Another really cool thing to note is how we've mixed IPv4 (ip) rules with IPv6
+    (ip6) rules in the same configuration file. Also, unless we specify otherwise,
+    all the rules that we create will apply to both IPv4 and IPv6\. That's the beauty
+    of using an inet-type table. For simplicity and flexibility, you'll want to use
+    inet tables as much as possible, rather than separate tables for IPv4 and IPv6.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Most of the time, when all you need is just a simple host firewall, your best
+    bet would be to just use this `nftables.conf` file as your starting point, and
+    edit the file to suit your own needs. However, there's also a command-line component
+    that you may find useful.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using nft commands
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: My preferred method of working with nftables is to just start with a template
+    and hand-edit it to my liking, as we did in the previous section. But for those
+    who'd rather do everything from the command line, there's the nft utility.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Even if you know that you'll always create firewalls by hand-editing `nftables.conf`,
+    there are still a couple of practical reasons to know about the nft utility.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Let's say that you've observed an attack in progress, and you need to stop it
+    quickly without bringing down the system. With an `nft` command, you can create
+    a custom rule on the fly that will block the attack. Creating nftables rules on
+    the fly also allows you to test the firewall as you configure it, before making
+    any permanent changes.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: And, if you decide to take a Linux security certification exam, you might see
+    questions about `nft` commands. (I happen to know.)
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: There are two ways to use the `nft` utility. For one, you could just do everything
+    directly from the Bash shell, prefacing every action you want to perform with
+    `nft`, followed by the `nft` subcommands. The other way is to use `nft` in interactive
+    mode. For our present purposes, we'll just go with the Bash shell.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, let''s delete our previous configuration and create an `inet` table
+    since we want something that works for both IPv4 and IPv6\. We''ll want to give
+    it a somewhat descriptive name, so let''s call it `ubuntu_filter`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE82]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, we''ll add an input filter chain to the table that we just created (note
+    that since we''re doing this from the Bash shell, we need to escape the semicolon
+    with a backslash):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE83]'
+  prefs: []
+  type: TYPE_PRE
+- en: We could have given it a more descriptive name, but for now, `input` works.
+    Within the pair of curly brackets, we're setting the parameters for this chain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Each nftables protocol family has its own set of hooks, which define how packets
+    will be processed. For now, we''re only concerned with the ip/ip6/inet families,
+    which have the following hooks:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Prerouting
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Input
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Forward
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Output
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Postrouting
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Of these, we're only concerned with the input and output hooks, which apply
+    to filter-type chains. By specifying a hook and a priority for our input chain,
+    we're saying that we want this chain to be a base chain that will accept packets
+    directly from the network stack. You will also see that certain parameters must
+    be terminated by a semicolon, which in turn would need to be escaped with a backslash
+    if you're running the commands from the Bash shell. Finally, we're specifying
+    a default policy of `drop`. If we had not specified `drop` as the default policy,
+    then the policy would have been `accept` by default.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Tip:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Every `nft` command that you enter takes effect immediately. So, if you're doing
+    this remotely, you'll drop your Secure Shell connection as soon as you create
+    a filter chain with a default `drop` policy.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Some people like to create chains with a default `accept` policy, and then add
+    a `drop` rule as the final rule. Other people like to create chains with a default
+    `drop` policy, and then leave off the `drop` rule at the end. Be sure to check
+    your local procedures to see what your organization prefers.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Verify that the chain has been added. You should see something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE84]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'That''s great, but we still need some rules. Let''s start with a connection
+    tracking rule and a rule to open the Secure Shell port. Then, we''ll verify that
+    they were added:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE85]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Okay, that looks good. You now have a basic, working firewall that allows Secure
+    Shell connections. Well, except that just as we did in the in the iptables section
+    of this chapter, we forgot to create a rule to allow the loopback adapter to accept
+    packets. Since we want this rule to be at the top of the rules list, we''ll use
+    `insert` instead of `add`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE86]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, we''re all set. But what if we want to insert a rule at a specific location?
+    For that, you''ll need to use list with the `-a` option to see the rule handles:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE87]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As you can see, there''s no real rhyme or reason to the way the handles are
+    numbered. Let''s say that we want to insert the rule about blocking certain IP
+    addresses from accessing the Secure Shell port. We can see that the SSH `accept`
+    rule is `handle 3`, so we''ll need to insert our `drop` rule before it. This command
+    will look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE88]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, to place the rule before the rule with the `handle 3` label, we have to
+    insert it at position `3`. The new rule that we just inserted has the label `handle
+    6.` To delete a rule, we have to specify the rule''s handle number:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE89]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As is the case with iptables, everything you do from the command line will
+    disappear once you reboot the machine. To make it permanent, let''s redirect the
+    output of the `list` subcommand to the `nftables.conf` configuration file (of
+    course, we''ll want to have made a backup copy of the already-existing file, in
+    case we want to revert back to it):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE90]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Due to a quirk in the Bash shell, we can''t just redirect output to a file
+    in the `/etc/` directory in the normal manner, even when we use `sudo`. That''s
+    why I had to add the `sh -c` command, with the `nft list` command surrounded by
+    double quotes. Also, note that the file has to be named `nftables.conf` because
+    that''s what the nftables systemd service looks for. Now, when we look at the
+    file, we''ll see that there are a couple of things that are missing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE91]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Those of you who are sharp-eyed will see that we''re missing the `flush` rule
+    and the shebang line to specify the shell that we want to interpret this script.
+    Let''s add them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE92]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Much better. Let''s test this by loading the new configuration and observing
+    the `list` output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE93]'
+  prefs: []
+  type: TYPE_PRE
+- en: That's all there is to creating your own simple host firewall. Of course, running
+    commands from the command line, rather than just creating a script file in your
+    text editor, does make for a lot more typing. However, it does allow you to test
+    your rules on the fly, as you create them. And creating your configuration in
+    this manner and then redirecting the `list` output to your new configuration file
+    relieves you of the burden of having to keep track of all of those curly brackets
+    as you try to hand-edit the file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It's also possible to take all of the `nft` commands that we just created and
+    place them into a regular, old-fashioned Bash shell script. Trust me, though,
+    you really don't want to do that. Just use the nft-native scripting format, as
+    we've done here, and you'll have a script that performs better and is much more
+    human-readable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab for nftables on Ubuntu
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: For this lab, you'll need a clean snapshot of your Ubuntu 22.04 virtual machine.
+    Let’s get started.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Restore your Ubuntu virtual machine to a clean snapshot to clear out any firewall
+    configurations that you created previously. (Or, if you refer, start with a new
+    virtual machine.) Disable ufw and verify that no firewall rules are present:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE94]'
+  prefs: []
+  type: TYPE_PRE
+- en: You should see no rules listed for nftables.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Copy the `workstation.nft` template over to the `/etc/` directory and rename
+    it `nftables.conf`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE95]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Edit the `/etc/nftables.conf` file to create your new configuration. (Note
+    that due to formatting constraints, I have to break this into three different
+    code blocks.) Make the top portion of the file look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE96]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Make the second portion of the file look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE97]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Make the final portion of the file look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE98]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Save the file and reload nftables:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE99]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'View the results:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE100]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'From either your host computer or from another virtual machine, do a Windows
+    scan against the Ubuntu virtual machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE101]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Look at the packet counters to see which blocking rule was triggered. (Hint:
+    It''s in the prerouting chain.):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE102]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This time, do a null scan of the virtual machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE103]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, look at which rule was triggered this time. (Hint: It''s the other
+    one in the prerouting chain.):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE104]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the `/var/log/kern.log` file, search for the `Invalid Packets` text string
+    to view the messages about the dropped invalid packets.
+  prefs: []
+  type: TYPE_NORMAL
+- en: That's the end of this lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this section, we looked at the ins and outs of nftables, and looked at ways
+    to configure it to help prevent certain types of attacks. In the next chapter,
+    we’ll look at the helper programs for our helper programs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In this chapter, we looked at both of the helper programs that directly interface
+    with the netfilter firewall. First, we looked at our trusty old friend, iptables.
+    We saw that even though it's been around forever and still works, it does have
+    some shortcomings. Then, we worked with nftables, and saw that it has certain
+    advantages over the old iptables.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the space that's been allotted for this chapter, I've only been able to present
+    the essentials that you need in order to set up basic host protection. However,
+    this should be enough to get you started.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we'll look at ufw and firewalld, which are helper programs
+    for the two helper programs that we discussed in this chapter. I’ll see you there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Which of the following statements is true?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: iptables is the easiest firewall system to work with.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With iptables, any rule that you create applies to both IPv4 and IPv6.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With iptables, you have to create IPv6 rules separately from IPv4 rules.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With nftables, you have to create IPv6 rules separately from IPv4 rules.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is the official name of the Linux firewall?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: iptables
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: ufw
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: nftables
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: netfilter
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following statements about nftables is false?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With nftables, rules are added atomically.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With nftables, a table refers to a particular protocol family.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With nftables, ports and their associated rules are bundled into zones.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: With nftables, you can write scripts in either normal bash shell scripting,
+    or with the scripting engine that's built into nftables.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which iptables command would show you how many packets have been dropped by
+    a particular rule?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which nftables command would you use to see how many packets have been dropped
+    by a particular rule?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In iptables, which of the following targets would cause packets to be blocked
+    without sending a notification back to the source?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`STOP`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`DROP`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`REJECT`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`BLOCK`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following six choices are tables in iptables?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: netfilter
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: filter
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: mangle
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: security
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: ip6table
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: NAT
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which firewall system loads its rules atomically?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '25 iptables netfilter firewall examples: [https://www.cyberciti.biz/tips/linux-iptables-examples.html](https://www.cyberciti.biz/tips/linux-iptables-examples.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Linux IPv6 how-to: [http://tldp.org/HOWTO/html_single/Linux+IPv6-HOWTO/](http://tldp.org/HOWTO/html_single/Linux+IPv6-HOWTO/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Recommendations for Filtering ICMPv6 Messages in Firewalls: [https://www.ietf.org/rfc/rfc4890.txt](https://www.ietf.org/rfc/rfc4890.txt)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'nftables wiki: [https://wiki.nftables.org/wiki-nftables/index.php/Main_Page](https://wiki.nftables.org/wiki-nftables/index.php/Main_Page)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'nftables examples: [https://wiki.gentoo.org/wiki/Nftables/Examples](https://wiki.gentoo.org/wiki/Nftables/Examples)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Answers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: C
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: D
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: C
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo iptables -L -v
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: sudo nft list ruleset
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: B
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: B, C, D, F
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: nftables
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

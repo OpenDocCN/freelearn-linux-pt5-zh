@@ -1,0 +1,480 @@
+- en: Chapter 4. Managing Clusters
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we will cover how to setup and manage a local CoreOS cluster
+    on a personal computer. You will learn how to bootstrap a three-peer cluster,
+    customize it via the `cloud-config` file, and schedule a fleet unit in the cluster.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Bootstrapping a local cluster
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Customizing a cluster via the`cloud-config` file
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Scheduling a `fleet` unit in the cluster
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: You are going to learn how to setup a simple three-node cluster on your personal
+    computer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Determining the optimal etcd cluster size
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The most efficient cluster size is between three and nine peers. For larger
+    clusters, `etcd` will select a subset of instances to participate in order to
+    keep it efficient.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The bigger the cluster, the slower the writing to the cluster becomes, as all
+    of the data needs to be replicated around the cluster peers. To have a cluster
+    well-optimized, it needs to be based on an odd number of peers. It must have a
+    quorum of at least of three peers and prevent a split-brain in the event of network
+    partition.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In our case, we are going to set up a three-peer `etcd` cluster. To build a
+    highly available cluster on the cloud (GCE, AWS, Azure, and so on), you should
+    use multiple availability zones in order to decrease the effect of failure in
+    a single domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In a general cluster, peers are not recommended to be used for anything except
+    for running an `etcd` cluster. But for testing our cluster setup, it will be fine
+    to deploy some `fleet` units there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In later chapters, you will learn how to properly set up clusters to be used
+    for production.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Bootstrapping a local cluster
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: As discussed earlier, we will be installing a three-peer `etcd` cluster on our
+    computer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Cloning the coreos-vagrant project
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let''s clone the project and get it running. Follow these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In your terminal or command prompt, type this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Now we need to adjust some settings. Edit `config.rb` and change the file''s
+    top part to this example:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Alternatively, you can use the example code of this chapter, which will be kept
+    up to date with changes in the coreos-vagrant GitHub repository.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'What we did here is as follows:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: We set the cluster to three instances
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Discovery token is automatically replaced on each `vagrant up` command
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Next, we need to edit the user data file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Change the `"#discovery: https://discovery.etcd.io/<token>"` line to this:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: So, when we boot our vagrant-based cluster the next time, we will have three
+    CoreOS `etcd` peers running and connected to the same cluster via the discovery
+    token provided through "`https://discovery.etcd.io/<token>`".
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Let''s now fire up our new cluster using the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'We should see something like this in our terminal:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '![Cloning the coreos-vagrant project](img/image00121.jpeg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: Hold on! There's more output!
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '![Cloning the coreos-vagrant project](img/image00122.jpeg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: The cluster should be up and running now.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'To check the status of the cluster, type the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'You should see something like what is shown in the following screenshot:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '![Cloning the coreos-vagrant project](img/image00123.jpeg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'Now it''s time to test our new CoreOS cluster. We need to run `ssh` for one
+    of our peers and check the `fleet` machines. This can be done by the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We should see something like what is shown in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Cloning the coreos-vagrant project](img/image00124.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Excellent! We have got our first CoreOS cluster set, as we see all the three
+    machines up and running. Now, let''s try to set a key in `etcd` with which we
+    can check on another machine later on. Type in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You will see the following output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Press *Ctrl*+*D* to exit and type the following command to get to VM host''s
+    console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s verify that we can see our new `etcd` key there too:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: Brilliant! Our `etcd` cluster is working just fine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exit from the `core-02` machine by pressing *Ctrl*+*D*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Customizing a cluster via the cloud-config file
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let''s make some changes to the `cloud-config` file and push it into the cluster
+    machines:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the user data file (`cloud-config` file for Vagrant-based CoreOS), below
+    the text block `fleet` make changes:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Add a new line:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'So, it will look like this:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Let''s add a `test.txt` file to the `/home/core` folder via `cloud-config`
+    too. At the end of the user data file, add this code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: This will add a new file in the`/home/core` folder on each cluster machine.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'To get our changes implemented which we did previously, run the following commands:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'You will see the following result:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '![Customizing a cluster via the cloud-config file](img/image00125.jpeg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'Then, run this command:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: The first command provisionally updated user data file on all three VMs, and
+    the second reloaded them.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'To `ssh` to one of the VMs, enter this code:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'To check the content of the `test.txt` file, use this line:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'You should see output as follows:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: As you can see, we have added some files to all cluster machines via the `cloud-config`
+    file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s check one more change that we have done in that file using the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You will see something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Customizing a cluster via the cloud-config file](img/image00126.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Thus, you can see that we have some metadata assigned to cluster machines via
+    the `cloud-init` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Scheduling a fleet unit in the cluster
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Now, for the fun part, we will schedule a `fleet` unit in the cluster.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s log in to the `core-03` machine:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create a new `fleet` unit called `hello-cluster.service` by copying and pasting
+    this line:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Let''s schedule the `hello-cluster.service` job for the cluster:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'You should see output as follows:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: We can see that `hello-cluster.service` was scheduled to be run on the `172.17.8.103`
+    machine because that machine first responded to the `fleetctl` command.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'In later chapters, you will learn how to specifically schedule jobs to a particular
+    machine. Now let''s check out the real-time `hello-cluster.service` log:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'You will see something like this:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '![Scheduling a fleet unit in the cluster](img/image00127.jpeg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'To exit from the VM and reload the cluster, type the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Now, `ssh` again back to any machine:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Then run this command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'The following output will be seen:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '![Scheduling a fleet unit in the cluster](img/image00128.jpeg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'As you can see, `hello-cluster.service` got scheduled on another machine; in
+    our case, it is `core-01`. Suppose we `ssh` to it:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Then, we run the following command there. As a result, we will see the real-time
+    log again:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '![Scheduling a fleet unit in the cluster](img/image00129.jpeg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: References
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You can read more about how to use cloud-config at [https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/).You
+    can find out more about Vagrant at [https://docs.vagrantup.com](https://docs.vagrantup.com).If
+    you have any issues or questions about Vagrant, you can subscribe to the Vagrant
+    Google group at [https://groups.google.com/forum/#!forum/vagrant-up](https://groups.google.com/forum/#!forum/vagrant-up).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter,you learned how to set up aCoreOS cluster, customize it via
+    cloud-config, schedule `fleet` service units to the cluster, and check the `fleet`
+    unit in the cluster status and log.In the next chapter,you will learn how to perform
+    local and cloud development setups.
+  prefs: []
+  type: TYPE_NORMAL

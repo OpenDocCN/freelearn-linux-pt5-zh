@@ -1,0 +1,627 @@
+- en: '*Chapter 6*: Introduction to Devices, Drivers, and Platform Abstraction'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The **Linux Device Model** (**LDM**) is a concept that was introduced in the
+    Linux kernel to describe and manage kernel objects (those requiring reference
+    counting, for example, such as files, devices, buses, and even drivers), as well
+    as their hierarchies and how they are bound to others. LDM introduced object life
+    cycle management, reference counting, an **object-oriented** (**OO**) programming
+    style in the kernel, and other advantages (such as code reusability and refactoring,
+    automatic resource releasing, and more), which will not be discussed here.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since reference counting and life cycle management are at the lowest level of
+    LDM, we will discuss higher representations, such as dealing with common kernel
+    data objects and structures, including **devices**, **drivers**, and **buses**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Linux kernel platform abstraction and data structures
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Device and driver matching mechanism explained
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Linux kernel platform abstraction and data structures
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The Linux device model is built on top of some fundamental data structures,
+    including `struct device`, `struct device_driver`, and `struct bus_type`. The
+    first data structure represents the device to be driven, the second is the data
+    structure of each software entity intended to drive the device, and the latter
+    represents the channel between the device and the CPU.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Device base structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Devices help extract either physical or virtual devices. They are built on
+    top of the `struct device` structure, which is worth introducing first, as described
+    in `include/linux/device.h`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s look at each element in this structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`parent`: This is the device''s "parent" device, the device that this device
+    is attached to. In most cases, a parent device is some sort of bus or host controller.
+    If `parent` is `NULL`, then the device is a top-level device. This is the case
+    for bus controller devices for example.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`kobj`: This is the lowest-level data structure and is used to track a kernel
+    object (bus, driver, device, and so on). This is the centerpiece of LDM. We will
+    discuss this in [*Chapter 14*](B17934_14_Epub.xhtml#_idTextAnchor203), *Introduction
+    to the Linux Device Model*.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`bus`: This specifies the type of bus the device is on. It is the channel between
+    the device and the CPU.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`driver`: This specifies which driver has allocated this device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`platform_data`: This provides platform data that''s specific to the device.
+    This field is automatically set when the device is declared from within the board
+    file. In other words, it points to board-specific structures from within the board
+    setup file that describe the device and how it is wired. It helps minimize the
+    use of `#ifdefs` inside the device driver code. It contains resources such as
+    chip variants, GPIO pin roles, and interrupt lines.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`driver_data`: This is a private pointer for driver-specific information. The
+    bus controller driver is responsible for providing helper functions, which are
+    accessors that are used to get/set this field.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`pm_domain`: This specifies power management-specific callbacks that are executed
+    during system power state changes: suspend, hibernation, system resume, and during
+    runtime PM transitions, along with subsystem-level and driver-level callbacks.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`of_node`: This is the device tree node that''s associated with this device.
+    This field is automatically filled by the `platform_data` or `of_node` is set
+    to determine where exactly the device has been declared.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`id`: This is the device instance.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Devices are rarely represented by bare device structures since most subsystems
+    track extra information about the devices they host; instead, the structure is
+    frequently embedded within a higher-level representation of the device. This is
+    the case for the `struct i2c_client`, `struct spi_device`, `struct usb_device`,
+    and `struct platform_device` structures, which all embed a `struct device` element
+    in their members (`spi_device->dev`, `i2c_client->dev`, `usb_device->dev`, and
+    `platform_device->dev`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Device driver base structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The next structure we need to introduce is the `struct device_driver` structure.
+    This structure is the base element of any device driver. In object-oriented languages,
+    this structure would be the base class, which would be inherited by each device
+    driver.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This data structure is defined in `include/linux/device/driver.h` like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s look at each element in this structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`name`: This is the name of the device driver. It''s used as a fallback (that
+    is, it matches this name with the device name) when no matching method succeeds.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`bus`: This field is mandatory. It represents the bus that the devices of this
+    driver belong to. Driver registration will fail if this field is not set because
+    it is its probe method that is responsible for matching the driver with devices.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`owner`: This field specifies the module owner.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`of_match_table`: This is the open firmware table. It represents the array
+    of `struct of_device_id` elements that are used for device tree matching.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`acpi_match_table`: This is the ACPI match table. This is the same as `of_match_table`
+    but for ACPI matching, which will not be discussed in this tutorial.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`probe`: This function is called to query the existence of a specific device,
+    whether this driver can work with it, and then bind the driver to a specific device.
+    The bus driver is responsible for calling this function at given moments. We will
+    discuss this shortly.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`remove`: When a device is removed from the system, this method is called to
+    unbind it from this driver.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`shutdown`: This command is issued when the device is about to be turned off.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`suspend`: This is a callback that allows you to put the device into sleep
+    mode, mostly in a low-power state.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`resume`: This is invoked by the driver core to wake up a device that has been
+    in sleep mode.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`pm`: This represents a set of power management callbacks for devices that
+    matched this driver.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In the preceding data structure, the `shutdown`, `suspend`, `resume`, and `pm`
+    elements are optional as they are used for power management purposes. Providing
+    these elements depends on the capability of the underlying device (whether it
+    can be shut down, suspended, or perform other power management-related capabilities).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Driver registration
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: First, you should keep in mind that registering a device consists of inserting
+    that device into the list of devices that are maintained by its bus driver. In
+    the same way, registering a device driver consists of pushing this driver into
+    the list of drivers that's maintained by the driver of the bus that it sits on
+    top of. For example, registering a USB device driver will result in inserting
+    that driver into the list of drivers that are maintained by the USB controller
+    driver. The same goes for registering an SPI device driver, which will queue the
+    driver into the list of drivers that are maintained by the SPI controller driver.
+    `driver_register()` is a low-level function that's used to register a device driver
+    with the bus. It adds the driver to the bus's list of drivers. When a device driver
+    is registered with the bus, the core walks through the bus's list of devices and
+    calls the bus's `match()` callback for each device that does not have a driver
+    associated with it to find out whether there are any devices that the driver can
+    handle. When a match occurs, the device and the device driver are bound together.
+    The process of associating a device with a device driver is called binding.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You probably never want to use `driver_register()` as-is; it is up to the bus
+    driver to provide a bus-specific registration function, which will be a wrapper
+    based on `driver_register()`. So far, bus-specific registration functions have
+    always matched the `{bus_name}_register_driver()` pattern. For example, the registration
+    functions for the USB, SPI, I2C, and PCI drivers would be `usb_register_driver()`,
+    `spi_register_driver()`, `i2c_register_driver()`, and `pci_register_driver()`,
+    respectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The recommended place to register/unregister the driver is within the `init`/`exit`
+    functions of the module, which are executed at the module loading/unloading stages,
+    respectively. In lots of cases, registering/unregistering the driver is the only
+    action you will want to execute within those `init`/`exit` functions. In such
+    cases, each bus core provides a specific helper macro, which will be expanded
+    as the `init`/`exit` functions of the module and internally call the bus-specific
+    registering/unregistering function. Those bus macros follow the `module_{bus_name}_driver(__{bus_name}_driver);`
+    pattern, where `__{bus_name}_driver` is the driver structure of the corresponding
+    bus. The following table shows a non-exhaustive list of buses that are supported
+    in Linux, along with their macros:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Table 6.1 – Some buses, along with their (un)registration macros'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/B17934_06_Table_1.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Table 6.1 – Some buses, along with their (un)registration macros
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The bus controller code is responsible for providing such macros, but this
+    is not always the case. For example, the MDIO bus driver (a 2-wire serial bus
+    that''s used to control network devices) does not provide a `module_mdio_driver()`
+    macro. You should check whether this macro exists for the bus that the device
+    sits on top of to write the driver before using it. The following code blocks
+    show two examples of different buses – one using the bus-provided registering/unregistering
+    macro, and another not using it. Let''s see what the code looks like when we don''t
+    use the macro:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding example does not use the macro at all. Now, let''s look at an
+    example that uses the macro:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, you can see how the code is factorized, which is a serious plus when you're
+    writing a driver.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Exposing the supported devices in the driver
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The kernel must be aware of the devices that are supported by a given driver
+    and whether they are present on the system so that whenever one of them appears
+    on the system (the bus), the kernel knows which driver is in charge of it and
+    runs its probe function. That said, the `probe()` function of the driver will
+    only be run if this driver is loaded (which is a userspace operation); otherwise,
+    nothing will happen. The next section will explain how to manage driver auto-loading
+    so that when the device appears, its driver is automatically loaded, and its probe
+    function is called.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If we have a look at each bus-specific device driver structure (`struct platform_driver`,
+    `struct i2c_driver`, `struct spi_driver`, `struct pci_driver`, and `struct usb_driver`),
+    we will see that there is an `id_table` field whose type depends on the bus type.
+    This field should be given an array of device IDs that correspond to those supported
+    by the driver. The following table shows the common buses, along with their device
+    ID structures:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Table 6.2 – Some buses, along with their device identification data structures'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/B17934_06_Table_2.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Table 6.2 – Some buses, along with their device identification data structures
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'I intentionally omitted two special cases: the device tree and ACPI. They can
+    expose devices so that they can be declared either from within the device tree
+    or ACPI using the `driver.of_match_table` or `driver.acpi_match_table` fields,
+    which are not direct elements of the bus-specific driver structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Table 6.3 – Pseudo buses, along with their device identification data structures'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/B17934_06_Table_3.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Table 6.3 – Pseudo buses, along with their device identification data structures
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'These structures are all defined in `include/linux/mod_devicetable.h` in the
+    kernel sources, and their names match the `{bus_name}_device_id` pattern. We have
+    already discussed each structure in the appropriate chapters. So, let''s look
+    at an example that exposes SPI devices using both `struct spi_device_id` and `struct
+    of_device_id` for declaring the device tree (new and recommended) of this driver
+    ([http://elixir.free-electrons.com/linux/v4.10/source/drivers/gpio/gpio-mcp23s08.c](http://elixir.free-electrons.com/linux/v4.10/source/drivers/gpio/gpio-mcp23s08.c)):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding excerpt shows how a driver can declare the devices it supports.
+    Since our example is an SPI driver, the data structure that is involved is `struct
+    spi_device_id`, in addition to `struct of_device_id,` which is used in any driver
+    that needs to match a device according to their `compatible` string in the driver.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we are done learning the way a driver can expose the device it supports,
+    let's get deeper in the device and driver binding mechanism to understand what
+    happens under the hood when there is a match between a device and a driver.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Device/driver matching and module (auto) loading
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Please pay attention to this section, even though we will partially repeat what
+    we discussed previously. The **bus** is the fundamental element that device drivers
+    and devices rely on. From a hardware point of view, the bus is the link between
+    devices and the CPU, while from a software point of view, the bus driver is the
+    link between devices and their drivers. Whenever a device or driver is added/registered
+    with the system, it is automatically added to a list that's maintained by the
+    driver of the bus that it sits on top of. For example, registering a list of I2C
+    devices that can be managed by a given driver (i2c, of course) will result in
+    queueing those devices into a global list that maintains the I2C adapter driver,
+    as well as providing a USB device table that will insert those devices into the
+    list of devices that's maintained by the USB controller driver. Another example
+    involves registering a new SPI driver, which will insert this driver into the
+    list of drivers that's maintained by the SPI controller driver. Without this,
+    there would be no way for the kernel to know which driver should handle which
+    device.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Every device driver should expose the list of devices it supports and should
+    make that list accessible to the driver core (especially to the bus driver). This
+    list of devices is called `id_table` and is declared and filled from within the
+    driver code. This table is an array of device IDs, where each ID's type depends
+    on the device's type (I2C, SPI, USB, and so on). In this manner, whenever a device
+    appears on the bus, the bus driver will walk through its device driver's list
+    and look into each ID table for the entry that corresponds to this new device.
+    Every driver that contains the device ID in their table will have their `probe()`
+    function run, with the new device given as a parameter. This process is called
+    the matching loop. It works similarly for drivers. Whenever a new driver is registered
+    with the bus, the bus driver will walk through the list of its devices and look
+    for the device IDs that appear in the registered driver's `id_table`. For each
+    hit, the corresponding device will be given as a parameter to the `probe()` function
+    of the driver, which will be run as many times as there are hits.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The problem with the matching loop is that only loaded modules will have their
+    probe functions invoked. In other words, the matching loop will be useless if
+    the corresponding module is not loaded (`insmod`, `modprobe`) or built-in. You''ll
+    have to manually load the module before the device appears on the bus. The solution
+    to this issue is module auto-loading. Since, most of the time, module loading
+    is a userspace action (when the kernel does not request the module itself using
+    the `request_module()` function), the kernel must find a way to expose drivers,
+    along with their device tables, to the userspace. Thus came a macro called `MODULE_DEVICE_TABLE()`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: This macro is used to support hot-plugging, which describes which devices each
+    specific driver can support. At compilation time, the build process extracts this
+    information out of the driver and builds a human-readable table called `modules.alias`,
+    which is located in the `/lib/modules/kernel_version/` directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `<bus_type_name>` parameter should be the generic name of the bus that
+    you need to add module auto-loading support to. It should be `spi` for an SPI
+    bus, `of` for a device tree, `i2c` for I2C, and so on. In other words, it should
+    be one of the elements of the first column (of the **bus type**) of the previous
+    table (knowing that not all the buses are listed). Let''s add module auto-loading
+    support to the same driver we used previously (gpio-mcp23s08):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, let''s see what these two lines do when they''re added to the `modules.alias`
+    file on an i.MX6-based board running a Yocto-based image:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: The second part of the solution is the kernel informing the userspace about
+    some events (called `pci:v00008086d000015B8sv*sd*bc*sc*i*`). This event will be
+    caught by your system hotplug manager (`module.alias` file while looking for an
+    entry with the same alias and load the corresponding module (for example, e1000).
+    As soon as the module is loaded, the device will be probed. This is how the simple
+    `MODULE_DEVICE_TABLE()` macro can change your life.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Device declaration – populating devices
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Device declaration is not part of the LDM. It consists of declaring devices
+    that are present (or not) on the system, while the module device table involves
+    feeding the drivers with devices they support. There are three places you can
+    declare/populate devices:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: From the board file or in a separate module (older and now deprecated)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: From the **device tree** (the new and recommended method)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: From the **Advanced Configuration and Power Interface** (**ACPI**), which will
+    not be discussed here
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: To be handled by a driver, any declared device should exist at least in one
+    module device table; otherwise, the device will simply be ignored, unless a driver
+    with this device ID in its module device table gets loaded or has already been
+    loaded.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Bus structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Finally, there''s the `struct bus_type` structure, which is the structure that
+    the kernel internally represents a bus with (whether it is physical or virtual).
+    The `struct bus_type`) is the link between devices (`struct device`) and drivers
+    (`struct device_driver`). Without this, nothing would be appended to the system,
+    since the bus (`bus_type`) is responsible for matching the devices and drivers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s look at the elements in this structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`name`: This is the bus''s name as it will appear in `/sys/bus/`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`match`: This is a callback that''s called whenever a new device or driver
+    is added to the bus. The callback must be smart enough and should return a nonzero
+    value when there is a match between a device and a driver. Both are given as parameters.
+    The main purpose of a match callback is to allow a bus to determine whether a
+    particular device can be handled by a given driver or the other logic if the given
+    driver supports a given device. Most of the time, the verification process is
+    done with a simple string comparison (the device and driver name, or a table and
+    **device tree** (**DT**)-compatible property). For enumerated devices (such as
+    PCI and USB), the verification process is done by comparing the device IDs that
+    are supported by the driver with the device ID of the given device, without sacrificing
+    bus-specific functionality.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`probe`: This is a callback that''s called when a new device or driver is added
+    to the bus *and* once a match has occurred. This function is responsible for allocating
+    the specific bus device structure and calling the given driver''s probe function,
+    which is supposed to manage the device (we allocated this earlier).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`remove`: This is called when a device is removed from the bus.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: When the device that you wrote the driver for sits on a physical bus called
+    the **bus controller**, it must rely on the driver of that bus, called the **controller
+    driver**, which is responsible for sharing bus access between devices. The controller
+    driver offers an abstraction layer between your device and the bus. Whenever you
+    perform a transaction (read or write) on an I2C or USB bus, for example, the I2C/USB
+    bus controller transparently takes care of that in the background (managing the
+    clock, shifting data, and so on). Every bus controller driver exports a set of
+    functions to ease the development of drivers for the devices sitting on that bus.
+    This works for every bus (I2C, SPI, USB, PCI, SDIO, and so on).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have looked at the bus driver and how modules are loaded, we will
+    discuss the matching mechanism, which tries to bind a particular device to its
+    drivers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Device and driver matching mechanism explained
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Device drivers and devices are always registered with the bus. When it comes
+    to exporting the devices that are supported by the driver, you can use `driver.of_match_table`,
+    `driver.of_match_table`, or `<bus>_driver.id_table` (which is specific to the
+    device type; for example, `i2c_device.id_table` or `platform_device.id_table`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Each bus driver has the responsibility of providing its match function, which
+    is run by the kernel whenever a new device or device driver is registered with
+    this bus. That said, there are three matching mechanisms for platform devices,
+    all of which consist of string comparison. Those matching mechanisms are based
+    on the DT table, ACPI table, device, and driver name. Let''s see how the pseudo-platform
+    and i2c buses implement their matching functions using those mechanisms:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding code shows the `drivers/base/platform.c`. The following code
+    shows the I2C bus matching function, which is defined in `drivers/i2c/i2c-core.c`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: Case study – the OF matching mechanism
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In the device tree, each device is represented by a node and declared as a
+    child of its bus node. At boot time, the kernel (the **OF** core) parses every
+    bus node (as well as their sub-nodes, which are the devices that are sitting on
+    it) in the device tree. For each device node, the kernel will do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identify the bus that this node belongs to.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Allocate a platform device and initialize it according to the properties contained
+    in the node using the `of_device_alloc()` function. `built_pdev->dev.of_node`
+    will be set with the current device tree node.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Walk through the list of device drivers associated with (maintained by) the
+    previously identified bus using the `bus_for_each_drv()` function.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'For each driver in the list, the core will do the following:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Call the bus match function, given as the parameter that the driver found and
+    the previously built device structure; that is, `bus_found->match(cur_drv, cur_dev);`.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If the DT matching mechanism is supported by this bus driver, the bus match
+    function will then call `of_driver_match_device()`, given the same parameters
+    that were mentioned previously; that is, `of_driver_match_device(ur_drv, cur_dev)`.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`of_driver_match_device` will walk through the `of_match_table` table (which
+    is an array of struct `of_device_id` elements) that''s associated with the current
+    driver. For each `of_device_id` in the array, the kernel will compare the compatible
+    property of both the current `of_device_id` element and `built_pdev->dev.of_node`.
+    If they are the same (let''s say that there''s a match), the probe function of
+    the current driver will be run.'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If no driver that supports this device is found, this device will be registered
+    with the bus anyway. Then, the probing mechanism will be deferred to a later date
+    so that whenever a new driver is registered with this bus, the core will walk
+    through the list of devices that are maintained by the bus; any devices without
+    any drivers associated with them will be probed again. For each, the compatible
+    property of associated `of_node` will be compared to the compatible property of
+    each `of_device_id` in the `of_match_table` array that's associated with the freshly
+    registered driver.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This is how drivers are matched with devices that are declared from within the
+    device tree. This works in the same manner for each type of device declaration
+    (board file, ACPI, and so on).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, you learned how to deal with devices and drivers, as well as
+    how they are tied to each other. We have also demystified the matching mechanism.
+    Make sure you understand this before moving on to [*Chapter 7*](B17934_07_Epub.xhtml#_idTextAnchor105),
+    *Understanding the Concept of Platform Devices and Drivers*, [*Chapter 8*](B17934_08_Epub.xhtml#_idTextAnchor117),
+    *Writing I2C Device Drivers*, and [*Chapter 9*](B17934_09_Epub.xhtml#_idTextAnchor130),
+    *Writing SPI Device Drivers* , which will deal with device driver development.
+    This will involve working with devices, drivers, and bus structures.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we will delve into *platform driver development* in detail.
+  prefs: []
+  type: TYPE_NORMAL

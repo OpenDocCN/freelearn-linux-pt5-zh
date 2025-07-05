@@ -1,0 +1,1789 @@
+- en: Chapter 12. Setting Up an E-mail Server
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting up your server to send and receive e-mails
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting up secure IMAP access to mailboxes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting up a secure SMTP relay for users
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Controlling the mail queue
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Reading and writing e-mails on the server
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configuring e-mail aliases
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Filtering incoming mail using Procmail and SpamAssassin
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Debugging e-mail-related problems
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: E-mail is a standard means of communication on the Internet. As a way to send
+    messages to anyone in the world, instantly and for free, it became one of the
+    first killer features of the Internet and a harbinger of many things to come.
+  prefs: []
+  type: TYPE_NORMAL
+- en: E-mail is an old technology, designed in the early, naive days of the Internet.
+    Initially, every mail server accepted all messages from anyone and forwarded them
+    on to any destination. E-mail accounts were protected by passwords, but those
+    were symbolic—sent as plain text over unencrypted connections, and the word, "spam"
+    was still associated mainly with the Monty Python sketches.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unfortunately, as more and more people came online, many malicious users started
+    to abuse the e-mail system. E-mail became a free way to send marketing information
+    with the ability to reach every person on the planet. This caused an explosion
+    of unwanted e-mail messages, most commonly called **spam**, which, at its peak,
+    made up more than 95 percent of e-mail traffic. These days, the problem is slowly
+    subsiding as administrators valiantly fight against the spam tide. On a properly
+    configured system, spam is no longer the nuisance it once was, but there is no
+    single foolproof solution. If you decide to host your own mail server, be aware
+    that you will have to put in a substantial bit of work to get everything working
+    properly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: You may decide to let someone else host mail for your domain. For example, Google
+    provides a commercial version of its Gmail service to businesses as Google Apps
+    for Business. Many companies offer similar services.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Because e-mail is such a complex topic, one book chapter will only get you started.
+    If you follow these recipes, you will end up with a working, but very basic, e-mail
+    system. If e-mail is important to your enterprise, you should proceed to read
+    other material on this topic. There is a benefit of starting here, as we will
+    demonstrate how helpful Webmin can be in administering a mail server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we will set up Postfix, a popular open source mail transfer
+    agent. Its alternatives, such as exim and sendmail, are also supported by Webmin
+    but are not covered here.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting up your server to send and receive e-mails
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'To handle e-mail, your server needs to run a service called a **Mail Transfer
+    Agent** (**MTA**) that is capable of:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Receiving incoming e-mail and placing it in the user's local mail spool
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Sending e-mail to other MTAs for delivery to users on remote systems
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: MTAs exchange messages using **Simple Mail Transfer Protocol** (**SMTP**). A
+    mail server listens for connections on port 25 and accepts incoming e-mail messages
+    from anywhere on the Internet. If the message is addressed to a valid local address,
+    it should be delivered to the destination mailbox.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When a user of our server decides to send an e-mail, the MTA picks up the message,
+    checks where it is addressed to, and forwards it to the MTA associated with the
+    destination domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: MTAs can also relay e-mails—forward e-mails coming in over SMTP but bound for
+    other destinations. This is discussed in the *Setting up a secure SMTP relay for
+    users* recipe later in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we will set up the Postfix mail transfer agent on your server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'E-mail addresses are based on the following structure: `mailbox@fqdn`, where
+    `mailbox` uniquely identifies a user or alias and `fqdn` uniquely identifies a
+    mail system through a fully qualified domain name (FQDN). You will need to assign
+    an FQDN to your server in order to make use of the e-mail system.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To make sure that your server is assigned an FQDN, check that your domain's
+    DNS A or MX (Mail eXchange) record points to the IP of your mail server. A DNS
+    MX record allows you to host mail on a machine other than the one indicated by
+    the basic A record.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Throughout this recipe, we will assume that your server's FQDN is `mailserver.example.com`,
+    which makes `mailserver` its hostname and `example.com` its domain. Replace these
+    with your real values.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Follow these steps to set up Postfix on your server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Follow the instructions contained in the *Installing software packages* recipe
+    from [Chapter 1](ch01.html "Chapter 1. Setting Up Your System"), *Setting Up Your
+    System*, and install the `postfix` package for your system.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: A system can have only one MTA installed at any time. If another MTA was installed
+    on your system, you will need to uninstall it. If you're installing from a system
+    package, this should be done automatically.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: To receive mail, your server will need to answer incoming SMTP connections on
+    TCP port 25\. Follow the steps described in the *Allowing access to a service
+    through the firewall* recipe in [Chapter 3](ch03.html "Chapter 3. Securing Your
+    System"), *Securing Your System*, to allow incoming TCP traffic to port `25` through
+    your firewall.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **System** | **Bootup and Shutdown**, check the box next to `postfix`,
+    and click the **Start Now and On Boot** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **General Options**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **What domain to use in outbound mail** to **Use domainname**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **What domains to receive mail for** to **Whole domain**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Internet hostname of this mail system** to `mailserver.example.com`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Local internet domain name** to **Default**. This sets the mail domain
+    to the hostname without the first component. In our case, this would be `example.com`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Network interfaces for receiving mail** to **All**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Save and Apply** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Stop Postfix** and then the **Start Postfix** buttons to restart
+    the mail system.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Your system should now be able to send and receive e-mail messages. Test the
+    ability of the server to send e-mail, and its ability to receive it, by following
+    the steps in the *Debugging e-mail related problems* recipe later in this chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In this recipe, we installed the popular open source MTA called Postfix on your
+    system. In order to receive mail, we opened port 25 in your firewall, and we also
+    made sure that the service is started during system boot.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We then proceeded to configure the mail system's basic settings. Postfix keeps
+    settings in a text file located in the path `/etc/postfix/main.cf`. Posfix's default
+    configuration is very close to what a working system requires, so we only needed
+    to specify which domain we are going to handle mail for and instruct Postfix to
+    listen for connections on all network interfaces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: More information about each setting we modified is available in Webmin. Just
+    click the label of any form field to get a detailed description.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Now that you have gotten your feet wet, you should probably read all recipes
+    in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In particular, take a look at the *Debugging e-mail related problems* recipe
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: To allow users to pick up e-mail from your server, refer to the recipe, *Setting
+    up secure IMAP access to mailboxes*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: To allow users to send e-mails through your system, refer to the recipe, *Setting
+    up a secure SMTP relay for users*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting up secure IMAP access to mailboxes
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Mail received by your MTA is delivered to a queue directory on your server.
+    Recipients are expected to pick up messages from here and store them in their
+    own mailboxes. If users connect to your server by SSH, they may use terminal applications
+    such as `mutt` or `alpine` and store messages in their home directories. Another
+    access method you can provide is a web mail application such as Roundcube, which
+    runs on Apache with PHP. Webmin's companion product, Usermin, also provides basic
+    mail functionality for users. See the *Installing Usermin* recipe in [Chapter
+    2](ch02.html "Chapter 2. User Management"), *User Management*, for more information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'You can find more information on each of these programs online, but most system
+    distributions offer convenient packages, which make installation very easy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Roundcube: [http://www.roundcube.net](http://www.roundcube.net)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Alpine, the successor to Pine: [https://www.washington.edu/alpine/](https://www.washington.edu/alpine/)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Mutt: [http://www.mutt.org](http://www.mutt.org)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The standard method of picking up e-mail, however, is to use a **Mail User Agent**
+    (**MUA**), more commonly referred to as an e-mail client or e-mail reader. Programs
+    such as Thunderbird, KMail, Evolution, Apple Mail, Outlook, and many others, serve
+    this role for desktop users. These programs expect to talk to your server using
+    the IMAP, POP3, and SMTP protocols.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Protocol | Function |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| POP3 | Used to pick up messages from the server by downloading the entire
+    mailbox. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| IMAP | Used to download new mail and manages message on the server. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| SMTP | Used to submit mail for delivery to others. |'
+  prefs: []
+  type: TYPE_TB
+- en: In this recipe, we'll demonstrate how to set up IMAP access to your Postfix
+    server using a companion server named Dovecot. We'll make sure that access is
+    secured using a TLS encrypted connection. In the next recipe, *Setting up a secure
+    SMTP relay for users*, we'll demonstrate setting up SMTP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The POP3 protocol is becoming obsolete, so in this recipe, we'll focus on IMAP.
+    If you need it, enabling POP3 using the described software is simple.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In this recipe, we're building on basic Postfix MTA setup described in *Setting
+    up your server to send and receive e-mails*. Make sure your Postfix is working
+    properly before starting with this recipe.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We will need to know the location of your Postfix mail queue directory. Check
+    it by following these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **General Options**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Make a note of the **Mail queue directory** value.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Follow these steps to set up the Dovecot IMAP service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Follow the instructions contained in the *Installing software packages*recipe
+    from [Chapter 1](ch01.html "Chapter 1. Setting Up Your System"), *Setting Up Your
+    System,* and install Dovecot Version 2\. The package should be named `dovecot`,
+    but on some (Debian-based) systems you may need to install a number of smaller
+    packages such as `dovecot-common`, `dovecot-imapd`, and optionally, `dovecot-pop3d`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Your server will need to answer incoming IMAP connections on TCP ports 143 and
+    993\. Follow the steps described in the *Allowing access to a service through
+    the firewall*recipe in [Chapter 3](ch03.html "Chapter 3. Securing Your System"),
+    *Securing Your System,* to allow incoming TCP traffic to ports `143` and `993`
+    through your firewall.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **System** | **Bootup and Shutdown**, check the box next to `dovecot`,
+    and click the **Start Now and On Boot** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Dovecot IMAP/POP3 Server** | **Networking and Protocols**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the **Serve mail protocols,** select **IMAP**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Dovecot IMAP/POP3 Server** | **Mail Files**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Set mail location and reading options to **Other Dovecot** location, and enter
+    a string based on the location of your Postfix mail queue directory. For example,
+    if the location is `/var/spool/postfix`, enter the following:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Set **UIDL format** to **Other**, and enter `%08Xu%08Xv` in the text field.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Dovecot IMAP/POP3 Server** | **SSL Configuration**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Disallow plaintext authentication in non-SSL mode?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Apply Configuration** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Users will now be able to connect to your server to receive mail via IMAP.
+    Test the configuration by creating an account in your e-mail client program with
+    the following settings:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**IMAP server**: The hostname of your mail server'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Port**: `143` or `993`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Require SSL**: **Yes**'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Username**: Your system username'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Password**: Your system password'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'If you''re having trouble connecting, look for debugging information in your
+    server''s mail log. If you see an error message resembling `Operation not permitted
+    (egid=500(username), group based on /var/spool/mail/username)`, then you will
+    need to change the group permissions of files in your mail spool directory. You
+    can do that by issuing the following command:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Paste the error messages you encounter into a search engine to find resolutions
+    of other problems.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Dovecot was designed to be secure and easy to configure. During installation,
+    it generates a self-signed SSL certificate to encrypt communication with clients.
+    This is very important because without encryption, your system username and password
+    travels in plain text throughout the Internet and may be read by every ISP along
+    the way. E-mail clients will complain that no recognized certificate authority
+    signed your certificate. You may purchase a signed certificate and replace the
+    self-signed certificate that Dovecot generated to get rid of these error messages.
+    Take a look at the *There's more* section for more information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Dovecot listens for IMAP connections on ports 143 or 993\. Traditionally, port
+    143 was used for unencrypted IMAP connections and port 993 for SSL/TLS encrypted
+    connections. Dovecot allows both ports to use encryption; in fact, we specifically
+    instructed it to reject authentication attempts in non-SSL mode. Leaving both
+    ports open makes it easier for users to configure their e-mail clients, which
+    attempt to guess IMAP ports.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Professional e-mail services use commercially signed SSL certificates. To replace
+    your certificate, follow these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Upload your purchased certificate, private key, and the certificate of your
+    certificate authority to a folder on your server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Make sure that the private key is protected and not readable by users other
+    than root.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Dovecot IMAP/POP3 Server** | **SSL Configuration**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Specify the paths to each of the uploaded files in the text fields labeled **SSL
+    certificate file**, **SSL private key file**, and **SSL CA certificate file**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If your key is password protected, enter the password in the **Password for
+    key file** field.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Save** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: For more information about working with SSL certificates, take a look at the
+    *Setting up encrypted websites with SSL* recipe in [Chapter 8](ch08.html "Chapter 8. Running
+    an Apache Web Server"), *Running an Apache Web Server.*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Your users will need to send e-mail through your server via SMTP. Take a look
+    at the next recipe, *Setting up a secure SMTP relay for users*, for information
+    about that.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: As with every recipe in this chapter, if you run into problems, take a look
+    at the *Debugging e-mail-related problems* recipe in this chapter.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting up a secure SMTP relay for users
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Users who employ a mail client program will want to send messages through your
+    server using the SMTP protocol. Since we set up an MTA, your server already supports
+    SMTP connections, but only to receive e-mail destined for your domain. Messages
+    submitted anonymously for destinations other than your domain should be rejected.
+    Otherwise, we would create a so-called **open relay**, and spammers would quickly
+    abuse your server. Anti-spam filters would then put your server on blacklists,
+    and other mail servers would stop accepting messages from your users.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In order to avoid creating an open relay, and yet allow remote users to send
+    mail to other domains, we need to require user authentication. We will allow authenticated
+    users to submit mail bound for any domain but reject outbound mail submitted anonymously.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The SMTP protocol supports a method of authentication called **Simple Authentication
+    and Security Layer** (**SASL**), which allows users to specify their username
+    and password before submitting e-mail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we will use a combination of Postfix and Dovecot to set up SASL
+    authentication for your SMTP server. Sensitive information should not be sent
+    using an unencrypted connection, so we will also provide a layer of TLS encryption
+    for SMTP connections.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe builds on the groundwork performed in the previous recipes, *Setting
+    up your server to send and receive e-mails* and *Setting up secure IMAP access
+    to mailboxes*. Make sure your Postfix and Dovecot are working properly before
+    starting with this recipe.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We will need to know the name of your Postfix user name and group. Check it
+    by following these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **General Options**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Make a note of the **Mail owner** value; this is the Postfix user name.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **System** | **Users and Groups**, and check the primary group of
+    this user.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Follow these steps to set up a secure SMTP relay for your users:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **SMTP Authentication And
+    Encryption**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Require SASL SMTP authentication?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Disallow SASL** **authentication over insecure connections?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Handle non-compliant SMTP clients?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Under **SMTP security options**, check the box labeled **Reject anonymous logins**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Under **SMTP relaying restrictions**, check the boxes marked as follows:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '**Allow connections from same network**'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Allow authenticated clients**'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Reject email to other domains**'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Set **Enable TLS encryption?** to **If requested by client**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You should use the same SSL certificates that the Dovecot server uses. Provide
+    a path to your **TLS certificate file**, **TLS private key file**, and optionally
+    to your **TLS certificate authority file**:![How to do it...](img/5849OS_12_01.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Save and Apply**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **Edit Config Files**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Select `main.cf` from the **Edit config file** dropdown.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Edit** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Scroll down to the end of the configuration file, and add the following settings:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Dovecot IMAP/POP3** **Server** | **Edit Config Files**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Select `10-master.conf` from the **Edit config** file dropdown.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Edit** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Find the configuration section for the `auth` service, and uncomment lines
+    related to the socket. Specify the username and group name of your Postfix user.
+    The section should look something like the following code when finished:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '![How to do it...](img/5849OS_12_02.jpg)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Stop Dovecot Server** button and then the **Start Dovecot Server**
+    button to restart the daemon.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Users will now be able to connect to your server and send mail via SMTP. Test
+    the configuration by creating an account in your e-mail client program with the
+    following settings:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**SMTP server**: The hostname of your mail server'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Port**: `25`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Some users may have problems using port 25\. Take a look at the *There's more...*
+    section for instructions on adding the alternate SMTP port number 587.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '**Require SSL**: **Yes**'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Username**: Your system username'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Password**: Your system password'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If you're having trouble connecting, look for debugging information in your
+    server's mail log. Refer to the *Using Telnet to test SMTP authentication* section
+    of the *Debugging e-mail related problems* recipe for a way to manually test your
+    server. Paste any error messages you encounter into a search engine to find solutions.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Dovecot and Postgres work together to provide an authenticated SMTP server.
+    Dovecot provides the SASL authentication service, which is accessible via a UNIX
+    socket. The configuration file, `10-master.conf`, tells Dovecot which services
+    to launch when starting. We edited this file to instruct Dovecot to start the
+    SASL service (named `auth`). We specified the location of the socket (`/var/spool/postfix/private/auth`)
+    and which user and group may connect to it (`postfix`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: We also edited the main configuration file of Postfix called `main.cf`. The
+    changes we made cause Postfix to require SASL authentication over an encrypted
+    connection for submission of messages for relaying. We also told Postfix which
+    type of authentication backend to use (`dovecot`) and the location of the socket
+    relative to its mail queue directory (`private/auth`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Some Internet service providers block traffic on port 25 to prevent machines
+    infected by viruses and worms from abusing the e-mail system. Your server can
+    provide the SMTP service at an alternate port 587\. This will allow users from
+    such ISPs to send mail through your server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Follow these steps to instruct Postfix to listen for SMTP connections on port
+    587:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **Server Processes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Add a new server process**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Transport type** to **Internet**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Server name/port** to `587`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Process command** to `smtpd`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Enabled?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Listen on host address** to **Any address**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Private to mail system?** to **No**.![There's more...](img/5849OS_12_07.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Create**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **Server Processes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Stop Postfix** and then **Start Postfix** to restart the service.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To find more detailed information about this setup, refer to the Postfix and
+    Dovecot manuals:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://wiki2.dovecot.org/HowTo/PostfixAndDovecotSASL](http://wiki2.dovecot.org/HowTo/PostfixAndDovecotSASL)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[http://www.postfix.org/SASL_README.html](http://www.postfix.org/SASL_README.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Controlling the mail queue
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Messages that your mail server is going to send are placed in a mail queue.
+    Normally, they don't stay there very long as the server deletes them as soon as
+    they are sent. However, if for any reason a message cannot be sent, it may stay
+    stuck in the queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Inspecting the mail queue will give you important information about the health
+    of your mail system. Webmin provides a convenient graphical user interface to
+    view and control the queue.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In this recipe, we are going to control the Postfix MTA's mail queue. Refer
+    to the *Setting up your server to send and receive e-mails* recipe in this chapter
+    for information about its installation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **Mail Queue**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If no messages are currently queued for delivery, Webmin will inform you of
+    that. Otherwise, you will see a list of messages resembling the following screenshot:![How
+    to do it...](img/5849OS_12_03.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: To delete a message from the queue, mark the checkbox next to its ID, and click
+    **Delete Selected Messages**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Webmin controls the Postfix mail queue by issuing appropriate Postfix superintendent
+    (`postsuper`) or Postfix queue control (`postqueue`) commands. The following table
+    lists the functions of commands that Webmin allows you to execute:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Command | Function |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Delete message | This removes the message from the queue without sending
+    it. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Requeue message | This moves the message to a new queue file, and restarts
+    the delivery attempt. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Hold message | This puts the message *on hold* and does not attempt to deliver
+    it. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Un-Hold message | This removes the hold on a message and attempts to deliver
+    it. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Flush queue | This attempts to deliver all queued messages. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Refresh queue | This updates the information about the queue. |'
+  prefs: []
+  type: TYPE_TB
+- en: Reading and writing e-mails on the server
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Webmin gives you a convenient interface to read and write messages as any user
+    of your system. This can be very useful when debugging mail problems, for instance,
+    to check if a particular message reached a particular mailbox. Keep your users'
+    privacy in mind of course.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Read User Mail**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click on the name of the user whose mailbox you would like to visit.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You will be presented with a graphical interface similar to any mail program,
+    which allows you to read the user's e-mail messages:![How to do it...](img/5849OS_12_04.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Compose** button to see an interface for writing and sending a new
+    message.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Enter a destination address, message subject, and body.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Send Mail** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Webmin features a basic mail client program written in Perl. Thanks to this
+    functionality, Webmin is able to read and write messages in your users' mailboxes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring e-mail aliases
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Each e-mail address is normally associated with a single user's mailbox on your
+    server. In some situations, however, it's beneficial to forward incoming mail
+    to multiple users or to an address on another server. This can be achieved by
+    using mail aliases, which Postfix supports and Webmin makes easy to administer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: There are a number of aliases which every mail server should define. For instance,
+    mail to the `root` mailbox should always reach an actual person. If you're running
+    a mail server, you should also define aliases named `postmaster` and `abuse` through
+    which people can report mail-related issues. If you wish to read mail sent in
+    reply to automated messages from your MTA, define an alias for `mailer-daemon`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: More information about common mailbox names may be found in the RFC2142 document
+    at [http://tools.ietf.org/html/2142.](http://tools.ietf.org/html/2142.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Postfix aliases allow you to not only forward mail to other addresses, but also
+    save their content to files or pipe them to other applications. Sensitive data
+    such as password verification codes are often sent via e-mail, so keep the security
+    of such destinations in mind.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we demonstrate how easy it is to configure Postfix mail aliases
+    using Webmin.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'For configuring e-mail aliases, perform the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **Mail Aliases**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Create a new alias**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the **Address** field, enter a local e-mail address without the domain, that
+    is, for `mailbox@example.com`, enter just `mailbox.`
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Enabled?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Alias to** to **Email address**, and enter a full e-mail address or a
+    local mailbox name in the text field provided.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Whenever Postfix encounters an incoming message, it checks whether the destination
+    address is contained amongst defined aliases. The main list of aliases is stored
+    in a text file named `/etc/aliases` on most systems. Because this file can grow
+    quite large, it isn''t used directly in its text format. Instead, it''s converted
+    to an indexed binary file, which allows quick lookups. Every time the alias file
+    is modified, Webmin executes a command named `postalias`, which creates the binary
+    index. The command will resemble the following with paths adjusted for your system:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Postfix aliases may serve a number of different functions listed in the following
+    table. Webmin allows you to not only create all of these, but also others that
+    may not be supported by your MTA. This table lists examples of different ways
+    to define the alias `test` (as in `test@example.com`) and what function they may
+    serve:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Alias syntax | Function |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `test: user` | This forwards the message to another local mailbox. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `test: user@remotedomain.com` | This forwards the message to a remote e-mail
+    address. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `test: "/path/to/file"` | This appends incoming messages to a file. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `test: "&#124;/usr/local/bin/mailhelper"` | This pipes incoming messages
+    to a program. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `test: user, root, user@remotedomain.com` | This forwards the message to
+    a list of recipients. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `test: :include:/path/to/aliases` | This forwards the message to destinations
+    listed in `/path/to/aliases`. |'
+  prefs: []
+  type: TYPE_TB
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: There are many interesting ways to use mail aliases, for instance, to create
+    a basic mailing list. Users can also influence how their mail is forwarded by
+    creating a special file in their home directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a simple mailing list
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'You can create a basic mailing list by creating an address and assigning it
+    to forward mail to addresses defined in a text file. You can then manage subscriptions
+    by editing the file. For example, you could create a mailing list, `students@yourdomain.com`,
+    by following these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create a file `/etc/postfix/list-students.txt``.`
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Enter e-mail addresses of all list members in the file, one address per line.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Postfix Mail Server** | **Mail Aliases**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Create a new alias** link.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the **Address** field, enter the mailing list address without the domain,
+    for example, `students.`
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Enabled?** to **Yes**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Alias to** to **Addresses in file**, and enter `/etc/postfix/list-students.txt`
+    in the provided text field.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Save**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This type of mailing list provides only the most basic functionality. Users
+    cannot manage their mailing preferences or sign out. There are multiple applications
+    dedicated to running full-featured mailing lists. Take a look at Mailman ([http://www.list.org](http://www.list.org))
+    and Sympa ([http://www.sympa.org](http://www.sympa.org)).
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Using .forward files
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Users can also control their own mail-forwarding preferences by placing a file
+    named `.forward` in their home directory. Before Postfix delivers mail to a user,
+    it will check if this file exists, and if it does, Postfix will obediently forward
+    the message to addresses specified in the file. Other types of alias behaviors
+    can also be specified in `.forward` files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Find more information about Postfix aliases in its manual at [http://www.postfix.org/aliases.5.html](http://www.postfix.org/aliases.5.html).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Filtering incoming mail using Procmail and SpamAssassin
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: E-mail gives us the ability to send free messages to nearly everyone in the
+    world. Unfortunately, some people decided to abuse this system and send unsolicited
+    mass mail (spam) in hopes of making money through advertising or fraud. So many
+    people were tempted by this possibility that, at some point, spam made up over
+    95 percent of e-mail traffic. This would make e-mail practically unusable, but
+    thankfully, anti-spam filters make this problem more manageable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Spam fighting is a large and complex topic. In this recipe, we will demonstrate
+    an effective yet basic technique based on the programs Procmail and SpamAssassin.
+    If your site handles a large volume of e-mail, you will probably need a more efficient
+    solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe is divided into two parts. First, we instruct our Postfix MTA to
+    hand incoming messages to a filtering program called Procmail. Next, we create
+    a filter, which pipes messages through SpamAssassin and sends spam to a separate
+    mailbox.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, let''s start with setting up Procmail filters in Postfix:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Follow instructions contained in the *Installing software packages* recipe from
+    [Chapter 1](ch01.html "Chapter 1. Setting Up Your System"), *Setting Up Your System,*
+    and install Procmail. The package should simply be named `procmail`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Determine the location of the `procmail` binary by issuing the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'The output of this command will give you the location of the binary, as follows:'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Navigate to **Servers** | **Postfix Mail Server** | **Local Delivery**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Enter the following command in the **External command to use instead of mailbox
+    delivery** text field. Replace `/usr/bin/procmail` with your location if it's
+    different.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Click **Save and Apply**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Now, let''s set up SpamAssassin filters in Procmail:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Install SpamAssassin its package should simply be named `spamassassin`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Determine the location of the `spamassassin` binary by issuing the following
+    command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Navigate to **Servers** | **Procmail Mail Filter**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Add a new filter action** link.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Delivery mode** to **Feed to program**, and enter the path to the `spamassassin`
+    binary in the text field.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Mark the checkboxes, **Action program is a filter** and **Wait for action program
+    to finish, and check result**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Delivery lock file** to **Specific file**, and enter `spamassassin.lock`
+    in the text field.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Don't set any action conditions; we want to run all mail through SpamAssassin:![How
+    to do it...](img/5849OS_12_05.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Create**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Let's create a second filter now, which will move all spam messages to another
+    folder called `Junk`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Click the **Add a new filter action** link.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Delivery mode** to **Append to file**, and enter `$HOME/mail/Junk` in
+    the text field.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Set **Delivery lock file** to **Default**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Under **Condition type**, select **Matches regular expression**, and enter
+    `^X-Spam-Status: Yes`:![How to do it...](img/5849OS_12_06.jpg)'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Create**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Incoming mail should now be passed to SpamAssassin. Detected spam messages should
+    not be delivered to your users' regular mailboxes but to files named `~/mail/Junk`
+    in their home directories.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe attempts to filter out spam by passing incoming messages through
+    two programs. The first is Procmail, a mail delivery agent (MDA). Postfix hands
+    messages off to the MDA for delivery to mailboxes. Procmail has the added functionality
+    of passing mail through a series of configurable filters. A Procmail filter inspects
+    the headers or body of a message and decides what to do with the message based
+    on its content.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Procmail is a stable software installed by default on many operating systems.
+    Unfortunately, it's no longer maintained, so no new features will be added in
+    the future. The **maildrop** program is often recommended as a newer replacement
+    for Procmail, but Webmin does not currently support it. More information is available
+    at [http://www.courier-mta.org/maildrop/](http://www.courier-mta.org/maildrop/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In our example, we set up two Procmail filters. The first has no conditions,
+    which means that it applies to every message, and it hands the message off to
+    yet another program for spam analysis. SpamAssassin inspects every part of the
+    message, looks up DNS records of MTAs the message was relayed through, and checks
+    them against spam blacklist and other sources of information about spammers. It
+    uses all this data to perform statistical and artificial intelligence analysis
+    and ends up giving every message a score. If the score is high, the message should
+    probably be considered spam. SpamAssassin writes its report in the headers of
+    the messages and hands it back to Procmail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Our second Procmail filter inspects message headers to check if SpamAssassin
+    decided that the message is spam (`X-Spam-Status: Yes`). These messages will not
+    be delivered to a user''s inbox but instead appended to a secondary inbox called
+    Junk (`~/mail/Junk`).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If your system is going to handle a lot of mail, then invoking SpamAssassin
+    for every message can create a serious bottleneck. It could slow down your server
+    significantly and cause problems. There is a way to optimize SpamAssassin's performance
+    by running it as a background daemon. Look for it in its manual.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Once you have everything set up, you should test your anti-spam configuration.
+    There is a way to trigger an automatic SpamAssassin high score. Just enter the
+    following string in a message, and it will be marked as spam:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can find more information about this technique, called **Generic Test for
+    Unsolicited Bulk E-mail** (**GTUBE**), in SpamAssassin's manual at [http://spamassassin.apache.org/gtube/](http://spamassassin.apache.org/gtube/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Find more information about the type of setup we created in the SpamAssassin
+    manual, which contains a slightly more complex set of Procmail filters that solves
+    some common bugs you may encounter, at the following URL: [http://wiki.apache.org/spamassassin/UsedViaProcmail](http://wiki.apache.org/spamassassin/UsedViaProcmail).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Debugging e-mail-related problems
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: You will learn most about your mail server by talking to it directly in SMTP
+    through a Telnet session. At the same time, you should be monitoring mail logfiles
+    for any messages that occur while you're performing your tests.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this recipe, we cover a number of techniques for testing and debugging e-mail
+    systems. We will demonstrate how to test your system''s ability to:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Receive e-mail by submitting a message directly over SMTP
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Send e-mail by sending a message though the mail command
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Authenticate users
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We'll also mention the location of mail logs, various ways of sending e-mail,
+    debugging SMTP authentication, and other topics. Read on; this recipe should give
+    you a way to find the solution to your problem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We will be testing the mailing capabilities of a system located at the `mailserver.example.com`
+    domain name. Our test will be performed from another machine (the client).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Before starting, make sure that you have the Telnet program installed on the
+    client machine. A Telnet client is installed by default on most systems and can
+    be installed from a package named `telnet` on others.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'On some systems, the Netcat (nc) program may be a better alternative to using
+    Telnet. You can find out more about it on its website: [http://nc110.sourceforge.net](http://nc110.sourceforge.net).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Follow these steps to submit an e-mail message directly to your server using
+    Telnet:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'On the client machine, open a terminal, and type in the following command to
+    start a Telnet client and connect to port `25` of the `mailserver.example.com`
+    system:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: The mail server should respond with its greeting banner.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Type in the `EHLO` command followed by the fully qualified domain name of your
+    client system. When you press *Enter*, the server should reply with a list of
+    `250` messages:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Tip
+  prefs:
+  - PREF_IND
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If your client system isn't a mail server in its own right, it may not have
+    an FQDN. In this situation, use `localhost.localdomain`, but note that most mail
+    servers will reject your message if it comes from a misidentified sender. Look
+    for information about the `XCLIENT` command in the Postfix manual if this is causing
+    a problem for you.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Type in the `MAIL FROM` command to specify the sender''s e-mail address. The
+    server should respond with a `250 OK` message for the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Type in the `RCPT TO` command to specify the recipient''s e-mail address. The
+    server should respond with a `250 OK` message for the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Type in the `DATA` command to start the message body.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Optionally, type in e-mail headers. For instance, enter a `Subject:` header
+    to specify the message subject, as shown in the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Enter a blank line to close the headers section and start the message body.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Type in a message, and end by entering a dot (`.`) on a single line. The server
+    should respond with a `250 OK` message and indicate that the message was queued
+    for delivery.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Type `QUIT` to finish the SMTP session.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The complete Telnet session may look something like the following commands.
+    Your commands are highlighted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The Telnet client allows you to establish an interactive TCP connection to your
+    server. When you successfully connect to port `25`, the SMTP service answers with
+    code `220` and a welcome message. You can then type text commands, which will
+    be sent to the server when you press *Enter*. The server's answers are displayed
+    inline, and you can proceed to send the next command. This technique may be used
+    to debug any text-based protocol running over TCP such as HTTP, FTP, POP, or IMAP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Simple Mail Transfer Protocol (SMTP) is as simple as the name promises. The
+    only commands you need to send an e-mail are `EHLO`, `MAIL` `FROM`, `RCPT TO`,
+    and `DATA`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The `EHLO` command used to be called `HELO`. It was substituted in the current
+    extended version of the protocol (ESMTP). Using `EHLO` indicates that you are
+    ready to use this protocol version.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Other information about the message is provided in an envelope, which consists
+    of a number of headers. Each header is provided on a separate line consisting
+    of the header name, colon, and header content. This section ends with an empty
+    line.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'More information about e-mail formats may be found in RFC 2822:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://tools.ietf.org/html/rfc2822](http://tools.ietf.org/html/rfc2822)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The message body ends when a line with a single dot character (`.`) is sent.
+    This finishes the submission of this message, and the server will answer with
+    `250 OK` and information that the message was queued for delivery or an error
+    message. The fact that a message was queued is not a guarantee of its delivery.
+    The e-mail system will scan it for viruses, analyze if it isn't spam, and may
+    decide not to deliver (bounce) the message. In most cases, the sender of the message
+    will be notified by a response e-mail if the message could not be delivered. This
+    may not be true if the message was classified as spam.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using Telnet to analyze what your e-mail server is doing is a great way to see
+    what errors others who try to send you mail may encounter. Note that not all diagnostic
+    messages are displayed as SMTP responses. You should keep an eye on the server's
+    mail log for additional details if you see any errors.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'There are many additional tools you should use when debugging e-mail system
+    issues. Some of them are described in the following sections:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Analyzing mail logs
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Your Postfix server sends detailed logs to Syslog's `mail` facility. These messages
+    are usually saved in a file named `/var/log/mail.log`, `/var/log/maillog`, or
+    some such similar name. Refer to the *Viewing and searching through system log
+    files* and *Saving Syslog messages to a file* recipes in [Chapter 5](ch05.html
+    "Chapter 5. Monitoring Your System"), *Monitoring Your System*, for more information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Every message coming into your server is given a unique ID, which allows you
+    to track it through verbose logs. For instance, a single message sent from `root@mailserver.example.com`
+    to `user@other.example.com` could leave the following log trace as it is picked
+    up, queued, delivered, and removed by your server. Note that the message identifier,
+    `EB0FA2049B`, is contained in every entry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: Testing message sending through Webmin
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Webmin provides a convenient way to test whether your mail server is actually
+    able to send e-mail messages. To do that, just follow these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigate to **Servers** | **Read User Mail**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click on the username of the user you would like to send a message as, for instance,
+    **root**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click the **Compose** button.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Use the GUI to enter an e-mail message, subject, and recipient address.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Click **Send**.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Sending mail from the command line
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'A quick way to send e-mail messages to others is to use the `mail` command.
+    You can type the message body manually or pipe it into the `mail` command. For
+    instance, to send a message to `user@example.com` , you can use the following
+    syntax:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: If the command is not found on your system, you may need to install a package
+    named `mail` or `mailx`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using Telnet to test SMTP authentication
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'You may test your server''s SMTP authentication through a Telnet session. The
+    only tricky part is to encode your username and password combination using Base64\.
+    For instance, to encode the username `myusername` and password `mypassword`, use
+    the following Perl command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You should see the following output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Base64 is just a form of encoding; it''s not a one-way hash or encryption.
+    The algorithm is fully reversible, for instance, by using the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once you have your Base64 encoded username and password, you can use it in
+    the `AUTH` command of a Telnet SMTP session, as shown in the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: If everything went according to the plan, you should see the `Authentication
+    successful` message.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Take a look at the Postfix manual for more information about configuration and
+    debugging. In particular, take a look at the [http://www.postfix.org/DEBUG_README.html](http://www.postfix.org/DEBUG_README.html)
+    page, which deals with debugging.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Other, more advanced Postfix debugging tools include the `qshape` command,
+    which will give you an overview of which messages are getting stuck on your server,
+    and the `XCLIENT` facility, which allows you to pretend to be a user of another
+    system. More information is available in these manual pages:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[http://www.postfix.org/qshape.1.html](http://www.postfix.org/qshape.1.html)'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[http://www.postfix.org/XCLIENT_README.html](http://www.postfix.org/XCLIENT_README.html)'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Also, take a look at the *Controlling the mail queue* recipe in this chapter.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

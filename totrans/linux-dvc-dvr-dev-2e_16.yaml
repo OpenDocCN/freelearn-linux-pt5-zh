@@ -1,0 +1,1033 @@
+- en: '*Chapter 13*: Demystifying the Kernel IRQ Framework'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Linux is a system on which devices notify the kernel about events by means of
+    **interrupt requests** (**IRQs**), though some devices are polled. The CPU exposes
+    IRQ lines, shared or not, used by connected devices so that when a device needs
+    the CPU, it sends a request to the CPU. When the CPU gets this request, it stops
+    its actual job and saves its context, in order to serve the request issued by
+    the device. After serving the device, its state is restored back to exactly where
+    it stopped when the interruption occurred.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we will deal with the APIs that the kernel offers to manage
+    IRQs and the ways in which multiplexing can be done. Moreover, we will analyze
+    and look closer at **interrupt controller** driver writing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To summarize, in this chapter, the following topics will be covered:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Brief presentation of interrupts
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Understanding interrupt controllers and interrupt multiplexing
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Diving into advanced peripheral IRQ management
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Demystifying per-CPU interrupts
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Brief presentation of interrupts
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'On many platforms, a special device is responsible for managing IRQ lines.
+    That device is the interrupt controller and it stands between the CPU and the
+    interrupt lines it manages. The following is a diagram that shows the interactions
+    that take place:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.1 – Interrupt controller and IRQ lines'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/B17934_13_001.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 13.1 – Interrupt controller and IRQ lines
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Not only can devices raise interrupts, but some processor operations can do
+    that too. There are then two different kinds of interrupts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Synchronous interrupts, called **exceptions**, are produced by the CPU while
+    processing instructions. These are **non-maskable interrupts** (**NMIs**) and
+    result from a critical malfunction such as hardware failure. They are always processed
+    by the CPU.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Asynchronous interrupts, called **interrupts**, are issued by other hardware
+    devices. These are normal and **maskable interrupts**. These are what we will
+    discuss in the next sections of this chapter.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Before getting deeper into interrupt management in the Linux kernel, let's talk
+    a bit more about exceptions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Exceptions are consequences of programming errors, handled by the kernel, which
+    sends a signal to the program and tries to recover from the error. These are classified
+    into two categories, enumerated as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Processor-detected exceptions**: Those the CPU generates in response to an
+    anomalous condition, which are divided into three groups:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Faults, which can generally be corrected (bogus instruction).
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Traps, which occur in the user process (invalid memory access, division by zero),
+    are also a mechanism to switch to kernel mode in response to a system call. If
+    the kernel code does cause a trap, it immediately panics.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Aborts – the serious errors.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Programmed exceptions**: These are requested by the programmer and handled
+    like traps.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now that we have introduced the different families of interrupts, let's learn
+    how they are implemented from within the interrupt controller.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding interrupt controllers and interrupt multiplexing
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Having a single interrupt from the CPU is usually not enough. Most systems
+    have tens or hundreds of them. Now comes interrupt controller, which allows them
+    to be multiplexed. Very often, architecture or platform-specific implementations
+    offer specific facilities, such as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Masking/unmasking individual interrupts
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting priorities
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: SMP affinity
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Exotic features, such as wake-up interrupts
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'IRQ management and interrupt controller drivers both rely on the concept of
+    the IRQ domain, which is built on top of the following structures:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`struct irq_chip`: This is the interrupt controller data structure. This structure
+    also implements a set of methods that allow to drive the interrupt controller
+    and that are directly called by core IRQ code.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`struct irqdomain`: This provides the following options:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A pointer to the interrupt controller's firmware node (`fwnode`)
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A function for converting an IRQ's firmware description into an ID local to
+    this interrupt controller (`hwirq`, also called hardware IRQ number)
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A way to retrieve the Linux view (`virq`, also called virtual IRQ number) of
+    an IRQ from `hwirq`
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`struct irq_desc`: This structure is Linux''s view of an interrupt. It contains
+    all the information about the interrupt as well as one-to-one mapping to the Linux
+    interrupt number.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`struct irq_action`: This structure is used to describe an IRQ handler.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`struct irq_data`: This structure is embedded in the `struct irq_desc` structure
+    and provides us with the following information:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The data that is relevant to the IRQ chip managing this interrupt.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Both `virq` and `hwirq`.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A pointer to `struct irq_chip` (the IRQ chip data structure). Note that most
+    IRQ chip-related function calls are given `irq_data` as a parameter, from which
+    you can obtain the corresponding `struct irq_desc`.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'All the preceding data structures are part of the IRQ domain API. An interrupt
+    controller is represented in the kernel by an instance of the `struct irq_chip`
+    structure, which describes the actual hardware device, and some methods used by
+    the IRQ core. The following code block shows its definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following list explains the meanings of the elements in the structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`parent_device`: This is a pointer to the parent of this IRQ chip.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`name`: This is the name for the`/proc/interrupts` file.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_enable`: This hook enables the interrupt. If not set (if `NULL`), it defaults
+    to `chip->unmask`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_disable`: This disables the interrupt.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_ack`: This callback acknowledges an interrupt. It is unconditionally invoked
+    by `handle_edge_irq()` and, therefore, must be defined (even an empty shell) for
+    IRQ controller drivers that use `handle_edge_irq()` to handle interrupts. For
+    such controllers, this callback is invoked at the start of the interrupt. Some
+    controllers do not need this. Linux calls this function as soon as an interrupt
+    is raised, long before it is serviced. This function is mapped to `chip->disable()`
+    in some implementations so that if another interrupt request pokes on the line,
+    it will not cause another interrupt until after the current interrupt request
+    has been handled.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_mask`: This is the hook that masks an interrupt source in the hardware
+    so that it cannot be raised anymore.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_unmask`: This hook unmasks an interrupt source.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_eoi`: Linux invokes this `chip->enable()` to reverse operations done in
+    `chip->ack()`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_set_affinity`: This sets the CPU affinity only on SMP machines. In such
+    machines, this function is used to specify the CPU on which the interrupt will
+    be handled. This function is unused in single-processor environments, as interrupts
+    are always services on the same single CPU.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_retrigger`: This retriggers the interrupt in the hardware, which resends
+    an IRQ to the CPU.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_set_type`: This sets the flow type, such as `IRQ_TYPE_LEVEL`, of an IRQ.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_set_wake`: This enables/disables the power management wake-on of an IRQ.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_bus_lock`: This function locks access to slow bus (I2C) chips. Locking
+    a mutex here is sufficient.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_bus_sync_unlock`: This function syncs and unlocks slow bus (I2C) chips,
+    and unlocks the mutex previously locked.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_get_irqchip_state` and `irq_set_irqchip_state`: These return or set the
+    internal state of an interrupt, respectively.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ipi_send_single` and `ipi_send_mask`: These are used, respectively, to send
+    **inter-processor interrupts** (**IPIs**) either to a single CPU or to a set of
+    CPUs defined by a mask. IPIs are used on SMP systems to generate a CPU remote
+    interrupt from the local CPU. We will discuss this later in the chapter, in the
+    *Demystifying per-CPU interrupts* section.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Each interrupt controller is given a domain, which is to the controller what
+    an address space is to a process (see [*Chapter 10*](B17934_10_Epub.xhtml#_idTextAnchor146),
+    *Understanding the Linux Kernel Memory Allocation*). The interrupt controller
+    domain is described in the kernel with a `struct irq_domain` structure. It manages
+    mappings between hardware IRQ numbers and Linux IRQ numbers (that is, virtual
+    IRQs). It is the hardware interrupt number translation object. The following code
+    block shows its definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For the sake of readability, only elements that are relevant to us have been
+    listed. The following list tells us their meanings:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`name`: This is the name of the interrupt domain.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ops`: This is a pointer to the IRQ domain methods.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`host_data`: This is a private data pointer for use by the owner. Not touched
+    by the IRQ domain core code.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`flags`: This hosts per-IRQ domain flags.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`mapcount`: This is the number of mapped interrupts in this IRQ domain.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Like all the remaining elements, `fwnode` is optional. It is a pointer to the
+    **device tree** (**DT**) node associated with the IRQ domain. Used when decoding
+    DT interrupt specifiers.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'An interrupt controller driver creates and registers an IRQ domain by calling
+    one of the `irq_domain_add_<mapping_method>()` functions, where `<mapping_method>`
+    is the method by which `hwirq` should be mapped to Linux `virq`. These functions
+    are described in the following list:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`irq_domain_add_linear()`: This uses a fixed-size table indexed by the `hwirq`
+    number. When an `hwirq` number is mapped, an `irq_desc` object is allocated for
+    this `hwirq` and the IRQ number is stored in the table. This linear mapping is
+    suitable for controllers or domains that have a fixed and small number of `hwirq`
+    (~ < 256). The inconvenience of this mapping is the table size, being as large
+    as the largest possible `hwirq` number. Therefore, the IRQ number lookup time
+    is fixed, and IRQ descriptors are allocated for in-use IRQs only. Most drivers
+    should use linear mapping. This function has the following prototype:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`irq_domain_add_tree()`: With this mapping, the IRQ domain maintains the mapping
+    between `virqs` (Linux IRQ numbers) and `hwirsq` (Hardware interrupt numbers)
+    in a radix tree. An `irq_desc` object is allocated when an `hwirq` is mapped,
+    and this hardware IRQ number is used as the radix tree''s lookup key. If the `hwirq`
+    number can be very large, then the treemap is a viable solution because it does
+    not require allocating a table as large as the largest `hwirq` number. The drawback
+    is that the `hwirq`-to-IRQ-number lookup is affected by the number of entries
+    in the table. Very few drivers should need this mapping. There are fewer than
+    10 users of this API in the kernel. It has the prototype shown in the following
+    code block:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`irq_domain_add_nomap()`: You will probably never use this method. Nonetheless,
+    its entire description is available in `Documentation/IRQ-domain.txt`, in the
+    kernel source tree. Its prototype is shown in the following code block:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In these functions, `of_node` is a pointer to the interrupt controller's DT
+    node. `size` corresponds to the number of interrupts in the domain. `ops` represent
+    map/unmap domain callbacks, and `host_data` is the controller's private data pointer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When it is initially created, the IRQ domain is empty (no mapping). A mapping
+    is created and added as and when the IRQ chip driver calls `irq_create_mapping()`,
+    which has the following prototype:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding function, `domain` is the domain to which this hardware interrupt
+    belongs, or `NULL` for the default domain; `hwirq` represents the hardware interrupt
+    number in that domain space.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If a mapping for the `hwirq` number doesn''t already exist in the IRQ domain,
+    the function will allocate a new Linux IRQ descriptor (`struct irq_desc`) structure,
+    returning a virtual interrupt number at the same time. Then, it will associate
+    it with the `hwirq` number (by means of the `irq_domain_associate()` function,
+    which in turn invokes the `irq_domain_ops.map` callback so that the driver can
+    perform any required hardware setup). To understand this paragraph, we need to
+    describe the IRQ domain operation data structure (`struct irq_domain_ops`), which
+    is defined in the following code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Elements in the data structure have been limited to the scope of this chapter.
+    Nonetheless, the complete data structure can be found in `include/linux/irqdomain.h`
+    in the kernel source. The following list tells us the meanings of the elements
+    we have enumerated:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`map`: This creates or updates mapping between a `virq` number and an `hwirq`
+    number. This callback is invoked only once for a given mapping. It generally maps
+    the `virq` number with a given handler using `irq_set_chip_and_handler()`, so
+    that calling either `generic_handle_irq()` or `handle_nested_irq()` will trigger
+    this handler. The function `irq_set_chip_and_handler()` is defined as in the following
+    code block:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In this function, `irq` is the Linux IRQ given as a parameter to the `map()`
+    function, and `chip` is your IRQ chip. There are, however, dummy controllers that
+    need almost nothing in their `irq_chip` structure. In this case, the driver passes
+    `dummy_irq_chip`, defined in `kernel/irq/dummychip.c`, which is a kernel-predefined
+    `irq_chip` structure defined for such controllers. `handle` determines the interrupt
+    flow handler, the one that calls the real handler registered using `request_irq()`.
+    Its value depends on the IRQ being edge- or level-triggered. In either case, `handle`
+    should be set to `handle_edge_irq` or `handle_level_irq`. Both are kernel helper
+    functions that do some operations before and after calling the real IRQ handler.
+    An example is shown in this code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`xlate`: Given a DT node with an interrupt specifier, this hook decodes the
+    hardware interrupt number in that specifier along with its Linux interrupt type
+    value. Depending on the `#interrupt-cells` value specified in the DT controller
+    node, the kernel provides generic translation functions:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_domain_xlate_twocell()`: Generic translation function to be used for direct
+    two-cell binding. It works with a device tree IRQ specifier with two-cell bindings
+    where the cell values map directly to the `hwirq` number and Linux IRQ flags.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq_domain_xlate_onecell()`: Generic `xlate` for direct one-cell bindings.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Irq_domain_xlate_onetwocell()`: Generic `xlate` for one- or two-cell bindings.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'An example of domain operation is given in the following code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When an interrupt is received, the `irq_find_mapping()` function is used to
+    find the Linux IRQ number from the `hwirq` number. Of course, the mapping must
+    exist prior to being returned. A Linux IRQ number is always tied to a `struct
+    irq_desc` structure, which is the structure by which Linux describes an IRQ and
+    has the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Some fields in this data structure are intentionally missing. For the remainder,
+    the following list gives us their definitions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`kstat_irqs`: This is the per-CPU IRQ statistics since boot.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`handle_irq`: This is the high-level IRQ events handler.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`action`: This represents the list of the IRQ actions for this descriptor.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irqs_unhandled`: This is the stats field for spurious unhandled interrupts.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lock`: This represents locking for SMP.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`threads_active`: This is the number of IRQ action threads currently running
+    for this descriptor.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`wait_for_threads`: This represents the wait queue for `sync_irq` to wait for
+    threaded handlers.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`nr_actions`: This is the number of installed actions on this descriptor.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`no_suspend_depth` and `force_resume_depth`: This represents the number of
+    `irqaction` instances on an IRQ descriptor that have `IRQF_NO_SUSPEND` or `IRQF_FORCE_RESUME`
+    flags set.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`dir`: This represents the `/proc/irq/` procfs entry.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`name`: This names the flow handler, visible in the `/proc/interrupts` output.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'When registering an interrupt handler, this handler is added to the end of
+    the `irq_desc.action` list associated with that interrupt line. For instance,
+    each call to `request_irq()` (or the threaded version, `request_threaded_irq()`)
+    creates and adds one `struct irqaction` structure to the end of the `irq_desc.action`
+    list (knowing that `irq_desc` is the descriptor for this interrupt). For a shared
+    interrupt, this field will contain as many `irqaction` objects as there are handlers
+    registered. An IRQ action data structure has the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The meanings of each element in this data structure are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`handler`: This is the non-threaded (hard) interrupt handler function.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`name`: This is the device name.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`dev_id`: This is a cookie to identify the device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`percpu_dev_id`: This is a per-CPU cookie to identify the device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`next`: This is a pointer to the next IRQ action for shared interrupts.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`irq`: This is the Linux interrupt number (`virq`).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`flags`: This represents the IRQ flags (see `IRQF_*`).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`thread_fn`: This is the threaded interrupt handler function for threaded interrupts.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`thread`: This is a pointer to the thread structure in case of threaded interrupts.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`thread_flags`: This represents the flags related to the thread.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`thread_mask`: This is a bitmask for keeping track of thread activity.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`dir`: This points to the `/proc/irq/NN/<name>/` entry.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following is the definition of important fields in the `struct irq_data`
+    structure, which is per-IRQ chip data passed down to chip functions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following list gives the meanings of elements in this data structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`irq`: This is the interrupt number (Linux IRQ number).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`hwirq`: This is the hardware interrupt number, local to the `irq_data.domain`
+    interrupt domain.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`chip`: This represents the low-level interrupt controller hardware access.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`domain`: This represents the interrupt translation domain, responsible for
+    mapping between the `hwirq` number and the Linux IRQ number.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`chip_data`: This is platform-specific, per-chip private data for the chip
+    methods, to allow shared chip implementations.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now that we are familiar with the data structures of the IRQ framework, we can
+    go a bit further and study how interrupts are requested and propagated all along
+    the processing chain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Diving into advanced peripheral IRQ management
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In [*Chapter 3*](B17934_03_Epub.xhtml#_idTextAnchor039), *Dealing with Kernel
+    Core Helpers*, we introduced peripheral IRQs, using `request_irq()` and `request_threaded_irq()`.
+    With the former, you register a handler (top half) that will be executed in an
+    atomic context, from which you can schedule a bottom half using one of the mechanisms
+    discussed in that same chapter. On the other hand, with the `_threaded` variant,
+    you can provide top and bottom halves to the function, so that the former will
+    be run as the hard IRQ handler, which may decide to raise the second and threaded
+    handler or not, which will be run in a kernel thread.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The problem with those approaches is that sometimes, drivers requesting an
+    IRQ do not know about the nature of the interrupt controller that provides this
+    IRQ line, especially when the interrupt controller is a discrete chip (typically
+    a GPIO expander connected over SPI or I2C buses). Now comes the `request_any_context_irq()`function
+    with which drivers requesting an IRQ know whether the handler will run in a thread
+    context, and call `request_threaded_irq()` or `request_irq()` accordingly. This
+    means that whether the IRQ associated with our device comes from an interrupt
+    controller that may not sleep (memory-mapped one) or from one that can sleep (behind
+    an I2C/SPI bus), there will be no need to change the code. Its prototype is shown
+    in the following code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here are the meanings of each parameter in the function:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`irq`: This represents the interrupt line to allocate.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`handler`: This is the function to be called when the IRQ occurs. Depending
+    on the context, this function might run as a hard IRQ or might be threaded.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`flags`: This represents the interrupt type flags. It is the same as those
+    in `request_irq()`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`name`: This will be used for debugging purposes to name the interrupt in `/proc/interrupts`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`dev_id`: This is a cookie passed back to the handler function.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`request_any_context_irq()` means that you can either get a hard IRQ or a threaded
+    one. It works in the same way as the usual `request_irq()`, except that it checks
+    whether the IRQ is configured as nested or not, and calls the right backend. In
+    other words, it selects either a hard IRQ or threaded handling method depending
+    on the context. This function returns a negative value on failure. On success,
+    it returns either `IRQC_IS_HARDIRQ` or `IRQC_IS_NESTED`. A use case is shown in
+    the following code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code is an excerpt of the driver sample of an input device driver.
+    The advantage of using `request_any_context_irq()` is that you do not need to
+    care about what can be done in the IRQ handler, since the context in which the
+    handler will run depends on the interrupt controller that provides the IRQ line.
+    In our example, if the GPIO belongs to a controller sitting on an I2C or SPI bus,
+    the handler will be threaded. Otherwise (memory mapped), the handler will run
+    in a hard IRQ context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding IRQ and propagation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let''s consider the following diagram with a GPIO controller whose interrupt
+    line is connected to a native GPIO on the SoC:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 13.2 – Interrupt propagation'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/B17934_13_002.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 13.2 – Interrupt propagation
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'IRQs are always processed based on the Linux IRQ number (not `hwirq`). The
+    general function to request an IRQ on a Linux system is `request_threaded_irq()`.
+    `request_irq()` is a wrapper on `request_threaded_irq()` which just don''t provide
+    the bottom half. The following code block shows its prototype:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When called, the function extracts `struct irq_desc` associated with the IRQ
+    using the `irq_to_desc()` macro. It then allocates a new `struct irqaction` structure
+    and sets it up, filling parameters such as handler and flags. The following code
+    block is an excerpt:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: That same function finally inserts/registers the descriptor in the proper IRQ
+    list by invoking the `__setup_irq()` (by means of `setup_irq()`) function, defined
+    in `kernel/irq/manage.c`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, when an IRQ is raised, the kernel executes some assembler code in order
+    to save the current state and jumps to the arch-specific handler, `handle_arch_irq`.
+    For ARM architectures, this handler is set with the value of the `handle_irq`
+    field in `struct machine_desc` of the platform in the `setup_arch()` function
+    implemented in `arch/arm/kernel/setup.c`. The assignation is done as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For SoCs that use the ARM `handle_irq` callback is set with `gic_handle_irq`,
+    in either `drivers/irqchip/irq-gic.c` or `drivers/irqchip/irq-gic-v3.c`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`gic_handle_irq()` calls `handle_domain_irq()`, which executes `generic_handle_irq()`,
+    in turn calling `generic_handle_irq_desc()`, which ends by calling `desc->handle_irq()`.
+    The whole chain can be seen in `arch/arm/kernel/irq.c`. Now, `handle_irq` is the
+    actual call for the flow handler, which we registered as `mcp23016_irq_handler`
+    in the diagram.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`gic_hande_irq()` is a GIC interrupt handler. `generic_handle_irq()` will execute
+    the handler of the SoC''s GPIO4 IRQ, which will look for GPIO pins that issued
+    the interrupt, and call `generic_handle_irq_desc()`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chaining IRQs
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This section describes how the interrupt handlers of a parent call its children's
+    interrupt handlers, in turn calling their children's interrupt handlers, and so
+    on. The kernel offers two approaches on how to call interrupt handlers for child
+    devices in the IRQ handler of the parent (interrupt controller) device. These
+    are the chained and nested methods.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Chained interrupts
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This approach is used for SoC's internal GPIO controllers, which are memory-mapped
+    and which do not put the caller to sleep when these are accessed. Chained means
+    that those interrupts are just chains of function calls (for example, SoC's GPIO
+    module interrupt handler is being called from the GIC interrupt handler, just
+    as a function call). `generic_handle_irq()` is used for interrupts chaining. Child
+    IRQ handlers are called from inside the parent's hard IRQ handler. This means
+    that even from within the child interrupt handlers, we are still in an atomic
+    context (HW interrupt), and the driver must not call functions that may sleep.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Nested interrupts
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: With this flow, function calls are nested, which means interrupt handlers are
+    not invoked in the parent's handler. `handle_nested_irq()` is used for creating
+    nested interrupt child IRQs. Handlers are called inside a new thread created for
+    this purpose. This method is used by controllers that sit on slow buses such as
+    SPI or I2C (such as GPIO expanders), and whose access may sleep (I2C and SPI access
+    routines may sleep). Nested interrupt handlers that run in a process context can
+    call any sleeping function.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Demystifying per-CPU interrupts
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The most common ARM interrupt controller, GIC in the ARM multi-core processor,
+    supports three types of interrupts:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**CPU private interrupts**: These interrupts are private per CPU. If triggered,
+    such a per-CPU interrupt will exclusively be serviced on the target CPU or CPU
+    to which it is bound. Private interrupts can be split into two families:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Private peripheral interrupts** (**PPIs**): These are private and can only
+    be generated by hardware bound to the CPU.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Software-generated interrupts** (**SGIs**): Unlike PPIs, these are generated
+    by the software. Thanks to this, SGIs are usually used as interrupt IPIs for inter-core
+    communication on multi-core systems, meaning that one CPU can generate an interrupt
+    (by writing the appropriate message, made of the interrupt ID and the target CPU
+    to the GIC controller) to (an)other CPU(s). This is what we will talk about in
+    this section.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Shared peripheral interrupts** (**SPIs**) (not to be confused with the SPI
+    bus): These are the classical interrupts that we have discussed so far. Such interrupts
+    can route to any CPU.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In systems with an interrupt controller that supports private interrupts per
+    core, some of the IRQ controller registers will be banked so that they're only
+    accessible from one core (for example, a core will only be able to read/write
+    its own interrupt configuration). Usually, to be able to do so, some interrupt
+    controller registers are banked per CPU; a CPU can enable its local interrupt
+    by writing to its banked registers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The distributor block and the CPU interface block are logically partitioned
+    in the GIC. Interacting with interrupt sources, the distributor block prioritizes
+    interrupts and delivers them to the CPU interface block. The CPU interface block
+    links to the system's processors and manages priority masking and preemption for
+    the processors to which it is linked.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The GIC can support up to 8 CPU interfaces, each of which can handle up to
+    1,020 interrupts. Interrupt ID numbers 0–1019 are assigned by the GIC as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Interrupt numbers 0–31 are interrupts that are private to a CPU interface.
+    These private interrupts are banked in the distributor block and split as follows:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: SGIs use banked interrupt numbers 0–15.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: PPIs use banked interrupt numbers 16–31\. In SMP systems, for example, a per-CPU
+    timer provided by clock event devices can generate such interrupts.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: SPIs use interrupt numbers 32–1,019.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The remaining interrupts are reserved, that is, interrupt numbers 1020–1023.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now that we are familiar with ARM GIC interrupt families, we can focus on the
+    family we are interested in, that is, SGIs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: SGIs and IPIs
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In ARM processors, there are 16 SGIs, numbered from 0 to 15, but the Linux
+    kernel registers only a few of them: eight (from 0 to 7) to be precise. SGI8 to
+    SGI15 are free for now. Registered SGIs are those defined in `enum ipi_msg_type`,
+    which is defined as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Their respective descriptions can be found in an array of strings, or `ipi_types`,
+    defined in the following code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'IPIs are registered in the `set_smp_ipi_range()` function, defined in the following
+    code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding code block, each IPI is registered with `request_percpu_irq()`
+    on a per-CPU basis. We can see that IPIs have the same handler, `ipi_handler()`,
+    defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The underlying function executed in the handler is `do_handle_IPI()`, defined
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: From the preceding function,
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`IPI_WAKEUP`: This is used to wake up and boot a secondary CPU. It is mostly
+    issued by the boot CPU.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IPI_RESCHEDULE`: The Linux kernel uses rescheduling interrupts to tell another
+    CPU core to schedule a thread. The scheduler on SMP systems does this to distribute
+    the load over multiple CPU cores. As a general rule, it is ideal to have as many
+    processes running on all the cores in lower power (lower clock frequencies) rather
+    than have one busy core running at full speed while other cores are sleeping.
+    When the scheduler needs to offload work from one core to another sleeping core,
+    the scheduler sends a kernel IPI message to that sleeping core, causing it to
+    wake up from its low-power sleep and begin running a process. These IPI events
+    are reported by `powertop` as `Rescheduling Interrupts`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IPI_TIMER`: This is the timer broadcast interrupt. This IPI emulates a timer
+    interrupt on an idle CPU. It is sent by the broadcast clock event/tick device
+    to CPUs represented in `tick_broadcast_mask`, which is the bitmap that represents
+    the list of processors that are in a sleeping mode. Tick devices and broadcast
+    masks are discussed in [*Chapter 3*](B17934_03_Epub.xhtml#_idTextAnchor039), *Dealing
+    with Kernel Core Helpers*.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IPI_CPU_STOP`: When a kernel panic occurs on one CPU, other CPUs are instructed
+    to dump their stack and to stop execution via the `IPI_CPU_STOP` IPI message.
+    The target CPUs are not shut down or taken offline; instead, they stop execution
+    and are placed in a low-power loop, in a **wait for event** (**WFE**) state.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IPI_CALL_FUNC`: This is used to run a function in another processor context.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IPI_IRQ_WORK`: This is used to run a work in a hardware IRQ context. The kernel
+    offers a bunch of mechanisms to defer works to a later time, especially out of
+    the hardware interrupt context. There might, however, be the occasional need to
+    run a work in a hardware interrupt context and there is no hardware conveniently
+    signaling interrupts at the time. To achieve that, an IPI is used to run the work
+    in a hardware interrupt context. This is mainly used in code running from non-maskable
+    interrupts, which needs to be able to interact with the rest of the system.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'On a running system, you can look for available IPIs from the `/proc/interrupt`
+    file, as shown in the following code block:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the command output shown here, the first column is the IPI identifier and
+    the last one is the description of the IPI. The columns in between are their respective
+    numbers of executions on each CPU.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Now, IRQ multiplexing has no more secrets from you. We have discussed the most
+    important element of IRQ management in Linux systems: the IRQ domain API. You
+    have the basics to understand existing interrupt controller drivers, as well as
+    their binding from within the DT. IRQ propagation has been discussed in order
+    to explore what happens between the request and the handler invocation.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the next chapter, we deal with a completely different topic: the Linux device
+    model.'
+  prefs: []
+  type: TYPE_NORMAL

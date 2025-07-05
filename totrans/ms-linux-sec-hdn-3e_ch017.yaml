@@ -1,0 +1,1857 @@
+- en: 16 Security Tips and Tricks for the Busy Bee
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Join our book community on Discord
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '[https://packt.link/SecNet](https://packt.link/SecNet)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/file110.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: In this final chapter, I'd like to do a roundup of some quick tips and tricks
+    that don't necessarily fit in with the previous chapters. Think of these tips
+    as time savers for the busy administrator. First, you will learn about some quick
+    ways to see which system services are running, in order to ensure that nothing
+    that isn't needed is running. Then, we'll look at how to password protect the
+    GRUB 2 bootloader, how to securely configure BIOS/UEFI to help prevent attacks
+    on a physically accessible machine, and how to use a checklist to perform a secure
+    initial system setup.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Auditing system services
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Password protecting the GRUB2 configuration
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Securely configuring and then password protecting UEFI/BIOS
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using a security checklist when setting up your system
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you’re ready, let’s get going.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Technical requirements
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The code files for this chapter are available here: [https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-3E](https://github.com/PacktPublishing/Mastering-Linux-Security-and-Hardening-3E).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Auditing system services
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: A basic tenet of server administration, regardless of which operating system
+    we're talking about, is to never have anything that you don't absolutely need
+    installed on a server. You especially don't want any unnecessary network services
+    running because that would give the bad guys extra ways to get into your system.
+    And, there's always a chance that some evil hacker might have planted something
+    that acts as a network service, and you'd definitely want to know about that.
+    In this section, we'll look at a few different ways to audit your system to ensure
+    that no unnecessary network services are running on it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Auditing system services with systemctl
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'On Linux systems that come with `systemd`, the `systemctl` command is pretty
+    much a universal command that does many things for you. In addition to controlling
+    your system''s services, it can also show you the status of those services, like
+    so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown of the preceding command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`-t service`: We want to view information about the services – or, what used
+    to be called daemons – on the system.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`--state=active`: This specifies that we want to view information about all
+    the system services that are actually running.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'A partial output of this command looks something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Generally, you won't want to see quite this much information, although you might
+    at times. This command shows the status of every service that's running on your
+    system. What really interests us now is the network services that can allow someone
+    to connect to your system. So, let's look at how to narrow things down a bit.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Auditing network services with netstat
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Here are two reasons why you would want to keep track of what network services
+    are running on your system:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: To ensure that no legitimate network services that you don't need are running
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: To ensure that you don't have any malware that's listening for network connections
+    from its master
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The `netstat` command is both handy and easy to use. First, let''s say that
+    you want to see a list of network services that are listening, waiting for someone
+    to connect to them. (Due to formatting restrictions, I can only show part of the
+    output here. We''ll look at some lines that I can''t show here in just a moment.
+    Also, you can download the text file with the full output from the Packt Publishing
+    website.):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`-lp`: The `l` means that we want to see which network ports are listening.
+    In other words, we want to see which network ports are waiting for someone to
+    connect to them. The `p` means that we want to see the name and process ID number
+    of the program or service that is listening on each port.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-A inet`: This means that we only want to see information about the network
+    protocols that are members of the `inet` family. In other words, we want to see
+    information about the `raw`, `tcp`, and `udp` network sockets, but we don''t want
+    to see anything about the Unix sockets that only deal with interprocess communications
+    within the operating system.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Since this output is from the openSUSE workstation that I used to write the
+    original version of this chapter, you won''t see any of the usual server-type
+    services here. However, you will see a few things that you likely won''t want
+    to see on your servers. For example, let''s look at the very first item:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `Local Address` column specifies the local address and port of this listening
+    socket. The asterisk means that this socket is on the local network, while `ideafarm-door`
+    is the name of the network port that is listening. (By default, `netstat` will
+    show you the names of ports whenever possible by pulling the port information
+    out of the `/etc/services` file.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, because I didn''t know what the `ideafarm-door` service is, I used my
+    favorite search engine to find out. By plugging the term `ideafarm-door` into
+    DuckDuckGo, I found the answer:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.1: WhatPortIs](img/file111.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.1: WhatPortIs'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The top search result took me to a site named **WhatPortIs**. According to this,
+    `ideafarm-door` is, in reality, port `902`, which belongs to the **VMware Server
+    Console**. Okay, that makes sense because I do have VMware Player installed on
+    this machine. So, that's all good.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can check out the `WhatPortIs` site here: [http://whatportis.com/](http://whatportis.com/).'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Here’s the next item on the list:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: This item shows the local address as `localhost` and that the listening port
+    is port `40432`. This time, the `PID/Program Name` column actually tells us what
+    this is. `SpiderOak ONE` is a cloud-based backup service that you might or might
+    not want to see running on your server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s look at a few more items:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we can see that `dropbox` and `SpiderOakONE` are both listed with the
+    asterisk for the local address. So, they're both using the local network address.
+    The name of the port for `dropbox` is `db-lsp`, which stands for **Dropbox LAN
+    Sync Protocol**. The `SpiderOakONE` port doesn't have an official name, so it's
+    just listed as port `37468`. The bottom two lines show that `dropbox` also uses
+    the local machine's address, on ports `17600` and `17603`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So far, we''ve looked at nothing but TCP network sockets. Let''s see how they
+    differ from UDP sockets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: The first thing to note is that there's nothing under the `State` column. That's
+    because, with UDP, there are no states. They are actually listening for data packets
+    to come in, and they're ready to send data packets out. But since that's about
+    all that UDP sockets can do, there was really no sense in defining different states
+    for them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the first two lines, we see some strange local addresses. That's because
+    I have both VMware Player and VirtualBox installed on this workstation. The local
+    addresses of these two sockets are for the VMware and VirtualBox virtual network
+    adapters. The last line shows the hostname of my OpenSUSE workstation as the local
+    address. In all three cases, the port is the **Network Time Protocol** port, for
+    time synchronization.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s look at one last set of UDP items:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we see that my Chromium web browser is ready to accept network packets
+    on a few different ports. We also see that Dropbox uses UDP to accept discovery
+    requests from other local machines that have Dropbox installed. I assume that
+    port `21327` performs the same function for SpiderOak ONE.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Of course, since this machine is one of my workhorse workstations, Dropbox and
+    SpiderOak ONE are almost indispensable to me. I installed them myself, so I've
+    always known that they were there. However, if you see anything like this on a
+    server, you'll want to investigate to see if the server admins know that these
+    programs are installed, and then find out why they're installed. It could be that
+    they're performing a legitimate function, and it could be that they're not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A difference between Dropbox and SpiderOak ONE is that with Dropbox, your files
+    don't get encrypted until they've been uploaded to the Dropbox servers. So, the
+    Dropbox folk have the encryption keys to your files. On the other hand, SpiderOak
+    ONE encrypts your files on your local machine, and the encryption keys never leave
+    your possession. So, if you really do need a cloud-based backup service and you're
+    dealing with sensitive files, something such as SpiderOak ONE would definitely
+    be better than Dropbox. (And no, the SpiderOak ONE folk aren't paying me to say
+    that.)
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'If you want to see port numbers and IP addresses instead of network names,
+    add the `n` option. As before, here''s the partial output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'All you have to do to view the established TCP connections is to leave out
+    the `l` option. On my workstation, this makes for a very long list, so I''ll only
+    show a few items:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `Foreign Address` column shows the address and port number of the machine
+    at the remote end of the connection. The first item shows that the connection
+    with a Dropbox server is in a `CLOSE_WAIT` state. This means that the Dropbox
+    server has closed the connection, and we're now waiting on the local machine to
+    close the socket.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Because the names of those foreign addresses don''t make much sense, let''s
+    add the `n` option to see the IP addresses instead:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: This time, we see something new. The first item shows a `SYN_SENT` state for
+    the Firefox connection. This means that the local machine is trying to establish
+    a connection to the foreign IP address. Also, under `Local Address`, we can see
+    the static IP address for my OpenSUSE workstation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If I had space to display the entire `netstat` output here, you'd see nothing
+    but `tcp` under the `Proto` column. That's because the UDP protocol doesn't establish
+    connections in the same way that the TCP protocol does.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Something to keep in mind is that rootkits can replace legitimate Linux utilities
+    with their own trojaned versions. For example, a rootkit could have its own trojaned
+    version of `netstat` that would show all network processes except for those that
+    are associated with the rootkit. That's why you want to do everything you can
+    to prevent unauthorized users from gaining root privileges, to prevent them from
+    being able to install rootkits.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: If you need more information about `netstat`, see the `netstat` man page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab – viewing network services with netstat
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'In this lab, you''ll practice what you''ve just learned about `netstat`. Do
+    this on a virtual machine that has a desktop interface so that you can use Firefox
+    to visit websites. Follow these steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'View the list of network services that are listening for a connection:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'View the list of established connections:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: Open Firefox and navigate to any website. Then, repeat *Step 2*.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Repeat *Step 2* again, but preface each command with `sudo`. Note how the output
+    is different from that of *Step 2*.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: From your host machine, log into the virtual machine via SSH. Then, repeat *Step
+    2*.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You've reached the end of the lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: You've just seen how to audit network services with `netstat`. Now, let's learn
+    how to do this with Nmap.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Auditing network services with Nmap
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The `netstat` tool is very good, and it can give you lots of good information
+    about what's going on with your network services. The slight downside is that
+    you have to log in to every individual host on your network in order to use it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you'd like to remotely audit your network to see what services are running
+    on each computer without having to log in to each and every one, then you need
+    a tool such as Nmap. It's available for all the major operating systems, so even
+    if you're stuck having to use Windows on your workstation, you're in luck. An
+    up-to-date version is already installed on Kali Linux, if that's what you're using.
+    It's also in the repositories of every major Linux distro, so installing it is
+    quite simple. If you’re running Windows or macOS, you can download a version for
+    either of them directly from the Nmap website.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can download Nmap for all of the major operating systems from [https://nmap.org/download.html](https://nmap.org/download.html).
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: In all cases, you'll also find instructions for installation.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'You''ll use Nmap the same way on all operating systems, with only one exception.
+    On Linux and macOS machines, you''ll preface certain Nmap commands with `sudo`,
+    while on Windows machines, you won''t. (Although, on Windows 10/11, you might
+    have to open the `command.exe` terminal as an administrator.) Since I just happen
+    to be working on my trusty OpenSUSE workstation, I''ll show you how it works on
+    Linux. Let''s start by doing a SYN packet scan:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`-sS`: The lowercase `s` denotes the type of scan that we want to perform.
+    The uppercase `S` denotes that we''re doing a SYN packet scan. (More on that in
+    a moment.)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`192.168.0.37`: In this case, I''m only scanning a single machine. However,
+    I could also scan either a group of machines or an entire network.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`Not shown: 996 closed ports`: The fact that it''s showing all of these closed
+    ports instead of `filtered` ports tells me that there''s no firewall on this machine.
+    (Again, more on that in a moment.)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Next, we see a list of ports that are open. (More on that in a moment.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: The MAC address of this machine indicates that it's an Apple product of some
+    sort. In a moment, I'll show you how to get more details about what kind of Apple
+    product that it might be.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, let's look at this more in detail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Port states
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'An Nmap scan will show the target machine''s ports in one of three **port states**:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`filtered`: This means that the port is blocked by a firewall.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`open`: This means that the port is not blocked by a firewall and that the
+    service that''s associated with that port is running.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`closed`: This means that the port is not blocked by a firewall, and that the
+    service that''s associated with that port is not running.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: So, in our scan of the Apple machine, we see that the Secure Shell service is
+    ready to accept connections on port `22`, that the print service is ready to accept
+    connections on ports `515` and `631`, and that the **Virtual Network Computing**
+    (**VNC**) service is ready to accept connections on port `5900`. All of these
+    ports would be of interest to a security-minded administrator. If Secure Shell
+    is running, it would be interesting to know if it's configured securely. The fact
+    that the print service is running means that this is set up to use the **Internet
+    Printing Protocol** (**IPP**). It would be interesting to know why we're using
+    IPP instead of just regular network printing, and it would also be interesting
+    to know if there are any security concerns with this version of IPP. And of course,
+    we already know that VNC isn't a secure protocol, so we would want to know why
+    it's even running at all. We also saw that no ports are listed as `filtered`,
+    so we would also want to know why there's no firewall on this machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: One little secret that I'll finally reveal is that this machine is the same
+    one that I used for the Greenbone Security Assistant scan demos. So, we already
+    have some of the needed information. The Greenbone scan told us that Secure Shell
+    on this machine uses weak encryption algorithms and that there's a security vulnerability
+    with the print service. In just a bit, I'll show you how to get some of that information
+    with Nmap.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Scan types
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: There are lots of different scanning options, each with its own purpose. The
+    SYN packet scan that we're using here is considered a stealthy type of scan because
+    it generates less network traffic and fewer system log entries than certain other
+    types of scans. With this type of scan, Nmap sends a SYN packet to a port on the
+    target machine, as if it were trying to create a TCP connection to that machine.
+    If the target machine responds with a SYN/ACK packet, it means that the port is
+    in an `open` state and is ready to create the TCP connection. If the target machine
+    responds with an RST packet, it means that the port is in a `closed` state. If
+    there's no response at all, it means that the port is `filtered`, blocked by a
+    firewall. As a normal Linux administrator, this is one of the types of scans that
+    you would do most of the time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `-sS` scan shows you the state of TCP ports, but it doesn''t show you the
+    state of UDP ports. To see the UDP ports, use the `-sU` option:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, you see something a bit different: two ports are listed as `open|filtered`.
+    That''s because, due to the way that UDP ports respond to Nmap scans, Nmap can''t
+    always tell whether a UDP port is `open` or `filtered`. In this case, we know
+    that these two ports are probably open because we''ve already seen that their
+    corresponding TCP ports are open.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'ACK packet scans can also be useful, but not to see the state of the target
+    machine''s network services. Rather, it''s a good option for when you need to
+    see if there might be a firewall blocking the way between you and the target machine.
+    An ACK scan command looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You''re not limited to scanning just a single machine at a time. You can scan
+    either a group of machines or an entire subnet at once:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: The first command scans only the first 128 hosts on this network segment. The
+    second command scans all 254 hosts on a subnet that's using a 24-bit netmask.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A discovery scan is useful for when you need to just see what devices are on
+    the network:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'With the `-sn` option, Nmap will detect whether you''re scanning the local
+    subnet or a remote subnet. If the subnet is local, Nmap will send out an **Address
+    Resolution Protocol** (**ARP**) broadcast that requests the IPv4 addresses of
+    every device on the subnet. That''s a reliable way of discovering devices because
+    ARP isn''t something that will ever be blocked by a device''s firewall. (I mean,
+    without ARP, the network would cease to function.) However, ARP broadcasts can''t
+    go across a router, which means that you can''t use ARP to discover hosts on a
+    remote subnet. So, if Nmap detects that you''re doing a discovery scan on a remote
+    subnet, it will send out ping packets instead of ARP broadcasts. Using ping packets
+    for discovery isn''t as reliable as using ARP because some network devices can
+    be configured to ignore ping packets. Anyway, here''s an example from my own home
+    network:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: We see three hosts in this snippet, and there are three lines of output for
+    each host. The first line shows the IP address, the second shows whether the host
+    is up, and the third shows the MAC address of the host's network adapter. The
+    first three pairs of characters in each MAC address denote the manufacturer of
+    that network adapter. (For the record, that unknown network adapter is on a recent
+    model Gigabyte motherboard. I have no idea why it's not in the Nmap database.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The final scan that we''ll look at does four things for us:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: It identifies `open`, `closed`, and `filtered` TCP ports.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It identifies the versions of the running services.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It runs a set of vulnerability scanning scripts that come with Nmap.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It attempts to identify the operating system of the target host.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The scan command that does all of these things looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'I guess that you could think of the `-A` option as the *all* option since it
+    really does do it all. (Well, almost all, since it doesn''t scan UDP ports.) First,
+    here''s the command that I ran to do the scan:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here are the results, broken down into sections for formatting purposes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Right away, we see that there''s no active firewall on this machine because
+    no ports are in the `filtered` state. By default, Nmap scans only the most 1,000
+    most popular ports. Since 996 ports are in the `closed` state, we obviously only
+    have four active network services that would listen on any of these 1,000 ports:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: Port `22` is open for Secure Shell access, which we would normally expect. However,
+    look at the SSH version. Version 5.1 is a really old version of OpenSSH. (At the
+    time of writing, the current version is version 9.1.) What's worse is that this
+    OpenSSH server supports version 1 of the Secure Shell protocol. Version 1 is seriously
+    flawed and is easily exploitable, so you never want to see this on your network.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we have amplifying information on the print service vulnerability that
+    we found with the Greenbone Security Assistant scan:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the `631/tcp` line, we see that the associated service is `ipp`. This protocol
+    is based on the same HTTP that we use to look at web pages. The two methods that
+    HTTP uses to send data from a client to a server are `POST` and `PUT`. What we
+    really want is for every HTTP server to use the `POST` method because the `PUT`
+    method makes it very easy for someone to compromise a server by manipulating a
+    URL. So, if you scan a server and find that it allows using the `PUT` method for
+    any kind of HTTP communications, you have a potential problem. In this case, the
+    solution would be to update the operating system and hope that the updates fix
+    the problem. If this were a web server, you'd want to have a chat with the web
+    server administrators to let them know what you found.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we see that the VNC service is running on this machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: VNC can be handy at times. It's like Microsoft's Remote Desktop service for
+    Windows, except that it's free, open source software. But it's also a security
+    problem because it's an unencrypted protocol. So, all your information goes across
+    the network in plain text. If you must use VNC, run it through an SSH tunnel.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, let''s see what Nmap found out about the operating system of our target
+    machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: Wait, what? Mac OS X 10.4? Isn't that really, really ancient? Well, yeah, it
+    is. The secret that I've been guarding for the past couple of chapters is that
+    the target machine for my Greenbone Security Assistant and Nmap scan demos has
+    been my ancient, collectible Apple eMac from the year 2003\. I figured that scanning
+    it would give us some interesting results to look at, and it would appear that
+    I was right. (And yes, that is *eMac*, not *iMac*.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The final thing we see is the `TRACEROUTE` information. It''s not very interesting,
+    though, because the target machine was sitting right next to me, with only one
+    Cisco switch between us:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: Let's say that the target machine has had its SSH service changed to some alternate
+    port, instead of having it run on the default port, `22`. If you scan the machine
+    with a normal `-sS` or `-sT` scan, Nmap won't correctly identify the SSH service
+    on that alternate port. However, a `-A` scan will correctly identify the SSH service,
+    regardless of which port it's using.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Okay, let’s do a lab.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab – scanning with Nmap
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'In this lab, you''ll see the results of scanning a machine with various services
+    either enabled or disabled. You''ll start with a virtual machine that has its
+    firewall disabled. Let''s get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Briefly peruse the Nmap help screen by using the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'From either your host machine or from another virtual machine, perform these
+    scans against a virtual machine that has its firewall disabled (substitute your
+    own IP address for the one I''m using here):'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Stop the SSH service on the target machine on Ubuntu:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On either CentOS or AlmaLinux, use this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: Repeat *step 2*.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You've reached the end of this lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that you've seen how to scan a system, let's look at the GRUB2 bootloader.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Password protecting the GRUB 2 bootloader
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: People sometimes forget passwords, even if they're administrators. And sometimes,
+    people buy used computers but forget to ask the seller what the password is. (Yes,
+    I've done that.) That's okay, though, because all of the major operating systems
+    have ways to let you either reset or recover a lost administrator password. That's
+    handy, except that it does kind of make the whole idea of having login passwords
+    a rather moot point when someone has physical access to the machine. Let's say
+    that your laptop has just been stolen. If you haven't encrypted the hard drive,
+    it would only take a few minutes for the thief to reset the password and steal
+    your data. If you have encrypted the drive, the level of protection would depend
+    on which operating system you're running. With standard Windows folder encryption,
+    the thief would be able to access the encrypted folders just by resetting the
+    password. With LUKS whole-disk encryption on a Linux machine, the thief wouldn't
+    be able to get past the point of having to enter the encryption passphrase.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With Linux, we have a way to safeguard against unauthorized password resets,
+    even if we're not using whole-disk encryption. All we have to do is to password
+    protect the **Grand Unified Bootloader** (**GRUB**), which would prevent a thief
+    from booting into emergency mode to do the password reset.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Whether or not you need the advice in this section depends upon your organization's
+    physical security setup. That's because booting a Linux machine into emergency
+    mode requires physical access to the machine. It's not something that you can
+    do remotely. In an organization with proper physical security, servers – especially
+    ones that hold sensitive data – are locked away in a room that's locked within
+    another room. Only a very few trusted personnel are allowed to enter, and they
+    have to present their credentials at both access points. So, setting a password
+    on the bootloader of those servers would be rather pointless, unless you're dealing
+    with a regulatory agency that dictates otherwise.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: On the other hand, password protecting the bootloaders of workstations and laptops
+    that are out in the open could be quite useful. However, that alone won't protect
+    your data. Someone could still boot the machine from a live disk or a USB memory
+    stick, mount the machine's hard drive, and obtain the sensitive data. That's why
+    you also want to encrypt your sensitive data, as I showed you in *Chapter 6*,
+    *Encryption Technologies*.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: To reset a password, all you have to do is interrupt the boot process when the
+    boot menu comes up and either change a couple of kernel parameters, or select
+    the **Recovery** mode option if it’s available. Either way, the machine will boot
+    into emergency mode without asking for a password. However, resetting passwords
+    isn't the only thing you can do from emergency mode. Once you’ve booted into emergency
+    mode, you have full root user control over the whole system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, just so you'll know what I'm talking about when I say that you can edit
+    kernel parameters from the GRUB 2 boot menu, let me show you how to perform a
+    password reset on a Red Hat-type system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab – resetting the password for Red Hat/CentOS/AlmaLinux
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'With only one very minor exception, this procedure works exactly the same on
+    CentOS 7, AlmaLinux 8, and AlmaLinux 9\. Let''s get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Boot the virtual machine. When the boot menu comes up, interrupt the boot process
+    by hitting the down arrow key once. Then, hit the up arrow key once to select
+    the default boot option:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![Figure 16.2: Selecting the boot option](img/file112.png)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'Figure 16.2: Selecting the boot option'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Hit the e key to edit the kernel parameters. When the GRUB 2 configuration
+    comes up, cursor down until you see this line:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![Figure 16.3: Edit the kernel options](img/file113.png)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'Figure 16.3: Edit the kernel options'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Note that on CentOS 7, the line begins with `linux16`, as shown here. On AlmaLinux
+    8/9, the line begins with `linux`.
+  prefs:
+  - PREF_IND
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Delete the words `rhgb quiet` from this line and then add `rd.break enforcing=0`
+    to the end of the line. Here''s what these two new options do for you:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`rd.break`: This will cause the machine to boot into emergency mode, which
+    gives you root user privileges without you having to enter a root user password.
+    Even if the root user password hasn''t been set, this still works.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`enforcing=0`: When you do a password reset on an SELinux-enabled system, the
+    security context for the `/etc/shadow` file will change to the wrong type. If
+    the system is in enforcing mode when you do this, SELinux will prevent you from
+    logging in until the `shadow` file is relabeled. However, relabeling during the
+    boot process can take a very long time, especially with a large drive. By setting
+    SELinux to permissive mode, you can wait until after you''ve rebooted to restore
+    the proper security context on just the `shadow` file.'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'When you''ve finished editing the kernel parameters, hit Ctrl + X to continue
+    the boot process. This will take you to emergency mode with the `switch_root`
+    command prompt:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![Figure 16.4: In emergency mode](img/file114.png)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'Figure 16.4: In emergency mode'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'In emergency mode, the filesystem is mounted as read-only. You''ll need to
+    remount it as read-write and enter `chroot` mode before you can reset the password,
+    using these two commands:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After you enter these two commands, the command prompt will change to that
+    of a normal bash shell:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.5: Entering the chroot](img/file115.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.5: Entering the chroot'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that you've reached this stage, you're finally ready to reset the password.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you want to reset the root user password, or even if you want to create
+    a root password where none previously existed, just enter:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: Then, enter the new desired password.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If the system has never had a root user password and you still don''t want
+    it to have one, you can reset the password for an account that has full sudo privileges.
+    For example, on my system, the command would look like this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, remount the filesystem as read-only. Then, enter `exit` twice to resume
+    rebooting:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The first thing you need to do after rebooting is to restore the proper SELinux
+    security context on the `/etc/shadow` file. Then, put SELinux back into enforcing
+    mode:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s a before and after screenshot of the context settings for my `shadow`
+    file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.6: SELinux context settings for the shadow file](img/file116.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.6: SELinux context settings for the shadow file'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here, you see that resetting the password changed the type of the file to `unlabeled_t`.
+    Running the `restorecon` command changed the type back to `shadow_t`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You've reached the end of this lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we'll look at the same procedure for Ubuntu.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab – resetting the password for Ubuntu
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The procedure for resetting a password on an Ubuntu system is quite a bit different
+    and quite a bit simpler. However, there is one slight difference between doing
+    this on Ubuntu 16.04 and Ubuntu 18.04 or newer. That is, to see the boot menu
+    on Ubuntu 16.04, you don''t have to do anything. On Ubuntu 18.04, you have to
+    press either the Shift key (on BIOS-based systems) or the Esc key (on UEFI-based
+    systems) in order to see the boot menu. On the current Ubuntu 22.04, you’ll press
+    the Esc key for either BIOS-based or UEFI-based systems. Other than that, the
+    procedure is identical for everything from Ubuntu 16.04 through the current Ubuntu
+    22.04\. So now, let’s get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Boot the virtual machine. Press the Esc key to bring up the boot menu.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Press the down arrow key to highlight the Advanced Options for Ubuntu menu
+    item, and press the Enter key:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![Figure 16.7: Ubuntu Advanced Options submenu](img/file117.png)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'Figure 16.7: Ubuntu Advanced Options submenu'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'From the **Advanced Options for Ubuntu** submenu, select the **recovery mode**
+    option, and press Enter:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![Figure 16.8: Select the recovery mode option](img/file118.png)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'Figure 16.8: Select the recovery mode option'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'When the **Recovery Menu** comes up, select the **root** option, and press
+    the Enter key:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![Figure 16.9: Select the root option](img/file119.png)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'Figure 16.9: Select the root option'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Press the Enter key again. This will take you to a root shell:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '![Figure 16.10: In recovery mode](img/file120.png)'
+  prefs:
+  - PREF_IND
+  type: TYPE_IMG
+- en: 'Figure 16.10: In recovery mode'
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: 'Since Ubuntu doesn''t normally have a password assigned to the root user, you
+    would most likely just reset the password of whoever had full sudo privileges,
+    like so:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When you''ve finished, reboot as you normally would:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: The machine will now boot up for normal operation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You've reached the end of this lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Of course, we don't want everybody and his brother to be able to edit kernel
+    parameters or enter **Recovery** mode when booting a machine. So, let's fix that.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Preventing kernel parameter edits on Red Hat/CentOS/AlmaLinux
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Ever since the introduction of Red Hat/CentOS 7.2, setting a GRUB 2 password
+    to prevent kernel parameter edits is easy. Fortunately, this trick still works
+    on the newest iterations of Red Hat and AlmaLinux. All you have to do is to run
+    one command and choose a password:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: That's all there is to it. The password hash will be stored in the `/boot/grub2/user.cfg`
+    file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, when you reboot the machine and try to do a kernel parameter edit, you''ll
+    be prompted to enter a username and password:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.11: Password protection for RHEL 7.2 and newer](img/file121.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.11: Password protection for RHEL 7.2 and newer'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that you'll enter `root` as the username, even if the `root` user's password
+    hasn't been set on the system. The `root` user, in this case, is just the superuser
+    for GRUB 2.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When you boot your Red Hat, CentOS, or AlmaLinux machine, you’ll see a **0-rescue**
+    option come up at the bottom of the boot menu. (You can see it above in Figure
+    16.2.) If you select it, you’ll find that it does nothing but take you to a normal
+    login prompt that will require you to enter your username and password. (Red Hat-type
+    distros really do have a Rescue mode, but you have to boot the machine from the
+    installation media to get to it.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Preventing kernel parameter edits or Recovery mode access on Ubuntu
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Ubuntu doesn't have that cool utility that Red Hat, CentOS, and AlmaLinux have,
+    so you'll have to set a GRUB 2 password by hand-editing a configuration file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the `/etc/grub.d/` directory, you''ll see the files that make up the GRUB
+    2 configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The file you want to edit is the `40_custom` file. However, before you edit
+    the file, you''ll need to create the password hash. Do that with the `grub-mkpasswd-pbkdf2`
+    utility:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Open the `40_custom` file in your favorite text editor and add a line that
+    defines who the superuser(s) will be. Add another line for the password hash.
+    In my case, the file now looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: The string of text that begins with `password_pbkdf2` is all one line that wraps
+    around on the printed page.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'After you save the file, the last step is to generate a new `grub.cfg` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, when I reboot this machine, I have to enter my password before I can either
+    edit kernel parameters or access the **Advanced options for Ubuntu** submenu:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.12: Password protection for Ubuntu](img/file122.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.12: Password protection for Ubuntu'
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's only one problem with this. Not only does this prevent anyone except
+    the superuser from editing the kernel parameters, but it also prevents anyone
+    except for the superuser from booting normally. Yes, that's right. Even for normal
+    booting, Ubuntu will now require you to enter the username and password of the
+    authorized superuser. Fortunately, this is an easy fix.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The fix requires inserting a single word into the `/boot/grub/grub.cfg` file.
+    Easy enough, right? However, it''s not an elegant solution because you''re not
+    really supposed to hand-edit the `grub.cfg` file. At the top of the file, we see
+    this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: This means that every time we do something that will update the `grub.cfg` file,
+    any hand-edits that we've made to the file will be lost. This includes when we
+    do a system update that installs a new kernel, or when we do a `sudo apt autoremove`
+    that removes any old kernels that we no longer need. The supreme irony though,
+    is that the official GRUB 2 documentation tells us to hand-edit the `grub.cfg`
+    file to deal with these sorts of problems. A much better way is to modify the
+    shell script that the `update-grub` utility uses to build the `grub.cfg` file.
+    This will prevent you from accidentally overwriting any changes that you need
+    to preserve.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the `/etc/grub.d/` directory, you’ll see several scripts that are used to
+    build `grub.cfg`. The one we want is in the `10_linux` file. Open it in your text
+    editor, and navigate down to the vicinity of line number 197\. Look for these
+    two lines:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: (Note that each of these is one line that wraps around on the printed page.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In each line, add `--unrestricted` after `{CLASS}`, so that the lines now look
+    like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, run the `sudo update-grub` command, and you’ll be able to boot the
+    machine normally on the default option. But, it’s a different story if you want
+    to enter the **Advanced options for Ubuntu** submenu. With a superuser password
+    set, you’ll always need to enter the superuser password in order to enter the
+    **Advanced options for Ubuntu** submenu. This is true even with the `--unrestricted`
+    option that you added to `10_linux script.` Effectively, this prevents anyone
+    without the password from accessing the **Recovery** option.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Disabling the submenu for Ubuntu
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'On Ubuntu systems, you can easily disable the Ubuntu submenu so that you’ll
+    see all boot options by default, which will look something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.13: The Ubuntu boot menu without the submenu](img/file123.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.13: The Ubuntu boot menu without the submenu'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If desired, you can also make it so that you don’t have to press the Shift or
+    Esc key in order to see the boot menu.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, open the `/etc/default/grub` file in your text editor. Disable the submenu
+    by adding by adding the `GRUB_DISABLE_SUBMENU=y` line. To make the boot menu visible
+    by default, look for these two lines:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Comment out the first line, and change the value for the second line to a non-zero
+    number. The lines should now look something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, run the `sudo update-grub` command. Now, when you reboot the machine,
+    you'll see the boot menu come up by itself, and you’ll see the whole list of boot
+    options instead of just the default boot option and a submenu option. After a
+    ten-second timeout, the system will automatically boot on the default option.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The major flaw with disabling the Ubuntu submenu is that if you’ve configured
+    GRUB with the `--unrestricted` option as I’ve just shown you, users will be able
+    to boot into **Recovery** mode without entering a password. So, it’s now just
+    as if you never password-protected GRUB in the first place. If you do disable
+    the Ubuntu submenu, remember to also disable the **Recovery** mode option. Open
+    the `/etc/default/grub` file in your editor, and look for this line:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Remove the `#` sign from in front of the line so that it now looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Update the GRUB configuration as you’ve done before:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, reboot the machine and verify that the **Recovery** mode option is
+    gone. If you disable the **Recovery** boot menu option and still need to boot
+    into **Recovery** mode, you can still do that by editing the kernel parameters
+    at the beginning of the boot process. The procedure is somewhat different from
+    what you’ve just seen with AlmaLinux, since you don’t have to worry about SELinux
+    on Ubuntu. Rather than duplicate the procedure here, I’ll leave a link to a tutorial
+    for it in the *Further reading* section. (The linked article is for Ubuntu 18.04,
+    but the procedure still works for the current Ubuntu 22.04.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, you’re now asking, *Why would I ever need to disable the Ubuntu submenu?*
+    Well, you’ll never actually *need* to. For me, it’s just a matter of preference.
+    Unlike the Red Hat distros, Ubuntu doesn’t automatically delete old Linux kernels
+    if a new one gets installed during an update operation. If you don’t remember
+    to do a `sudo apt autoremove` command after you update in order to get rid of
+    them, you could fill up your `/boot/` partition, which could prevent future updates
+    from installing a new kernel. By disabling the submenu and making the boot menu
+    visible by default, I can see how many Linux kernels are installed as soon as
+    I boot the machine. (But hey, that’s just me, and I’m kind of weird. Just ask
+    anyone who knows me.) On a production machine, it would make more sense to leave
+    both the submenu and the **Recovery** option enabled, and set a GRUB 2 password.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You'll find the security section of the official GRUB 2 documentation at [http://www.gnu.org/software/grub/manual/grub/grub.html#Security](http://www.gnu.org/software/grub/manual/grub/grub.html#Security).
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Securely configuring BIOS/UEFI
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This topic is different from anything we've looked at thus far because it has
+    nothing to do with the operating system. Rather, we're now going to talk about
+    the computer hardware.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Every computer motherboard has either a BIOS or a UEFI chip, which stores both
+    the hardware configuration for the computer and the bootstrap instructions that
+    are needed to start the boot process after the power is turned on. UEFI has replaced
+    the old-style BIOS on newer motherboards, and it has more security features than
+    the old BIOS had.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I can't give you any specific information about BIOS/UEFI setup because every
+    model motherboard has a different way of doing things. What I can give you is
+    some more generalized information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When you think about BIOS/UEFI security, you might be thinking about disabling
+    the ability to boot from anything other than the normal system drive. In the following
+    screenshot, you see that I''ve disabled all SATA drive ports except for the one
+    to which the system drive is connected:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.14: Disabling drive ports on my Hewlett-Packard Envy](img/file124.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.14: Disabling drive ports on my Hewlett-Packard Envy'
+  prefs: []
+  type: TYPE_NORMAL
+- en: When computers are out in the open where the general public can have easy physical
+    access to them, this might be a consideration. For servers that are locked away
+    in their own secure room with limited access, there's no real reason to worry
+    about this, unless the security requirements of some regulatory body dictate otherwise.
+    For machines that are out in the open, having the whole disk encrypted would prevent
+    someone from stealing data after booting from either an optical disk or a USB
+    device. However, you may still have other reasons to prevent anyone from booting
+    the machine from these alternate boot devices.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Another consideration might be if you work in a secure environment where super-sensitive
+    data are handled. If you''re worried about unauthorized exfiltration of sensitive
+    data, you might consider disabling the ability to write to USB devices. This will
+    also prevent people from booting the machine from USB devices:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.15: Disabling USB devices](img/file125.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.15: Disabling USB devices'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'At times, you might not want to completely disable a machine’s USB ports. Instead,
+    you can leave them enabled and use USBGuard to allow only certain USB devices
+    to be connected. Rather than do my own write-up about it, I’ll refer you to this
+    excellently-written tutorial that I found:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '[https://www.cyberciti.biz/security/how-to-protect-linux-against-rogue-usb-devices-using-usbguard/](https://www.cyberciti.biz/security/how-to-protect-linux-against-rogue-usb-devices-using-usbguard/)'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: The main catch with USBGuard is that it still won’t prevent someone from booting
+    from a USB device.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'However, there''s more than just this to BIOS/UEFI security. Today''s modern
+    server CPUs come with a variety of security features to help prevent data breaches.
+    For example, let''s look at a list of security features that are implemented in
+    Intel Xeon CPUs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identity-protection technology
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Advanced Encryption Standard New Instructions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Trusted Execution Technology
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Hardware-assisted virtualization technology
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'AMD, that plucky underdog in the CPU market, have their own new security features
+    in their line of EPYC server CPUs. These features include:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Secure Memory Encryption
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Secure Encrypted Virtualization
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In any case, you would configure these CPU security options in your server's
+    UEFI setup utility.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can read about Intel Xeon security features at [https://www.intel.com/content/www/us/en/newsroom/news/xeon-scalable-platform-built-sensitive-workloads.html](https://www.intel.com/content/www/us/en/newsroom/news/xeon-scalable-platform-built-sensitive-workloads.html).
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: You can read about AMD EPYC security features at [https://semiaccurate.com/2017/06/22/amds-epyc-major-advance-security/](https://semiaccurate.com/2017/06/22/amds-epyc-major-advance-security/)
+    and at [https://www.servethehome.com/amd-psb-vendor-locks-epyc-cpus-for-enhanced-security-at-a-cost/](https://www.servethehome.com/amd-psb-vendor-locks-epyc-cpus-for-enhanced-security-at-a-cost/)
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'And of course, for any machines that are out in the open, it''s a good idea
+    to password-protect the BIOS or UEFI:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.16: Password protect the BIOS/UEFI](img/file126.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.16: Password protect the BIOS/UEFI'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If for no other reason, do it to keep people from monkeying around with your
+    settings.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that you know a bit about locking down BIOS/UEFI, let's talk about security
+    checklists.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using a security checklist for system setup
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Previously, I told you about OpenSCAP, which is a really useful tool for locking
+    down your system with just a minimal amount of effort. OpenSCAP comes with various
+    profiles that you can apply to help bring your systems into compliance with the
+    standards of different regulatory agencies. However, there are certain things
+    that OpenSCAP can't do for you. For example, certain regulatory agencies require
+    that your server's hard drive be partitioned in a certain way, with certain directories
+    separated out into their own partitions. If you've already set up your server
+    with everything under one big partition, you can't fix that just by doing a remediation
+    procedure with OpenSCAP. The process of locking down your server to ensure that
+    it's compliant with any applicable security regulations has to begin before you
+    even install the operating system. For this, you need the appropriate checklist.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are a few different places where you can obtain a generic security checklist
+    if that's all you need. The University of Texas at Austin published a generic
+    checklist for Red Hat Enterprise Linux 7, which you can adjust if you need to
+    use it with CentOS 7, Oracle Linux 7, or Scientific Linux 7\. (Sadly, they don’t
+    offer anything that’s more up-to-date.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You might find that some checklist items don''t apply to your situation, and
+    you can adjust them as required:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.17: University of Texas checklist](img/file127.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.17: University of Texas checklist'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For specific business fields, you''ll need to get a checklist from the applicable
+    regulatory body. If you work in the financial sector or with a business that accepts
+    credit card payments, you''ll need a checklist from the Payment Card Industry
+    Security Standards Council:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 16.18: The PCI-DSS website](img/file128.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 16.18: The PCI-DSS website'
+  prefs: []
+  type: TYPE_NORMAL
+- en: For healthcare organizations here in the US, there's HIPAA with its requirements.
+    For publicly-traded companies here in the US, there's Sarbanes-Oxley with its
+    requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can get the University of Texas checklist at [https://wikis.utexas.edu/display/ISO/Operating+System+Hardening+Checklists](https://wikis.utexas.edu/display/ISO/Operating+System+Hardening+Checklists).
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: You can get a PCI-DSS checklist at [https://www.pcisecuritystandards.org/](https://www.pcisecuritystandards.org/).
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: You can get a HIPAA checklist at [https://www.hhs.gov/hipaa/for-professionals/security/guidance/cybersecurity/index.html](https://www.hhs.gov/hipaa/for-professionals/security/guidance/cybersecurity/index.html)
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: You can get a Sarbanes-Oxley checklist at [https://www.sarbanes-oxley-101.com/sarbanes-oxley-checklist.htm](https://www.sarbanes-oxley-101.com/sarbanes-oxley-checklist.htm).
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Other regulatory bodies may also have their own checklists. If you know that
+    you have to deal with any of them, be sure to get the appropriate checklist.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Once again, we've come to the conclusion of another chapter, and we covered
+    a lot of cool topics. We started by looking at various ways to audit which services
+    are running on your systems, and we saw some examples of what you probably don't
+    want to see. We then saw how to use the password protection features of GRUB 2,
+    and we saw the little quirks that we have to deal with when using those features.
+    Next, we had a change of pace by looking at how to further lock down a system
+    by properly setting up a system's BIOS/UEFI. Finally, we looked at why we need
+    to begin preparations to set up a hardened system by obtaining and following the
+    proper checklist.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Not only does this conclude another chapter, but it also concludes this book.
+    However, this doesn't conclude your journey into the land of *Mastering Linux
+    Security and Hardening*. Oh, no. As you continue this journey, you'll find that
+    there's still more to learn, and still more that won't fit into the confines of
+    just one book. Where you go from here mainly depends on the particular area of
+    IT administration in which you work. Different types of Linux servers, whether
+    they be web servers, DNS servers, or whatever else, have their own special security
+    requirements, and you'll want to follow the learning path that best fits your
+    needs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I've enjoyed the part of the journey on which I've been able to accompany you.
+    I hope that you've enjoyed it just as much as I have.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: You need to see a list of network services that are listening for incoming connections.
+    Which of the following commands would you use?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo systemctl -t service --state=active`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`netstat -i`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`netstat -lp -A inet`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo systemctl -t service --state=listening`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following commands would you use to see only a list of established
+    TCP connections?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`netstat -p -A inet`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`netstat -lp -A inet`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo systemctl -t service --state=connected`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo systemctl -t service --state=active`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When Nmap tells you that a port is in an open state, what does that mean?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: That the port is open on the firewall.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: That the port is open on the firewall and that the service that's associated
+    with that port is running.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: That the port is accessible via the internet.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: That the port's Access Control List is set to open.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of these Nmap scan options would you most likely use to scan for open
+    TCP ports?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`-sn`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`-sU`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`-sS`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`-sA`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What do you want to do when resetting the root user password on a Red Hat/CentOS/AlmaLinux
+    machine?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ensure that AppArmor is in enforcing mode.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ensure that SELinux is in enforcing mode.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ensure that AppArmor is in complain mode.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ensure that SELinux is in permissive mode.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How does discovery mode work in Nmap?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It discovers network devices by sending ping packets to the network's broadcast
+    address.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It discovers network devices by sending SYN packets to the network's broadcast
+    address.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It sends out ARP packets for a local network and ping packets for a remote network.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It sends out ping packets for a local network and ARP packets for a remote network.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You want to use Nmap to perform a UDP port scan of an entire subnet. Which of
+    the following commands would you use?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo nmap -sU 192.168.0.0`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo nmap -U 192.168.0.0`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo nmap -U 192.168.0.0/24`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo nmap -sU 192.168.0.0/24`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How would you begin the process of hardening a new computer system?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Apply an OpenSCAP profile when installing the operating system.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Begin the initial setup by following a checklist.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Install the operating system, then apply an OpenSCAP profile.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Install the operating system, then follow a hardening checklist.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On a Red Hat/CentOS/AlmaLinux server, what would you most likely do to force
+    users to enter a password before editing kernel parameters during bootup?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Enter the `sudo grub2-password` command.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Hand-edit the grub configuration file.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Enter the `sudo grub2-setpassword` command.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Enter the `sudo grub-setpassword` command.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Enter the `sudo grub-password` command.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'netstat – The easy tutorial: [https://openmaniak.com/netstat.php](https://openmaniak.com/netstat.php)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Four ways to find which process is listening on a specific port: [https://www.putorius.net/process-listening-on-port.html](https://www.putorius.net/process-listening-on-port.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'netstat versus ss User Guide: [https://computingforgeeks.com/netstat-vs-ss-usage-guide-linux/](https://computingforgeeks.com/netstat-vs-ss-usage-guide-linux/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The official Nmap website: [https://nmap.org/](https://nmap.org/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The GNU GRUB manual: [https://www.gnu.org/software/grub/manual/grub/grub.html](https://www.gnu.org/software/grub/manual/grub/grub.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'How to boot Ubuntu 18.04 into emergency and rescue mode (An alternate method
+    that still works on Ubuntu 22.04.): [https://linuxconfig.org/how-to-boot-ubuntu-18-04-into-emergency-and-rescue-mode](https://linuxconfig.org/how-to-boot-ubuntu-18-04-into-emergency-and-rescue-mode)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'How to see the GRUB boot menu on Ubuntu 18.04: [https://askubuntu.com/questions/16042/how-to-get-to-the-grub-menu-at-boot-time](https://askubuntu.com/questions/16042/how-to-get-to-the-grub-menu-at-boot-time)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Answers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: c
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: a
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: b
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: c
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: d
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: c
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: d
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: b
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: c
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

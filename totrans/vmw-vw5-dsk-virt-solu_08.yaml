@@ -1,0 +1,2173 @@
+- en: Chapter 8. Sizing the Storage
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The storage layer is perhaps one of the most critical components in a VMware
+    View design. For many VDI professionals, this is likely to be the major issue
+    when called in for a performance troubleshooting exercise. Commonly, the storage
+    layer is the root cause of the performance issue. Why is storage so critical?
+    To answer this question, we first need to understand how Intel®-based desktops
+    work and interact with Windows operating systems before diving into the world
+    of storage for VDI.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Physical desktops have always had dedicated hard disks to rely upon and only
+    a single Windows kernel had access to the disk causing a single I/O stream. Despite
+    being dedicated to the desktop, that device also faced disk contention. This contention
+    could have been generated due to an excessive amount of disk I/O operations or
+    I/O block sizes. The important thing is that no matter what type of operation
+    causes the contention, the end result is high response time, also known as **latency**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Recent disk technology advancements such as **Solid State Drives (SSD)** drastically
+    reduced the latency implications, and thus improved the end user experience. The
+    most advanced SSD can ingest and deliver an enormous amount of I/O and throughput.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the ability to use faster disks, users became spoilt with the given enhanced
+    performance. However, microprocessors and RAM technology also evolved in such
+    a fast fashion that technologies like Intel Core i7 and DDR3 quickly made even
+    the fastest SSD become the performance bottleneck once again.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With a few exceptions, VDI implementations do not utilize a single dedicated
+    disk. Instead, VDI uses a pool of disks to provide storage capacity, I/O, and
+    throughput to vDesktops.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Most VDI implementations require shared storage to provide shared datastores
+    to multiple servers. Shared storage is also a key enabler for VMware vSphere features
+    such as vMotion, DRS, and Fault Tolerance. Implementations that utilize a combination
+    of floating pools and roaming profiles may opt for storage appliance solutions,
+    where no persistent data is stored on those appliances.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Local disks, **Dedicated Attached Storage (DAS)**, and even diskless solutions
+    can be employed in VDI deployments. It is important to understand the use cases
+    and implications behind each of the approaches.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Storage architecture decisions made during the VDI design phase will have a
+    deep impact on how the infrastructure will perform and operate. The type of storage
+    and transport protocol chosen will determine how VMware View and vSphere will
+    operate. Yet, the type of storage and protocol will also dictate how datastores
+    should be designed or how many desktops per datastore should be used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware View Composer
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The VMware View infrastructure includes VMware View Composer as an optional
+    component. View Composer runs as a Windows service on the vCenter Server(s) and
+    enables View Manager to rapidly clone and deploy multiple virtual desktops from
+    a single centralized standard base image. View Composer was originally designed
+    to reduce the total storage required in VDI deployments; however, today View Composer
+    also provides essential management features such as the Refresh and Recompose
+    operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: View Composer uses linked clone technology. Unlike a traditional virtual machine
+    model wherein each VM exists as an independent entity with dedicated virtual disks,
+    View Composer creates dependent VMs all linked to a master VM. This master VM
+    is called the **Parent VM** in VMware terminology.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Parent VM is used as a base image, and a snapshot and copy are taken from
+    the Parent VM to create the replica image, which will serve as the master VM disk
+    for all linked clones in a desktop pool.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware View Composer](img/1124EN_08_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The replica disk is created as a read-only thin provisioned entity from the
+    Parent VM to ensure that any subsequent changes to the Parent VM do not impact
+    the linked clone desktops. As mentioned previously, the replica is thin provisioned
+    which means that only the data contained within the Parent VM is copied to the
+    replica. As an example, if the Parent VM was created with a 40 GB disk but only
+    20 GB appears on the guest's Windows NTFS volume, then the replica will be 20
+    GB.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The replica image is a protected entity in vCenter Server via a **VM LockStatus**
+    parameter added to the VM annotations, as seen in the following screenshot. If
+    a replica needs to be deleted for any reason, the process outlined in KB1008704
+    must be followed. It is given at the following URL:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://kb.vmware.com/selfservice/microsites/search.do?language=en_US&cmd=displayKC&externalId=1008704](http://kb.vmware.com/selfservice/microsites/search.do?language=en_US&cmd=displayKC&externalId=1008704).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows the **VM LockStatus** parameter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware View Composer](img/1124EN_08_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: A Parent VM may contain several snapshots that represent changes introduced
+    to the base image. These differences may be due to fixes, patches, and upgrades
+    required by the Windows Guest OS. The deployment of new applications to the base
+    image, application upgrades, or even Windows configuration changes can be added
+    to the snapshots.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After each modification, the Parent VM must be shutdown by the administrator
+    and a new snapshot is taken.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The snapshot to be used in a desktop pool is selected during the desktop pool
+    configuration. A single snapshot is assigned to the entire desktop pool. However,
+    it is possible to individually recompose virtual desktops using different snapshots
+    from the same or different Parent VM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot demonstrates VMware vCenter Server Snapshot Manager
+    with a few snapshots already taken. It is recommended practice to annotate the
+    changes made to the Parent VM in the description field:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware View Composer](img/1124EN_08_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The VMware View snapshot selection during the desktop pool configuration process
+    can be seen in the following screenshot, which shows snapshot selection in the
+    View Admin console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware View Composer](img/1124EN_08_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In releases prior to VMware View 4.5, a unique replica disk was created in each
+    datastore hosting virtual desktops for a desktop pool. Additionally, for each
+    different snapshot in use by a desktop pool, a new replica disk used to be created
+    for each datastore in use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Only a single snapshot can be assigned to the desktop pool at any one time.
+    However, after selecting a different snapshot for the desktop pool and triggering
+    Recompose action, a second replica disk representing the new snapshot is created
+    in each datastore in use by the virtual desktops using the replica disk. In this
+    case, each datastore may contain two replicas for the desktop pool.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In a Recompose operation, the original replica image is only deleted after all
+    desktops in the datastore are recomposed with the new base replica disk and the
+    old replica is not required anymore. Therefore, it is important to ensure that
+    there is ample space available on the datastore(s) dedicated to storing replicas.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This scenario is still applicable with VMware View 5.0 when the administrator
+    does not select the optional Dedicated Replica Datastore feature during the datastore
+    selection.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware View 4.5 and later implemented the ability to specify a unique datastore
+    to host replica disks for an entire desktop pool. This piece is part of the VMWare
+    View Tiered Storage feature.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows datastore selection in the View Admin console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware View Composer](img/1124EN_08_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: If the desktop pool is large and eventually uses the entire vSphere cluster
+    resources, it is possible to end up with a single replica disk for the entire
+    cluster. For VMware View 5.0, the maximum number of virtual desktops supported
+    in a single desktop pool is 1,000\. While it is possible to go further than 1,000
+    desktops, it is not recommended nor supported.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In some cases, where multiple snapshots are in use, multiple replicas will
+    be created in the single datastore selected during the pool configuration. The
+    following diagram demonstrates the differences between not using and using the
+    Dedicated Replica Datastore option in VMware View 4.5 and above:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware View Composer](img/1124EN_08_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the following sample scenario, VMware View is running 256 virtual desktops
+    across 2 desktop pools with 2 snapshots in use for each pool. If the replica disk
+    size is 20 GB, the total storage allocation for the replica disks would be 320
+    GB, being 80 GB per datastore.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Number of desktop pools * replicas in use * number of datastores * replica size
+    = 2 * 2 * 4 * 20 GB = 160 GB.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the same sample scenario with Dedicated Replica Datastore, the total storage
+    allocation for the replica disks would be 80 GB in a single datastore.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Number of desktop pools * replicas in use * replica size = 2 * 2 * 20 GB = 80
+    GB
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram demonstrates both scenarios. It is an illustration showing
+    the difference between the replica disk placement when using multiple snapshots
+    and a Dedicated Replica Disk Datastore in View 4.5 and above:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware View Composer](img/1124EN_08_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Running the same calculations for the preceding scenario with 2,000 virtual
+    desktops, the storage savings provided by the View Composer technology could be
+    as large as 6.3 TB. The more virtual machines and desktop pools in the environment,
+    the bigger the number of replicas per datastore when the Dedicated Replica Datastore
+    option is not selected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is possible to break down the amount of replica disks and storage consumption
+    if all datastores are not selected for each desktop pool, therefore, limiting
+    the placement of virtual desktops across datastores.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The number of datastores and datastore sizes must provide the capacity and performance
+    requirements for the provisioning of the required number of desktops. This concept
+    assumes that the administrator will carefully manage and select the datastores
+    in use by the desktop pool, not allowing all datastores to be used by all desktop
+    pools.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows a solution not using a Dedicated Replica Datastore
+    option:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware View Composer](img/1124EN_08_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: A linked clone disk is also called a **delta disk** because it accumulates delta
+    changes. After the replica disk is created, View Composer starts to create the
+    linked clone virtual desktops. Each linked clone has a unique delta disk and is
+    linked to the replica disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Delta disks contain only the differences from the original read-only replica
+    disk that are unique to the cloned virtual desktop, resulting in significant storage
+    savings. Linked Clone disks will grow over time according to block write changes
+    requested by the Guest OS, and may grow up to the maximum size of the Parent VM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As an example, if the Parent VM was originally configured by the administrator
+    with a 30 GB flat disk, this will be the maximum size of the delta disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: View Composer allows for great storage savings; however, there will be dozens
+    or hundreds of linked clone virtual desktops using the same datastore to read
+    that single existing replica disk. If the Dedicated Replica Datastore option is
+    not in use, the replica is only used by the desktops hosted in the same datastore.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All virtual desktops accessing the replica disk will cause I/O stress on LUNs,
+    RAID group, and disks, and may create I/O contention. The I/O contention is caused
+    by multiple virtual desktops and users accessing the same datastore, all at the
+    same time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Each datastore is normally backed by a LUN, if **Fibre Channel Protocol (FCP)**
+    is in use or by an Export if NFS is in use. Both LUN and Export are backed by
+    a RAID Group configuration that encompasses a pool of disks configured to support
+    the workload. Those disks and LUNS together must be able to meet the required
+    performance specifications for the replica disk. These specifications are **Input/Output
+    Operations Per Second (IOPS)** and throughput.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If a decision to use a dedicated replica datastore is made during the design
+    phase, it is recommended to allocate Tier 1 storage, for example, SDD to host
+    the replica disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram is an illustration showing a typical virtual disk to
+    drive type associations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![VMware View Composer](img/1124EN_08_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Storage vendors have different solutions and architectures to solve response
+    time and latency issues. Some of the solutions available are automated storage
+    tiering, storage pools, diskless environments, inline I/O de-duplication, and
+    local host caching.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware vSphere files
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Mentioned in the following table are the files and disks created for the virtual
+    desktop provisioned through VMware View and are the standard files for any virtual
+    machine created on a vSphere hypervisor:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| File type | Description |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `.vmx` | The `.vmx` file is the primary configuration file for a virtual
+    machine. It contains information such as the operating system, disk sizes, networking,
+    and so on. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `.vmsd` | Information and metadata about snapshots. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `.vmxf` | Supplemental configurations file for virtual machines that are
+    in a team. Note that the `.vmxf` file remains if a virtual machine is removed
+    from the team. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `.vswp` | The `.vswp` file is a swap file created for each virtual machine
+    to allow for VM memory over-commitment on an ESXi host. This file is created when
+    a VM is powered on and will be equal in size to the unreserved memory configured
+    for the VM. When VMs are created, the default memory reservation is 0 MB, so the
+    size of the `.vswp` file is equal to the amount of memory allocated to the VM.
+    If a VM is configured with a 1024 MB memory reservation, the size of the `.vswp`
+    file will be equal to the amount of memory allocated to the VM minus the 1024
+    MB reservation. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `.vmss` | The `.vmss` file is created when a VM is suspended and is used
+    to save the suspended state. In essence, this is a copy of the VM''s memory and
+    will always have the size of the total amount of allocated RAM. One thing to note
+    is that a `.vmss` file is created when the machine enters the suspended state,
+    however it''s not removed when the VM is removed from the suspended state. The
+    `.vmss` file is only removed when the VM is powered off. If a VM is configured
+    with 2048 MB memory, the size of the `.vmss` file will be 2048 MB. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `.nvram` | This is the file that stores the state of the virtual machine''s
+    BIOS. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `.vmsn` | Snapshot state file, which stores the running state of a virtual
+    machine at the time you take the snapshot. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `-flat.vmdk` | The `-flat.vmdk` is a raw disk file that is created for each
+    virtual disk allocated to a given VM and will be of the same size as the virtual
+    disks added to the VM at the time of creation. It''s a pre-allocated disk file
+    only available with full clone VMs. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `.log` | VM log files are relatively small. |'
+  prefs: []
+  type: TYPE_TB
+- en: VMware View specific files
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Mentioned in the following table are the files and disks created for virtual
+    desktops provisioned through VMware View. Some of the disks are only created by
+    View Composer or when assigning a persistent or disposable disk to the desktop
+    pool:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| File type | Composer | Description |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `replica-GUID.vmdk` | Yes | Replica VM is used to spin-up linked clone VMs.
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `-internal.vmdk` | Yes | Data configuration for Quick Prep/Sysprep. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `VM-s000[n].vmdk` | Yes | Created when a virtual machine has snapshot(s).
+    This file stores changes made to a virtual disk while the virtual machine is running.
+    There may be more than one such file. The 3-digit number after the letter (000
+    after s in this case) indicates a unique suffix added automatically to avoid duplicate
+    filenames. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `VDM-disposable-GUID.vmdk` | Yes | Redirected Windows OS pagefile and temporary
+    files. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| `.log` | No | VM log files. |'
+  prefs: []
+  type: TYPE_TB
+- en: Tiered storage
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: VMware View 4.5 and above allow administrators to select different datastores
+    to host different types of virtual disks (replica, linked clone, and persistent).
+    Data performance classification is an important part of storage tiering implementation
+    and allows administrators to select datastores that provide the most appropriate
+    storage tier in regards to performance, cost, and capacity for each type of disk
+    in use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Important: Do not confuse the storage tiering feature provided by VMware View
+    with auto storage tiering offered by storage vendors. The solution provided by
+    VMware View is static and does not automatically move data around to achieve best
+    performance. The solutions are complementary to each other.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the introduction of storage tiering and the ability to segment workloads
+    across datastores and types of disks, it is important to understand what type
+    of disks and data are created for each virtual desktop. The type of disks created
+    may differ for each implementation. Desktop pools that utilize linked clone technology
+    may have additional virtual disks that are not created when using traditional
+    full clone provisioning.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram is an illustration showing the multiple types of virtual
+    disks in use by VMware View:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Tiered storage](img/1124EN_08_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Replica disk
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `replica-GUID.vmdk` folder contains all files required to run the virtual
+    machine, however, it will be exclusively used as read-only and as the base for
+    linked clone virtual desktops. The following screenshot demonstrates the folder
+    and files created to host a replica disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Despite the fact that the provisioned size of the disk is set to 30 GB (31,457,280
+    KB) in the following example, only 8 GB is in fact used. The reason for this is
+    that View Composer makes use of vSphere VMFS thin provisioning technology to create
+    replica disks. This is an automatic setting that cannot be changed via View Manager
+    UI and will work independently of the Parent VM being thin or thick provisioned.
+    For NFS deployments, thin is also the only provisioning mechanism.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Replica disk](img/1124EN_08_11.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Internal disk
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `internal.vmdk` disk is a small disk and contains the configuration data
+    for Quick Prep/Sysprep. In previous VMware View releases, operations, for example,
+    Refresh would incur a full desktop deletion, followed by provision and customization
+    of a new virtual desktop. This process used to take a long time to complete and
+    would normally draw a high number of Compute and Storage resources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware View 4.5 and later started implementing a different technique to refresh
+    virtual desktops that make use of the vSphere snapshot technology.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A Refresh operation is simply a snapshot revert-back operation. The internal
+    disk is created to store the Active Directory computer account password changes
+    that Windows performs every so often as per default AD policy setting. The computer
+    account password is encrypted before being stored on the internal disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Whenever the domain computer account password is changed, VMware View Agent
+    stores another encrypted copy of the password in the disk. This ensures that domain
+    connectivity is maintained when a desktop is refreshed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The internal disk is connected to the desktop; however, it does not get a drive
+    letter assigned to it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows the internal disk screenshot from within a guest
+    vDesktop showing the internal disk:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Internal disk](img/1124EN_08_12.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The internal disk is the only disk created by VMware View that is not thin provisioned.
+    Its size is so small that being thick provisioned doesn't change the capacity
+    requirements in the solution.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Delta/differential disk
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The following screenshot demonstrates folders and files created in the VM folder
+    to host a linked clone desktop. In the following example, the delta disk is `VMView-7-D-01-000001.vmdk`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After the customization process is complete, the VM is shutdown and View Composer
+    takes a snapshot of the linked clone.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows the folders and files created in the respective
+    VM''s folder:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Delta/differential disk](img/1124EN_08_13.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: After the snapshot is taken, data is no longer written to the base `.vmdk` file.
+    Instead, changes are written to the delta disk. A delta disk will be created every
+    time a snapshot is taken. It is important that any requirements to use snapshots
+    are considered when defining the datastore size requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Disposable disk
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: VMware View allows for the creation of an optional fixed-size non-persistent
+    disk for each virtual desktop. When disposable disks are assigned to a desktop
+    pool, VMware View redirects Windows temporary system files and folders to a disposable
+    disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Disposable disks are automatically deleted when the virtual desktop is powered
+    off, refreshed or recomposed, meaning that temporary files are also deleted during
+    these operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Disposable disks are also thin provisioned and will grow over time to the maximum
+    size set during the desktop pool configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows the **Disposable File Redirection** configuration
+    within the View Admin console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Disposable disk](img/1124EN_08_14.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The disposable disk is hardcoded to register itself as the first available drive
+    on the Windows desktop. This behavior may cause some implications while trying
+    to map network drives in Windows virtual desktops. Even when the CD-ROM is not
+    in use, the first available drive letter would be `E:` because `C:` is taken by
+    the OS and `D:` by the disposable disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The files that are commonly offloaded to disposable disks are Windows paging
+    files, VMware log files, and temporary internet files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Windows paging files
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: When Windows is constantly running out of physical memory, it will start to
+    page memory to disk. This paging process will incur in block writes that will
+    increase the size of the disposable disk. As a recommended approach, administrators
+    should make sure that virtual desktops have enough virtual memory available to
+    avoid disk paging. Disk paging has a negative impact on performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Temporary internet files
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: User temporary files are kept on the system or persistent data disk and this
+    may include files written to `%USERPROFILE%\AppData\Local\Temp` and `Temporary
+    Internet Files`. These are the temporary files that can grow very fast and consume
+    disk space.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As the temporary files are offloaded to the disposable disk, the steady growth
+    of the delta file is reduced. Instead of utilizing delta disks that will grow
+    according to block changes, View Composer utilizes the disposable disk. However,
+    it is important to size the disposable disks according to the virtual desktop
+    and workload requirements. Once assigned to a virtual desktop pool, this setting
+    cannot be changed through the View Manager.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows a disposable disk with Windows temporary files:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Temporary internet files](img/1124EN_08_15.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: When configuring a linked clone pool, make sure that the disposable disk is
+    larger than the Windows paging file size plus overhead for temporary files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Persistent disk
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Persistent data disk is the new name for what used to be called **User Data
+    Disk (UDD)** in previous releases of VMware View and maintains the similar characteristics
+    to the UDD. Persistent disks were created to maintain a one-to-one relationship
+    between users and virtual desktops.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When selected during the desktop pool configuration, the persistent disk is
+    created and VMware View Agent makes modifications to the Windows Guest OS to allow
+    the user profile to be redirected to this disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In VMware View 4.5 and later, persistent disks can be managed. The disk can
+    be detached and reattached to virtual desktops. Note that this will only work
+    if the disks are created in VMware View 4.5 or later. If a VMware View environment
+    has been upgraded from earlier releases, these operations will not be available.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Just like disposable disks, persistent disks cannot be disabled or enabled once
+    they are configured for the desktop pool. It is also not possible to change the
+    size through the View Manager graphical user interface after the initial configuration.
+    However, it is possible to change the persistent disk's size for virtual desktops
+    being newly provisioned in the desktop pool if the administrator changes the pool
+    settings.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When configuring persistent disks, you should make sure that the size of the
+    disk is adequate for your users. If Active Directory Folder Redirection or VMware
+    View Persona Management is not in use, the user profile size could be several
+    gigabytes in size.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a general rule, if you are using persona management or Windows roaming profiles,
+    make sure the disk is large enough to cater to the user's roaming profiles, or
+    apply quotas to roaming profiles.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot demonstrates the persistent disk selection screen
+    during the desktop pool configuration. It shows the configuration of persistent
+    disks within the View Admin console:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Persistent disk](img/1124EN_08_16.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: In the Windows OS, the persistent disk and the disposable disk can be seen in
+    Windows Explorer. Important folders will be locked and users cannot delete them.
+    However, through the use of Windows Group Policy, it is possible to hide the drives
+    while still making them available for use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows the various disks, as seen within the guest
+    vDesktop:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Persistent disk](img/1124EN_08_17.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The persistent disk''s drive letter is selected during the desktop pool configuration
+    process and the content is similar to the following screenshot. In the **Users**
+    folder, the profile folders and settings are found:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Persistent disk](img/1124EN_08_18.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Storage overcommit
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: With the introduction of linked clone technology and the ability to specify
+    when each virtual desktop is refreshed or recomposed, there is an opportunity
+    to specify how much storage should be overcommitted to help reduce storage consumption.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's assume that not every virtual desktop will utilize the full provisioned
+    storage at the same time, thereby leaving a gap for storage utilization and overallocation
+    (overcommit).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'During the desktop pool provisioning process, the administrator has the option
+    to select "Refresh OS Disk after log off" with one of the following options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Never:** If the **Never** option is selected, then virtual desktops will
+    never execute the delta disk Refresh operation. The delta disk will grow with
+    every block change up to the limit of the disk itself. If the disk size defined
+    for the virtual desktop is 40 GB, this is the limit. When 40 GB is reached, then
+    vSphere VMFS starts reutilizing the blocks just like it does with full clones.
+    You will not run out of disk space in this case.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Always:** If the **Always** option is in use, then virtual desktops will
+    be refreshed every time a user logs off from the desktop. Assuming that only a
+    few gigabytes have been added to the delta disk during use, they will then be
+    recuperated when the virtual desktop is refreshed.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Every x number of days:** If the **Every x number of days** option is selected,
+    then virtual desktops will be refreshed on the number of days defined, independent
+    of the utilization of the delta disk. Delta files grow over time based on a number
+    of factors that include Windows and application utilization. Therefore, while
+    selecting this option, it is important to understand how big the delta can get
+    during that period, so you are able to size datastores accordingly.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**At y percent of disk utilization:** If the **At y percentage disk utilization**
+    option is selected and *y* is set to 50 percent, then the virtual desktop will
+    be refreshed when half of the total provisioned storage is utilized by the delta.
+    This calculation does not include additional disks such as persistent or disposable.
+    If a virtual desktop has been created with a total disk size of 40 GB, the Refresh
+    operation would happen when the user logs off and the delta disk utilization is
+    more than or equal to 20 GB.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An important aspect to remember is that linked clones start at a fraction of
+    its full provisioned size. The storage capacity savings provided by VMware View
+    Composer through the Refresh operation allow administrators to decide how the
+    available storage capacity should be utilized until the storage is fully occupied.
+    As an example, the administrator who selected the **Always** option knows that
+    delta files, on average, will grow up to 300 MB while the desktop is in use during
+    business hours.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Based on the storage utilization, it is possible to enforce the placement of
+    more virtual desktops per datastore than would be possible with full clone virtual
+    desktops. This is called the **storage overcommit level.**
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: VMware View does not allow administrators to configure the maximum number of
+    linked clones per datastore and the limitation on the number of desktops comes
+    from the datastore size. It is critical to size datastores appropriately to support
+    the required number of desktops, yet be compliant with VMware View and View Composer
+    maximums and limits.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Typically, the overcommit level is defined based on how virtual desktops are
+    used. If a desktop pool with floating assignment has desktops that have **Always**
+    Refresh option after logoff, storage consumption will be low and you may set the
+    overcommit to **Aggressive**. However, if virtual desktops are not frequently
+    refreshed, you may prefer to set it to **Conservative**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Storage overcommit level options
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: It is possible to define different overcommit levels among different types of
+    datastores to address different levels of capacity, performance, or availability
+    provided. For example, a NAS datastore may have a different overcommit level than
+    a SAN datastore; in the same way an SSD datastore can have a different overcommit
+    level than an FC datastore.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Option | Storage overcommit level |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| None | Storage is not overcommitted. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Conservative | Four times the size of the datastore. This is the default
+    level. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Moderate | Seven times the size of the datastore. |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Aggressive | Fifteen times the size of the datastore. |'
+  prefs: []
+  type: TYPE_TB
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: It is recommended practice to always match vSphere datastores with LUNS or Exports
+    on a one-by-one basis. Administrators should avoid using large storage LUNS backed
+    by multiple datastores.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The number of linked clones per datastore defined by the storage overcommit
+    level is based on the size of the Parent VM. Based on a 30 GB VM and a 200 GB
+    datastore, VMware View would be able to fit approximately 6 full clone virtual
+    desktops. However, if using overcommit level 7 (Moderate), VMware View would be
+    able to fit approximately 42 desktops.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| VM size (GB) | Datastore size (GB) | Overcommit level | Number of full clone
+    VMs | Number of linked clone VMs |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- | --- | --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 30 | 200 | 4 | 6 | 24 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 30 | 200 | 7 | 6 | 42 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| 30 | 200 | 15 | 6 | 90 |'
+  prefs: []
+  type: TYPE_TB
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: It's possible to run out of storage capacity. When the storage available in
+    a datastore is not sufficient, VMware View will not provision new desktops, however,
+    the existing linked clone desktops will keep growing and eventually fill up the
+    datastore. This situation is more common with overcommit level set to **Aggressive.**
+  prefs: []
+  type: TYPE_NORMAL
+- en: To make sure that linked clones do not run out of disk space, administrators
+    should periodically refresh or rebalance desktop pools to reduce the linked clone
+    footprint to its original size.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot demonstrates storage overcommit selection during the
+    desktop pool provisioning or configuration process:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Storage overcommit level options](img/1124EN_08_19.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Storage protocols
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: VMware View is supported by the VMware vSphere, and therefore supports multiple
+    storage protocols for storing data. VMware vSphere is capable of using Fiber Channel,
+    iSCSI, **Fiber Channel over Ethernet (FCoE)**, and NFS.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The main considerations for protocol choice for VMware View are maximum throughput,
+    VMDK behavior, and the cost of reusing existing versus acquiring new storage infrastructure.
+    These considerations affect network design and performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The intention of this section is not to cover each protocol or how they perform
+    in a VDI environment. The numbers in the following table are based on VMware View
+    5 and vSphere 5 and are intended to help with the decision on the storage protocol
+    to be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '|   | Fiber Channel | iSCSI | FCoE | NFS |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Type | Block | Block | Block | File |'
+  prefs: []
+  type: TYPE_TB
+- en: '| VAAI | Yes | Yes | Yes | Yes |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Transmission rate | 4 Gbps or 8 Gbps | Multiple 10 Gbps | Multiple 10 Gbps
+    | Multiple 10 Gbps |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Maximum number of hosts | 8 | 8 | 8 | 8 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| LUNs/Exports per host | 256 | 256 | 256 | 256 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Clones per datastore | 64 to 140 | 64 to 140 | 64 to 140 | Not validated
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: Maximums and limits
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Designing a large-scale VMware View solution is a complex task. The same challenges
+    faced in large deployments may be faced in small deployments if VMware validated
+    maximums and limits are not observed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: It is recommended to use a conservative approach when sizing the VDI environment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are tools to help administrators to understand requirements and constraints
+    from graphics, CPU, memory, and storage perspectives. Other tools help to calculate
+    the infrastructure size based on the number of virtual desktops, average IOPS,
+    memory size, percentage of shared memory, percentage of used memory, percentage
+    of read/write IOPS, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: No matter what results these tools provide, the VDI architect should always
+    ensure that the numbers are within VMware vSphere and VMware View maximums and
+    limits.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 64 — to 140 linked clones per datastore (VMFS)
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: For FC arrays with support for **vStorage APIs for Array Integration(VAAI)**
+    , the maximum number of linked clones per datastore is 140\. The VAAI primitives
+    that augment the number of virtual desktops per datastore is called **hardware
+    assisted locking** or **Atomic Test and Set (ATS)**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The vSphere VMkernel has to update VMFS metadata for operations involving the
+    virtual desktops stored in the VMFS. Updates to metadata occur as a result of
+    powering on/off virtual desktops, suspending/resuming virtual desktops, and various
+    other operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In a VDI environment, that would mean the VMkernel may have to update metadata
+    for many hundreds of virtual desktops, and would therefore have to lock the entire
+    VMFS in order to update its metadata just to power on a single virtual desktop.
+    That operation takes no more than a few milliseconds, but does become problematic
+    when powering on many virtual desktops simultaneously.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hardware assisted locking, available with vSphere 4.1 and compatible vendor
+    array code, allows the VMkernel to lock metadata at the block level within the
+    VMFS stored on the array and allow multiple operations to occur simultaneously
+    within the VMFS, which in turn allows many desktop VMs to be powered on at the
+    same time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 250 linked clones per datastore (NFS)
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: For datastores backed by **Network File System (NFS)**, there is no limitation
+    on the number of virtual desktops per datastore because NFS doesn't present the
+    same SCSI reservation problems. However, to date there is no official validation
+    from VMware on the maximum number of virtual desktops that can be hosted in a
+    single datastore backed by NFS. The recommendation thus far is to keep the number
+    of virtual desktops per NFS datastore to below 250.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 32 full — clones desktops per datastore (VMFS)
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: It would be good if it was possible to answer the "Why?" question for every
+    maximum and limit dictated by the documentation. Some of the widely known limits
+    are either based on quality assurance tests or field experience. Some other limits
+    are based on best practices that have been set for prior technology, but due to
+    the lack of additional tests they remain valid.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We tried to understand where the 32 virtual desktops limit when using full clone
+    came from, and the answer we received from VMware was that there was no good answer,
+    except that the limitation is based on server workloads, SCSI reservations, and
+    storage administrators not doing a good job at sizing the infrastructure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If this limit was set for virtual server workloads, it could have been set years
+    ago when storage architectures didn't have features such as advanced caching and
+    VAAI support, among others.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 8 hosts per vSphere cluster with View Composer
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: VMware View will stop the provision of new virtual desktop if the number of
+    hosts in a cluster with View Composer surpasses 8\. The behavior is hard-coded
+    into View Composer. However, the source of the limitation lies in the VMFS layer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMFS structure only allows for a maximum of 8 hosts to access to read or write
+    a single VMDK file. In a linked clone implementation, all hosts in a cluster may
+    have virtual desktops reading storage blocks from the same replica disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: At the time of writing, VMware was working to validate up to 16 hosts per vSphere
+    cluster with View Composer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 1,000 clones per replica
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The number of clones per replica also determines the number of linked clones
+    that may coexist in a single desktop pool. This number is resulting from VMware's
+    QA validation labs, however this is a soft limit and despite not being recommended,
+    it can be increased.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In previous releases, the VMware View validated limit was 512 virtual desktops
+    per replica or desktop pool. This limit was a result from a maximum of 64 linked
+    clones per datastore multiplied by 8 hosts per vSphere cluster. (64 * 8 = 512).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Storage I/O profile
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The I/O storage profile produced by each virtual desktop is entirely dependent
+    on which type of Windows OS is in use, the applications deployed, and even how
+    each user individually interacts with the environment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IOPS (pronounced as **eye-ops)** is a common performance measurement used to
+    benchmark computer storage devices such as **hard disk drives (HDDs)**, **solid
+    state drives (SSDs)**, and **storage area networks (SANs)**. As with any benchmark,
+    IOPS numbers published by storage device manufacturers do not guarantee real-world
+    application performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: According to Wikipedia, predictions of what the average virtual desktop I/O
+    profile will likely be is one of the most difficult tasks when designing a VDI
+    solution. The reason for that is the lack of information about the workload that
+    will be running in each one of the virtual desktops at the design time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is possible to use pre-trended numbers as a baseline; however, despite the
+    indication of what the workload would likely be, it could be a point out of the
+    curve in some cases.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In a nirvana scenario, a VDI pilot project has been operational for a little
+    while and data can be collected and trended appropriately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A few metrics must be taken into consideration to size storage correctly. They
+    are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Storage size:** How much storage capacity is required?'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**LUN size:** How many LUNs and/or datastores are required?'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Tier type:** What type of disk is required and what is the disk placement?'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**IOPS (cmd/s):** What is the number of I/O commands per second?'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Read/write ratio:** What is the read and write ratio?'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The first three items in the list may be calculated without major understanding
+    of the I/O workload; however, it would require knowledge about the virtual desktop
+    storage capacity utilization.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The real problem lies with the I/O per second and the read/write I/O pattern.
+    Without those values, storage architects/administrators will probably not be able
+    to provision storage with the performance that the virtual desktop infrastructure
+    requires.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IOPS, also known as the **disk I/O profile**, will differ for each type of Windows
+    OS. The profile is also dependent upon the type and number of applications deployed,
+    including services running in the OS. The I/O profile is also dependent on how
+    users interact with their virtual desktops. VMware and partners have validated
+    I/O profiles that can be used as a baseline. It is highly recommended that you
+    find out the correct I/O profile for your particular VDI environment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'VMware View documentation establishes some I/O baselines:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Light (5 IOPS):** Light users typically use e-mail (Outlook), Excel, Word,
+    and a web browser (Internet Explorer or Firefox) during the normal workday. These
+    workers are usually data entry operators or clerical staff.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Heavy (15 IOPS):** Heavy users are full knowledge workers using all the tools
+    of the light worker (Outlook, Excel, Word, Internet Explorer, and Firefox) and
+    also working with large PowerPoint presentations and performing other large file
+    manipulations. These workers include business managers, executives, and members
+    of the marketing staff.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Another study performed by PQR Consultants (Herco van Brug) demonstrates I/O
+    profiles as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '|   | Windows XP | Windows 7 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Light | 3 to 4 | 4 to 5 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Medium | 6 to 8 | 8 to 10 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Heavy | 12 to 16 | 14 to 20 |'
+  prefs: []
+  type: TYPE_TB
+- en: The *VDI & Storage Deep Impact v1-25 hot!* article can be found at [http://www.virtuall.nl/whitepapers/solutions](http://www.virtuall.nl/whitepapers/solutions).
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is common to talk about average IOPS per virtual desktop; however, when sizing
+    the VDI solutions, it is crucial that the peaks are also catered for. Otherwise
+    the storage infrastructure will be under heavy stress and will not be able to
+    deliver the required IOPS and throughput.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Common scenarios where high performance and high throughput are required are
+    during boot and login storms. As an example, a Windows 7 desktop can generate
+    up to 700 IOPS during boot time. Another good example is if the "Refresh on logoff"
+    option is used in conjunction with floating pools, it is common to see utilization
+    peaks at the end of the work shift when business users start to log off.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, we have an existing paradigm where, from a cost perspective, storage infrastructure
+    should be sized for the average performance requirements over time, but from a
+    performance perspective it should be sized for those peaks. For that reason, storage
+    vendors have implemented their own proprietary caching solutions to optimize storage
+    arrays to deal with the high peaks yet volatile VDI I/O requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Most architecture documents or white papers published will demonstrate some
+    divergences on these numbers. If you want to run your own I/O benchmarking during
+    the pilot phase, use storage array admin tools, VMware vCenter client, or tools,
+    for example, vscsiStats that will provide you with a much more granular overview.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Read/write I/O ratio
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The read/write I/O ratio will determine how many disks are required to support
+    the VDI workload in a RAID configuration. Now we will learn how critical it is
+    to understand the read and write I/O ratio to allow administrators to properly
+    size storage arrays from a frontend (storage processors) and backend (disks) standpoint.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the last topic, we talked about the total number of IOPS that a virtual desktop
+    produces during boot, log in, and steady state utilization. IOPS may be read or
+    written. Every time a disk block is read, we have a read I/O and every time a
+    blog is written, we have a write I/O.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Windows operating systems are by nature very I/O intensive, and most of
+    those I/Os are write I/Os. This is actually a very interesting subject. During
+    workload simulations, it is possible to identify that Windows is constantly issuing
+    more write than read I/Os. However, the most interesting fact is that even when
+    Windows is idle, it still produces more write than read I/Os.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The same study performed by PQR Consultants (Herco van Brug ) says that:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"The amount of IOPS a client produces is very much dependent on the users and
+    their applications. But on average, the IOPS required amount to eight to ten per
+    client in a read/write ratio of between 40/60 percent and 20/80 percent. For XP
+    the average is closer to eight, for Windows 7 it is closer to ten, assuming the
+    base image is optimized to do as little as possible by itself and all I/Os come
+    from the applications, not the OS."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: During an experiment conducted by Andre Leibovici and published in his blog
+    at [http://myvirtualcloud.net/?p=2138](http://myvirtualcloud.net/?p=2138), it
+    was possible to clearly identify the intensive write I/O pattern in contrast to
+    the read I/Os during a Login VSI workload generation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The following screenshot shows I/O testing performed at [http://myvirtualcloud.net/:](http://myvirtualcloud.net/)
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Read/write I/O ratio](img/1124EN_08_20.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'VMware View Reference Architecture documentation points us to read and write
+    ratios with the following magnitudes: 70/30, 60/40, and 50/50\. However, it''s
+    not uncommon to see VDI workloads with 10 percent reads and 90 percent writes.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram shows an illustration of the read/write ratio from real
+    production data:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Read/write I/O ratio](img/1124EN_08_21.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The reason we are focusing so much on the I/O pattern is because it determines
+    how many drives are required to support the VDI workload. There are numerous proprietary
+    technologies that reduce the impact of the I/Os on the physical drives. However
+    the methodology to calculate the number of Input/Outputs Per Second required will
+    not change.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In many cases, architects will be asked to design a solution without knowing
+    what the I/O profile will look like. For most of those cases there is an ongoing
+    pilot. It's very common for organizations to try to understand costs before actually
+    going to a pilot and that's what makes it a difficult task to guess IOPS. If all
+    organizations went first for a small pilot and then decided to buy the whole infrastructure
+    to support the VDI solution, we would be living in an ideal world.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you are designing VDI architecture without knowledge of the I/O profile,
+    you should be extremely conservative to avoid undersizing the storage solution.
+    If this is the case, you should use the Heavy I/O profile for all virtual desktops
+    with read and write ratios of 20 reads and 80 writes. Hopefully, you will not
+    be in this situation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The RAID type selected will determine the performance and number of hard drives
+    required to support the workload based on the amount of IOPS and read/write ratio.
+    When sizing the storage infrastructure, the RAID group selected will add a write
+    performance penalty due to the requirements to stripe the data and record the
+    parity across disk drives. The read I/Os do not suffer a penalty for different
+    types of RAID groups.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The most common RAID types utilized with VDI workloads are RAID 5, 6, and 10:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: RAID 10 adds a write penalty of 2
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: RAID 5 adds a write penalty of 4
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: RAID 6 adds a write penalty of 6
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The preceding numbers can be tabulated as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '|   | **I/O impact** |   |'
+  prefs: []
+  type: TYPE_TB
+- en: '| **RAID level** | **Read** | **Write** |'
+  prefs: []
+  type: TYPE_TB
+- en: '| **RAID 0** | 1 | 1 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| **RAID 1 (and 10)** | 1 | 2 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| **RAID 5** | 1 | 4 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| **RAID 6** | 1 | 6 |'
+  prefs: []
+  type: TYPE_TB
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: It could be argued that for RAID 10, the read impact is 0.5 as the Windows operating
+    system is able to read the same block off two disks at the same time, or read
+    half of one disk and half of the other. Therefore, we get twice the read performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The formula commonly used to calculate these penalties is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: VM I/O = VM Read I/O + (VM Write I/O * RAID Penalty)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Other important information for architecting a VDI solution is that Windows
+    operating systems predominantly have small random I/Os. Jim Moyle, in his paper
+    *Windows 7 IOPS for VDI: Deep Dive* at [http://jimmoyle.com/wordpress/wp-content/uploads/downloads/2011/05/Windows_7_IOPS_for_VDI_a_Deep_Dive_1_0.pdf](http://jimmoyle.com/wordpress/wp-content/uploads/downloads/2011/05/Windows_7_IOPS_for_VDI_a_Deep_Dive_1_0.pdf),
+    defines the Windows nature to generate small I/Os:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '"This is due to how Windows Memory works, memory pages are 4 K in size, as
+    such windows will load files into memory in 4 K blocks, this means that most of
+    the read and write activity has a 4 K block size. Windows 7 does try and aggregate
+    sequential writes to a larger block size to make writing a more efficient process.
+    It will try and aggregate the writes to up to 1 MB in size. The reason for this
+    is that again Windows is expecting a local, dedicated spindle and spinning disks
+    are very good at writing large blocks."'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Windows operating systems constantly read and write information in blocks with
+    different disk placement, and the native user interaction is another reason for
+    the behavior. Random access with small blocks is a time consuming task for mechanic
+    disk drives and the number of operations per second (IOPS) for each drive is very
+    limited. For this reason, it is important to utilize RAID groups to achieve the
+    required I/O throughput.
+  prefs: []
+  type: TYPE_NORMAL
+- en: SSDs provide excellent read performance, but also have limitation for small,
+    random write I/Os. Nonetheless, they provide better performance over disk drives,
+    at a much higher cost.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram shows an illustration showing the difference between
+    sequential access and random access:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Read/write I/O ratio](img/1124EN_08_22.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Storage tiering and I/O distribution
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Previously in this chapter, we discussed VMware View tiered storage and the
+    ability to assign different datastores or exports to different types of disks.
+    Now, we will discuss how those tiers interact with the storage infrastructure
+    from an I/O perspective.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware View 4.5 introduced the ability to select a dedicated datastore, where
+    replica disks are stored. The VMware View Architecture Guide recommends that this
+    datastore should be served by a pool of SSDs. SSDs generally provide a larger
+    amount of Input/Outputs Per Second and throughput.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As mentioned earlier, common scenarios where high performance and high throughput
+    are required are during boot and login storms, and during large scale application
+    deployment to users or AV updates. As an example, Windows 7 can generate up to
+    700 IOPS during boot time. Another good example is if the "Refresh on logoff"
+    option is used in conjunction with floating pools, it is common to see utilization
+    peaks at the end of the work shift, when business users start to logoff.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The total amount of IOPS generated by a virtual desktop is a combination of
+    the number of read I/Os in the replica disk plus read and write I/Os on all other
+    disks. During the different utilization phases, the virtual desktop performs differently
+    and requires a different number of I/Os and a different read/write I/O pattern
+    for each individual tier.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The best way to understand how many I/Os are required for power on, customization,
+    and first boot is to find out the averaged maximum I/O per datastore. The reason
+    for this is that each storage tier will have different performance requirements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram is an illustration showing the IOPS breakdown. It demonstrates
+    the number of IOPS generated by a virtual desktop from the first power on operation
+    to its first boot. The operations involved are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Power on.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Customization.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: First boot.![Storage tiering and I/O distribution](img/1124EN_08_23.jpg)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'The same numbers from the preceding diagram can be demonstrated in a percent
+    style per storage tier. The following diagram shows a table that provides great
+    visibility of what is happening with the virtual desktop during its creation process:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Storage tiering and I/O distribution](img/1124EN_08_32.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Important: Please remember that those numbers may be completely different in
+    your VDI environment.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding how many virtual desktops will be booting, logging on, or working
+    simultaneously is critical to correctly design the tier supporting replica disks.
+    If the Dedicated Replica Datastore option is selected, it is even more critical
+    that this single disk tier supporting the replica disks can efficiently deliver
+    the performance required, considering that up to 1,000 virtual desktops may be
+    using that single replica disk simultaneously.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram is an illustration showing the use of a Dedicated Replica
+    Datastore option:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Storage tiering and I/O distribution](img/1124EN_08_24.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Getting to the exact number of IOPS required for each tier of the storage solutions
+    can be a tireless task. To provide you with an insight into how complex this can
+    get, imagine a linked clone virtual desktop making use of a disposable disk and
+    persistent disk. Assume that the replica disk is hosted in the dedicated replica
+    datastore, the linked clone and the disposable disk on a different datastore,
+    and the persistent disk on yet another datastore. The following diagram demonstrates
+    this scenario. It is an illustration showing the breakdown of I/O when using the
+    various virtual disks of VMware View:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Storage tiering and I/O distribution](img/1124EN_08_25.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: As can be observed in the preceding diagram, in this scenario the virtual desktop
+    is generating 30 percent read I/O and 70 percent write I/O. Let's assume that
+    the total I/O for the virtual desktop is 20; then we have 6 read I/Os and 14 write
+    I/Os.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We know replicas are 100 percent read; however, unless we scrutinize the replica
+    disk it's not possible to know how many of the 14 read I/Os are actually being
+    issued against the disk. Read I/Os could also be issued to the linked clone, disposable
+    or persistent disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the tier supporting linked clones and disposable disks, and for the tier
+    supporting the persistent disk, we will also have a different number of read and
+    write I/Os that are a small percentage from the 6 read I/Os and 14 write I/Os
+    produced by the virtual desktop.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As you can see, the total number of operations produced by a virtual desktop
+    will often be split across multiple tiers and datastores. The best time to gather
+    those numbers is during the VDI pilot. VMware has the ideal tools for the job
+    esxtop and vscsiStats.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The truth is that there is no magic formula to help you to get to the exact
+    I/O profile other than analyzing an existing environment's usage patterns. Plan
+    your storage for performance and whenever possible utilize real workload data
+    to calculate the environment. Pre-trended data from white papers and reference
+    architecture guides may give you a baseline; however, they may not apply to your
+    workload and you may end up with an undersized or oversized infrastructure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The most common formulae for IOPS calculation are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Replica tier (read I/O only) = (Concurrent Boot VMs * Peak Boot IOPS) + (Concurrent
+    VMs - Concurrent Boot VMs) * (Replica Steady State IOPS)
+  prefs: []
+  type: TYPE_NORMAL
+- en: All other tiers = (VM Read I/O + (VM Write I/O * RAID Penalty) * concurrent
+    VMs
+  prefs: []
+  type: TYPE_NORMAL
+- en: Paul Wilson from Citrix has created an attention-grabbing complex model based
+    on peak IOPS, steady state IOPS, and estimated boot IOPS that takes into consideration
+    the launch rate and desktop login time. His article can be found at [http://blogs.citrix.com/2010/10/31/finding-a-better-way-to-estimate-iops-for-vdi](http://blogs.citrix.com/2010/10/31/finding-a-better-way-to-estimate-iops-for-vdi).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Disk types
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A common question is related to the type of disk that should be utilized for
+    each storage tier. That's a complex discussion that you will need to have with
+    your storage administrator or vendor. Most intelligent storage arrays provide
+    some type of acceleration or caching mechanism that will potentially reduce the
+    storage backend requirements. With the reduction of the requirements, disks with
+    higher capacity and lower performance may be used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following diagram is an illustration showing the virtual disk-to-disk type
+    relationship typically used by storage providers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Disk types](img/1124EN_08_26.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The most common type of disks used for VMware View deployments are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**SSDs:** They provide the best throughput performance and may be leveraged
+    for the replica tier requiring bursting capabilities during boot and login storms.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Fibre Channel and SAS:** They provide the best relationship between costs
+    versus performance. Nowadays, Fibre Channel and SAS disks are probably the most
+    common type of disks in enterprise environment and may be leveraged to host Linked
+    Clone disks.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Serial Advanced Technology Attachment (SATA)**: They provide the highest
+    capacity and lowest cost, but with lowest performance. A common use for SATA disks
+    is for persistent or user profile disk placement.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: It's important to note that these are just conventional recommendations and
+    your environment may pose different challenges or features. As an example, some
+    scale-out NAS appliances may use very large pools of SATA disks and perform as
+    well as Fibre Channel disks when the matter is throughput.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Capacity sizing exercises
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Sizing the storage infrastructure correctly might be the difference between
+    succeeding or failing a VDI rollout. Many deployments that have excellent performance
+    during the pilot and initial production quickly start to run into storage contention
+    issues because of the lack of understanding of the storage layer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next section, we demonstrate a few sizing exercises for different VMware
+    View implementations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sizing full clones
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let's see two scenarios for sizing full clones.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Scenario 1
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The following are the parameters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Desktops:** 1,000'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Pool type:** Dedicated (full clones)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Guest OS:** Windows 7'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**RAM:** 2 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Disk size:** 40 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Disk consumed:** 22 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Overhead:** 10 percent'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Parent VM
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: The Parent VM may be thin or thick provisioned and is usually powered off. If
+    the Parent VM is thick provisioned, its size is similar to the creation of the
+    disk plus log files. As an example, if the Parent VM disk size is set to 40 GB,
+    this will be the approximate size of the Parent VM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the Parent VM is created using thin provisioning, its size is equal to the
+    amount of storage utilized by the Windows operating system at the NTFS plus log
+    files. As an example, if the Parent VM disk size is set to 40 GB but only 10 GB
+    is used, the total size of the Parent VM will be approximately 10 GB plus log
+    files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There is no considerable performance improvement using thick provisioning over
+    thin provisioning for the Parent VM, given that these are master images and won't
+    be used unless a new replica disk is required.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Overhead
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: The VMware recommendation on storage overhead per datastore is at least 10 percent.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following table explains the features and requirements:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Feature | Requirement | Reasoning |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| VMs per datastore | 32 VMFS | Recommended limit of full clones per datastore
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '| VM datastore size |   | Size based on the following calculations: |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Raw file size | 40,960 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Log file size | 100 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Swap file size | 2,048 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Free space allocation | 10 percent overhead |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Minimum allocated datastore size = (VMs * (raw + swap + log) + overhead)
+    = (32 * (40,960 MB + 2,048 MB + 100 MB) + 137 GB) = 1.44 TB |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Number of datastores | 1 per 32 virtual desktops | Number of VMs/VMs per
+    datastore = 1,000/32 = 32 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Total storage |   | Number of datastores * datastore size = 32 * 1.44 TB
+    = 46 TB |'
+  prefs: []
+  type: TYPE_TB
+- en: Comments
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'The following is a list of comments:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: As a safety number, it's an assumption that all full clone raw files will eventually
+    achieve the full size (40 GB). Some administrators may prefer to use a fraction
+    of the full utilization size to cut storage costs during calculation.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In addition to the storage allocation required to support all full clone virtual
+    desktops, it is important to set aside at least another one datastore per VMware
+    View cluster to host the Parent VM and ISO images.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Scenario 2
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Here are the parameters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Desktops:** 2,000'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Pool type:** Dedicated (full clones)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Guest OS:** Windows 7'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**RAM:** 2 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Disk size:** 32 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Disk consumed:** 22 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**VM memory reservation:** 50 percent (1,024 MB)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Overhead:** 10 percent'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following table shows the features and requirements:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Feature | Requirement | Reasoning |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| VMs per datastore | 32 VMFS | Recommended limit of full clones per datastore
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '| VM datastore size |   | Size based on the following calculations: |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Raw file size | 32,768 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Log file size | 100 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Swap file size | 1,024 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Free space allocation | 10 percent overhead |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Minimum allocated datastore size = (VMs * (raw + swap + log) + overhead)
+    = (32 * (40,960 MB + 1,024 MB + 100 MB) + 108 GB) = 1.13 TB |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Number of datastores | 1 per 32 virtual desktops | Number of VMs/VMs per
+    datastore = 2,000/32 = 33 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Total storage |   | Number of datastores * datastore size = 32 * 1.12 TB
+    = 36 TB |'
+  prefs: []
+  type: TYPE_TB
+- en: Comments
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'The following is a list of comments:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The disk size for this scenario has been changed to 32 GB, reducing the overall
+    storage footprint required. It's important to size virtual desktops appropriately
+    for what the users require, not adding extra fat to the infrastructure.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This scenario introduces 50 percent VM memory reservation, reducing the size
+    of the `.vswp` file to half of the virtual desktop memory. In this scenario, the
+    `.vswp` file is 1,024 MB.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Sizing linked clones
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Sizing linked clone virtual desktops is to a certain extent more complex than
+    sizing full clones due to the number of variables involved in the calculation.
+    As mentioned earlier in this chapter, linked clone virtual desktops introduce
+    new files and may work differently when the Dedicated Replica Datastore option
+    is selected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Parent VM
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The Parent VM used with linked clones is similar to the one used with full clones,
+    however, it includes VM snapshots that are used by View Composer to determine
+    what baseline image is used to create replica disks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Replica
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Replica disks are created as thin provisioned clones from the Parent VM. If
+    the Parent VM is set to a 40 GB disk size, the replica is equal to the amount
+    of storage utilized by the Windows operating system at the NTFS plus the snapshot
+    selected. As an example, if the Parent VM disk size is set to 40 GB but only 10
+    GB is used, the total size of the replica is approximately 10 GB.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Without making use of the Dedicated Replica Datastore option, for any desktop
+    pool, a unique replica is created in each datastore assigned to the pool. If multiple
+    snapshots are in use in a desktop pool, multiple replicas per datastore may be
+    created if VMware View decides to use the datastore. It is common to have two
+    or more snapshots in use at the same time in a single datastore, especially during
+    Recompose operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Desktop pools * snapshots * datastores = number of replicas
+  prefs: []
+  type: TYPE_NORMAL
+- en: 2 * 1 * 32 = 64 replicas (2 per datastore)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 2 * 2 * 32 = 128 replicas (4 per datastore)
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the Dedicated Replica Datastore option is in use, VMware View uses a single
+    datastore to create all replicas for the desktop pool. The calculation of the
+    number of replicas is also subject to the number of snapshots concurrently in
+    use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Desktop pools * snapshots * datastores = number of replicas
+  prefs: []
+  type: TYPE_NORMAL
+- en: 2 * 1 * 1 = 2 replicas
+  prefs: []
+  type: TYPE_NORMAL
+- en: 2 * 2 * 1 = 4 replicas
+  prefs: []
+  type: TYPE_NORMAL
+- en: Scenario 1
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Here are the parameters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Desktops:** 5,000'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Pool type:** Floating (linked clones)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Guest OS:** Windows 7'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**RAM:** 2 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Disk size:** 32 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Disk consumed:** 22 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Refresh on logoff:** 10 percent'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Overhead:** 10 percent'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**VAAI:** Enabled'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following table explains the features and requirements:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Feature | Requirement | Reasoning |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| VMs per datastore | 140 VMFS (VAAI) | Recommended limit of full clones per
+    datastore |'
+  prefs: []
+  type: TYPE_TB
+- en: '| VM datastore size |   | Size based on the following calculations: |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Raw file size | 3,277 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Log file size | 100 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Swap file size | 1,024 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Free space allocation | 10 percent overhead |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Minimum allocated datastore size = (VMs * (raw + swap + log) + overhead)
+    = (140 * (3,277 MB + 1,024 MB + 100 MB) + 60 GB) = 661 GB |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Number of datastores | 1 per 140 virtual desktops | Number of VMs/VMs per
+    datastore = 5,000/140 = 36 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Total storage |   | Number of datastores * datastore size = 36 * 661 GB =
+    23 TB |'
+  prefs: []
+  type: TYPE_TB
+- en: Comments
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'The following is a list of comments:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The desktop pool type is floating and that means that whenever the user has
+    logged off, the virtual desktop will be refreshed. The important information here
+    is to know for how long, on average, the users will remain connected to the virtual
+    desktop and how much data they will generate on the delta disk during their usage.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If the desktops are designated to classes that will last 45 minutes, the chances
+    are that the delta disk will present marginal growth. However, if the virtual
+    desktop is used for a whole day, the chances are that the delta will grow a few
+    hundred megabytes.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: For this exercise, we are assuming that the delta disk will grow to a maximum
+    size of 10 percent of the Parent VM, that is, 3,277 MB.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: VAAI is enabled in this scenario, enabling higher virtual desktop consolidation
+    per datastore. The maximum number of virtual desktops per datastore supported
+    with VAAI is 140.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Scenario 2
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The following are the parameters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Desktops:** 10,000'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Pool type:** Persistent (linked clones)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Guest OS:** Windows 7 (64 bit)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**RAM:** 4 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Disk size:** 32 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Disk consumed:** 22 GB'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Refresh:** Never'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Overhead:** 10 percent'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following table explains the features and requirements:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '| Feature | Requirement | Reasoning |'
+  prefs: []
+  type: TYPE_TB
+- en: '| --- | --- | --- |'
+  prefs: []
+  type: TYPE_TB
+- en: '| VMs per datastore | 100 VMFS | Recommended limit of full clones per datastore
+    |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Size based on the following calculations: |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Raw file size | 32,768 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Log file size | 100 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Swap file size | 4,096 MB |'
+  prefs: []
+  type: TYPE_TB
+- en: '| VM datastore size |   | Free space allocation | 10 percent overhead |'
+  prefs: []
+  type: TYPE_TB
+- en: '|   |   | Minimum allocated datastore size = (VMs * (raw + swap + log) + overhead)
+    = (100 * (32,768 MB + 4,096 MB + 100 MB) + 360 GB) = 3.9 TB |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Number of datastores | 1 per 100 virtual desktops | Number of VMs/VMs per
+    datastore = 10,000/100 = 100 |'
+  prefs: []
+  type: TYPE_TB
+- en: '| Total storage |   | Number of datastores * datastore size = 100 * 3.9 TB
+    = 390 TB |'
+  prefs: []
+  type: TYPE_TB
+- en: Comments
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: This scenario explores the idea of using linked clone but not having an internal
+    policy to refresh virtual desktops so often. The result is similar to implementing
+    full clones as the delta disks will grow to its full capacity, 32 GB in this case.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With 64-bit Windows 7 and 4 GB RAM without any VM memory reservation, the swap
+    file is responsible for consuming 4 GB of storage capacity per virtual desktop.
+    In total, the `.vswap` file will be consuming 40 TB; however, with only 20 percent
+    memory reservation, this total would go down to approximately 31 TB of used storage
+    space.
+  prefs: []
+  type: TYPE_NORMAL
+- en: vSphere 5.0 video swap
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: VMware View has always automatically calculated video RAM based on resolution
+    and color depth. Up to VMware View 4.6, only 24-bit color depth was supported
+    and VMware published the vRAM overhead that each resolution type would require.
+    vRAM overhead is part of the VM memory overhead in virtual machines running on
+    ESXi. The other part of the overhead comes from the number of vCPUs and amount
+    of RAM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: VMware View 5.0 introduces a 32-bit color depth and makes it the default option.
+    On top of that, to allow 3D support, VMware introduced a new feature in View 5.0
+    that allows administrators to select how much video RAM should be assigned to
+    virtual desktops.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows the configuration of vRAM for vDesktops requiring
+    3D capabilities:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![vSphere 5.0 video swap](img/1124EN_08_27.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The VMware View explanation of how to configure vRAM for 3D support is not
+    very helpful and essentially says: the more vRAM, the more 3D performance will
+    be available to vDesktop(s).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: To support the new 3D option, vSphere 5.0 implements a second `.vswp` file for
+    every virtual desktop created either using hardware version 7 or 8\. This second
+    `.vswp` file is dedicated to video memory overhead and will be used when the virtual
+    desktop is under video resource constraint.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows the second `.vswp` file; this is used for video
+    memory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![vSphere 5.0 video swap](img/1124EN_08_28.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The total memory overhead is defined by the following factors:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Number of virtual CPUs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Amount of RAM
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Amount of vRAM (defined by number of displays, screen resolution, and color
+    depth)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 3D support
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Memory overhead is nothing new to VMware administrators, as they used to calculate
+    overhead based on vCPU, RAM, and vRAM. However, with the introduction of a video
+    memory calculator, vSphere Client 5.0 provides an easy way to define the amount
+    of vRAM required for a given video configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The following screenshot shows advanced **Video Memory Calculator:**
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![vSphere 5.0 video swap](img/1124EN_08_29.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The new video overhead `.vswp` file will affect storage footprint and datastore
+    sizing. In order to understand the real impact, we have reverse-engineered the
+    new video support option. The **swap (MB)** column demonstrates the total storage
+    utilized by the video swap file, and the **overhead (MB)** column demonstrates
+    the amount of RAM overhead utilized for each combination of vCPU, vRAM, and color
+    depth:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![vSphere 5.0 video swap](img/1124EN_08_30.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: When 3D support is enabled, a 256 MB overhead is added to the secondary `.vswp`
+    file. Therefore, if you are planning to use 3D, you should size datastores appropriately
+    to accommodate this difference. This additional 256 MB will help virtual desktops
+    not to run into video performance issues when executing 3D display operations.
+    The 256 MB overhead is independent of how much vRAM you assigned to the virtual
+    desktop in VMware View 5.0.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A datastore with 100 desktops will require additional 25 GB with 3D support
+    enabled:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 100 VMs * 256 MB = 25 GB
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following screenshot shows a table that demonstrates the `.vswp` file (swap)
+    resulting from 3D support enabled:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![vSphere 5.0 video swap](img/1124EN_08_31.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: When sizing for 3D support, you will need to ensure that datastores are appropriately
+    sized for the amount of virtual desktops that will reside in the datastore, plus
+    any additional 3D swap overhead.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Storage for virtualized environments already offers significant complexity from
+    a design perspective. By adding VDI on top of a classic server virtualization
+    solution, the additional storage technologies that were (for example, View Composer)
+    potentially utilized, makes the storage design exponentially more complex. This
+    chapter covered both the high-level aspects of storage design for VMware View
+    solutions as well as the subtle intricacies that can often make or break a solution.
+    Storage design, especially for solutions that are intended to scale over time,
+    can require significant effort. It is important to not only understand fundamental
+    storage principles before embarking on a VMware View storage design, but also
+    understand the various types of virtual disks, as well as how the underlying guest
+    uses its disk.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that all of the major design concepts have been covered, the next chapter
+    will focus on backup and recovery. While a robust VMware View solution should
+    be able to mitigate most outage scenarios, there may be times where a recovery
+    action needs to be taken; as such, understanding the points of interest from a
+    backup perspective as well as the recovery process is important as a design is
+    implemented and handed over to an operations team.
+  prefs: []
+  type: TYPE_NORMAL

@@ -1,0 +1,2380 @@
+- en: 11 Kernel Hardening and Process Isolation
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Join our book community on Discord
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '[https://packt.link/SecNet](https://packt.link/SecNet)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/file69.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: Although the Linux kernel is already fairly secure by design, there are still
+    a few ways to lock it down even more. It's simple to do, once you know what to
+    look for. Tweaking the kernel can help prevent certain network attacks and certain
+    types of information leaks. (But fear not – you don't have to recompile a whole
+    new kernel to take advantage of this.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: With process isolation, our aim is to prevent malicious users from performing
+    either a vertical or a horizontal privilege escalation. By isolating processes
+    from each other, we can help prevent someone from taking control of either a root
+    user process or a process that belongs to some other user. Either of these types
+    of privilege escalation could help an attacker either take control of a system
+    or access sensitive information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, we'll take a quick tour of the `/proc` filesystem and show
+    you how to configure certain parameters within it to help beef up security. Then,
+    we'll turn to the subject of process isolation and talk about various methods
+    to ensure that processes remain isolated from each other.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this chapter, we''ll cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the `/proc` filesystem
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting kernel parameters with `sysctl`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configuring the `sysctl.conf` file
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An overview of process isolation
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Control groups
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Namespace isolation
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Kernel capabilities
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: SECCOMP and system calls
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using process isolation with Docker containers
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Sandboxing with Firejail
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Sandboxing with Snappy
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Sandboxing with Flatpak
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: So, if you're ready and raring, we'll start by looking at the `/proc` filesystem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the /proc filesystem
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: If you `cd` into the `/proc/` directory of any Linux distro and take a look
+    around, you'll be excused for thinking that there's nothing special about it.
+    You'll see files and directories, so it looks like it could just be another directory.
+    In reality, though, it's very special. It's one of several different **pseudo-filesystems**
+    on the Linux system. (The definition of the word pseudo is *fake*, so you can
+    also think of it as a fake filesystem.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you were to pull the primary operating system drive out of a Linux machine
+    and mount it as the secondary drive on another machine, you''ll see a `/proc/`
+    directory on that drive, but you won''t see anything in it. That''s because the
+    contents of the `/proc/` directory are created from scratch every time you boot
+    a Linux machine, and then cleared out every time you shut down the machine. Within
+    `/proc/`, you''ll find two general classes of information:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Information about user-mode processes
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Information about what's going on at the kernel-level of the operating system
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We'll look at user-mode processes first.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Looking at user-mode processes
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'If you invoke the `ls` command within `/proc/`, you''ll see a whole bunch of
+    directories that have numbers as their names. Here''s a partial listing from my
+    CentOS VM:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: Each of these numbered directories corresponds to the **Process ID** (**PID**)
+    number of a user-mode process. On any Linux system, PID 1 is always the `init`
+    system process, which is the first user-mode process that starts when you boot
+    a machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On Debian/Ubuntu systems, the name of PID 1 is `init`. On `RHEL/CentOS/AlmaLinux`
+    systems, it's called `systemd`. All of these distros run the `systemd` `init`
+    system, but the Debian/Ubuntu folk have chosen to retain the old `init` name for
+    PID 1.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Within each numbered directory, you''ll see various files and subdirectories
+    that contain information about a particular running process. For example, in the
+    `1` directory, you''ll see what pertains to the `init` process. Here''s the partial
+    listing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As you see, there are a few symbolic links that we can''t access without root
+    privileges. When we use `sudo`, we can see where the symbolic links point:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can use the `cat` command to view the contents of some of these items, but
+    not all of them. However, even when you can view the contents, you won't be able
+    to make much sense of what's there, unless you're an operating system programmer.
+    Rather than trying to view the information directly, you're better off using either
+    `top` or `ps`, which pull their information from `/proc/` and parse it so that
+    humans can read it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I'm assuming that most of you are already familiar with `top` and `ps`. For
+    those who aren't, here's the short explanation.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '`ps` provides a static display of what''s going on with your machine''s processes.
+    There are loads of option switches that can show you different amounts of information.
+    My favorite `ps` command is `ps aux`, which provides a fairly complete set of
+    information about each process.'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '`top` provides a dynamic, constantly changing display of the machine''s processes.
+    Some option switches are available, but just invoking `top` without any options
+    is usually all you need.'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Next, let's look at the kernel information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Looking at kernel information
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Within the top level of `/proc/`, the files and directories that have actual
+    names contain information about what''s going on with the Linux kernel. Here''s
+    a partial view:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As with the user-mode stuff, you can use `cat` to look at some of the different
+    files. For example, here''s a partial output of the `cpuinfo` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, you can see the type and speed rating of my CPU, its cache size, and the
+    fact that this CentOS VM is only running on one of the host machine's eight CPU
+    cores. (Doing this on the Fedora host operating system would show information
+    about all eight of the host machine's cores.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Yes, you did read that right. I wrote parts of the original version of this
+    book on an antique, Opteron-equipped HP workstation from 2009\. I got it from
+    eBay for a very cheap price, and it runs beautifully with the LXDE spin of Fedora.
+    And, the openSUSE machine that you'll see mentioned in other parts of this book
+    is the exact same model and came from the same vendor. (So, now you know just
+    how cheap I really am.) Sadly though, the RHEL 9-type distros won’t run on the
+    first generation of x86_64 CPUs, so I’m now using something newer to write this
+    *Third Edition*.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'However, for our present purposes, we don''t need to go into the nitty-gritty
+    details of everything that''s in `/proc/`. What''s more important to our present
+    discussion is the different parameters that can be set from within `/proc/`. For
+    example, within the `/proc/sys/net/ipv4/` directory, we can see lots of different
+    items that can be tweaked to change IPv4 network performance. Here''s a partial
+    listing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can use the `cat` command to view each of these parameters, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, the `icmp_echo_ignore_all` parameter is set to `0`, which means that it''s
+    disabled. If I were to ping this machine from another machine, assuming that the
+    firewall is configured to allow that, this machine would respond to the pings.
+    Here are several ways to change that if need be:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`echo` a new value into the parameter from the command line.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Use the `sysctl` utility from the command line.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configure the `/etc/sysctl.conf` file.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Add a new `.conf` file that contains the new configuration to the `/etc/sysctl.d/`
+    directory.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Run a command from within a shell script.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let's go ahead and look at these different methods in detail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting kernel parameters with sysctl
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The traditional method that you''ll see in older Linux textbooks is to `echo`
+    a value into a `/proc/` parameter. This doesn''t directly work with `sudo`, so
+    you''ll need to use the `bash -c` command to force the command to execute. Here,
+    you can see me changing the value for the `icmp_echo_ignore_all` parameter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: With the value set to `1`, this machine will now ignore all ping packets, regardless
+    of how the firewall is configured. Any value you set like this is temporary and
+    will go back to its default setting when you reboot the machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next in the list after this one is the `icmp_echo_ignore_broadcasts` setting,
+    which looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: It's already enabled by default, so out of the box, Linux is already immune
+    to **Denial-of-Service** (**DoS**) attacks that involve ICMP broadcast flooding.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring `/proc/` parameters with `echo` is old hat, and personally, I don't
+    like to do it. It's better to use `sysctl`, which is the more modern way of doing
+    business. It's easy to use, and you can read all about it in the `sysctl` man
+    page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To see a list of all the parameter settings, just do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To set a parameter, use the `-w` option to write the new value. The trick to
+    this is that the forward slashes in the directory path are replaced by dots, and
+    you ignore the `/proc/sys/` part of the path. So, to change the `icmp_echo_ignore_all`
+    value back to `0`, we''ll do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, the change is permanent because I'm just changing the parameter
+    back to its default setting. Normally, though, any changes we make like this only
+    last until we reboot the machine. Sometimes, that's okay. Other times, we might
+    need to make the changes permanent.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring the sysctl.conf file
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: There are some significant differences between the default configurations of
+    Ubuntu and CentOS/AlmaLinux. They all use the `/etc/sysctl.conf` file, but on
+    CentOS and AlmaLinux, that file doesn't have anything except for some explanatory
+    comments. Ubuntu and CentOS/AlmaLinux all have files with default settings in
+    the `/usr/lib/sysctl.d/` directory, but there are more for CentOS and AlmaLinux
+    than there are for Ubuntu. On Ubuntu, you'll find other files with default values
+    in the `/etc/sysctl.d/` directory. On CentOS and AlmaLinux, that directory only
+    contains a symbolic link that points back to the `/etc/sysctl.conf` file. Also,
+    you'll find that some things are hardcoded into the Linux kernel and aren't mentioned
+    in any of the configuration files. In true Linux fashion, every distro has a different
+    way of configuring all this, just to ensure that users remain thoroughly confused.
+    One thing that’s consistent is that on any of your virtual machines, you can use
+    the `systemd-analyze cat-config sysctl.d` command to view a summary of the kernel
+    settings that are defined in these files. (To see the complete list of kernel
+    settings though, you’ll still need to use the `sysctl -a` command.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the `/usr/lib/sysctl.d/README` file on the AlmaLinux machine, you’ll find
+    additional information about how this works.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Now, with the introductory part out of the way, let’s see if we can make sense
+    of all this.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring sysctl.conf – Ubuntu
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In the `/etc/sysctl.conf` file on an Ubuntu machine, you'll see lots of comments
+    and a few examples of things that you can tweak. The comments provide good explanations
+    of what the various settings do. So, we'll start with it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Much of this file contains settings that can help improve networking security.
+    Toward the top of the file, we see this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: A spoofing attack involves a bad actor who sends you network packets with spoofed
+    IP addresses. Spoofing can be used for a few different things, such as DoS attacks,
+    anonymous port scanning, or tricking access controls. These settings, when enabled,
+    cause the operating system to verify if it can reach the source address that's
+    in the packet header. If it can't, the packet is rejected. You may be wondering
+    why this is disabled since it seems like such a good thing. However, this isn't
+    the case. It is enabled in another file. If you look in the `/etc/sysctl.d/10-network-security.conf`
+    file, you'll see it enabled there. So, there's no need to uncomment these two
+    lines.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we see this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'One form of DoS attack involves sending massive amounts of SYN packets to a
+    target machine, without completing the rest of the three-way handshake. This can
+    cause the victim machine to have lots of half-open network connections, which
+    would eventually exhaust the machine''s ability to accept any more legitimate
+    connections. Turning on SYN cookies can help prevent this type of attack. On Ubuntu
+    18.04, which is what I used to write the previous edition of this book, SYN cookies
+    are already turned on in the `/etc/sysctl.d/10-network-security.conf` file. On
+    Ubuntu 22.04, that setting is nowhere to be found in any of the `sysctl` configuration
+    files, other than the disabled setting in the `sysctl.conf` file. However, a `sudo
+    sysctl -a` command on the 22.04 machine will show us that SYN cookies are indeed
+    enabled:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To find where this is set, we’ll need to do a bit of clever detective work.
+    In the `/boot/` directory of the 22.04 machine, you’ll see one `config` file for
+    each installed kernel. When I used `grep -i` to perform a case-insensitive search
+    for the `syncookies` text string in one of the `config` files, I couldn’t find
+    anything. So, I broadened the search for all `syn` text strings. Here’s what that
+    looks like:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: So, we see that on Ubuntu 22.04, the developers chose to hard-code the SYN cookies
+    setting into the kernel rather than to set it in a `sysctl` configuration file.
+    So, as we saw before with the Ubuntu 18.04 machine, there’s no need to uncomment
+    the `syncookies` line in the `sysctl.conf` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here''s the next thing we see:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Uncommenting this line would allow network packets to flow from one network
+    interface to another in machines that have multiple network interfaces. Unless
+    you're setting up a router or a Virtual Private Network server, leave this setting
+    as is.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We''ve been looking at nothing but IPv4 stuff so far. Here''s one for IPv6:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: In general, you'll also want to leave this one commented out, as it is now.
+    Disabling **Stateless Address Autoconfiguration** on machines in an IPv6 environment
+    would mean that you'd need to either set up a DHCPv6 server or set static IPv6
+    addresses on all hosts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The next section controls ICMP redirects:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Allowing ICMP redirects can potentially allow a **Man-in-the-Middle** (**MITM**)
+    attack to be successful. Uncommenting the two lines in the top section of this
+    snippet would completely disable ICMP redirects. The bottom line in the bottom
+    section allows redirects, but only if they come from a trusted gateway. This one
+    is a bit deceiving, because even though this line is commented out, and even though
+    there''s nothing about this in any of the other configuration files, secure redirects
+    are actually enabled by default. We can see this by filtering our `sysctl -a`
+    output through `grep`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we can see that secure redirects are enabled on all network interfaces.
+    But if you're sure that your machine will never get used as a router, it's still
+    best to completely disable ICMP redirects. (We'll do that in just a bit.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The final networking item in this file involves Martian packets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, if you're as old as I am, you might remember a really silly television
+    show from the '60s called *My Favorite Martian*. But, this setting has nothing
+    to do with that. Martian packets have a source address that normally can't be
+    accepted by a particular network interface. For example, if your Internet-facing
+    server receives packets with a private IP address or a loopback device address,
+    that's a Martian packet. Why are they called Martian packets? Well, it's because
+    of someone's statement that these packets are not of this earth. Regardless, Martian
+    packets can exhaust network resources, so it's good to know about them. You can
+    enable logging for them either by uncommenting the line in the preceding snippet
+    or by placing an override file in the `/etc/sysctl.d/` directory. (We'll also
+    do that in just a bit.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following snippet is a kernel parameter for the **Magic system request
+    key**:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: When this parameter is enabled, you can perform certain functions, such as shutting
+    down or rebooting the system, sending signals to processes, dumping process debug
+    information, and several other things, by pressing a sequence of **Magic Keys**.
+    You would do this by pressing the Alt + SysReq + command-key sequence. (The SysReq
+    key is the PrtScr key on some keyboards, while the command-key is the key that
+    invokes some specific command.) A value of `0` for this would completely disable
+    it, and a value of `1` would enable all Magic Key functions. A value greater than
+    `1` would enable only specific functions. In this file, this option appears to
+    be disabled. However, it's actually enabled in the `/etc/sysctl.d/10-magic-sysrq.conf`
+    file. If you're dealing with a server that's locked away in a server room and
+    that can't be remotely accessed from a serial console, this might not be a big
+    deal. However, for a machine that's out in the open or that can be accessed from
+    a serial console, you might want to disable this. (We'll do that in a bit as well.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Under certain circumstances, bad guys could possibly create links to sensitive
+    files so that they can easily access them. Link protection is turned on in the
+    `/etc/sysctl.d/10-link-restrictions.conf` file on Ubuntu 18.04, and in the `/usr/lib/sysctl.d/99-protect-links.conf`
+    file on Ubuntu 22.04\. Here’s what that looks like on 22.04:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: That pretty much covers what we have in Ubuntu. Now, let's look at CentOS and
+    AlmaLinux.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring sysctl.conf – CentOS and AlmaLinux
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: On CentOS and AlmaLinux, the `/etc/sysctl.conf` file is empty, except for a
+    few comments. These comments tell you to look elsewhere for the default configuration
+    files and to make changes by creating new configuration files in the `/etc/sysctl.d/`
+    directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The default security settings for CentOS and AlmaLinux are pretty much the same
+    as they are for Ubuntu, except they're configured in different places. For example,
+    on CentOS and AlmaLinux, the spoof protection (`rp_filter`) parameters and the
+    link protection parameters are in the `/usr/lib/sysctl.d/50-default.conf` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By piping a `sysctl -a` command into `grep`, you''ll also see that SYN cookies
+    are enabled:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The same is true for `secure_redirects`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As was the case with Ubuntu, the SYN cookies setting is hard-coded into the
+    Linux kernel, as we see here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: Okay, so far so good. Let’s continue on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting additional kernel-hardening parameters
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: What we've seen so far isn't too bad. Most of the parameters that we've looked
+    at are already set to their most secure values. But is there room for improvement?
+    Indeed there is. You wouldn't know it by looking at any of the configuration files,
+    though. On Ubuntu, CentOS, and AlmaLinux, quite a few items have default values
+    that aren't set in any of the normal configuration files. The best way to see
+    this is to use a system scanner, such as **Lynis**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Lynis is a security scanner that shows lots of information about a system. (We'll
+    cover it in more detail in *Chapter 14*, *Vulnerability Scanning and Intrusion
+    Detection*.) For now, we'll just cover what it can tell us about hardening the
+    Linux kernel.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After you run a scan, you''ll see a `[+] Kernel Hardening` section in the screen
+    output. It''s fairly lengthy, so here''s just part of it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: Everything that's marked as `OK` is as it should be for best security. What's
+    marked as `DIFFERENT` should be changed to the suggested `exp:` value that's within
+    the pair of parentheses. (**exp** stands for **expected**.) Let's do that now
+    in a hands-on lab.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab – scanning kernel parameters with Lynis
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'Lynis is in the normal repositories for Ubuntu and in the EPEL repository for
+    CentOS and AlmaLinux. It''s always a few versions behind what you can get directly
+    from the author''s website, but for now, that''s okay. When we get to *Chapter
+    14*, *Vulnerability Scanning and Intrusion Detection*, I''ll show you how to get
+    the newest version. Let''s get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Install Lynis from the repository for Ubuntu, like this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Do this for CentOS 07:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Do this for AlmaLinux 8 or 9:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Scan the system by using the following command:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When the scan completes, scroll back up to the `[+] Kernel Hardening` section
+    of the output. Copy and paste the `sysctl` key pairs into a text file. Save it
+    as `secure_values.conf` in your own home directory. The contents of the file should
+    look something like this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Use `grep` to send all of the `DIFFERENT` lines to a new file. Name it `60-secure_values.conf`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Edit the `60-secure_values.conf` file to convert it into the `sysctl` configuration
+    format. Set each parameter to the `exp` value that''s currently within the pairs
+    of parentheses. The finished product should look something like this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Copy the file to the `/etc/sysctl.d/` directory:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Reboot the machine to read in the values from the new file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: Repeat *step 2*. Most items should now show up with their most secure values.
+    However, you might see a few `DIFFERENT` lines come up. That's okay; just move
+    the lines for those parameters into the main `/etc/sysctl.conf` file and reboot
+    the machine again.
+  prefs: []
+  type: TYPE_NORMAL
+- en: That's the end of the lab—congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We''ve already talked about some of the items that we changed in this procedure.
+    Here''s a breakdown of the rest of them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`kernel.dmesg_restrict = 1`: By default, any non-privileged user can run the
+    `dmesg` command, which allows the user to view different types of kernel information.
+    Some of this information could be sensitive, so we want to set this parameter
+    to `1` so that only someone with root privileges can use `dmesg`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`kernel.kptr_restrict = 2`: This setting prevents `/proc` from exposing kernel
+    addresses in memory. Setting this to `0` completely disables it, while setting
+    it to `1` prevents non-privileged users from seeing the address information. Setting
+    it to `2`, as we have here, prevents anyone from seeing address information, regardless
+    of the person''s privilege level. Note, though, that setting this to either `1`
+    or `2` could prevent certain performance monitor programs, such as `perf`, from
+    running. If you absolutely have to do performance monitoring, you might have to
+    set this to `0`. (That''s not as bad as it might sound, because having the `kernel.dmesg_restrict
+    = 1` setting in place can help mitigate this issue.)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`kernel.yama.ptrace_scope = 1 2 3`: This places restrictions on the `ptrace`
+    utility, which is a debugging program that the bad guys can also use. `1` restricts
+    `ptrace` to only debugging parent processes. `2` means that only someone with
+    root privileges can use `ptrace`, while `3` prevents anyone from tracing processes
+    with `ptrace`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In this section, you learned how to configure various kernel parameters to help
+    lock down your system. Next, we'll lock things down even more by restricting who
+    can view process information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Preventing users from seeing each others' processes
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'By default, users can use a utility such as `ps` or `top` to see everyone else''s
+    processes, as well as their own. To demonstrate this, let''s look at the following
+    partial output from a `ps aux` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: Even with just my normal user privileges, I can view processes that belong to
+    the root user and various system users, as well as my own. (And if any of my cats
+    were logged in, I'd also be able to view their processes.) This information can
+    be quite useful to an administrator, but it can also help the bad guys. This information
+    can help Joe or Jane Hacker plan an attack on your system, and it may also even
+    reveal some sensitive information. The best way to deal with this is to mount
+    the `/proc` filesystem with the `hidepid` option, as long as you’re not working
+    with some sort of RHEL 9-type distro.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This feature has been disabled for the RHEL 9-type distros. So, don’t try this
+    on any of your AlmaLinux 9 machines. Not only will it not work, it could break
+    your machine.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'On an Ubuntu, CentOS 7, or AlmaLinux 8 VM, you can do this by adding a line
+    to the end of the `/etc/fstab` file, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, remount `/proc`, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, any user who doesn't have `sudo` privileges can only view his or her own
+    processes. (Pretty slick, eh?)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The three values for the `hidepid` option are as follows:'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '`0`: This is the default, which allows all users to see each others'' processes.'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '`1`: This allows all users to see other users'' process directories within
+    `/proc`. However, users will only be able to `cd` into their own process directories.
+    Also, they''ll only be able to see their own process information with `ps` or
+    `top`.'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: '`2`: This hides all other users'' process information, including the process
+    directories within `/proc`.'
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Now that you've seen the inner workings of the `/proc` filesystem and how to
+    configure it for best security, let's look at **process isolation**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding process isolation
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: A primary objective of any network intruder is to gain the privileges that are
+    required to perform his or her dirty deeds. This normally involves logging in
+    as a normal user and then performing some sort of **privilege escalation**. A
+    **vertical escalation** involves obtaining root privileges, while a **horizontal
+    escalation** involves gaining the privileges of some other normal user. If the
+    other normal user has any sensitive documents in folders that he or she can access,
+    then a horizontal escalation might be all that the intruder requires. Discretionary
+    Access Control and Mandatory Access Control can help out, but we also want to
+    isolate processes from each other and ensure that processes run with only the
+    lowest possible privileges.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When planning a defense against these types of attacks, consider that the attacks
+    could come from either outsiders or insiders. So yes, you do need to guard against
+    attacks from your organization's own employees.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: In this section, we'll look at the various Linux kernel features that facilitate
+    process isolation. Then, we'll look at some cool ways to use these features.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding Control Groups (cgroups)
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Control Groups, more commonly called **cgroups**, were introduced back in 2010
+    in Red Hat Enterprise Linux 6\. Originally, they were just an add-on feature,
+    and a user had to jump through some hoops to manually create them. Nowadays, with
+    the advent of the `systemd` `init` system, cgroups are an integral part of the
+    operating system, and each process runs in its own cgroup by default.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When I wrote the first two editions of this book, all enterprise-grade `systemd`-based
+    Linux distros were running **cgroups Version 1**. Now though, they’ve all switched
+    to **cgroup Version 2**. (Yes, that really is *cgroups* for Version 1, and *cgroup*
+    for Version 2\. I have no idea why.) Although there’s a substantial difference
+    in the architecture of the two versions, there’s not that much difference in how
+    you would use them. The main difference is that Version 2 offers a few more features,
+    and that the names of some of the parameters that you can set are different. If
+    you want to read more about cgroups, check out my other book, *Linux Service Management
+    Made Easy with systemd*.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: With cgroups, processes run in their own kernel space and memory space. Should
+    the need arise, an administrator can easily configure a cgroup to limit the resources
+    that the process can use. This is not only good for security, but also for tuning
+    system performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, what is a cgroup? Well, it''s really just a collection of processes that
+    are grouped together for a particular purpose. Here''s what you can do with cgroups:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Set resource limits**: For each cgroup, you can set resource limits for CPU
+    usage, I/O usage, and memory usage.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Perform different accounting functions**: You can measure resource usage
+    for each cgroup, which makes it easy to bill specific customers for the resources
+    that they use.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Prioritize resources**: You can set limits on a user who''s hogging resources
+    like crazy.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Freezing, checkpointing, and restarting**: These functions are handy for
+    troubleshooting. They allow you to stop a process, take a snapshot of the system
+    state, and restore a system state from a backup.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Assign processes to specific CPU cores**: This is one of the cool features
+    that come with Version 2.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'There''s not enough space to look at all of these functions, but that''s okay.
+    Right now, our primary interest is setting resource limits. With only some minor
+    exceptions, things work the same on all `systemd`-based Linux distros. For now,
+    let’s look at it on an AlmaLinux 9 machine. To start, we’ll install the Apache
+    web server package, like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'By default, each cgroup on the system has no defined resource limits. The first
+    step in defining them is to enable accounting for CPU usage, memory usage, and
+    I/O usage. We could do that by hand-editing the `systemd` service file for each
+    service that we want to limit, but it''s easier to just run a `systemctl` command,
+    like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We''ve just turned on the accounting functions for the Apache web server on
+    our AlmaLinux 9 machine. (The command would be the same on an Ubuntu machine,
+    except that we would have `apache2.service` instead of `httpd.service`.) Now,
+    when we look in the `/etc/systemd/system.control/` directory, we''ll see that
+    we''ve created an `httpd.service.d` directory. Within that directory are the files
+    that turn on our accounting functions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Inside each file, we can see two lines that modify the original `httpd.service`
+    file in order to turn on accounting. For example, here''s the one for `CPUAccounting`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that we''ve enabled accounting for the Apache service, we can place some
+    resource limits on it. (By default, there are no limits.) Let''s say that we want
+    to limit Apache to only 40% of CPU usage and 500 MB of memory usage. We''ll set
+    both limits with the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This command created two more files in the `/etc/systemd/system.control/httpd.service.d/`
+    directory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s `cat` one of them, just to see the format of the files:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: We can allocate resources to other services in the same manner. For example,
+    if this were a **Linux-Apache-MySQL/MariaDB-PHP** (**LAMP**) server, we could
+    allocate a portion of the remaining CPU and memory resources to the PHP service,
+    and the rest to the MySQL/MariaDB service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: LAMP is the bedrock for many popular Content Management Systems, such as WordPress
+    and Joomla.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'We can also place resource limits on user accounts. For example, let''s limit
+    Katelyn to 20% of CPU usage and 500 MB of memory usage. First, we need to get
+    Katelyn''s User ID number. We''ll do that with the `id` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, her UID is `1001`. Let''s enable accounting for her and set her limits:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: If we look in the `/etc/systemd/system.control/user-1001.slice.d/` directory,
+    we'll see the same set of files that were created for the `httpd` service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I've already mentioned the difference between doing this on CentOS/AlmaLinux
+    and Ubuntu. That is, certain services have different names on each distro. In
+    this case, the service is `httpd.service` on CentOS/AlmaLinux and `apache2.service`
+    on Ubuntu. Other than that, things work the same for Ubuntu, CentOS 8, and AlmaLinux
+    8/9.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On CentOS 7, there's no `system.control` directory within the `/etc/systemd/`
+    directory. Instead, the `httpd.service.d` directory is created within the `/etc/systemd/system/`
+    directory. When I tried to set limits for Katelyn for the first time, again with
+    UID `1001`, CentOS 7 wouldn't allow me to do it until Katelyn logged in to activate
+    her `slice`. Her files were created in the `/run/systemd/system/user-1001.slice.d/`
+    directory, which only contains ephemeral runtime files. So, unlike with AlmaLinux
+    8/9, the files aren't persistent across reboots. This means that if you need to
+    set user resource limits on CentOS 7, you need to be aware that they'll disappear
+    once you reboot the machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There''s a lot more to cgroups than what I have space to present here. But
+    that''s okay. In this section, we''ve looked at two ways cgroups can enhance security:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: They provide process isolation.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using them to limit resource usage can help prevent DoS attacks.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Next up, we'll take a brief look at the concepts of namespaces and namespace
+    isolation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding namespace isolation
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '**Namespaces** are a kernel security feature that was introduced in Linux kernel
+    version 2.4.19, all the way back in 2002\. A namespace allows a process to have
+    its own set of computer resources that other processes can''t see. They''re especially
+    handy for times when you might have multiple customers sharing resources on the
+    same server. The processes for each user will have their own namespaces. Currently,
+    there are seven types of namespaces:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Mount (mnt)**: This is the original namespace, which was introduced in Linux
+    kernel 2.4.19\. At the time, this was the only namespace. This allows each process
+    to have its own root filesystem that no other processes can see, unless you choose
+    to share it. This is a good way of preventing information leakage.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**UTS**: The UTS namespace allows each process to have its own unique hostname
+    and domain name.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**PID**: Every running process can have its own set of PID numbers. PID namespaces
+    can be nested so that a parent namespace can see the PIDs of child namespaces.
+    (Note that child namespaces can''t see into the parent namespaces.)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Network (net)**: This allows you to create a whole virtual network for each
+    process. Each virtual network can have its own subnets, virtual network interfaces,
+    routing tables, and firewalls.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Interprocess Communication** **(ipc)**: This also prevents data leakage by
+    preventing two processes from sharing the same memory space. Each running process
+    can access its own memory space, but other processes will be blocked.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Control group (cgroup)**: This namespace hides the identity of the cgroup
+    of which a process is a member.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**User**: The User namespace allows a user to have different levels of privilege
+    on different processes. For example, a user could have root-level privileges on
+    one process, but only normal-user privileges on another process.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'To see these namespaces, just go into any numbered directory within the `/proc`
+    filesystem and view the contents of the `ns` directory. Here''s an example from
+    one of my machines:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: The sharp-eyed among you will see that there's an extra item in this directory
+    that we haven't covered. The `pid_for_children` item tracks PIDs in child namespaces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although it's certainly possible for you to create your own namespaces, you
+    likely never will, unless you're a software developer. Most likely, you'll just
+    use products that have namespace technologies already built into them. Some modern
+    web browsers use namespaces to create a sandbox for each open tab. You can use
+    a product such as Firejail to run a normal program within its own security sandbox.
+    (We'll look at this a bit later.) Then, there's Docker, which uses namespaces
+    to help isolate Docker containers from each other and from the host operating
+    system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We've just had a high-level overview of what namespaces are all about. Next,
+    let's look at kernel capabilities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding kernel capabilities
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: When you perform a `ps aux` command — or a `sudo ps aux` command if you've mounted
+    `/proc` with the `hidepid=1` or `hidepid=2` option — you'll see many processes
+    that are owned by the root user. This is because these processes have to access
+    some sort of system resource that unprivileged users can't access. However, having
+    services run with full root privileges can be a bit of a security problem. Fortunately,
+    there are some ways to mitigate that.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, any web server service, such as Apache or Nginx, needs to start
+    with root privileges in order to bind to ports `80` and `443`, which are privileged
+    ports. However, both Apache and Nginx mitigate this problem by either dropping
+    root privileges once the service has started or by spawning child processes that
+    belong to a non-privileged user. Here, we can see that the main Apache process
+    spawns child processes that belong to the non-privileged `apache` user:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: But not all software can do this. Some programs are designed to run with root
+    privileges all the time. For some cases — not all, but some — you can fix that
+    by applying a kernel capability to the program executable file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Capabilities allow the Linux kernel to divide what the root user can do into
+    distinct units. Let's say that you've just written a cool custom program that
+    needs to access a privileged network port. Without capabilities, you'd either
+    have to start that program with root privileges and let it run with root privileges,
+    or jump through the hoops of programming it so that it can drop root privileges
+    once it's been started. By applying the appropriate capability, a non-privileged
+    user would be able to start it, and it would run with only the privileges of that
+    user. (More about that later.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are too many capabilities to list here (there are about 40 in all), but
+    you can see the full list with this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: Returning to our previous example, let's say that we need to use Python to set
+    up a very primitive web server that any non-privileged user can start. (We have
+    to do this with Python 2, because it doesn't work with Python 3.) Let’s do this
+    on an AlmaLinux 8 machine, because Python 2 isn’t available for either AlmaLinux
+    9 or Ubuntu 22.04.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The command for running a simple Python web server is:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, this won''t work because it needs to bind to port `80`, which is the
+    privileged port that''s normally used by web servers. At the bottom of the output
+    from this command, you''ll see the problem:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Prefacing the command with `sudo` will fix the problem and allow the web server
+    to run. However, we don''t want that. We''d much rather allow non-privileged users
+    to start it, and we''d much rather have it run without root user privileges. The
+    first step in fixing this is to find the Python executable file, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Most times, the `python` or `python2` command is a symbolic link that points
+    to another executable file. We''ll verify that with a simple `ls -l` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, the `python2` link points to the `python2.7` executable file. Now, let''s
+    see if there are any capabilities assigned to this file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'No output means that there are none. When we consult the capabilities man page,
+    we''ll find that the `CAP_NET_BIND_SERVICE` capability seems to be what we need.
+    The one-line description for it is: *bind a socket to Internet domain privileged
+    ports* (*port numbers less than 1024*). Okay, that sounds good to me. So, let''s
+    set that on the `python2.7` executable file and see what happens. Since we used
+    `getcap` to look at the file capabilities, you can probably guess that we''ll
+    use `setcap` to set a capability. (And, you''d be correct.) Let''s do that now:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `+ep` at the end of the capability name means that we''re adding the capability
+    as **effective** (activated) and **permitted**. Now, when I try to run this web
+    server with just my own normal privileges, it will work just fine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When I use Firefox on my host machine to connect to this server, I will see
+    a file and directory listing of everything that''s in my home directory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.1: Directory listing with SimpleHTTPServer](img/file70.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 11.1: Directory listing with SimpleHTTPServer'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Linux capabilities can also be quite useful in other ways. On any Linux system,
+    the ping utility needs root privileges in order to craft the network packets that
+    it needs to do its job. However, everybody and his brother can use ping as just
+    a normal user. If you look at the ping executable file on certain Linux distros,
+    you''ll see that two capabilities have been assigned to it by the Linux maintainers,
+    as we see here on a CentOS 7 machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note that neither of these capabilities is set for either AlmaLinux 8 or 9,
+    and only the `cap_net_raw` capability is set for Ubuntu 22.04.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As cool as all this seems, there are some downsides:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Trying to figure out exactly which capabilities a program needs isn't always
+    straightforward. In fact, it can require a good bit of experimentation before
+    you can get things right.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting capabilities isn't a cure-all. A lot of times, you'll see that setting
+    a specific capability still won't allow the program to do what you need it to
+    do. Indeed, there may not even be a capability that will allow the program to
+    function without root privileges as you want it to.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Performing a system update could replace executable files to which you’ve assigned
+    capabilities. (With ping, we don't have to worry about this since the capabilities
+    were set by the Linux maintainers.)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Okay, so there's a good chance that you might never actually have to set any
+    capabilities. However, this is one of the tools that my IoT Security client uses
+    to help lock down IoT devices, so this does have a practical use. And besides,
+    capabilities are a building block for some of the technologies that we'll look
+    at a bit later.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab – setting a kernel capability
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'For this lab, you''ll allow a normal user to run a Python web server. You’ll
+    need to use Python 2 for this, which isn’t in the newest Linux distros. (Python
+    3 won’t work.) So for this one, use your AlmaLinux 8 VM. Let''s get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If Apache is installed on your virtual machine, ensure that it''s stopped:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE58]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Install Python 2:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE59]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'From within your own home directory, attempt to start the Python `SimpleHTTPServer`
+    with just your normal user privileges, and note the error message:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'See if any capabilities are set on the Python executable file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Set the `CAP_NET_BIND_SERVICE` capability on the Python executable file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs: []
+  type: TYPE_PRE
+- en: Repeat *Steps 3* and *4*. This time, it should work.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Ensure that port `80` is open on the virtual machine firewall and use your host
+    machine's web browser to access the server.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Shut down the web server using Ctrl + C.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'View the capabilities that have been assigned to the `ping` executable:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs: []
+  type: TYPE_PRE
+- en: Review the capabilities of the man page, especially the part about the various
+    capabilities that are there.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: That's the end of the lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: So far, you've seen how to set file capabilities and what they can and can't
+    do for you. Next, we'll look at how to control system calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding SECCOMP and system calls
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Multiple system calls, or **syscalls**, happen pretty much every time you run
+    any command on a Linux machine. Each syscall takes a command from a human user
+    and passes it to the Linux kernel. This tells the Linux kernel that it needs to
+    perform some sort of privileged action. Opening or closing files, writing to files,
+    or changing file permissions or ownership are just a few of the actions that require
+    making some sort of a syscall. There are approximately 330 syscalls built into
+    the Linux kernel. I can''t say exactly how many, because new syscalls get added
+    from time to time. Apart from this, syscalls differ between the various CPU architectures.
+    So, an ARM CPU won''t have exactly the same set of syscalls as an x86_64 CPU.
+    The best way to see the list of syscalls that are available on your machine is
+    to look at the man page, like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note that each individual syscall has its own man page.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'To get an idea of how this works, here''s the `strace` command, which shows
+    the syscalls that get made by a simple `ls` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE65]'
+  prefs: []
+  type: TYPE_PRE
+- en: In all, 22 syscalls are made from just doing `ls`. (Due to formatting restrictions,
+    I can't show all of them here.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Secure Computing** (**SECCOMP**), originally created for the Google Chrome
+    web browser, allows you to either enable just a certain subset of syscalls that
+    you want for a process to use or disable certain syscalls that you want to prevent
+    a process from using. Unless you''re a software developer or a Docker container
+    developer, you probably won''t be working with this directly all that much. However,
+    this is yet another building block for the technologies that are used daily by
+    normal humans.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, let's put all this cool stuff into perspective by looking at how it's
+    used in real life.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using process isolation with Docker containers
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Container technology has been around for quite some time, but it took Docker
+    to make containers popular. Unlike a virtual machine, a container doesn't contain
+    an entire operating system. Rather, a container contains just enough of an operating
+    system to run applications in their own private sandboxes. Containers lack their
+    own operating system kernels, so they use the kernel of the host Linux machine.
+    What makes containers so popular is that you can pack a lot more of them onto
+    a physical server than you can with virtual machines. So, they're great for cutting
+    the cost of running a data center.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Docker containers use the technologies that we've covered in this chapter. Kernel
+    capabilities, cgroups, namespaces, and SECCOMP all help Docker containers remain
+    isolated from both each other and from the host operating system, unless we choose
+    otherwise. By default, Docker containers run with a reduced set of capabilities
+    and syscalls, and Docker developers can reduce all that even more for the containers
+    that they create.
+  prefs: []
+  type: TYPE_NORMAL
+- en: I can't go into the nitty-gritty details about how all this works in Docker
+    because it would require explaining the development process for Docker containers.
+    That's okay, though. In this section, you'll understand what to look out for if
+    someone wants to deploy Docker containers in your data center.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: But as good as all that sounds, Docker security is far from perfect. As I demonstrated
+    in *Chapter 10*, *Implementing Mandatory Access Control with SELinux and AppArmor*,
+    any non-privileged member of the `docker` group can mount the root filesystem
+    of the host machine in a container of his or her own creation. The normally non-privileged
+    member of the `docker` group has root privileges within the container, and those
+    privileges extend to the mounted root filesystem of the host machine. In the demo,
+    I showed you that only an effective Mandatory Access Control system, specifically
+    SELinux, could stop Katelyn from taking control of the entire host machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To address this rather serious design flaw, the developers at Red Hat created
+    their own Docker replacement. They call it `podman`, and it's available in the
+    RHEL 8/9 and AlmaLinux 8/9 repositories. Security is much improved in `podman`,
+    and the type of attack that I demonstrated for you doesn't work with it, even
+    without SELinux. Personally, I wouldn't even consider anything other than Podman
+    for running containers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Podman used to only be available for RHEL and Fedora-type Linux distros. It’s
+    now also available for most other Linux distros.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Now that I've given you a high-level overview of how the process isolation technologies
+    are used in Docker, let's look at how they're used in technologies that a mere
+    mortal is more likely to use. We'll begin with Firejail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sandboxing with Firejail
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '**Firejail** uses namespaces, SECCOMP, and kernel capabilities to run untrusted
+    applications in their own individual sandboxes. This can help prevent data leakage
+    between applications, and it can help prevent malicious programs from damaging
+    your system. It''s in the normal repositories for Debian and its offspring, which
+    include Raspbian for Raspberry Pi devices and probably every member of the Ubuntu
+    family. On the Red Hat side, it’s in the EPEL repository, so you’ll need to install
+    it first. Firejail is meant for use on single-user desktop systems, so we''ll
+    need to use a desktop version of Linux. So, go ahead and set up an AlmaLinux 9
+    VM with the Gnome desktop.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the previous edition of this book, I demoed this with Lubuntu, which at the
+    time was Ubuntu with the LXDE desktop. (Lubuntu has since switched to the LXQT
+    desktop.) Unfortunately, the Ubuntu distros are now set up to install certain
+    packages as Snap packages, which aren’t compatible with Firejail. So, for this
+    edition, I’ve switched to AlmaLinux 9 in order to make the demo work.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Before we get too far along, let''s consider some of the use cases for Firejail:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: You want to make doubly sure that your web browser doesn't leak sensitive information
+    when you access your bank's web portal.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: You need to run untrusted applications that you've downloaded from the Internet.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'To install Firejail on your AlmaLinux 9 machine, use these commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE66]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This installs Firejail, along with a whole bunch of profiles for different
+    applications. When you invoke an application with Firejail, it will automatically
+    load the correct profile for that application, if one exists. If you invoke an
+    application that doesn''t have a profile, Firejail will just load a generic one.
+    To see the profiles, `cd` into `/etc/firejail/` and take a look:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE67]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To easily count the number of profiles, just do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE68]'
+  prefs: []
+  type: TYPE_PRE
+- en: Subtracting the `total 4996` line from the top of the output gives us a total
+    of 1,230 profiles.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The simplest way to use Firejail is to preface the name of the application
+    you want to run with `firejail`. Let''s start with Firefox:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE69]'
+  prefs: []
+  type: TYPE_PRE
+- en: The main problem with Firejail is that it doesn't work well consistently. A
+    few years ago, a client had me do a writeup about Firejail, and I got it to mostly
+    work on my Fedora workstation and on my Raspberry Pi with Raspbian. But even with
+    the programs for which it did work, I lost some important functionality. For example,
+    when running a web browser with Firejail on my Fedora machine, I wasn't able to
+    watch videos on several different sites, including YouTube. Dropbox and Keepass
+    didn't work at all under Firejail, even though there are specific profiles for
+    both of them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On a Lubuntu virtual machine, running Firefox under Firejail just gave me a
+    blank browser page, regardless of where I tried to surf. So, I installed `chromium-browser`
+    and tried it. It worked much better, and I could even watch YouTube videos with
+    it. Then, I installed LibreOffice, which seemed to run fine with Firejail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Among the many options that Firejail offers is the option to ensure that programs
+    run either without any kernel capabilities enabled or with just the capabilities
+    that you specify. Something that the man page recommends is to drop all capabilities
+    for any programs that don''t require root privileges. So, for Chromium, we''d
+    do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE70]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, what if you just want to start your applications from the **Start** menu,
+    the way that you normally would, but still have Firejail protection? For that,
+    you can do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE71]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This command creates symbolic links in the `/usr/local/bin/` directory for
+    each program that has a Firejail profile. They look something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE72]'
+  prefs: []
+  type: TYPE_PRE
+- en: If you find that a program doesn't work under Firejail, just go into `/usr/local/bin/`
+    and delete the link for it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, you'll want to be aware of a very curious thing with the Firejail documentation.
+    In both the Firejail man page and on the main page of the Firejail website, it
+    says that you can use Firejail to sandbox desktop applications, server applications,
+    and user login sessions. However, if you click on the **Documentation** tab of
+    the Firejail website, it says that Firejail is only meant for single-user desktop
+    systems. That's because, in order to do its job, the Firejail executable has to
+    have the SUID permission bit set. The Firejail developers consider it a security
+    risk to allow multiple users to access a machine with this SUID program.
+  prefs: []
+  type: TYPE_NORMAL
+- en: All right, that's enough talk. Let's get some practice in.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab – using Firejail
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'For this lab, you''ll use an AlmaLinux 9 virtual machine with the Gnome desktop.
+    Let''s get started:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create an AlmaLinux virtual machine with the Gnome desktop option.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Install the EPEL repository and update the VM with these commands:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE73]'
+  prefs: []
+  type: TYPE_PRE
+- en: Then, reboot the machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Install Firejail, LibreOffice, and Chromium:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE74]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In one terminal window, start Chromium without any kernel capabilities:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE75]'
+  prefs: []
+  type: TYPE_PRE
+- en: Surf to various websites to see if everything works as it should.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'In another terminal window, start LibreOffice, also without any capabilities:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE76]'
+  prefs: []
+  type: TYPE_PRE
+- en: Create the various types of LibreOffice documents and try out various LibreOffice
+    functions to see how much still works properly.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Shut down both Chromium and LibreOffice.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Configure Firejail so that it automatically sandboxes every application you
+    start, even if you do this from the normal **Start** menu:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE77]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Look at the symbolic links that were created:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE78]'
+  prefs: []
+  type: TYPE_PRE
+- en: Try to open Firefox from the normal menu and verify whether or not it works.
+    Then, shut down Firefox.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'To be able to run Firefox without Firejail, just delete its symbolic link from
+    the `/user/local/bin/` directory, like so:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE79]'
+  prefs: []
+  type: TYPE_PRE
+- en: Try to run Firefox again. You should see that it starts normally.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You've completed this lab – congratulations!
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are a lot more Firejail options than what I can show you here. For more
+    information, see the Firejail man page and the documentation on the Firejail website.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So far, you've seen both the good and the bad of using Firejail. Next up, we'll
+    look at a couple of universal packaging systems for Linux.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sandboxing with Snappy
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In the Windows world and the Mac world, operating systems and the applications
+    that they can run are sold independently of each other. So, you buy a computer
+    that runs either Windows or macOS, and then you buy the applications separately.
+    When it comes to doing updates, you have to update the operating system, and then
+    update each application separately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the Linux world, most applications that you'll ever need are in the repositories
+    of your Linux distro. To install an application, you just use your distro's package
+    management utility – `apt`, `yum`, `dnf`, or whatever else – to install it. However,
+    this has turned out to be both a blessing and a curse. It does make it easier
+    to keep track of your applications and to keep the latest bug fix and security
+    updates installed. But unless you're running a rolling release distro such as
+    Arch, the application packages will become out of date before your Linux distro's
+    end of life. That's because distro maintainers use application versions that are
+    current when the distro version is released, and they don't upgrade to new application
+    versions until the next version of the distro is released. This also makes things
+    hard for application developers, because each family of Linux distros uses its
+    own packaging format. So, wouldn't it be nice to have a universal packaging format
+    that works across all Linux distros, and that can be kept up to date with ease?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Universal packaging began several years ago with `AppImage` packages. However,
+    they never really caught on that well, and they don't provide any sandboxing features.
+    So, this is all I'll say about them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next came Ubuntu's Snappy system, which allows developers to create snap packages
+    that are supposed to run on any system on which the Snappy system can be installed.
+    Each snap application runs in its own isolated sandbox, which helps protect the
+    system from malicious programs. Each snap package is a self-contained unit, which
+    means you don't have to worry about installing dependencies. You can even create
+    snap packages for servers that contain multiple services. The `snapd` daemon constantly
+    runs in the background, automatically updating both itself and any installed snap
+    applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As good as this all sounds, there are a couple of things about Snappy that make
+    it a bit controversial. First, the Ubuntu folk refuse to release the source code
+    for the Snappy application server. So, it's not possible to look at the source
+    code, and it's not possible to set up your own local Snappy server. If you develop
+    snap packages and want to deploy them, even if this is just on your own local
+    network, you have no choice but to use the central snap package portal that's
+    run by Canonical, Ubuntu's parent company. This does fly in the face of software
+    freedom, which the whole GNU/Linux ecosystem is supposed to represent. However,
+    the Canonical folk do it this way to verify the security of snap packages that
+    get served out.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Secondly, even though snap packages are sandboxed in order to protect the system,
+    other weird things can happen. Soon after the Snappy system came online, a package
+    developer got caught sneaking some Monero mining software into one of his packages.
+    Although he just wanted to monetize his efforts and meant no harm, it's still
+    not good to sneak that sort of thing into your packages without telling your potential
+    customers. After that, the Canonical folk stepped up their efforts to scan packages
+    that get uploaded to the portal, in order to prevent that sort of thing from happening
+    again.
+  prefs: []
+  type: TYPE_NORMAL
+- en: And then, there's the matter of user control. A user can delay snap updates
+    for up to 60 days, but can’t turn them off altogether. At some point, the `snapd`
+    daemon will update your installed packages, whether or not you really want it
+    to.
+  prefs: []
+  type: TYPE_NORMAL
+- en: And lastly, the practice of making each snap package a self-contained unit and
+    storing the three previous versions of every snap increases disk space usage.
+    Each package contains all the linked libraries that its application uses, which
+    means that you might have multiple packages that all use the same libraries. This
+    isn't necessarily that big of a deal with today's modern, large capacity hard
+    drives, but it could be a problem if you're low on disk space.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you're running any recent version of Ubuntu, you’ll have the Snappy service
+    running already. At some point (I forget when), the Ubuntu folk started including
+    Snappy in a default installation of Ubuntu Server. It’s now also installed by
+    default in the desktop versions of Ubuntu. In fact, Ubuntu now automatically uses
+    Snappy to install certain packages, such as Firefox and Chromium, even if you
+    use a normal `sudo apt install` command to install them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Snappy is also available in the repositories of many non-Ubuntu distros. It's
+    in the normal repositories for Fedora, and in the EPEL repositories for Red Hat
+    and all of its offspring. (Note though that I gave up on using snaps on my Fedora
+    systems, because it was causing too many weird problems with SELinux.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, how can Snappy be useful to a busy administrator? Well, let''s say that
+    your pointy-haired boss has just told you to set up a Nextcloud server so that
+    employees can have a central place to store their documents. However, you''re
+    in a time crunch, and you don''t want to jump through the hoops of setting up
+    all the individual components of a LAMP system. No problem – just install a snap.
+    First, let''s see what''s available for our Ubuntu server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE80]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'There are quite a few choices. We can use the `info` option to narrow things
+    down a bit:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE81]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'It looks like this is what I need. So, let''s install it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE82]'
+  prefs: []
+  type: TYPE_PRE
+- en: We’re not worried about using `sudo` here, because snap will prompt you for
+    a password for this particular operation. Note that for other snap operations,
+    this doesn’t work, so you’ll need to use `sudo`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To start it, just do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE83]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, from a desktop machine, navigate to the IP address of the **Nextcloud**
+    server and **create an admin account**. Once you''ve filled in all the details,
+    click **Finish Setup**:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.2: Nextcloud](img/file71.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 11.2: Nextcloud'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Simple, right? Imagine how long that would have taken doing it the old-fashioned
+    way. The only slight catch is that it's running on an unencrypted HTTP connection,
+    so you definitely don't want to expose this to the Internet. (There is a way to
+    reconfigure this to use an encrypted connection, but that’s beyond the scope of
+    this topic.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The Snapcraft store is Canonical''s official repository for snap packages.
+    Anyone who wants to can create an account and upload his or her own snaps. There
+    are plenty of applications there for desktop/workstations, servers, and IoT devices.
+    Several different machine architectures, including x86_64, ARM, and PowerPC, are
+    supported. (So yes, this can even be useful for your Raspberry Pi device.) This
+    can be seen in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.3: The Snapcraft store](img/file72.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 11.3: The Snapcraft store'
+  prefs: []
+  type: TYPE_NORMAL
+- en: That's pretty much all there is to it. Despite the controversies, it's still
+    a pretty cool concept.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you have to deploy IoT devices, you might want to look into Ubuntu Core.
+    It's a stripped-down version of Ubuntu that consists wholly of snap packages.
+    Space doesn't permit me to cover it in detail here, but you can read all about
+    it at [https://ubuntu.com/core](https://ubuntu.com/core).
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Now that you've seen how to work with Ubuntu's Snappy system, we'll look at
+    Fedora's Flatpak system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Sandboxing with Flatpak
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The Flatpak system, which was created by the Fedora Linux team, works toward
+    the same goal as Ubuntu's Snappy system, but there are significant differences
+    in their implementation. You can have one or both systems running on any given
+    Linux machine. With either system, you can create a universal package that runs
+    on any machine that has Snappy or Flatpak installed. And, both systems run each
+    of their applications in their own security sandbox.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, as I mentioned previously, there are differences:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Instead of having each application package entirely self-contained, Flatpak
+    installs shared runtime libraries that the application can access. This helps
+    cut down on disk space usage.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The Fedora folk operate a central repository that they call Flathub. However,
+    they also made the server code available for anyone who wants to set up his or
+    her own Flatpak repository.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Flatpak requires just a tiny bit more effort to set up because after you install
+    it, you have to configure it to use the desired repository.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The Snapcraft store has packages for server, desktop, and IoT use. Flathub mainly
+    has desktop applications.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Depending on which distro you''re running, you may or may not already have
+    the Flatpak system installed. On Debian/Ubuntu systems, install it with these
+    commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE84]'
+  prefs: []
+  type: TYPE_PRE
+- en: On RHEL, CentOS, AlmaLinux, and Fedora systems, there's a good chance that it's
+    already installed. If it isn't, just install it with the normal `yum` or `dnf`
+    commands. After you've installed Flatpak, go to the Flatpak **Quick Setup** page
+    to see how to configure it. Click on the icon for the distro that you're running
+    and follow the directions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You''ll find the **Quick Setup** page here: [https://flatpak.org/setup/](https://flatpak.org/setup/).'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: After installing the repository, restart the machine. After the machine has
+    rebooted, you'll be ready to install some applications. To pick one, go to the
+    Flathub website and browse until you find something you want.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You''ll find Flathub here: [https://flathub.org/home](https://flathub.org/home).'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Let''s say that you''ve browsed through the Productivity apps and found the
+    Bookworm e-book reader. Click on the link to go to the **Bookworm** app page.
+    You''ll see an **Install** button at the top of it. If you click on that button,
+    you''ll download the install file for **Bookworm**. To install it, you''ll still
+    need to type a command at the command line. Your best bet is to scroll down to
+    the bottom of the page, where you''ll see the command that will both download
+    and install the app at the same time:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 11.4: The Flathub repository](img/file73.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Figure 11.4: The Flathub repository'
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's also the command to run the app, but you might not need it. Depending
+    on which distro you're running, you might or might not have an icon created for
+    you in your **Start** menu.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Flatpak sometimes requires admin privileges, and sometimes it doesn’t. Whenever
+    it does, it will prompt you for a password, so there’s no need to preface your
+    `flatpak` commands with `sudo`.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Unlike Snappy, Flatpak doesn''t automatically update its apps. You''ll have
+    to do that yourself by periodically implementing this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE85]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this section, you looked at the basics of using the Snappy and Flatpak universal
+    packaging systems. With each one, developers can package their applications just
+    once, instead of doing it multiple times with multiple types of packages. End
+    users can use them so that their applications are always up to date, instead of
+    having to stick with the more outdated versions that are in their distro repositories.
+    And, in keeping with the overall context of this book, understand that by running
+    applications in their own isolated sandboxes, both of these systems provide an
+    extra measure of application security.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: So, another big chapter is behind us, and we've seen lots of cool stuff. We
+    started by looking at the `/proc` filesystem and at how to configure some of its
+    settings for the best security possible. After that, we looked at how cgroups,
+    namespaces, kernel capabilities, and SECCOMP can be used to isolate processes
+    from each other. We wrapped this chapter up with some examples of utilities and
+    package management systems that use these cool technologies.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we'll talk about the different ways you can scan, audit,
+    and harden your systems. I'll see you there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Which of the following is true?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`/proc` is just like any other directory in the Linux filesystem.'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`/proc` is the only pseudo-filesystem in Linux.'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`/proc` is one of several pseudo-filesystems in Linux.'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You can set values for `/proc` parameters with the `systemctl` command.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following commands would you use to set a value for a `/proc` parameter?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo systemctl -w`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo sysctl -w`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo procctl -w`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo sysctl -o`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo systemctl -o`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You need a program executable to run with one specific root privilege, without
+    having to grant any root privileges to the person who will be running it. What
+    would you do?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add a namespace.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create a SECCOMP profile.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add the SUID permission.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add a kernel capability.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Where would you find information about user processes?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the numbered subdirectories of the `/proc` filesystem.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the alphabetically named subdirectories of the `/proc` filesystem.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In the `/dev` directory.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: In each user's home directory.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is a syscall?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It tells the Linux kernel to perform a privileged action on behalf of a user.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It calls new system information into the kernel.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It keeps track of everything that the system kernel is doing.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: It isolates calls to system resources from each other.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On non-RHEL 9-type Linux distros, what is the best way to allow users to only
+    see information about their own processes?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add the `hidepid=2` option to the kernel startup parameters in the GRUB configuration.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add the `nopid=1` option to the kernel startup parameters in the GRUB configuration.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add the `nopid=1` option to the `/etc/fstab` file.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Add the `hidepid=1` option to the `/etc/fstab` file.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following commands would you use to see which kernel parameters
+    need to be changed for the best security?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo audit system`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo lynis audit system`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo system audit`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo lynis system audit`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following commands would allow a non-privileged user to start a
+    Python web server on `Port 80` without using root privileges?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo setcap ''CAP_NET_SERVICE+ep'' /usr/bin/python2.7`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo setcap ''CAP_NET_BIND_SERVICE+ep'' /usr/bin/python2.7`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo getcap ''CAP_NET_BIND_SERVICE+ep'' /usr/bin/python2.7`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo setcap ''CAP_NET_SERVICE+ep'' /usr/bin/python2.7`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: What is a major difference between the Snappy and Flatpak systems?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: There are none.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Flatpak packages are completely self-contained, but Snappy packages have you
+    install separate runtime packages.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Snappy packages are completely self-contained, but Flatpak packages have you
+    install separate runtime packages.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Flatpak packages run in their own sandbox, but Snappy packages don't.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Snappy packages run in their own sandbox, but Flatpak packages don't.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: You need to limit the number of syscalls that your Docker container can make.
+    How would you do that?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create the container in its own cgroup and configure the syscall limits for
+    that cgroup.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create the container in its own namespace and configure the syscall limits for
+    that namespace.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Run the container under Firejail.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Create the container with a SECCOMP profile.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Exploring the `/proc` filesystem: [https://www.tecmint.com/exploring-proc-file-system-in-linux/](https://www.tecmint.com/exploring-proc-file-system-in-linux/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Linux kernel security subsystem wiki: [https://kernsec.org/wiki/index.php/Main_Page](https://kernsec.org/wiki/index.php/Main_Page)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Linux Magic System Request Key Hacks: [https://www.kernel.org/doc/html/latest/admin-guide/sysrq.html](https://www.kernel.org/doc/html/latest/admin-guide/sysrq.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Linux to get kernel "lockdown" feature: [https://www.zdnet.com/article/linux-to-get-kernel-lockdown-feature/](https://www.zdnet.com/article/linux-to-get-kernel-lockdown-feature/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Protect hard and symbolic links in RHEL/CentOS: [https://www.tecmint.com/protect-hard-and-symbolic-links-in-centos-rhel/](https://www.tecmint.com/protect-hard-and-symbolic-links-in-centos-rhel/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Log suspicious Martian packets: [https://www.cyberciti.biz/faq/linux-log-suspicious-martian-packets-un-routable-source-addresses/](https://www.cyberciti.biz/faq/linux-log-suspicious-martian-packets-un-routable-source-addresses/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Protect against the usage of ptrace: [https://linux-audit.com/protect-ptrace-processes-kernel-yama-ptrace_scope/](https://linux-audit.com/protect-ptrace-processes-kernel-yama-ptrace_scope/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Introduction to Linux Control Groups (cgroups) Version 1: [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/chap-introduction_to_control_groups](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/chap-introduction_to_control_groups)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'RHEL 7: How to get started with cgroups Version 1: [https://www.certdepot.net/rhel7-get-started-cgroups/](https://www.certdepot.net/rhel7-get-started-cgroups/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Introduction to cgroup Version 2: [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/monitoring_and_managing_system_status_and_performance/setting-limits-for-applications_monitoring-and-managing-system-status-and-performance](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/monitoring_and_managing_system_status_and_performance/setting-limits-for-applications_monitoring-and-managing-system-status-and-performance)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Limit CPU Usage on Ubuntu 19.10 with `systemd` cgroups: [https://youtu.be/_AODvcO5Q_8](https://youtu.be/_AODvcO5Q_8)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Control Groups versus Namespaces: [https://youtu.be/dTOT9QKZ2Lw](https://youtu.be/dTOT9QKZ2Lw)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'How to manage Linux file capabilities: [https://www.howtoforge.com/how-to-manage-linux-file-capabilities/](https://www.howtoforge.com/how-to-manage-linux-file-capabilities/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'getcap, setcap, and file capabilities: [https://www.insecure.ws/linux/getcap_setcap.html](https://www.insecure.ws/linux/getcap_setcap.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Docker security features – SECCOMP profiles: [https://blog.aquasec.com/new-docker-security-features-and-what-they-mean-seccomp-profiles](https://blog.aquasec.com/new-docker-security-features-and-what-they-mean-seccomp-profiles)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Docker documentation – Docker Security: [https://docs.docker.com/engine/security/security/](https://docs.docker.com/engine/security/security/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Firejail website: [https://firejail.wordpress.com/](https://firejail.wordpress.com/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Firejail documentation: [https://firejail.wordpress.com/documentation-2/](https://firejail.wordpress.com/documentation-2/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Introduction to App Packages on Linux: [https://fosspost.org/education/app-packages-linux-snap-flatpak-appimage](https://fosspost.org/education/app-packages-linux-snap-flatpak-appimage)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The Ubuntu snap Usage Tutorial: [https://tutorials.ubuntu.com/tutorial/basic-snap-usage#0](https://tutorials.ubuntu.com/tutorial/basic-snap-usage#0)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'How to manage snap updates: [https://snapcraft.io/blog/how-to-manage-snap-updates](https://snapcraft.io/blog/how-to-manage-snap-updates)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The Official Canonical Snapcraft Store: [https://snapcraft.io/](https://snapcraft.io/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The future of Linux desktop application delivery is Flatpak and Snap: [https://www.zdnet.com/article/the-future-of-linux-desktop-application-delivery-is-flatpak-and-snap/](https://www.zdnet.com/article/the-future-of-linux-desktop-application-delivery-is-flatpak-and-snap/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Flathub: [https://flathub.org/home](https://flathub.org/home)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Three approaches to secrets management for Flatpak applications: [https://opensource.com/article/19/11/secrets-management-flatpak-applications](https://opensource.com/article/19/11/secrets-management-flatpak-applications)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Answers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: c
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: b
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: d
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: a
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: a
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: d
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: b
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: b
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: c
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: d
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

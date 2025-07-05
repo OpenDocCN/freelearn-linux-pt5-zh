@@ -1,0 +1,1373 @@
+- en: Chapter 2. Dealing with File Labels
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover how file labels are set and managed, and learn
+    how to configure the SELinux policy ourselves to use and assign the right file
+    labels. The recipes that this chapter covers are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Defining file contexts through patterns
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using substitution definitions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Enhancing an SELinux policy with file transitions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting resource-sensitivity labels
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configuring sensitivity categories
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Setting, resetting, and governing file labels are the most common tasks administrators
+    have to perform on an SELinux-enabled system. The policies that are provided by
+    policy developers as well as Linux distributions offer sane defaults to use, but
+    many implementations harbor different locations for services and files. Companies
+    often install their custom scripts and logfiles in nondefault locations, and many
+    daemons can be configured to support multiple instances on the same system—each
+    of them using a different base directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'System administrators will know how to set context definitions through the
+    `semanage` application and then reset the contexts of the target files using `setfiles`
+    or `restorecon`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This, however, is a local definition, which, if necessary, needs to be exported
+    and imported in order to transfer it to other systems:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: By moving context definitions into the SELinux policy realm, such definitions
+    can be easily installed on multiple systems and managed centrally as we've seen
+    for SELinux policy modules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Defining file contexts through patterns
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: SELinux policy modules can contain file context definitions through their `.fc`
+    files. In these files, path expressions are used to point to the various locations
+    that should match a particular file context, and class identifiers are used to
+    differentiate file context definitions based on the file class (directories, regular
+    files, symbolic links, and more).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we'll create a `mylogging` SELinux module, which defines additional
+    path specifications for logging-related contexts. We will use direct file paths
+    as well as regular expressions, and take a look at the various class identifiers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To define a file context through an SELinux policy module, use the following
+    approach:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With `matchpathcon`, we can check what is the context that the SELinux tools
+    would reset the resource to:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create the `mylogging.te` file in which we mention the types that are going
+    to be used in the definition. It is a best practice to handle types that are not
+    defined by the SELinux module itself through a different SELinux module. In this
+    example though, we also declare `var_t` to keep the example simple:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Next, create the `mylogging.fc` file in which we declare the path expressions
+    and their associated file context:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Now, build the policy module and load it:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'With `matchpathcon`, we can now verify whether the context known to the SELinux
+    tools is the correct one:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: An SELinux policy module contains everything SELinux needs to properly handle
+    a set of policy rules. This includes the rules themselves (which are declared
+    in a `.te` file) with optional interface declarations (in the `.if` files), which
+    define interfaces that other policies can call in order to generate specific SELinux
+    rules. The third and final part of an SELinux policy module is the related file
+    contexts file —hence the `.fc` file suffix.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Context declarations in a `.fc` file do not automatically enforce and set these
+    contexts. These are merely definitions used by the SELinux utilities and libraries
+    when a relabeling operation occurs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This contexts file contains, per line:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A path expression to which an absolute file path should match
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An optional class identifier to discern contexts (files, directories, sockets,
+    symbolic links, and so on)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The context to be assigned to this path
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Each part of the context definition is whitespace delimited:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: The lines can be ordered to the policy developers' liking. Most developers order
+    paths in an alphabetical order with grouping based on the top-level directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Path expressions
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The regular expression support in the SELinux tools and libraries is based on
+    **Perl-Compatible Regular Expressions** (**PCRE**).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Of all possible expressions, the simplest expression to use is the one without
+    globbing, such as the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: An important part of this is the escape of the period—if we don't escape the
+    period, then the PCRE support would treat the period as any character matching
+    not only a `listener.log` file, but also `listener_log` or `listenerslog`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A very common expression is the one that matches a particular directory and
+    all subdirectories and files inside, which is represented in the following example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: This ensures that there is always a context definition for a file or directory
+    within.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The order of processing
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Given the exhaustive list of path expressions that a regular system has, a file
+    path can match multiple rules, so which one will the SELinux utilities use?
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Basically, the SELinux utilities follow the principle of *most specific first*.
+    Given two lines A and B, this is checked in the following order, where the first
+    match wins:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If line A has a regular expression in it and B doesn't, then B is more specific.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If the number of characters before the first regular expression in line A is
+    less than the number of characters before the first regular expression in line
+    B, then B is more specific.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If the number of characters in line A is less than the number of characters
+    in line B, then line B is more specific.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If line A does not specify an SELinux type (so that the context part of it is
+    `<<none>>`) and line B does, then line B is more specific.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The SELinux utilities will load in the definitions given through the files available
+    at `/etc/selinux/mcs/contexts/files/`, but will give preference to the ones in
+    `file_contexts.local` (and then `file_contexts.homedirs`) as those are the definitions
+    made by the system administrator locally. However, if a local definition uses
+    a regular expression and a policy-provided definition doesn't, then the policy-provided
+    definition is still used. This is the only exception to the preference rules between
+    the various context files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The SELinux utilities provide a tool called `findcon` (part of the `setools`
+    or `setools-console` package) that can be used to analyze this ordering, which
+    shows the matching patterns within a single (!) context definition file and orders
+    them from least specific to most specific:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If only the actual context definition is needed (and not the full set of matching
+    expressions with the precedence order as `findcon` shows), then `matchpathcon`
+    can be used instead:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: Class identifiers
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The second part of the context definition is an optional part—a class identifier.
+    Through a class identifier, developers can tell the SELinux utilities that a context
+    definition is only applicable if the path expression matches a particular file
+    class. If the class identifier is omitted, then any class matches.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If a class identifier is shown, then one (per line) of the following identifiers
+    can be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The '`--`' identifier is used for regular files
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The '`-d`' identifier is used for directories
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The '`-l`' identifier is used for symbolic links
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The '`-b`' identifier is used for block devices
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The '`-c`' identifier is used for character devices
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The '`-p`' identifier is used for FIFO files
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The '`-s`' identifier is used for sockets
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Context declaration
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The final part of a context definition is the context itself that is to be
+    assigned to all matching resources. It is generated through the `gen_context`
+    macro, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `gen_context` macro is used to differentiate context definitions based on
+    policy features. If the target policy does not support MLS, then only the first
+    argument (`system_u:object_r:var_t`, in the example) is used. If the policy supports
+    MLS but only a single sensitivity (`s0`), then `:s0` is appended to the context.
+    Otherwise, the second argument (coincidentally also `s0` in the example) is appended
+    (with a colon in front).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Generally, contexts only differ on the SELinux type. The SELinux owner and SELinux
+    role of the resource usually remain `system_u` and `object_r` respectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A special value for the context is `<<none>>`, like in the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: This tells the SELinux utilities that they should never try to set the context
+    of this resource. Whenever an administrator triggers a filesystem relabeling operation,
+    these specific locations will not have their label changed (regardless of their
+    current label). This does *not* mean that an existing context should be removed!
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In the recipe, we covered how to define labels in great detail. If many changes
+    are made, it makes sense to force a relabel on the entire system. On Red Hat systems,
+    this can be accomplished by creating a flag file and rebooting the system:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On Gentoo systems, the entire system can be relabeled using the `rlpkg` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On Red Hat systems, the command to relabel the system is called `fixfiles`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is also needed if a system has been (temporarily) booted without SELinux
+    support or with SELinux disabled as files will be created that have no file context.
+    When an SELinux-enabled system is booted again, it will mark those files as `unlabeled_t`,
+    which is a type that most domains have no access to (SELinux-wise).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using substitution definitions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Sometimes, applications and their resources get installed at different locations
+    than expected by the SELinux policy. Trying to accommodate this by defining additional
+    context definitions for each and every subdirectory can easily become unmanageable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To help administrators, the SELinux utilities support substitution entries,
+    which tell SELinux "if a path starts with *this*, then label it as if it starts
+    with *that*". Administrators can set such a substitution (which is called an **equivalence
+    class**) using `semanage`, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this example, any location under `/mnt/chroots/bind/` will be labeled as
+    if it started from the main `/` directory (so `/mnt/chroots/bind/etc/` becomes
+    `etc_t` as `/etc/` is `etc_t`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Target locations for `chroots` are a good use case for this. A `chroot` is an
+    alternate location on the filesystem, which will act as the root filesystem for
+    one or a set of applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For administrators who want to set substitutions across multiple systems, it
+    is not possible to make this part of an SELinux policy module. The file that we
+    need to manage is called `file_contexts.subs` (there is also one that ends with
+    `.subs_dist` and is managed by the Linux distribution, which we will not touch).
+    Having that said, we can always look at how to update this file in a more or less
+    sane manner.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The easiest method would be to use a central configuration management utility,
+    such as Puppet, CFEngine, Chef, or Ansible, as these systems allow administrators
+    to force the content of specific files to a particular value. The use of a configuration
+    management tool is an entire book in itself, so this is outside the scope of this
+    book. If you do want to pursue this, remember that the `file_contexts.subs` file
+    is (also) managed by the `semanage` command. Administrators might want to add
+    in local definitions that the central configuration management utility isn't aware
+    of (and thus might revert the change).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we'll cover a generic approach, but it does require that there
+    is a way to do both a file transfer followed by a single line command (executed
+    with proper permissions). This, however, shouldn't be much of a challenge to most
+    system administrators.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In order to apply changes to a wide range of systems, follow the next set of
+    steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Apply the change locally to the system:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Export the definitions to a single file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Edit the `local_selinux.mods` file and remove all entries that are not related
+    to the change but need to be distributed.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Distribute the resulting file to the target systems.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Apply the changes locally to the system:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `semanage fcontext` command instantiates an equivalence class for `/mnt/chroot/bind/`,
+    which has all subdirectories and files inside of it labeled as if they were at
+    /. This ensures that administrators do not need to define a large amount of file
+    contexts for each and every `chroot` location they manage.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, this might become problematic as `semanage fcontext` only applies changes
+    locally, and on a larger infrastructure, the same settings might need to be applied
+    to multiple systems. For this, `semanage export` and `semanage import` can be
+    used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The output of the `semanage export` command is a set of instructions for `semanage`
+    and follows the syntax of the `semanage` commands to the letter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When exporting the `semanage` definitions, the first set of commands that are
+    stored are the `delete all` statements such as `fcontext -D` (delete all locally
+    made `semanage fcontext` settings). Of course, if we only need to distribute the
+    substitution definitions, then deleting all previously made local statements is
+    incorrect. Hence, the need to manually edit the `local_selinux.mods` file. If
+    only the equivalence class definition needs to be distributed, then the file might
+    just contain the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: The exported file can then be distributed to all target systems and loaded through
+    the `semanage import` command effectively applying the same set of changes to
+    the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If the definition was already applied on a system, then the `import` command
+    will fail:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: It is important to note here that if one command in the file fails to apply,
+    then none of the commands in the file are applied (the file is processed in one
+    go). This is why the `delete all` rules are originally made part of the exported
+    set of commands.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This makes distributed management of such settings more challenging if locally
+    applied changes need to be kept as well, unless the distributed set of changes
+    are singular (one exported instruction, which is allowed to fail).
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Most files inside the `/etc/selinux/mcs/contexts/` location shouldn't be managed
+    through any tool except either the Linux distribution package management system
+    (through the installation of the base SELinux policy) or `semanage`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: That being said, most files inside this location don't change much (except for
+    the `files/file_contexts` file). It might be beneficial to hook into the package
+    management system to update these files (if supported) or bluntly take over the
+    management of these files, assuming you track the changes that the distribution
+    would make closely.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The following resources dive deeper into the topics discussed in this recipe:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: To find out more about the various configuration files, check out [http://selinuxproject.org/page/PolicyConfigurationFiles](http://selinuxproject.org/page/PolicyConfigurationFiles)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The interaction of SELinux with `chroots` is discussed in more detail in [Chapter
+    9](ch09.html "Chapter 9. Aligning SELinux with DAC"), *Aligning SELinux with DAC*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Enhancing an SELinux policy with file transitions
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Up until now, we''ve only handled the configuration part on file contexts:
+    if we would ask SELinux utilities to relabel files, then the changes we made would
+    come into effect. However, unless you run with the `restorecond` daemon checking
+    out all possible file modifications (which would really be a resource hog) or
+    run `restorecon` manually against all files regularly, the newly defined contexts
+    will not be applied to the files.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: What we need to do is modify the local SELinux policy so that, upon creation
+    of these files, the Linux kernel automatically assigns the right label to those
+    files. This is handled through file transitions, which is a specific case of a
+    **type transition**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In a type transition, we configure a policy so that if a given domain creates
+    a file (or other resource class) inside a directory with a specified label, then
+    the created object should automatically get a specific label. Policy-wise, this
+    is written as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'SELinux has also added in support for named file transitions (from Linux 2.6.39
+    onwards, and available in Gentoo, Fedora 16+, and Red Hat Enterprise Linux 7+).
+    In that case, such a transition only occurs if the created resource matches a
+    particular filename exactly (so no regular expressions):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: Through the reference policy macro's, this is supported with the `filetrans_pattern`
+    definition.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In order to properly define file transitions, we need to know what the source
+    domain is that is responsible for creating the resource. For instance, a `/var/run/snort/`
+    directory might be created by an `init` script, but if there is no file transition,
+    then this directory will be created with the type of the parent directory (which
+    is `var_run_t`) instead of the proper type (`snort_var_run_t`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: So make sure to write down all the involved labels (as an example, we will use
+    `initrc_t` for an `init` script, `var_run_t` for the parent directory, and `snort_var_run_t`
+    for the target directory) before embarking on this recipe.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Defining a file transition can be done as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Search through the SELinux policies to see if there is an interface that will
+    provide a file transition from a given domain to `snort_run_t`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Assuming that none have been found, search for interfaces that allow `initrc_t`
+    created resources to transition to a given type:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Bingo! Now, let''s create an enhancement for the snort SELinux module (through
+    a `mysnort` policy file) with the following declaration in it:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Build the new policy and load it. Then check with `sesearch` if a type transition
+    is indeed declared:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Linux distributions that support SELinux already provide an SELinux policy that
+    works in a majority of deployments. The default policy is extensive and works
+    mostly out of the box. If specific changes are needed, chances are that these
+    particular SELinux rules are already defined (as part of policy interfaces) and
+    only need to be instantiated and loaded.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Policy interfaces usually exist in the following two types:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Interfaces whose subject is delivered through an argument, and where the object
+    (against which operations are performed) and perhaps target (in our case, to which
+    a transition should occur) are hardcoded
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Interfaces whose subject is hardcoded and where the object, target, or both
+    are arguments to the interface
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'An example of the first interface type that can be used in our example would
+    look like the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We could then call this interface like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: However, such interfaces would be a burden to maintain. For every daemon support
+    added to the system, the `init` policy would need to be changed with a named file
+    transition together with the newly added policy rules for the daemon. Considering
+    the amount of daemons that can run on a system, the `init` policy would literally
+    be filled with a massive amount of named file transitions—at least one for every
+    daemon.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The interface declaration that we encountered in the example is much more manageable.
+    The interface is meant to be called by the daemon policy itself and immediately
+    ensures that the `initrc_t` type can create directories of the given type (`snort_var_run_t`)
+    inside the generic run directory (`var_run_t`). New additions to the policy leave
+    the `init` policy at rest, making maintenance of the policies easier.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finding the right search pattern
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To find the right pattern, we use the `sefindif` interface to search through
+    the available interfaces. Finding the right expression is a matter of experience.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we know, we want to search for file transitions, the line we are looking
+    for will contain `filetrans_pattern`. Then, one of the arguments involved is the
+    type we are going to transition to (`snort_var_run_t`). So the expression we used
+    in the example was changed to `filetrans.*snort_var_run_t`. As that didn't result
+    in anything, the next search involved the domain from which a transition has to
+    be made (`initrc_t`) so that the expression was changed to `filetrans.*initrc_t`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'However, let''s assume we don''t know that `filetrans_pattern` needs to be
+    searched for. The type itself (`snort_var_run_t`) or domain (`initrc_t`) might
+    be sufficient to search through, like in the following searches:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: From the resulting list of interfaces, we can then see if an interface is available
+    that suits our needs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Patterns
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Patterns such as `filetrans_pattern` are important supporting definitions inside
+    the reference policy. They bundle a set of permissions related to a functional
+    approach (such as read files, which are handled through a `read_files_pattern`)
+    and are not tied to a particular type (unlike interfaces).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The need for patterns comes from the very fine-grained access controls that
+    SELinux has on Linux activities. Reading a file is a nice example: it is not sufficient
+    to just allow a type to perform the `read` action:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Most applications first check the attributes of the file (`getattr`) and open
+    the file before they can read the file. Depending on the purpose, they might also
+    want to lock the file or perform I/O operations on it through `ioctl`. So instead
+    of just the preceding access vector, the rule was changed to:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The reference policy provides a single permission set for this called `read_file_perms`,
+    which turns the access vector into the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Second, the policy developers often want to allow a domain to read a file inside
+    a directory that is labeled similarly. For instance, a `snort_var_run_t` file
+    can be at `/var/run/snort/snort.pid` with the `/var/run/snort/` directory also
+    being labeled as `snort_var_run_t`. So we would also need to grant the `initrc_t`
+    type search rights inside the directory—which again is a set of permissions as
+    can be seen from the `search_dir_perms` definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Instead of creating multiple rules for this, a pattern is created, called `read_files_pattern`,
+    which looks like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This allows policy developers to use a single call:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To see the various patterns supported for policy development, use `sefinddef`
+    with the ''`define.*_pattern`'' expression:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: Using patterns allows developers to create readable policy rules using a functional
+    approach rather than a full sum-up of each individual access vector.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In the `snort_generic_pid_filetrans_pid` interface presented earlier, we used
+    a named file transition: the transition occurs only if the filename passed on
+    as the last argument matches the filename of the file created.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Named file transitions take precedence over normal file transitions. A good
+    example for this are the file transitions supported for the `initrc_t` domain:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, if an `init` script creates a directory called `udev` or `tor`
+    (or any of the other transition rules that are not shown in the example), then
+    a proper file transition occurs. If the filename doesn't match, then a transition
+    occurs to the `initrc_var_run_t` type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: File transitions on regular files and directories are the most common, but transitions
+    can also occur on various other classes, such as sockets, FIFO files, symbolic
+    links, and more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Domain transitions (which assign a different context to a process rather than
+    a file) are covered in [Chapter 3](ch03.html "Chapter 3. Confining Web Applications"),
+    *Confining Web Applications* in more detail and are used in [Chapter 4](ch04.html
+    "Chapter 4. Creating a Desktop Application Policy"), *Creating a Desktop Application
+    Policy* and [Chapter 5](ch05.html "Chapter 5. Creating a Server Policy"), *Creating
+    a Server Policy*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting resource-sensitivity labels
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: When an SELinux policy is MLS-enabled and supports multiple sensitivities (which
+    is not the case with MCS, as MCS only has a single sensitivity), then SELinux
+    can govern information flow and access between a domain and one or more resources
+    based on the clearance of the domain and the sensitivity level of the resource.
+    But even with a single sensitivity (as is the case with MCS), SELinux has additional
+    constraint support to ensure that domains cannot access resources that have one
+    of the categories assigned that the domain doesn't have clearance for.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A sensitivity level consists of a sensitivity (`s0` is generally being used
+    for the lowest sensitivity and `s15`—which is a policy build-time constant and
+    thus can be configured—is the highest sensitivity) together with a category set
+    (which can be a list such as `c0,c5,c8.c10`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: A security clearance is similar to a sensitivity level but shows a sensitivity
+    range (such as `s0-s3`) instead of a single sensitivity level. A security clearance
+    can be seen as a range going from the lowest sensitivity level to the highest
+    sensitivity level allowed by the domain.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When policies are being developed for such systems, context definitions and
+    policy rules can take sensitivities into account. In this recipe, we will do the
+    two most common operations for MLS-enabled systems:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Define a context with a higher-level sensitivity
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Set the clearance of a process policy-wise on a domain transition
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: To accomplish this, we will use the snort intrusion detection system as an example,
+    forcing it to be always executed with the `s3` sensitivity and all possible categories.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This example will also show us how to substitute an existing policy rather than
+    enhance it, as we are going to update a definition that would otherwise collide
+    with the existing definition.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To modify an existing domain to support specific sensitivity levels, execute
+    the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Copy the `snort.te` and `snort.fc` files from the distribution policy repository
+    to the local environment:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Rename the files to `mysnort` (or `customsnort`), so we always know this is
+    a customized policy. Don't forget to update the `policy_module` call in the `.te`
+    file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Open the `mysnort.te` file and look for the `init_daemon_domain` call. Substitute
+    the call with the following:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'In `mysnort.fc`, label the snort resources with the `s3` sensitivity. For instance,
+    for the snort binary, label it as follows:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Build the `mysnort` policy, remove the currently loaded snort SELinux policy
+    module, and load the `mysnort` one:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Relabel all files related to snort and then start snort again.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'There are three important aspects to this recipe:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We replace the entire policy rather than create an enhancement.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: We update the policy to use a ranged daemon domain.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: We update the file contexts to use the right sensitivity.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The file context update is obvious but the reason for fully replacing the policy
+    might not be.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Full policy replacement
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In the example, we copied the existing policy for the snort SELinux module and
+    made the updates in the copy, rather than trying to enhance the policy by creating
+    an additional module.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This is needed because we are making changes to the SELinux policy that are
+    mutually exclusive to the already running SELinux policy. For instance, the file
+    context changes would confuse SELinux as it would then have two fully matching
+    definitions through policy modules, but each with a different resulting context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the example, we only copied the type enforcement declarations (`snort.te`)
+    and file context declarations (`snort.fc`). If we would copy the interface definitions
+    as well (`snort.if`), the policy build would give us a warning that there are
+    duplicate interface definitions—the ones provided by the Linux distribution are
+    still on the system after all.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Ranged daemon domain
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'In the SELinux policy itself, we substituted the `init_daemon_domain(snort_t,
+    snort_exec_t)` entry with the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s take a look at the contents of this interface:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: The newly called interface calls the original `init_daemon_domain`, but enhances
+    it with MCS- and MLS-related logic. In both cases, it calls `range_transition`
+    so that when the snort `init` script (running as `initrc_t`) transitions to the
+    `snort_t` domain, then the active sensitivity range is also changed to the third
+    parameter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In our case, the third parameter is `s3:mcs_allcats`, where `mcs_allcats` is
+    a definition that expands to all categories supported by the policy (such as `c0.c255`
+    if the policy supports 256 categories).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In case of MLS, it also calls `mls_rangetrans_target`, which is an interface
+    that sets an attribute to the `snort_t` domain, which is needed for the MLS constraints
+    enabled in the policy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: From the expanded code, we can see that there are `ifdef()` statements. These
+    are blocks of SELinux policy rules that are enabled (or ignored) based on build-time
+    parameters. The `enable_mcs` and `enable_mls` parameters are set if an MCS or
+    MLS policy is enabled. Other often used build-time parameters are distribution
+    selections (such as `distro_redhat` if the SELinux policy rules are specific for
+    Red Hat Enterprise Linux and Fedora systems) and `enable_ubac` (which is when
+    user-based access control is enabled).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Constraints
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Most, if not all, SELinux policy development focuses on type enforcement rules
+    and context definitions. SELinux does support various other statements, one of
+    which is the `constrain` statement used to implement constraints.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A constraint restricts permissions further based on a set of expressions that
+    cover not only the type of the object or subject, but also SELinux role and SELinux
+    user. The constraint that is related to the `mlsrangetrans` attribute (which is
+    set by the `mls_rangetrans_target` interface) looks like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The constraint tells us the following things about a transition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The transition can occur only when the highest sensitivity level of the subject
+    (domain/actor) dominates the highest sensitivity level of the object
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The lowest sensitivity level of the subject is the same as the lowest sensitivity
+    level of the object
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If not, then the type of the subject has to have the `mlsprocsetsl` attribute
+    set
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'If not, then both of the following statements have to be true:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The type of the subject has the `privrangetrans` attribute set
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The type of the object has the `mlsrangetrans` attribute set
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Domination means that the sensitivity level of the first security level is equal
+    to or higher than the sensitivity level of the second security level, and the
+    categories of the first security level are the same or a superset of the categories
+    of the second security level.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Constraints in the SELinux policy are part of the base policy set—this means
+    that we are not able to add constraints through loadable SELinux policies. If
+    we want to include additional constraints, we would need to build the entire policy
+    ourselves, patching the `constraints`, `mls`, and `mcs` files inside the policy
+    repository's `policy/` subdirectory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Knowing about constraints is important, but we probably never need to write
+    constraints ourselves.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The SELinux project site is a good start for learning about constraints and
+    their related statements:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The MLS statements at [http://selinuxproject.org/page/NB_MLS](http://selinuxproject.org/page/NB_MLS)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The constraint statements at [http://selinuxproject.org/page/ConstraintStatements](http://selinuxproject.org/page/ConstraintStatements)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configuring sensitivity categories
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Although MCS policies are MLS-enabled, they are configured to only support a
+    single sensitivity (namely `s0`). Yet even with this limitation, an MCS policy
+    can be very useful, for instance, in situations where a system hosts services
+    for multiple customers. This is because MCS can still benefit from security clearances
+    based on categories.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Unlike sensitivities, categories are more like a discretionary access control
+    system. Categories are meant to be used by users (or administrators) to label
+    files and other resources as being a member of one or more categories. Access
+    to those resources is then based on the clearance level of the process and the
+    categories assigned to the resource. Categories are also not hierarchically structured.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'An example of a use case where categories play a major role is in multitenant
+    deployments: systems that host one or more services for multiple tenants (multiple
+    customers), which, of course, require proper security segregation so that one
+    tenant cannot access resources of another tenant.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: In most cases, administrators will try to separate those services through the
+    runtime user (and group membership). This is, however, not always possible. There
+    are situations where these separate processes still need to run as the same runtime
+    user (although with support for additional Linux security subsystems—such as capabilities—the
+    number of situations has significantly reduced again).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, we'll configure a system to use multiple categories to differentiate
+    between resources of different customers for a web server that the customers also
+    have shell access to. Through categories, we can provide more protection for the
+    resources of other customers, in case one of the customers is able to execute
+    an exploit that would elevate their privileges.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: You need to prepare a system for the multiple tenants. For instance, we can
+    host the entire website content in `/srv/web/<companyname>/` and have the web
+    server configuration at `/etc/apache/conf/<companyname>/`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this recipe, as an example, we will configure the system for two companies
+    called `CompanyX` and `CompanyY`. Each company also has a regular user (`userX`
+    for the first company and `userY` for the second).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To instantiate different categories, follow this approach:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Settle on the category naming (and numbers) for different customers and configure
+    those in the `setrans.conf` file inside `/etc/selinux/mcs/`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Restart the `mcstrans` service so that it is aware of this configuration.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'List the categories to make sure that the changes are properly interpreted:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create SELinux users that have clearance to handle the right categories:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Configure the Linux users (logins) with the right security clearance:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Set the right category on the company resources:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Configure the Apache `init` scripts to launch Apache with the right security
+    level by launching it through `runcon`. For instance, on a Red Hat Enterprise
+    Linux 6 system for the first company''s web server, the following script is used:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '(Re)start the web server and validate that it is running with the right security
+    level:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: We started by configuring the system so that we can name categories and ranges
+    rather than having to use the integer representations. Next, we created an SELinux
+    user for each company and assigned each (regular) Linux account to the right SELinux
+    user. After updating the contexts of all company-related files, we configured
+    Apache to start in the right context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The mcstrans and setrans.conf files
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The `setrans.conf` file is a regular text file that the MCS transition daemon
+    (`mcstransd`) uses to substitute the real security level (such as `s0:c100`) with
+    a human readable string (such as `CompanyX`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Linux utilities themselves (such as `ls` and `ps`) use the SELinux libraries
+    to get information about the contexts of files and processes. These libraries
+    then connect with the `mcstransd` process (through the `/var/run/setrans/.setrans-unix`
+    socket), sending the real security level and retrieving the human-readable representation
+    for it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It is important to remember that this is only a representation and not how the
+    security level is stored. In other words, do not use this in file context definition
+    files (that is, the SELinux policy `.fc` files).
+  prefs: []
+  type: TYPE_NORMAL
+- en: SELinux users and Linux user mappings
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In the example, an SELinux user is created for each company. This SELinux user
+    is given the clearance to work with resources tagged with the category of the
+    respective companies. The real Linux accounts are then mapped to this SELinux
+    user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'From the example, we see that there are two definitions for each company:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: The first one is a security level and can be assigned to both resources as well
+    as processes (users). The second one is a security clearance (a range). In this
+    particular example, the clearance tells us that the high security level (which
+    can be seen as *what the process is allowed to access*) are the resources of the
+    company (`s0:c100`), and the low security level (which can be seen as *the security
+    level of the process itself* ) is just `s0`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The users for the company, therefore, have clearance to access the files (and
+    other resources) that have their company''s category assigned to it. However,
+    all activities performed by these user accounts do not get this category by default—the
+    users will need to use `chcon` to set the category, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: It is possible to give the users the security level itself rather than the clearance.
+    When that occurs, any resource created by the user will also get the proper category
+    set. But, do not use this as a way to confine resources—users can always remove
+    categories from resources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Granting the security level can be done on the SELinux user level, but it is
+    also possible to do this through the SELinux user mapping as long as the range
+    passed on is dominated by the range set on the SELinux user level. For instance,
+    to set `CompanyX` (`s0:c100`) as the security level rather than `CompanyXClearance`,
+    which is the default for users mapped to the `userX_u` SELinux user, the following
+    command can be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: Running Apache with the right context
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The last change made in the example was to configure the system to start the
+    web server with the right security level. This is done through the `runcon` command,
+    where we pass on the sensitivity level (and not the security clearance) to make
+    sure that every resource created through the web server inherits the right category
+    as well as the target type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The SELinux policy knows that if an `init` script launches the Apache binary
+    (`httpd`), then this application has to run in the `httpd_t` domain. However,
+    now the `init` script launches `runcon`—which the SELinux policy sees as a regular
+    binary—so the application would continue to run in the `initrc_t` domain. Hence,
+    we need to pass on the target type (`httpd_t`). On systems with an SELinux policy
+    without unconfined domains, forgetting this would prevent the web server to run.
+    On systems with an SELinux policy with unconfined domains, this might result in
+    the web server to run in an unconfined domain (`initrc_t`), effectively disabling
+    the SELinux protections we need for the web server!
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The following are some more examples on multitenancy and how SELinux interacts
+    with it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: sVirt ([http://selinuxproject.org/page/SVirt](http://selinuxproject.org/page/SVirt))
+    uses SELinux categories to segregate virtual guests from one another
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Linux containers, such as through the LXC project ([https://linuxcontainers.org](https://linuxcontainers.org)),
+    use SELinux for further isolation of containers from the main system
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Apache has support for multitenancy through the `mod_selinux` module, which
+    is covered in [Chapter 3](ch03.html "Chapter 3. Confining Web Applications"),
+    *Confining Web Applications*
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

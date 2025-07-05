@@ -1,0 +1,1227 @@
+- en: Chapter 9. Aligning SELinux with DAC
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, our focus will be on the following set of recipes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Assigning a different root location to regular services
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using a different root location for SELinux-aware applications
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Sharing user content with file ACLs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Enabling polyinstantiated directories
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configuring capabilities instead of setuid binaries
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using group membership for role-based access
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Backing up and restoring files
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Governing application network access
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: SELinux is an access control mechanism that works alongside the regular access
+    controls that Linux provides. Making sure that these various access control systems
+    play nicely together is important as both have their merits and uses.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Regular DAC security services on Linux are already quite powerful and are being
+    extended with almost every Linux release. Namespaces, extended access controls,
+    additional **chroot** restrictions, and other services are added to the Linux
+    ecosystem to support the hardening of Linux systems further.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this process of hardening systems, SELinux is just another layer of defense.
+    Putting all efforts only on SELinux would be a major mistake to make, as SELinux
+    has its downsides as well. By properly enabling the Linux DAC controls and tweaking
+    SELinux so that it plays nicely together with these controls, a Linux system can
+    be made much more resilient against vulnerabilities and attacks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Assigning a different root location to regular services
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A different root location, also known as achroot, is an important feature of
+    Linux systems meant to disallow direct access to file resources outside a specified
+    directory location. The environment that is accessible from a chroot is called
+    a **jail** or **chroot jail**. Applications in a chroot jail are launched with
+    a different root, wherein only those files that are needed for the application
+    to work are hosted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Although it is commonly seen as a security feature, this was not the intention
+    of a chroot. However, with the proper approach, chroots can enhance the secure
+    setup of an application.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For instance, in case of a vulnerability, a successful exploit might only be
+    able to access the files available in the chroot. Other sensitive files, such
+    as authentication-related files or other service configurations, are not reachable
+    from within the chroot (assuming the exploited application does not have the privileges
+    to break out of a chroot jail).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The steps to set up a chroot environment for any service are similar, but the
+    end result of a chroot is never the same: different files need to be available
+    in a chroot depending on the application that is being restricted.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Find the application that needs to be restricted. Such applications have to
+    be end services, in the sense that there is little to no interaction between the
+    application and other applications or services. Otherwise, all those other applications
+    and services would need to be available in the same chroot as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Usually, the primary targets are those services that are very popular in use
+    on the Internet. Exploits for these services are usually more actively searched
+    and developed for, and when a vulnerability is found and an exploit has been developed,
+    malicious users or groups quickly scan the Internet for vulnerable versions to
+    attack.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The next set of steps shows how to set up a chroot environment and inform SELinux
+    about the chroot. We use the BIND DNS server as our example service and `/var/chroot/`
+    as the chroot location:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Create the chroot location and add in the necessary subdirectories:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Copy all the files that the application needs:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create the device files that the application needs:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: As the BIND service knows about chroots, we do not need to copy its binaries
+    and libraries to the chroot location. However, not all services support chroots
+    out of the box. When this is the case, we need to copy the binaries and libraries
+    as well.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Now, relabel the files in the chroot so that they get the proper SELinux labels:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Launch the application with the proper options to enable the chroot support.
+    Some Linux distributions already support chroot information for the BIND service.
+    In general, it requires the `named` application to be launched with the `-t /var/chroot/`
+    option. If the application does not support chroots out of the box, use the `chroot`
+    command itself:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'If the application supports chroots out of the box, it might require the `chroot`
+    capability. This is supported through the `sys_chroot` permission, granted through
+    the following SELinux policy interface:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Setting up a chroot environment is usually a trial-and-error approach; although,
+    for more popular services, many tutorials exist on the Internet that make setting
+    up chroots a lot easier.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The basic approach to use is four-fold:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Create the chroot location and directory structure.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Install the necessary files and, if necessary, application binaries and libraries.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Update the SELinux labels of the resources.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Call the chroot binary or use the built-in `chroot` capabilities of the application.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When creating a chroot location, we need to make sure that the structure is
+    similar to a real root location (that is, the `/` location); as for the application,
+    it will see the filesystem as if this chroot location is the entire filesystem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Which files to install is a different matter though, and having online resources
+    to inform us what to do is a great help. But if these online resources are missing,
+    then we can still find out which files are needed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For instance, we can use the `ldd` or `scanelf` application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: But in general, it is the trial-and-error approach that works the easiest. Just
+    launch the application in the chroot, register its errors, and resolve them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For SELinux, the important bit here is that the chroot should be labeled correctly.
+    Consider `/var/chroot/etc/named.conf`, for instance. The SELinux policy will assume
+    that this file is labeled `named_conf_t`. However, the location itself (`/var/chroot/etc/named.conf`)
+    implies `var_t`, as `/var/` is `var_t` and there are no definitions for any of
+    our defined location's subdirectories or files within.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `setfiles` command allows us to relabel a location with a different root
+    location, resulting in `/var/chroot/etc/named.conf` being labeled as if it was
+    `/etc/named.conf`. However, take care that a system relabeling operation is followed
+    by the `setfiles` command again as the SELinux configuration is not aware of this
+    change in labeling.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, the application itself needs to be launched inside the chroot or through
+    its built-in chroot support. Applications that support chroots themselves can
+    be tuned through their configuration files and start up options to make sure that
+    they run in a chroot environment. If that isn't possible, then the application
+    should be started using an `init` script that calls the `chroot` command, most
+    likely together with the `su` application to allow switching to a different user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: A chroot is a relatively primitive yet powerful method for reducing the impact
+    of an exploit. However, methods exist to escape a chroot. Luckily, there are some
+    kernel patches that improve the security of chroots tremendously. A popular update
+    is the one maintained by the **grsecurity** team ([http://www.grsecurity.net](http://www.grsecurity.net)).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With grsecurity''s chroot restrictions, the kernel can be configured with the
+    following options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Disallow mounts and remounts of filesystems initiated from within the chroot
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Disallow chrooting from within the chroot
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Disallow the `pivot_root` call from within the chroot
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Force the current working directory of chrooted applications to be the root
+    directory of the chroot
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Disallow the `setuid` and `setgid chmod` operations from within the chroot
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Disallow changing directories through open file descriptors pointing outside
+    the chroot
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Disallow attaching to shared memory created outside the chroot
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Disallow access to Unix domain sockets created outside the chroot
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Disallow sending signals to processes outside the chroot
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Besides these options, there are many, many more options. Such options make
+    chroot jails much more security-oriented than originally intended and make for
+    a very powerful mitigation against exploits.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'There are many resources available about chroot jails and BIND chroots in particular:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Building and configuring BIND 9 in a chroot jail available at [http://www.unixwiz.net/techtips/bind9-chroot.html](http://www.unixwiz.net/techtips/bind9-chroot.html)
+    goes in great detail and has pointers to various other BIND-related resources
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'On the same site, best practices for Unix `chroot()` operations can be found:
+    [http://www.unixwiz.net/techtips/chroot-practices.html](http://www.unixwiz.net/techtips/chroot-practices.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The Jailkit project ([http://olivier.sessink.nl/jailkit/](http://olivier.sessink.nl/jailkit/))
+    provides a set of utilities to manage chroot jails
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using a different root location for SELinux-aware applications
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: SELinux-aware applications have more requirements when they run inside a chroot
+    location. They require access to the SELinux subsystem (from within the chroot)
+    and possibly SELinux configuration entries. This includes PAM-enabled services,
+    as user logins on these services might require access to the SELinux user configuration
+    files (such as the `seusers` file and default contexts).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'First, create the regular chroot location as we saw earlier. To update the
+    system to support SELinux-aware applications inside the chroot, complete the following
+    steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Mount the SELinux filesystem inside the chroot at `/sys/fs/selinux/` so that
+    the application can query the SELinux policy:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Optionally, create the `/var/chroot/etc/selinux/` location and copy the current
+    definition inside it:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Update the `seusers` file (in `/var/chroot/etc/selinux/mcs/`) to only contain
+    the SELinux user mapping(s) needed inside the chroot.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Applications that are SELinux-aware usually require access to the SELinux filesystem
+    (`/sys/fs/selinux/`) and a kernel-provided pseudo filesystem needed in order to
+    interact with the SELinux subsystem. This should be seen as a more dangerous situation,
+    as this usually has the application run as a more privileged user and with access
+    to a system resource that is not protected by the chroot anymore. This reduces
+    the effectiveness of a chroot jail as a security measure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If applications do not support chroots themselves internally, then we will have
+    to expose the `/sys/fs/selinux/` filesystems to the application that is chrooted.
+    If the application supports chroot out of the box, it might only call the chroot
+    after consulting SELinux (that is, from the nonchrooted parent) and run the worker
+    or user processes inside a chroot. This is the case with chrooted SFTP users supported
+    through OpenSSH.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'It might also be sufficient to mount the SELinux filesystem on `/selinux/`
+    (a deprecated but still a supported location for the SELinux filesystem) inside
+    the chroot. That way, no fake `/sys/fs/` location needs to be created:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `/etc/selinux/` location is not always needed, so it shouldn't be made accessible
+    inside the chroot by default. SELinux-aware applications that use SELinux user
+    and role transitions or that actively modify file contexts will need to be able
+    to read the files inside `/etc/selinux/` though.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Depending on the reason of the chroot jail, it might be possible as well to
+    use a read-only bind-mount of the `/etc/selinux/` location:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: The remount afterwards is needed to mark it as read-only. A bind-mount, by itself,
+    doesn't allow additional mount options to be passed, so we cannot immediately
+    mount with the `ro` mount option. Of course, it is no longer possible/needed to
+    modify the `seusers` file with a read-only bind-mount.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Detailed guides on SFTP chroots can be found at [https://wiki.archlinux.org/index.php/SFTP_chroot](https://wiki.archlinux.org/index.php/SFTP_chroot)
+    and [http://en.wikibooks.org/wiki/OpenSSH/Cookbook/SFTP](http://en.wikibooks.org/wiki/OpenSSH/Cookbook/SFTP)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Sharing user content with file ACLs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Access control lists allow for more fine-grained access controls on files. Instead
+    of using a common group ownership, access to files can be individually granted
+    to users or groups.
+  prefs: []
+  type: TYPE_NORMAL
+- en: However, the access controls that SELinux enables should also be tailored to
+    this situation. Features such as the user-based access control constraints in
+    SELinux might prevent sharing user content altogether, regardless of the ACLs
+    set on the file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Assuming that a user wants to allow read and read-write accesses to a set of
+    files and directories, the following set of steps can be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Create an accessible location outside the user''s home directory:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create an SELinux file type that can be used for sharing resources:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Create an interface allowing users to administer the resource:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Assign this type to the new location:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Assign the interface to the user domain(s) that will participate in the shared
+    development of this resource:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Move the files that need to be shared outside the user's home directory, as
+    the SELinux context of the home directory will not allow sharing resources within.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Assign the ACL that allows the (limited set of) users proper access:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The file-level access controls can be perfectly used together with the SELinux
+    access controls. However, special care needs to be taken that both control mechanisms
+    (file ACLs and the SELinux policy) don't interfere with each other. SELinux might
+    disallow accesses expected to work (for instance, due to SELinux constraints rather
+    than type enforcement settings), but also file access controls need to be properly
+    managed in order to keep the behavior on the system consistent.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the recipes, the files that are shared are moved outside the user's home
+    directory. This is mostly because of SELinux' UBAC feature, which disallows different
+    SELinux users to access each others' regular resources (such as those labeled
+    as `user_home_t` but also `user_home_dir_t`). As `user_home_dir_t` isn't accessible
+    by other SELinux users under the UBAC constraints, users mapped to a different
+    SELinux user will not be able to enter and search through the sharing user's home
+    directory, regardless of ACLs being installed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Not all systems have UBAC enabled, or the sharing might be within a single SELinux
+    user, so this approach is not always necessary. Still, using a different location
+    allows for better management. Consider the case where the first user exits the
+    company, but his team wants to continue accessing and managing the shared resources.
+    They would disappear if the user home directory is removed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With the files moved to a different location, the next step is to label the
+    files with a file type that all users can access, but which isn't restricted by
+    the UBAC feature. File types that have the `ubac_constrained_type` attribute set
+    cannot be used for sharing, so a new file type is created that is labeled as a
+    regular file. The user domains are then granted administrative rights on this
+    type (allowing them not only to manage the files, but also to relabel files to
+    or from the `user_share_t` type). This ensures that SELinux doesn't prevent access
+    to the shared resources, while still preventing unauthorized domains to access
+    the resources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It might also be sufficient to pick a file type that is already accessible by
+    users, such as the `nfs_t` type (if the SELinux Boolean, `use_nfs_home_dirs`,
+    is set). However, assigning a type that is functionally used for different reasons
+    (`nfs_t` is for NFS-mounted filesystems) might open up access to these resources
+    from other domains as well. As such, administrators need to carefully consider
+    the reasons for and the consequences of each choice.
+  prefs: []
+  type: TYPE_NORMAL
+- en: After labeling the `/home/share/` location with the `user_share_t` type, the
+    original user copies the resources to the new location and removes them from the
+    current one. This approach (copy and remove) is used to ensure that resources
+    inherit the label of the target location (`user_share_t`) instead of keeping the
+    labels associated with the original file location (`user_home_t`), as would be
+    the case with a move (`mv`) command. In more recent `coreutils` packages, support
+    for `mv -Z` is made available, which allows you to move the resources directly
+    while still giving the resources a proper context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A third approach for the user would be to move the resources first and then
+    relabel them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, with all SELinux rules and support in place, the file access controls
+    are enabled on the shared resources, and a default ACL is enabled so that write
+    operations by other users will automatically inherit the proper ACL on the written
+    resource as well, making sure that all users cooperating on the shared resource
+    don't need to continuously set ACLs on the files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Without the default ACLs, other users might create files inside `sharedfiles/`
+    that have no ACLs set, disallowing other users to access the resources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Another approach that could be taken is to use the `setgid` group ownership.
+    For instance, if all users that participate in the shared files access are in
+    a `shrgrp` group, then the following will automatically have all files created
+    inside the mentioned directory have the `shrgrp` group ownership defined as well:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: This does require the users to have a proper `umask` setting (such as `007`
+    or less) so that the group permission on the newly created resource allows read
+    and write accesses for group members.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Enabling polyinstantiated directories
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: On Linux and Unix systems, the `/tmp/` and `/var/tmp/` locations are world writable.
+    They are used to provide a common location for temporary files and are protected
+    through the sticky bit so that users cannot remove files they don't own from the
+    directory, even though the directory is world writable.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But despite this measure, there is a history of attacks against the `/tmp/`
+    and `/var/tmp/` locations, such as race conditions with symbolic links and information
+    leakage through (temporary or not) world or group-readable files generated within.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Polyinstantiated directories provide a neat solution to this problem: users
+    get their own, private `/tmp/` and `/var/tmp/` instance. These directory instances
+    are created upon login on a different location, but then made visible (mounted)
+    on the `/tmp/` and `/var/tmp/` locations for that specific user session. This
+    mount is local to the user session through the use of Linux namespaces—other users
+    have their own view on the mounts, and for administrators, polyinstantiation is
+    not enabled, so they keep a global view on the system.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To enable polyinstantiation of `/tmp/` and `/var/tmp/`, the following steps
+    should be followed:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Create the `/tmp-inst/` and `/var/tmp/tmp-inst/` locations:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Set the label for these locations as `tmp_t`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Edit `/etc/security/namespace.conf` and add in the following definitions:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Edit the PAM configuration file used by logins, such as `system-login`, and
+    add the following line to the session group after the `pam_selinux.so` one:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Enable the `allow_polyinstantiation` SELinux Boolean:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The system preparation for polyinstantiated directories requires that the directories
+    themselves are available and have the proper permissions set. When the parent
+    directory, such as `/tmp/`, is a tmpfs mount, then we cannot have the polyinstantiated
+    directories made available inside of it (such as `/tmp/tmp-inst/`), as that directory
+    would be missing after a reboot (unless it is added through the `init` scripts);
+    hence the setup of `/tmp-inst/` as a separate location. Of course, administrators
+    can still opt to have this location itself as a tmpfs mount—the important thing
+    is that the directory must exist and have the proper permissions (which is represented
+    by the `000` permission set).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the example, `/var/tmp/` is assumed not to be a tmpfs mount, so we can define
+    the polyinstantiated directories inside of it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The configuration file for polyinstantiated directories is the `namespace.conf`
+    file under `/etc/security/`. In it, the mount-point is mentioned together with
+    the directory in which the polyinstantiated directories are created:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: The third column defines the method for polyinstantiation. On non-SELinux systems,
+    the most common method used is the `user` method, which creates directories based
+    on the username. On SELinux-enabled systems, the method must be either `level`
+    or `context`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In case of the `level` method, the directories are created based on the username
+    and MLS level of the user session. The `context` method has directories created
+    based on the username and security context. This allows for hiding temporary data
+    based on the role of the user, so accidental data leakage is less likely to occur.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Administrators can access the polyinstantiated directories as they are excluded
+    from the polyinstantiation: the excluded list of users is configured as the fourth
+    column in the `namespace.conf` file. Administrators can still see the directories
+    that are created dynamically:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Next, the PAM configuration file(s) are modified to enable the `pam_namespace.so`
+    library. To find the PAM configuration files that need to be edited, look for
+    the PAM configuration files that call `pam_selinux.so`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this example, the `system-login` PAM configuration file is the only file
+    calling `pam_selinux.so`, so the `pam_namespace.so` line is added to this file.
+    The line must be added after the `pam_selinux.so` call as the `pam_namespace.so`
+    file uses the context of the user to decide how to call the instantiated directory.
+    If `pam_selinux.so` has not been called yet, then this information is not available
+    and the logon will fail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, the SELinux Boolean, `allow_polyinstantiation`, is enabled so that
+    the proper domains have the privilege to create (and change the contexts of) the
+    proper directories, to use namespaces, to check user context, and more.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Administrators can go further than just having the directories created when
+    needed. During the setup of polyinstantiated directories, a script called `namespace.init`,
+    which is available at `/etc/security/` is called to further handle the creation
+    and modification of those directories.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This script can be adjusted to copy files towards the instantiated directory
+    (the file usually contains this logic already for polyinstantiated home directories)
+    or do other changes, allowing to further tune the setup for a user session.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `systemd init` system also has support for polyinstantiated `/tmp/` directories
+    through the `PrivateTmp` directive, which provides a private `/tmp/` directory
+    for a service rather than end users.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring capabilities instead of setuid binaries
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Linux capabilities allow for course-grained kernel security authorizations
+    on the user and application levels. Before capabilities existed, administrators
+    could only grant additional privileges to users through `setuid` applications:
+    applications which, when executed, inherit the privileges of the owner of the
+    application (usually, `root`). With capabilities, the set of privileges can be
+    restricted further.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: For instance, the `ping` application can be granted the `cap_net_raw` capability,
+    so it does not need to be `setuid` anymore. Depending on the setup, either users
+    need to be granted the possible use of the capability (if the application has
+    the proper flag set) or the capability is granted immediately (regardless of user
+    settings).
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To use capabilities with SELinux, execute the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Enable the capabilities that are needed for an application on the application
+    binary:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'For the users that are allowed to use the `net_raw` capability, add the proper
+    configurations in `/etc/security/capability.conf` (one line per user):'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: SELinux domains that will use the capability need to be granted the use of it.
+    For common applications, this is usually already in place.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'SELinux domains that are allowed to modify the capability set assigned to their
+    process(es) must have the `setcap` privilege set:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Edit the PAM configuration file(s) for the services through which the capabilities
+    are allowed, and add the following line to the `auth` configuration block:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'If capabilities need to be tracked/audited, SELinux''s `auditallow` statement
+    can be used:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The capabilities that a process is currently allowed to use are called the permitted
+    capabilities. The capabilities that are active are the effective capabilities.
+    A third set of capabilities are inheritable capabilities.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the example, we enabled the `cap_net_raw` capability for the `ping` application
+    and marked the capability as effective if it is inherited. In other words, it
+    is not enabled (permitted) by default. If we want to enable the `cap_net_raw`
+    capability immediately, we would use the effective and permitted set:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Applications that are capability-aware do not need to have the `effective`
+    bit set. They will enable (and drop) the capabilities as they are needed through
+    the proper system calls (which is why the `setcap` permission is needed for these
+    domains). If `ping` was capability-aware, then the following would be sufficient
+    for our example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: Next, the users that are allowed the `cap_net_raw` capability (through the selected
+    set of applications) need to be granted the `cap_net_raw` capability in their
+    inherited capability set. This is done through the `capability.conf` file in `/etc/security/`
+    and by calling the `pam_cap.so` module from within the proper PAM configuration
+    files. The use of PAM configuration files also allows us to differentiate capabilities
+    based on the service through which a user logs on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To check the currently enabled capabilities, users can execute the `capsh`
+    application:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To see the capabilities on a file, the `getcap` application can be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: Finally, auditing the use of capabilities through the `auditallow` statement
+    tells us when (and by whom) a capability was used, although the same can be accomplished
+    without an SELinux policy using the Linux audit subsystem, auditing for the `setcap`
+    system call.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Capabilities are well explained in Chris Friedhoff's **POSIX Capabilities &
+    File POSIX Capabilities** page ([http://www.friedhoff.org/posixfilecaps.html](http://www.friedhoff.org/posixfilecaps.html))
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using group membership for role-based access
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In larger environments, access controls are usually granted based on group
+    membership. Group membership is easier to manage than individual permissions:
+    just adding or removing users from a group automatically grants or revokes permissions,
+    and administrators can easily find out which permission(s) a user will have based
+    on the group membership.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In order to use group membership as a high-level method for assigning permissions,
+    administrators need to take care of the following aspects:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Add user(s) to the groups they should belong to:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Assign the proper SELinux user to the group:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Restrict binaries and libraries that should only be called by a specific group:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Use group notation inside the `sudoers` file to grant specific privileges to
+    group members:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Using groups makes permission handling much easier. In the end, this allows
+    administrators to just handle group membership for users and automatically assign
+    privileges based on the groups.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We can grant groups an SELinux user, and through the group membership decide
+    which SELinux user a regular user is logged into. Of course, users can belong
+    to multiple groups. For SELinux, it is the order of the `seusers` file that decides
+    which of the following mappings are used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: SELinux user mappings for individual users take precedence over group mappings
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The first group mapping in the `seusers` file that uses a group that the Linux
+    user is a member of decides the SELinux user mapping if no individual SELinux
+    user mappings exist for this user
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: As such, if a user is a member of two groups (say, `dba` and `web`) and there
+    are mappings to both `dbadm_u` (for the `dba` group) and `webadm_u` (for the `web`
+    group), then the first mapping in the `seusers` file will decide what the user's
+    SELinux user will be.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In order to override this, either add the user individually or create another
+    group (say, `dbaweb`), grant the user this group as well, and put that group mapping
+    at the beginning of the list in the `seusers` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When only a specific user group is allowed access to an application, but that
+    application does not use any specific SELinux domains, then it might be more flexible
+    for administrators to use the Linux DAC permissions to restrict access to the
+    application. By only allowing a specific group (`dev`, in our example), read and
+    execute rights on the application and application libraries, we can restrict access
+    easily.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another approach is to label the files with new SELinux types and grant the
+    proper domains access to those types. However, this might lead to a large set
+    of domains needing access to the types (and so requires massive policy development
+    effort), whereas the Linux DAC approach is easily implemented.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Backing up and restoring files
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: An important aspect to the availability of a system and the security of a service
+    is to provide backup and restore services. For many, having a copy of the files
+    available might seem sufficient as a backup approach. However, backups should
+    contain more than just the content of a file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'When selecting a backup solution, make sure to check for the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A selection of the extended attributes of the files should be backed up as well
+    (and not only the `security.selinux` one).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When files are restored onto their original location, the SELinux context should
+    be restored with it as well. If the backup solution doesn't support SELinux contexts,
+    the `restorecon` command should be invoked afterwards against the restored file(s).
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: When files are restored into a temporary area, the SELinux context should not
+    be restored. Instead, the administrator should put the file back in place and
+    restore the context afterwards.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: The SELinux configuration in `/etc/selinux/` should definitely be backed up,
+    even if no full system backups are used. Whenever the policy or file context definitions
+    are altered, these should be backed up as well whenever files are backed up.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: File labels are stored as the `security.selinux` extended attribute. As the
+    functioning of a policy is based on the labels of all objects involved, not backing
+    up and restoring the file labels might jeopardize the functioning of the system
+    after a restore operation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When the backup solution does not support extended attributes, it is important
+    that all labels are properly set through the `semanage fcontext` command. This
+    is the only way to make sure that, after a restore, the admin can run `restorecon`
+    against the restored files in order to reset the file labels:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, it is seriously recommended to select a backup solution that supports
+    extended attributes as many other Linux-related settings are stored as extended
+    attributes. The file ACLs, for instance, are stored as extended attributes as
+    well:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Other examples of extended attributes that can be used on a system are PaX
+    markings (`user.pax.flags`), IMA and EVM hashes (`security.ima` and `security.evm`),
+    and capabilities (`security.capability`). But herein lies the problem as well:
+    some attributes shouldn''t (or cannot) be restored. The IMA and EVM attributes,
+    for instance, are handled by the Linux kernel and cannot be manipulated by user
+    utilities.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Alongside the file labels, backing up and restoring the SELinux policy should
+    be integrated as well, especially on a system with a modified SELinux policy.
+    If a policy is different after a restore, then types might be missing and labels
+    might become invalid.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Governing application network access
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: On Linux systems, `iptables` (and more recently, `nftables`) is the de facto
+    host-based firewall technology. Administrators will undoubtedly use it to prevent
+    access to a service from unauthorized systems. We can also use `iptables` to identify
+    and label network packets, allowing only authorized applications (domains) to
+    send or receive those network packets.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'By default, the SELinux policy supports client and server packets and allows
+    the usual domains access to their client and/or server packets. For instance,
+    the web server domains (such as `httpd_t`) will have the privileges to send and
+    receive `http_server_packet_t` packets:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is provided through the `corenet_sendrecv_http_server_packets` interface.
+    Enabling packet labeling is simply done using `iptables` as will be shown through
+    this recipe. But to properly govern network access, custom packet types will need
+    to be created to ensure that no default allowed access is used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'To only allow authorized domains access to particular network packets (datagrams
+    and data streams), use the following approach:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identify the flow that needs to be allowed. For instance, we might only want
+    DNS requests from `10.11.12.0/24` to be accepted by the `dnsmasq_t` domain, and
+    requests from `10.13.14.0/24` to be accepted by the `named_t` domain.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Create two new packet types:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Allow the domains send and receive privileges for these packets:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Label the incoming traffic accordingly:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: How it works…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: By using custom network packet labels, access from or to specific applications
+    can be governed using an SELinux policy. Even though multiple applications can
+    accept incoming DNS requests, this recipe shows how to ensure that only one application
+    can deal with requests that have passed a certain filter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Whenever a SECMARK label is enabled with `iptables`, the Linux kernel will automatically
+    enable SECMARK labeling on all packets. Packets that are not marked specifically
+    by the administrator will be marked with the `unlabeled_t` type. Some domains
+    are allowed to handle the `unlabeled_t` packets through the `corenet_sendrecv_unlabeled_packets`
+    interface (or the `kernel_sendrecv_unlabeled_packets` interface). However, if
+    that is not the case, then those domains will not be able to handle network traffic
+    anymore.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As such, it is advised to use the standard labeling for other incoming (and
+    outgoing) traffic. To identify which incoming traffic should be labeled, we can
+    leverage assistance from the `netstat` output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: Based on this output, labeling the appropriate traffic as `mysqld_server_packet_t`
+    and `http_server_packet_t` will allow those domains to access their incoming network
+    traffic.
+  prefs: []
+  type: TYPE_NORMAL
+- en: By creating additional types for `dnsmasq_t` and `named_t`, those applications
+    can only handle requests associated with those packet types. If an administrator
+    changes the configuration of one of these DNS servers, then the network packet
+    labeling will still ensure that DNS requests from the previously identified network
+    segments cannot be used by the wrong DNS server, even though the flow is allowed
+    firewall-wise.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'With `sesearch`, interrogating the policy to see which applications (domains)
+    are able to send and receive certain packets is easy:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: The same approach can be taken from a client level. A mail server might need
+    to connect to other mail servers, which means that the outgoing data can be labeled
+    as `mail_client_packet_t` (if we use the default traffic). However, if we want
+    to make sure only the mail server can connect to other mail servers (and no other
+    domains that also have privileges to send and receive the `mail_client_packet_t`
+    packets), then a new packet type can be used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: See also
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'For more information about SECMARK labeling, read up on the following resources:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[http://www.selinuxproject.org/page/NB_Networking](http://www.selinuxproject.org/page/NB_Networking)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Paul Moore's **Transitioning to Secmark** at [http://paulmoore.livejournal.com/4281.html](http://paulmoore.livejournal.com/4281.html)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: James Morris's **New Secmark-based network controls for SELinux** at [http://james-morris.livejournal.com/11010.html](http://james-morris.livejournal.com/11010.html)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

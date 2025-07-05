@@ -1,0 +1,2655 @@
+- en: '*Chapter 15*: Digging into the IIO Framework'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '**Industrial input/output** (**IIO**) is a kernel subsystem dedicated to **analog-to-digital
+    converters** (**ADCs**) and **digital-to-analog converters** (**DACs**). With
+    the growing numbers of sensors (measurement devices with analog-to-digital or
+    digital-to-analog capabilities) with different code implementations, scattered
+    across kernel sources, gathering them became necessary. That is what the IIO framework
+    does, in a generic way. Jonathan Cameron and the Linux IIO community have been
+    developing it since 2009\. Accelerometers, gyroscopes, current/voltage measurement
+    chips, light sensors, and pressure sensors all fall into the IIO family of devices.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The IIO model is based on device and channel architecture:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The device represents the chip itself, the top level of the hierarchy.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The channel represents a single acquisition line of the device. A device may
+    have one or more channels. For example, an accelerometer is a device with three
+    channels, one for each axis (*x*, *y*, and *z*).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The IIO chip is the physical and hardware sensor/converter. It is exposed to
+    the user space as a character device (when a triggered buffer is supported) and
+    a sysfs directory entry that will contain a set of files, some of which represent
+    the channels.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'These are the two ways to interact with an IIO device from user space:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`/sys/bus/iio/iio:deviceX/`, a sysfs directory that represents the device along
+    with its channels'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/dev/iio:deviceX`, a character device that exports the device''s events and
+    data buffer'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'As a picture is worth a thousand words, the following is a figure showing an
+    overview of the IIO framework:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.1 – IIO framework overview'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/B17934_15_001.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 15.1 – IIO framework overview
+  prefs: []
+  type: TYPE_NORMAL
+- en: The preceding figure shows how the IIO framework is organized between the kernel
+    and the user space. The driver manages the hardware and reports processing to
+    the IIO core, using a set of facilities and APIs exposed by the IIO core. The
+    IIO subsystem then abstracts the whole underlying mechanism to user space by means
+    of the sysfs interface and the character device, on top of which users can execute
+    system calls.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'IIO APIs are spread over several header files, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this chapter, we will describe and handle every concept of the IIO framework,
+    such as walking through its data structure (devices, channels, and so on), dealing
+    with triggered buffer support and continuous capture, along with its sysfs interface,
+    exploring existing IIO triggers, learning how to capture data in either one-shot
+    mode or continuous mode, and listing tools that can help the developer in testing
+    their devices.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In other words, we will cover the following topics in this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introduction to IIO data structures
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Integrating IIO triggered buffer support
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Accessing IIO data
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Dealing with the in-kernel IIO consumer interface
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Walking through user-space IIO tools
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction to IIO data structures
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The IIO framework is made of a few data structures among which is one representing
+    the IIO device, another one describing this device, and the last one enumerating
+    the channels exposed by the device. An IIO device is represented in the kernel
+    as an instance of `struct iio_dev` and described by a `struct iio_info` structure.
+    All the important IIO structures are defined in `include/linux/iio/iio.h`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the struct iio_dev structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The `struct iio_dev` structure represents the IIO device, describing the device
+    and its driver. It tells us how many channels are available on the device and
+    what modes the device can operate in (one-shot or triggered buffer, for example).
+    Moreover, this data structure exposes some hooks to be provided by the driver.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This data structure has the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For the sake of readability, only relevant elements for us have been listed
+    in the preceding excerpt. The complete structure definition lies in `include/linux/iio/iio.h`.
+    The following are the meanings of the elements in the data structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`modes` represents the different modes supported by the device. Possible modes
+    are as follows:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`INDIO_DIRECT_MODE`: This says the device provides sysfs-type interfaces.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`INDIO_BUFFER_TRIGGERED`: This says that the device supports hardware triggers
+    associated with a buffer. This flag mode is automatically set when you set up
+    a triggered buffer using the `iio_triggered_buffer_setup()` function.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`INDIO_BUFFER_SOFTWARE`: In continuous conversions, the buffering will be implemented
+    in software, by the kernel itself. The kernel will push data into the internal
+    FIFO with a possible interrupt at a specified watermark.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`INDIO_BUFFER_HARDWARE`: This means the device has a hardware buffer. In continuous
+    conversions, the buffering can be handled by the device. This means that the data
+    stream can be obtained directly from the hardware backend.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`INDIO_ALL_BUFFER_MODES`: A union of the preceding three.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`INDIO_EVENT_TRIGGERED`: Conversion can be triggered by some sort of event,
+    such as a threshold voltage reached on an ADC, but no interrupt or timer trigger.
+    This flag is intended to be used for comparator-equipped chips with no other way
+    to trigger conversion.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`INDIO_HARDWARE_TRIGGERED`: Can be triggered by hardware events, such as IRQ
+    or clock events.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`INDIO_ALL_TRIGGERED_MODES` union of `INDIO_BUFFER_TRIGGERED`, `INDIO_EVENT_TRIGGERED`,
+    and `INDIO_HARDWARE_TRIGGERED`.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`currentmode`: This represents the mode used by the device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`dev`: This represents the struct device (according to Linux Device Model)
+    the IIO device is tied to.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`buffer`: This is your data buffer, pushed to the user space when using triggered
+    buffer mode. It is automatically allocated and associated with your device when
+    you enable triggered buffer support using the `iio_triggered_buffer_setup` function.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`scan_bytes`: This is the number of bytes captured to be fed to the buffer.
+    When using a trigger buffer from the user space, the buffer should be at least
+    `indio->scan_bytes` bytes large.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`available_scan_masks`: This is an optional array of allowed bitmasks. When
+    using a triggered buffer, you can enable channels to be captured and fed into
+    the IIO buffer. If you do not want to allow some channels to be enabled, you should
+    fill this array with only allowed ones. An example of an accelerometer (with X,
+    Y, and Z channels) is as follows:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`active_scan_mask`: This is a bitmask of enabled channels. Only the data from
+    those channels should be pushed into the buffer. For example, for an eight-channel
+    ADC converter, if you only enable the first (index 0), the third (index 2), and
+    the last (index 7) channels, the bitmask would be `0b10000101` (`0x85`). `active_scan_mask`
+    will be set to `0x85`. The driver can then use the `for_each_set_bit` macro to
+    walk through each set bit, fetch the data from the corresponding channels, and
+    fill the buffer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`scan_timestamp`: This tells whether to push the capture timestamp into the
+    buffer or not. If `true`, the timestamp will be pushed as the last element of
+    the buffer. The timestamp is 8 bytes (64 bits) large.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`trig`: This is the current device trigger (when buffer mode is supported).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`pollfunc`: This is the function run on the trigger being received.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`channels`: This represents the table channel specification structure, to describe
+    every channel the device has.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`num_channels`: This represents the number of channels specified in `channels`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`name`: This represents the device name.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`info`: Callbacks and constant information from the driver.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`setup_ops`: A set of callback functions to call before and after the buffer
+    is enabled/disabled. This structure is defined in `include/linux/iio/iio.h`, as
+    follows:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Note that each callback in this data structure is optional.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`chrdev`: Associated character device created by the IIO core, with `iio_buffer_fileops`
+    as the file operation table.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Now that we are familiar with the IIO device structure, the next step is to
+    allocate memory for it. The appropriate function to achieve that is `devm_iio_device_alloc()`,
+    which is the managed version for `iio_device_alloc()` and has the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: It is recommended to use the managed version in a new driver as the `devres`
+    core takes care of freeing the memory when it is no longer needed. In the preceding
+    function prototype, `dev` is the device to allocate `iio_dev` for and `sizeof_priv`
+    is the extra memory space to allocate for any private data structure. The function
+    returns `NULL` if the allocation fails.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After the IIO device memory has been allocated, the next step is to initialize
+    different fields. Once done, the device must be registered with the IIO subsystem
+    using the `devm_iio_device_register()` function, the prototype of which is the
+    following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This function is the managed version of `iio_device_register()` and takes care
+    of unregistering the IIO device on driver detach. In its parameters, `dev` is
+    the same device as the one for which the IIO device has been allocated, and `indio_dev`
+    is the IIO device previously initialized. The device will be ready to accept requests
+    from the user space after this function succeeds (returns `0`). The following
+    is an example showing how to register an IIO device:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'If an error occurs, `devm_iio_device_register()` will return a negative error
+    code. The reverse operation for the non-managed variant (usually done in the release
+    function) is `iio_device_unregister()`, which has the following declaration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: However, managed registration takes care of unregistering the device on driver
+    detach or when the device leaves the system. Moreover, because we used a managed
+    allocation variant, there is no need to free the memory as this will be internal
+    to the core.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You might have also noticed we used a new function in the excerpt, `iio_priv()`.
+    This accessor returns the address of the private data allocated with the IIO device.
+    It is recommended to use this function instead of doing a direct dereference.
+    As an example, given an IIO device, the corresponding private data can be retrieved
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: The IIO device is useless on its own. Now that we are done with the main IIO
+    device data structure, we have to add a set of hooks allowing us to interact with
+    the device.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the struct iio_info structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The `struct iio_info` structure is used to declare the hooks used by the IIO
+    core to read/write channel/attribute values. The following is part of its declaration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Again, the full definition of this data structure can be found in `/include/linux/iio/iio.h`.
+    For the enumerated elements in the preceding structure excerpt, the following
+    are their meanings:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`attrs` represents the device attributes exposed to user space.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`read_raw` is the callback invoked when a user reads a device sysfs file attribute.
+    The `mask` parameter is a bitmask allowing us to know which type of value is requested.
+    The `chan` parameter lets us know the channel concerned. `*val` and `*val2` are
+    output parameters that must contain the elements making up the returned value.
+    They must be set with raw values read from the device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The return value of this callback is kind of standardized and indicates how
+    `*val` and `*val2` must be handled by the IIO core to compute the real value.
+    Possible return values are the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`IIO_VAL_INT`: The output value is an integer. In this case, the driver must
+    set `*val` only.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IIO_VAL_INT_PLUS_MICRO`: The output value is made of an integer part and a
+    micro part. The driver must set `*val` with the integer value, while `*val2` must
+    be set with the micro value.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IIO_VAL_INT_PLUS_NANO`: This is the same as the micro, but `*val2` must be
+    set with the nano value.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IIO_VAL_INT_PLUS_MICRO_DB`: The output values are in `*val` must be set with
+    the integer part and `*val2` must set with the micro part, if any.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IIO_VAL_INT_MULTIPLE`: `val` is considered as an array of integers and `*val2`
+    is the number of entries in the array. They must be set accordingly then. The
+    maximum size of `val` is `INDIO_MAX_RAW_ELEMENTS`, defined as `4`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IIO_VAL_FRACTIONAL`: The final value is fractional. The driver must set `*val`
+    with the numerator and `*val2` with the denominator.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IIO_VAL_FRACTIONAL_LOG2`: The final value is a logarithmic fractional. The
+    IIO core expects the denominator (`*val2`) to be specified as the *log2* of the
+    actual denominator. For example, for ADCs and DACs, this will usually be the number
+    of significant bits. `*val` is a normal integer denominator.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`IIO_VAL_CHAR`: The IIO core expects `*val` to be a character. This is, most
+    of the time, used with the `IIO_CHAN_INFO_THERMOCOUPLE_TYPE` mask, in which case
+    the driver must return the type of thermocouple.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: All the preceding does not change the fact that, in case of an error, the callback
+    must return a negative error code, for example, `-EINVAL`. I recommend you have
+    a look at how the final value is processed in `iio_convert_raw_to_processed_unlocked()`
+    in the `drivers/iio/inkern.c` source file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`write_raw` is the callback used to write a value to the device. You can use
+    it, for example, to set the sampling frequency or change the scale.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'An example of setting up the `struct iio_info` structure is the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: You must not confuse this `struct iio_info` with the user-space `iio_info` tool,
+    which is part of the `libiio` package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The concept of IIO channels
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'In IIO terminology, a channel represents a single acquisition line of a sensor.
+    This means each data mesurement entity a sensor can provide/sense is called a
+    `struct iio_chan_spec` is the structure that represents and describes a single
+    channel in the kernel, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following are the meanings of elements in the data structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`type` specifies which type of measurement the channel makes. In the case of
+    voltage measurement, it should be `IIO_VOLTAGE`. For a light sensor, it is `IIO_LIGHT`.
+    For an accelerometer, `IIO_ACCEL` is used. All available types are defined in
+    `include/uapi/linux/iio/types.h`, as `enum iio_chan_type`. To write a driver for
+    a given converter, you have to look into that file to see the type each of your
+    converter channels falls into.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`channel` specifies the channel index when `.indexed` is set to `1`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`channel2` specifies the channel modifier when `.modified` is set to `1`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The `scan_index` and `scan_type` fields are used to identify elements from
+    a buffer, when using buffer triggers. `scan_index` sets the position of the captured
+    channel inside the buffer. Channels are placed in the buffer ordered by `scan_index`,
+    from the lowest index (placed first) to the highest index. Setting `.scan_index`
+    to `-1` will prevent the channel from buffered capture (no entry in the `scan_elements`
+    directory). Elements in this substructure have the folowing meanings:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`sign`: `s` or `u` specifies symbols (signed (complement of 2) or unsigned).'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`realbits`: The number of valid data bits.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`storagebits`: The number of digits occupied by this channel in the buffer.
+    That is to say, a value can really be encoded with 12 bits, but it occupies 16
+    bits (storage bits) in the buffer. Therefore, the data must be moved four times
+    to the right to get the actual value. This parameter depends on the device and
+    you should refer to its datasheet.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`shift`: Represents the number of times data values should be right-shifted
+    before masking out unused bits. This parameter is not always required. If the
+    number of valid bits equals the number of storage bits, the shift will be `0`.
+    This parameter can also be found in the device datasheet.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`repeat`: The number of times real/storage bits repeat.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`endianness`: Represents the data endianness. It is of the `enum iio_endian`
+    type and should be set with one of `IIO_CPU`, `IIO_LE`, or `IIO_BE`, which mean,
+    the native CPU endianness, little endian, or big endian respectively.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `modified` field specifies whether a modifier is to be applied to this channel
+    attribute name or not. In that case, the modifier is set in `.channel2`. (For
+    example, `IIO_MOD_X`, `IIO_MOD_Y`, and `IIO_MOD_Z` are modifiers for axial-sensors
+    about the `X`, `Y`, and `Z` axis). The available modifier list is defined in the
+    kernel IIO header as `enum iio_modifier`. Modifiers only mangle the channel attribute
+    name in sysfs, not the value.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`indexed` specifies whether the channel attribute name has an index or not.
+    If yes, the index is specified in the `.channel` field.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`info_mask_separate` marks the attribute as being specific to this channel.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`info_mask_shared_by_type` marks the attribute as being shared by all channels
+    of the same type. The information exported is shared by all channels of the same
+    type.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`info_mask_shared_by_dir` marks the attribute as being shared by all channels
+    of the same direction. The information exported is shared by all channels of the
+    same direction.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`info_mask_shared_by_all` marks the attribute as being shared by all channels,
+    whatever their type or their direction may be. The information exported is shared
+    by all channels.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_chan_spec.info_mask_*` elements are masks used to specify channel sysfs
+    attributes exposed to user space depending on their shared information. Therefore,
+    masks must be set by ORing one or more bitmasks, all of which are defined in `include/linux/iio/types.h`,
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following is an example of specifying a mask for a given channel:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: This means raw and processed attributes are specific to the channel.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: While not specified in the preceding `struct iio_chan_spec` structure description,
+    the term *attribute* refers to a *sysfs attribute*. This applies across the whole
+    chapter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Having described the channel data structure, let's decipher the mystery about
+    channel attribute naming, which respects a specific convention.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Channel attribute naming convention
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'An attribute''s name is automatically generated by the IIO core following a
+    predefined pattern, `{direction}_{type}{index}_{modifier}_{info_mask}`. The following
+    are descriptions of each field in the pattern:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`{direction}` corresponds to the attribute direction, according to the `struct
+    iio_direction` structure in `drivers/iio/industrialio-core.c`:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Do note that an input channel is a channel that can generate samples (such channels
+    are handled in the read method, for instance, an ADC channel). On the other hand,
+    an output channel is a channel that can receive samples (such channels are handled
+    in the write method, for instance, a DAC channel).
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`{type}` corresponds to the channel type string, according to the constant
+    `iio_chan_type_name_spec` char array (indexed by the channel type of type `enum
+    iio_chan_type`) defined in `drivers/iio/industrialio-core.c`, as follows:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`{index}` depends on the channel `.indexed` field being set or not. If set,
+    the index will be taken from the `.channel` field in order to replace the `{index}`
+    pattern.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The `{modifier}` pattern depends on the channel `.modified` field being set
+    or not. If set, the modifier will be taken from the `.channel2` field, and the
+    `{modifier}` field in the pattern will be replaced according to the `char` array
+    `struct iio_modifier_names` structure:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`{info_mask}` depends on the channel info mask, private or shared, indexing
+    the value in the `iio_chan_info_postfix` char array, defined as the following:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Channel naming convention should have no more secrets for us now. Now that we
+    are familiar with the naming, let's learn how to precisely identify channels.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this naming pattern, if an element is not present, then the directly preceding
+    underscore will be omitted. For example, if the modifier is not specified, the
+    pattern becomes `{direction}_{type}{index}_{info_mask}` instead of `{direction}_{type}{index}__{info_mask}`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Distinguishing channels
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'You may face some difficulties when there are multiple data channels of the
+    same type. The dilemma would be *how to precisely identify each of them*. There
+    are two solutions for that: **indexes** and **modifiers**.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Channel identification using an index
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Given an ADC device with one channel line, indexing is not needed. Its channel
+    definition would be as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: Given the preceding excerpt, the attribute name will be `in_voltage_raw`, and
+    its absolute sysfs path will be `/sys/bus/iio/iio:deviceX/in_voltage_raw`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now let''s say the ADC has four or even eight channels. How do we identify
+    each of them? The solution is to use indexes. Setting the `.indexed` field to
+    `1` will modify the channel attribute name with the `.channel` value, replacing
+    `{index}` in the naming pattern:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following are the full sysfs paths of the resulting channel attributes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: As we can see, even if they all have the same type, they are differentiated
+    by their index.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Channel identification using a modifier
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'To highlight the concept of modifiers, let''s consider a light sensor with
+    two channels – one for infrared light and the other for both infrared and visible
+    light. Without an index or a modifier, an attribute name would be `in_intensity_raw`.
+    Using indexes here can be error-prone because it makes no sense to have `in_intensity0_ir_raw`
+    and `in_intensity1_ir_raw` as it would mean they are channels of the same type.
+    Using a modifier will help us to have meaningful attribute names. The channel
+    definition could look as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The resulting attributes would be as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`/sys/bus/iio/iio:deviceX/in_intensity_ir_raw` for the channel measuring IR
+    intensity'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/sys/bus/iio/iio:deviceX/in_intensity_both_raw` for the channel measuring
+    both'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/sys/bus/iio/iio:deviceX/in_illuminance_input` for the processed data'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/sys/bus/iio/iio:deviceX/sampling_frequency` for the sampling frequency, shared
+    by all'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This is valid with an accelerometer too, as we will see in a later case study.
+    For now, let's summarize what we have discussed so far by implementing a dummy
+    IIO driver.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Putting it all together – writing a dummy IIO driver
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Let's summarize what we have seen so far with a simple dummy driver, which will
+    expose four voltage channels. We will not care about the `read()` or `write()`
+    functions for the moment.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, let''s define the headers we''ll need for the development:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, because channel description is a generic and repetitive operation, let''s
+    define a macro that will populate the channel description for us, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After the channel population macro has been defined, let''s define our driver
+    state data structure, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The data structure defined previously is useless. It is there just to show
+    the concept. Then, since we do not need read or write operations in this dummy
+    driver example, let''s create empty read and write functions that just return
+    `0` (meaning that everything went successfully):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can now declare our IIO channels using the macro we defined earlier. Moreover,
+    we can set up our `iio_info` data structure as follows, assigned at the same time
+    as the fake read and write operations:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that all the necessary IIO data structures have been set up, we can switch
+    to platform driver-related data structures and implementing its methods, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding probing method, we have exclusively used resource-managed
+    APIs for allocation and registering. This significantly simplifies the code and
+    gets rid of the driver''s `remove` method. The driver declaration and registering
+    would then look like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After loading the preceding module, you will have the following output while
+    listing available IIO devices on the system:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: A very complete IIO driver that can be used for learning purposes or a development
+    model is the IIO simple dummy driver, in `drivers/iio/dummy/iio_simple_dummy.c`.
+    It can be made available on the target by enabling the `IIO_SIMPLE_DUMMY` kernel
+    config option.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have addressed the basic IIO concept, we can go a step further by
+    implementing buffer support and the concept of triggers.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Integrating IIO triggered buffer support
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'It might be useful to be able to capture data based on some external signals
+    or events (triggers) in data acquisition applications. These triggers might be
+    the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A data ready signal
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An IRQ line connected to some external system (GPIO or whatever)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: On processor periodic interrupt (a timer, for example)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: User space reading/writing a specific file in sysfs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: IIO device drivers are completely decorrelated from the triggers, whose drivers
+    are implemented in `drivers/iio/trigger/`. A trigger may initialize data capture
+    on one or many devices. These triggers are used to fill buffers, exposed to user
+    space through the character device created during the registration of the IIO
+    device.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'You can develop your own trigger driver, but it is out of the scope of this
+    book. We will try to focus on existing ones only. These are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`iio-trig-interrupt`: This allows using IRQs as IIO triggers. In old kernel
+    versions (prior to v3.11), it used to be `iio-trig-gpio`. To support this trigger
+    mode, you should enable `CONFIG_IIO_INTERRUPT_TRIGGER` in the kernel config. If
+    built as a module, the module will be called `iio-trig-interrupt`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio-trig-hrtimer`: Provides a frequency-based IIO trigger using high-resolution
+    timers as an interrupt source (since kernel v4.5). In an older kernel version,
+    it used to be `iio-trig-rtc`. To support this trigger mode in the kernel, the
+    `IIO_HRTIMER_TRIGGER` config option must be enabled. If built as a module, the
+    module will be called `iio-trig-hrtimer`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio-trig-sysfs`: This allows us to use the `SYSFS` entry to trigger data capture.
+    `CONFIG_IIO_SYSFS_TRIGGER` is the kernel option to add the support of this trigger
+    mode.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio-trig-bfin-timer`: This allows us to use a Blackfin timer as an IIO trigger
+    (still in staging).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'IIO exposes an API so that we can do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Declare any given number of triggers.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Choose which channels will have their data pushed into a buffer.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If your IIO device provides the support of a trigger buffer, you must set `iio_dev.pollfunc`,
+    which is executed when the trigger fires. This handler has the responsibility
+    of finding enabled channels through `indio_dev->active_scan_mask`, retrieving
+    their data, and feeding them into `indio_dev->buffer` using the `iio_push_to_buffers_with_timestamp`
+    function. Therefore, buffers and triggers are tightly connected in the IIO subsystem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The IIO core provides a set of helper functions to set up triggered buffers,
+    which you can find in `drivers/iio/industrialio-triggered-buffer.c`. The following
+    are the steps to support a triggered buffer from within your driver:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Fill an `iio_buffer_setup_ops` structure if needed:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Write the top half associated with the trigger. In 99% of cases, you just have
+    to feed the timestamp associated with the capture:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: We then return a special value so the kernel knows it must schedule the bottom
+    half, which will run in a threaded context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Write the trigger bottom half, which will fetch data from each enabled channel
+    and feed it into the buffer:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Finally, in the probe function, you have to set up the buffer itself, prior
+    to registering the device:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: The magic function here is `iio_triggered_buffer_setup()`. It will also give
+    the `INDIO_BUFFER_TRIGGERED` capability to the device, meaning that a polled ring
+    buffer is possible.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When a trigger is assigned (from user space) to the device, the driver has
+    no way of knowing when the capture will be fired. This is the reason why, while
+    continuous buffered capture is active, you should prevent (by returning an error)
+    the driver from handling sysfs per-channel data capture (performed by the `read_raw()`
+    hook) in order to avoid undetermined behavior, since both the trigger handler
+    and the `read_raw()` hook will try to access the device at the same time. The
+    function used to check whether buffered mode is currently enabled is `iio_buffer_enabled()`.
+    The hook will look as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `iio_buffer_enabled()` function simply tests whether the device''s current
+    mode corresponds to one of the IIO buffered modes. This function is defined as
+    the following in `include/linux/iio/iio.h`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s now describe some important things used in the preceding code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`iio_buffer_setup_ops` provides buffer setup functions to be called at a fixed
+    step of the buffer configuration sequence (before/after enable/disable). If not
+    specified, the default `iio_triggered_buffer_setup_ops` will be given to your
+    device by the IIO core.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`sensor_iio_pollfunc` is the trigger''s top half. As with every top half, it
+    runs in an interrupt context and must do as little processing as possible. In
+    99% of cases, recording the timestamp associated with the capture will be enough.
+    Once again, you can use the default IIO `iio_pollfunc_store_time()` function.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`sensor_trigger_handler` is the bottom half, which runs in a kernel thread,
+    allowing you to do any processing, even acquiring a mutex or sleeping. The heavy
+    processing should take place here. Most of the job here consists of reading data
+    from the device and storing this data in the internal buffer together with the
+    timestamp that has been recorded in the top half and pushing these to the IIO
+    device buffer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: A triggered buffer involves a trigger. It tells the driver when to read the
+    sample from the device and put it into the buffer. A triggered buffer is not mandatory
+    for writing an IIO device driver. You can use a single-shot capture through sysfs
+    too, by reading the raw attribute of the channel, which will only perform a single
+    conversion (for the channel attribute being read). Buffer mode allows continuous
+    conversions, thus capturing more than one channel in a single shot.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Now that we are comfortable with all the in-kernel aspects of triggered buffers,
+    let's introduce their setup in user space using the sysfs interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IIO trigger and sysfs (user space)
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'At runtime, there are two sysfs directories from where triggers can be managed:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`/sys/bus/iio/devices/trigger<Y>/`: This directory is created once an IIO trigger
+    is registered with the IIO core. In this path, `<Y>` corresponds to a trigger
+    with an index. There is at least a `name` attribute in that directory, which is
+    the trigger name that can be later used for association with a device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/sys/bus/iio/devices/iio:deviceX/trigger/*`: This directory will be automatically
+    created if your device supports a triggered buffer. A trigger can be associated
+    with our device by writing the trigger''s name in the `current_trigger` file in
+    this directory.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Having enumerated the trigger-related sysfs directories, let's start by describing
+    how the sysfs trigger interface works.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The sysfs trigger interface
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'A sysfs trigger is enabled in the kernel with the `CONFIG_IIO_SYSFS_TRIGGER=y`
+    config option, which will result in the `/sys/bus/iio/devices/iio_sysfs_trigger/`
+    folder being automatically created, which can be used for sysfs trigger management.
+    There will be two files in the directory, `add_trigger` and `remove_trigger`.
+    Its driver is `drivers/iio/trigger/iio-trig-sysfs.c`. The following are descriptions
+    of each of these attributes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`add_trigger`: Used to create a new sysfs trigger. You can create a new trigger
+    by writing a positive value (which will be used as a trigger ID) into that file.
+    It will create the new sysfs trigger, accessible at `/sys/bus/iio/devices/triggerX`,
+    where `X` is the trigger number. For example, `echo 2 > add_trigger` will create
+    a new sysfs trigger, accessible at `/sys/bus/iio/devices/trigger2`. An invalid
+    argument message will be returned if a trigger with the supplied ID already exists
+    in the system. The sysfs trigger name pattern is `sysfstrig{ID}`. The `echo 2
+    > add_trigger` command will create the `/sys/bus/iio/devices/trigger2` trigger,
+    whose name is `sysfstrig2`, and you can check it with `cat /sys/bus/iio/devices/trigger2/name`.
+    Each sysfs trigger contains at list one file: `trigger_now`. Writing `1` into
+    that file will instruct all devices with the corresponding trigger name in their
+    `current_trigger` to start the capture and push data into their respective buffers.
+    Each device buffer must have its size set and must be enabled (`echo 1 > /sys/bus/iio/devices/iio:deviceX/buffer/enable`).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`remove_trigger`: Used to remove a trigger. The following command will be sufficient
+    to remove the previously created trigger:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: As you can see, the value used in `add_trigger` while creating the trigger must
+    be the same value you use when removing the trigger.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: You should note that the driver will only capture data when the associated trigger
+    is triggered. Thus, when using the sysfs trigger, the data will only be captured
+    at the time when `1` is written into the `trigger_now` attribute. Thus, to implement
+    continuous data capture, you should run `echo 1 > trigger_now` as many times as
+    you need a sample count, in a loop, for example. This is because a single call
+    of `echo 1 > trigger_now` is equivalent to a single trigging and thus will perform
+    only one capture, which will be pushed in the buffer. With interrupt-based triggers,
+    data is captured and pushed in the buffer anytime an interrupt occurs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now we are done with the trigger setup, this trigger must be assigned to a device
+    so that it can trigger data capture on this device, as we will see in the next
+    section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tying a device to a trigger
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Associating a device with a given trigger consists of writing the name of the
+    trigger to the `current_trigger` file available under the device''s trigger directory.
+    For example, let''s say we need to tie a device with the trigger that has index
+    `2`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To detach the trigger from the device, you should write an empty string to
+    the `current_trigger` file of the device trigger directory, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: We will see later in the chapter (in the *Capturing data using a sysfs trigger*
+    section) a practical example dealing with sysfs triggers for data capture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Interrupt trigger interface
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Say we have the following sample:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In this sample, we declare our IRQ- (that the IIO interrupt trigger will register
+    using `request_irq()`) based trigger as a platform device. It will result in the
+    IRQ trigger standalone module (whose source file is `drivers/iio/trigger/iio-trig-interrupt.c`)
+    being loaded. After the probing succeeds, there will be a directory corresponding
+    to the trigger. IRQ trigger names have the form `irqtrigX`, where `X` corresponds
+    to the IRQ we just passed. This name is the one you will see in `/proc/interrupt`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As we have done with other triggers, you just have to assign that trigger to
+    your device, by writing its name into your device''s `current_trigger` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now, every time the interrupt fires, device data will be captured.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The IRQ trigger driver is implemented in `drivers/iio/trigger/iio-trig-interrupt.c`.
+    Since the driver requires a resource, we can use a device tree without any code
+    change, with the only condition to respect the `compatible` property, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: The example assumes the IRQ line is `GPIO#30`, which belongs to the `gpio4`
+    GPIO controller node. This consists of using a GPIO as an interrupt source, so
+    that whenever the GPIO changes to a given state, the interrupt is raised, thus
+    triggering the capture.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The hrtimer trigger interface
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '`hrtimer trigger` is implemented in `drivers/iio/trigger/iio-trig-hrtimer.c`
+    and relies on the `configfs` filesystem (see `Documentation/iio/iio_configfs.txt`
+    in kernel sources), which can be enabled via the `CONFIG_IIO_CONFIGFS` config
+    option and mounted on our system (usually under the `/config` directory):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, loading the `iio-trig-hrtimer` module will create IIO groups accessible
+    under `/config/iio`, allowing users to create `hrtimer` triggers under `/config/iio/triggers/hrtimer`.
+    The following is an example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: Each `hrtimer` trigger contains a single `sampling_frequency` attribute in the
+    trigger directory. A full and working example is provided later in the chapter
+    in the *Data capture using an hrtimer trigger* section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IIO buffers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: An IIO buffer offers continuous data capture, where more than one data channel
+    can be read at once. The buffer is accessible from the user space via the `/dev/iio:device`
+    character device node. From within the trigger handler, the function used to fill
+    the buffer is `iio_push_to_buffers_with_timestamp()`. In order to allocate and
+    set up a trigger buffer for a device, drivers must use `iio_triggered_buffer_setup()`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IIO buffer sysfs interface
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'An IIO buffer has an associated attributes directory under `/sys/bus/iio/iio:deviceX/buffer/*`.
+    The following are some of the existing attributes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`length`: The capacity of the buffer. It represents the total number of data
+    samples that can be stored by the buffer. It is the number of scans contained
+    by the buffer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`enable`: Activate the buffer capture and start the buffer capture up.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`watermark`: This attribute has been available since kernel version v4.2\.
+    It is a positive number that specifies how many scan elements a blocking read
+    should wait for. If using the `poll()` system call, for example, it will block
+    until the watermark is reached. It makes sense only if the watermark is greater
+    than the requested amount of reads. It does not affect non-blocking reads. A maximum
+    delay guarantee can be achieved by blocking on `poll()` with a timeout and reading
+    the available samples after the timeout expires.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now that we have enumerated and described the attributes present in the IIO
+    buffer directory, let's discuss how to set up the IIO buffer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: IIO buffer setup
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'A channel whose data is to be read and pushed into the buffer is called a `/sys/bus/iio/iio:deviceX/scan_elements/*`
+    directory, containing the following attributes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`*_en`: This is a suffix for the attribute name, used to enable the channel.
+    If, and only if, the value of its attribute is non-zero, then a triggered capture
+    will contain data samples for this channel. For example, `in_voltage0_en` and
+    `in_voltage1_en` are attributes that enable `in_voltage0` and `in_voltage1`. Therefore,
+    if the value of `in_voltage1_en` is non-zero, then the output of a triggered capture
+    on the underlying IIO device will include the `in_voltage1` channel value.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`type`: Describes the scan element data storage within the buffer and hence
+    the form in which it is read from user space. For example, `in_voltage0_type`
+    is an example of a channel type. The format respects the following pattern: `[be|le]:[s|u]bits/storagebitsXrepeat[>>shift]`.
+    The following are the meanings of each field in the following format:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`be` or `le` specifies the endianness (big or little).'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`s` or `u` specifies the sign, either signed (two''s complement) or unsigned.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`bits` is the number of valid data bits.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`storagebits` is the number of bits this channel occupies in the buffer. That
+    said, a value may really be coded on 12 bits (`bits`) but occupies 16 bits (`storagebits`)
+    in the buffer. You must, therefore, shift the data four times to the right to
+    obtain the actual value. This parameter depends on the device, and you should
+    refer to its datasheet.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`shift` represents the number of times you must shift the data value prior
+    to masking out unused bits. This parameter is not always needed. If the number
+    of valid bits is equal to the number of storage bits, the shift will be `0`. You
+    can also find this parameter in the device datasheet.'
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `repeat` element specifies the number of times `bits`/`storagebits` is repeated.
+    The repeat value is omitted when the repeat element is `0` or `1`.
+  prefs:
+  - PREF_IND
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The best way to explain this section is by providing an excerpt of the kernel
+    docs, which you can find here: [https://www.kernel.org/doc/html/latest/driver-api/iio/buffers.html](https://www.kernel.org/doc/html/latest/driver-api/iio/buffers.html).
+    Let''s consider a driver for a 3-axis accelerometer with 12-bit resolution where
+    data is stored in two 8-bit (thus 16 bits) registers, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'According to the preceding description, each axis will have the following scan
+    element:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: You should interpret this as being little-endian signed data, 16 bits in size,
+    which needs to be shifted right by 4 bits before masking out the 12 valid bits
+    of data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The element of `struct iio_chan_spec` responsible for determining how a channel''s
+    value should be stored in a buffer is `scant_type`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This structure absolutely matches `[be|le]:[s|u]bits/storagebitsXrepeat[>>shift]`,
+    which was the pattern described previously. Let''s have a look at each part of
+    the structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`sign` represents the sign of the data and matches `[s|u]` in the pattern.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`realbits` corresponds to `bits` in the pattern.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`storagebits` matches `storagebits` in the pattern.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`shift` corresponds to `shift` in the pattern, as well as `repeat`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_indian` represents the endianness and matches `[be|le]` in the pattern.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'At this point, we should be able to implement the IIO channel structure that
+    corresponds to the type explained previously:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: Buffer and trigger support are the last concepts in our learning process of
+    the IIO framework. Now that we are familiar with that, we can put everything together
+    and summarize the knowledge we have acquired with a concrete, lite example.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Putting it all together
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Let''s have a closer look at the BMA220 digital triaxial acceleration sensor
+    from Bosch. This is an SPI/I2C-compatible device, with 8-bit-sized registers,
+    along with an on-chip motion-triggered interrupt controller, which senses tilt,
+    motion, and shock vibration. Its datasheet is available here: [http://www.mouser.fr/pdfdocs/BSTBMA220DS00308.PDF](http://www.mouser.fr/pdfdocs/BSTBMA220DS00308.PDF).
+    Its driver is available thanks to the `CONFIG_BMA200` kernel config option. Let''s
+    walk through it.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We first declare our channels using `struct iio_chan_spec`. If the triggered
+    buffer will be used, then we need to fill in the `scan_index` and `scan_type`
+    fields. The following code excerpt shows the declaration of our channels:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`.info_mask_separate = BIT(IIO_CHAN_INFO_RAW)` means there will be a `*_raw`
+    sysfs entry (attribute) for each channel, and `.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE)`
+    says that there is only a `*_scale` sysfs entry for all channels of the same type:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: Reading `in_accel_scale` calls the `read_raw()` hook with the mask set to `IIO_CHAN_INFO_SCALE`.
+    Reading `in_accel_x_raw` calls the `read_raw()` hook with the mask set to `IIO_CHAN_INFO_RAW`.
+    The real value is then `raw_value x scale`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'What `.scan_type` says is that each channel''s return value is signed, 8 bits
+    in size (will occupy 8 bits in the buffer), but the useful payload only occupies
+    6 bits, and data must be right-shifted twice prior to masking out unused bits.
+    Any scan element type will look as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following is our `pullfunc` (actually, it is the bottom half), which reads
+    a sample from the device and pushes read values into the buffer (`iio_push_to_buffers_with_timestamp()`).
+    Once done, we inform the core (`iio_trigger_notify_done()`):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following is the read function. It is a hook called every time you read
+    a sysfs entry of the device:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: When you read a `*raw` sysfs file, the hook is called given `IIO_CHAN_INFO_RAW`
+    in the `mask` parameter and the corresponding channel in the `*chan` parameter.
+    `*val` and `*val2` are actually output parameters that must be set with the raw
+    value (read from the device). Any read performed on the `*scale` sysfs file will
+    call the hook with `IIO_CHAN_INFO_SCALE` in the `mask` parameter, and so on for
+    each attribute mask.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The same principle applies in the write function, used to write a value to
+    the device. There is an 80% chance your driver does not require a `write` operation.
+    In the following example, the `write` hook lets the user change the device''s
+    scale, though other parameters can be changed, such as sampling frequency or digital-to-analog
+    raw value:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: This function is called whenever you write a value to the device, and only supports
+    scaling value change. An example of usage in user space could be `echo $desired_scale
+    > /sys/bus/iio/devices/iio:devices0/in_accel_scale`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now it comes time to fill a `struct iio_info` structure to be given to our
+    `iio_device`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the `probe` function, we allocate and set up a `struct iio_dev iio` device.
+    Memory for private data is reserved too:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can enable this driver by means of the `CONFIG_BMA220` kernel option. That
+    says, *this is available only from v4.8 in the kernel*. The closest device you
+    can use on older kernel versions is BMA180, which you can enable using the `CONFIG_BMA180`
+    option.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: To enable buffered capture in the IIO simple dummy driver, you must enable the
+    `IIO_SIMPLE_DUMMY_BUFFER` kernel config option.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we are familiar with IIO buffers, we will learn how to access the data
+    coming from IIO devices and resulting from channel acquisitions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Accessing IIO data
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'You may have guessed, there are only two ways to access data with the IIO framework:
+    one-shot capture through sysfs channels or continuous mode (triggered buffer)
+    via an IIO character device.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Single-shot capture
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Single-shot data capture is done through the sysfs interface. By reading the
+    sysfs entry that corresponds to a channel, you''ll capture only the data specific
+    to that channel. Say we have a temperature sensor with two channels: one for the
+    ambient temperature and the other for the thermocouple temperature:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The processed value is obtained by multiplying the scale by the raw value:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '*Voltage value: 6646 * 0.305175781 = 2028.19824053*'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The device datasheet says the process value is given in mV. In our case, it
+    corresponds to *2.02819 V*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Accessing the data buffer
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: To get a triggered acquisition working, trigger support must have been implemented
+    in your driver. Then, to acquire data from within the user space, you must create
+    a trigger, assign it, enable the ADC channels, set the dimension of the buffer,
+    and enable it. The code for this is given in the following section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Capturing data using a sysfs trigger
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Data capture using sysfs triggers consists of sending a set of commands and
+    a few sysfs files. Let''s go through what you should do to achieve that:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Creating the trigger**: Before the trigger can be assigned to any device,
+    it should be created:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE58]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: In the preceding command, `0` corresponds to the index we need to assign to
+    the trigger. After this command, the trigger directory will be available under
+    `/sys/bus/iio/devices/` as `trigger0`. The trigger's full patch will be `/sys/bus/iio/devices/trigger0`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`0` as the index, the trigger will be named `sysfstrig0`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE59]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'We could have used this command too:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'However, if the value you have written does not correspond to an existing trigger
+    name, nothing will happen. To make sure the trigger has been defined successfully,
+    you can use the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`available_scan_masks` in the driver:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '**Setting up the buffer size**: Here, you should set the number of sample sets
+    that may be held by the buffer:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '**Enabling the buffer**: This step consists of marking the buffer as being
+    ready to receive pushed data:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: To stop the capture, we'll have to write `0` in the same file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Firing the trigger**: Launch acquisition. This must be done as many times
+    as data sample counts are needed in the buffer, in a loop, for example:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE65]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Now that acquisition is done, you can do the following.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Disable the buffer:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE66]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Detach the trigger:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE67]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Dump the contents of our IIO character device:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE68]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Now that we have learned how to use sysfs triggers, it will be easier to deal
+    with hrtimer-based ones as they kind of use the same theoretical principle.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Data capture using an hrtimer trigger
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'hrtimers are high-resolution kernel timers with up to nanosecond granularity
+    when the hardware allows it. As with sysfs-based triggers, data capture using
+    hrtimer triggers requires a few commands for their setup. These commands can be
+    split into the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Create the hrtimer-based trigger:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE69]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: The preceding command will create a trigger named `trigger0`. This name will
+    be used to assign this trigger to a device.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Define the sampling frequency:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE70]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: There is no configurable attribute in the `config` directory for the `hrtimer`
+    trigger type. It introduces the `sampling_frequency` attribute to trigger directory.
+    That attribute sets the polling frequency in Hz, with mHz precision. In the preceding
+    example, we have defined a polling at 50 Hz (every 20 ms).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Link the trigger with the IIO device:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE71]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Choose on which channels data must be captured and pushed into the buffer:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE72]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Start the hrtimer capture, which will perform periodic data capture at the
+    frequency we defined earlier and on channels that have been enabled previously:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE73]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Finally, data can be dumped using `cat /dev/iio\:device0 | xxd –`. Because the
+    trigger is an hrtimer, data will be captured and pushed at every hrtimer period
+    interval.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'To disable this periodic capture, the command to use is the following:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '**echo 0 > /sys/bus/iio/devices/iio:device0/buffer/enable**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Then, to remove this hrtimer trigger, the following command must be used:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '**rmdir /sys/kernel/config/iio/triggers/hrtimer/trigger0**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can notice how easy it is to set up either a simple sysfs trigger or an hrtimer-based
+    one. They both consist of a few commands to set up and start the capture. However,
+    captured data would be meaningless or even dangerously misleading if not interpreted
+    as it should, which we'll discuss in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Interpreting the data
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Now that everything has been set up, we can dump the data using the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE74]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding command will dump raw data that would need more processing to
+    obtain the real data. In order to be able to understand the data output and process
+    it, we need to look at the channel type, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE75]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding, `be:s14/16>>2` means big-endian (`be:`) signed data (`s`)
+    stored on 16 bits but whose real number of bits is 14\. Moreover, it also means
+    that the data must be shifted to the right two times (`>>2`) to obtain the real
+    value. This means, for example, to obtain the voltage value in the first sample
+    (`0x188`), this value must be right-shifted twice in order to mask unused bits:
+    *0 x 188 >> 2 = 0 x 62 = 98*. Now, the real value is *98 * 250 = 24500 = 24.5
+    V*. If there were an offset attribute, the real value would be `(raw + offset)
+    * scale`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We are now familiar with IIO data access (from user space) and we are also done
+    with the IIO producer interface in the kernel. It is not just the user space that
+    can consume data from the IIO channel. There is an in-kernel interface as well,
+    which we will discuss in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Dealing with the in-kernel IIO consumer interface
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far, we have dealt with the user-space consumer interface since data was
+    consumed in user space. There are situations where a driver will require a dedicated
+    IIO channel. An example is a battery charger that needs to measure the battery
+    voltage as well. This measurement can be achieved using a dedicated IIO channel.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'IIO channel attribution is done in the device tree. From the producer side,
+    only one thing must be done: specifying the `#io-channel-cells` property according
+    to the number of channels of the IIO device. Typically, it is `0` for nodes with
+    a single IIO output and `1` for nodes with multiple IIO outputs. The following
+    is an example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE76]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On the consumer side, there are a few properties to provide. These are the
+    following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`io-channels`: This is the only mandatory property. It represents the list
+    of phandle (reference or pointer to a device tree node) and IIO specifier pairs,
+    one pair for each IIO input to the device. Do note that if the IIO provider''s
+    `#io-channel-cells` property is `0`, then only the phandle portion should be specified
+    when referring to it in the consumer node. This is the case for single-channel
+    IIO devices, for example, a temperature sensor. Otherwise, both the phandle and
+    the channel index must be specified.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`io-channel-names`: This is an optional but recommended property that is a
+    list of IIO channel name strings. These names must be sorted in the same order
+    as their corresponding channels, which are enumerated in the `io-channels` property.
+    Consumer drivers should use these names to match IIO input names with IIO specifiers.
+    This eases the channel identification in the driver.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Take the following example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE77]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding node describes a device with two IIO resources, named `vcc` and
+    `vdd`, respectively. The `vcc` channel originates from the `&adc` device output
+    `1`, while the `vdd` channel comes from the `&ref` device output `0`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Another example consuming several channels of the same ADC is the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE78]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now that we are familiar with IIO binding and channel hogging, we can see how
+    to play with those channels using the kernel IIO consumer API.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Consumer kernel API
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The kernel IIO consumer interface relies on a few functions and data structures.
+    The following is the main API:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE79]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following are descriptions of each API:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`devm_iio_channel_get()`: Used to get a single channel. `dev` is the pointer
+    to the consumer device, and `consumer_channel` is the channel name as specified
+    in the `io-channel-names` property. On success, it returns a pointer to a valid
+    IIO channel, or a pointer to a negative error number if it is not able to get
+    the IIO channel.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`devm_iio_channel_get_all()`: Used to look up IIO channels. It returns a pointer
+    to a negative error number if it is not able to get the IIO channel; otherwise,
+    it returns an array of `iio_channel` structures terminated with 0 null `iio_dev`
+    pointer. Say we have the following consumer node:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE80]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'The following code is an example of using `devm_iio_channel_get_all()` to get
+    the IIO channels. This code also shows how to check for the last valid channel
+    (the one with the null `iio_dev` pointer):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE81]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`iio_get_channel_type()`: Returns the type of a channel, such as `IIO_VOLTAGE`
+    or `IIO_TEMP`. This function fills `enum iio_chan_type` of the channel in the
+    `type` output parameter. On error, the function returns a negative error number;
+    otherwise, it returns `0`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_read_channel_processed()`: Reads the channel processed value in the correct
+    unit, for example, in micro-volts for voltage and milli-degrees for temperature.
+    `val` is the processed value read back. This function returns `0` on success or
+    a negative value otherwise.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_read_channel_raw()`: Used to read a raw value from the channel. In this
+    case, the consumer may need scale (`iio_read_channel_scale()`) and offset (`iio_read_channel_offset()`)
+    in order to compute the processed value. `val` is the raw value read back.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'In the preceding APIs, `struct iio_channel` represents an IIO channel from
+    the consumer point of view. It has the following declaration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE82]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, `iio_dev` is the IIO device to which the channel belongs,
+    and `channel` is the underlying channel spec as seen by the provider.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Writing user-space IIO applications
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: After the long journey through the kernel-side implementation, it might be interesting
+    to have a look at the other side, the user space. IIO support in user space can
+    be handled through sysfs or using **libiio**, a library that has been specially
+    developed for this purpose and follows the kernel-side evolutions. This library
+    abstracts the hardware's low-level details and provides an easy and comprehensive
+    programming interface that can also be used for complex projects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In this section, we will be using version 0.21 of the library, whose documentation
+    can be found here: [https://analogdevicesinc.github.io/libiio/v0.21/libiio/index.html](https://analogdevicesinc.github.io/libiio/v0.21/libiio/index.html).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`libiio` can run on the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A target, that is, the embedded system running Linux that includes IIO drivers
+    for devices that are physically connected to the system, such as ADCs and DACs.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A remote computer connected to the embedded system through a network, USB, or
+    serial connection. This remote computer may be a PC running a Linux distribution,
+    Windows, macOS, or OpenBSD/NetBSD. This remote PC communicates with the embedded
+    system via the `iiod` server, which is a daemon running on the target.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following diagram summarizes the architecture:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Figure 15.2 – libiio overview'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '](img/B17934_15_002.jpg)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Figure 15.2 – libiio overview
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`libiio` is built around five concepts, each of which corresponds to a data
+    structure, altogether making almost all the API. These concepts are the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**The backend**: This represents the connectivity (or the communication channel)
+    between your application and the target on which the IIO devices to interact with
+    are connected. This backend (thus connectivity) can be via USB, network, serial,
+    or local. Independently from the hardware connectivity available, supported backends
+    are library compile-time defined.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**The context**: A context is a library instance that represents a collection
+    of IIO devices, which in most cases correspond to a global view of the IIO devices
+    on a running target. In this way, a context gathers all the IIO devices the target
+    contains, as well as their channels and their attributes. For instance, when looking
+    for an IIO device, code must create a context and request the target IIO device
+    from this context.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Because applications may run remotely to the target board, the context will
+    need a communication channel with that target. This is where the backend intervenes.
+    Therefore, a context must be backed by a backend, which represents the connectivity
+    between the target and the machine running the application. However, remotely
+    running applications are not always aware of the target environment; thus, the
+    library allows look up for available backends, allowing, among other things, dynamic
+    behavior. This lookup is referred to as IIO context scanning. That said, applications
+    may not bother with scanning if running locally to the target.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A context is represented with an instance of `struct iio_context`. A context
+    object may contain zero or more devices. However, a device object is associated
+    with only one context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`struct iio_device`, which is the user-space (`libiio` actually) counterpart
+    of the in-kernel `struct iio_dev`. A device object may contain zero or more channels,
+    while a channel is associated with only one device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`struct iio_buffer`. A device may be associated with one buffer object, and
+    a buffer is associated with only one device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`struct iio_channel`. A device may contain zero or more channels, and a channel
+    is associated with only one device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'After becoming familiar with these concepts, we can split IIO application development
+    into the following steps:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a context, after having (optionally) scanned for available backends
+    to create this context with.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Iterating over all devices, or looking for and picking the one of interest.
+    Eventually getting/setting the device parameters via its attributes.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Walking through the device channels and enabling channels of interest (or disabling
+    the ones we are not interested in). Eventually getting/setting the channel parameters
+    via their attributes.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: If a device needs a trigger, then associating a trigger with the given device.
+    This trigger must have been created before creating the context.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Creating a buffer and associating this buffer with the device, and then starting
+    streaming.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Starting the capture and reading the data.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Scanning and creating an IIO context
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: When creating a context, the library will identify the IIO devices (including
+    triggers) that can be used and identify the channels for each device; then, it
+    will identify all device- and channel-specific attributes and also identify attributes
+    shared by all channels; finally, the library will create a context where all those
+    entities are placed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A context can be created using one of the following APIs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE83]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Each of these functions returns a valid context object on success and `NULL`
+    otherwise, with `errno` set appropriately. That said, while they all return the
+    same values, their arguments may vary, as described in the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`iio_create_local_context()`: Used to create a local context:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE84]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Note that the local backend interfaces the Linux kernel through the sysfs virtual
+    filesystem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`iio_create_network_context()`: Creates a network context. It takes as a parameter
+    a string representing the IPv4 or IPv6 network address of the remote target:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE85]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'USB context can be created using an URI-based API, `iio_create_context_from_uri()`.
+    The argument is a string identifying the USB device using the following pattern
+    – `usb:[device:port:instance]`:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE86]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'A serial context, like a USB context, uses a URI-based API. However, its URI
+    must match the following pattern – `serial:[port][,baud][,config]`:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE87]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`iio_create_context_from_uri()` is a URI-based API, taking as a parameter a
+    valid URI (starting with the backend to use). For local context, the URI must
+    be `"local:"`. For a URI-based network context, the URI pattern must match `"ip:<ipaddr>"`,
+    where `<ipaddr>` is the IPv4 or IPv6 of the remote target. More information on
+    URI-based contexts can be found here: https://analogdevicesinc.github.io/libiio/v0.21/libiio/group__Context.html#gafdcee40508700fa395370b6c636e16fe.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_context_clone()` duplicates the context given as a parameter and returns
+    the new clone. This function is not supported on `usb:` contexts, since `libusb`
+    can only claim the interface once.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Before creating a context, the user might be interested in scanning the available
+    contexts (that is, looking for available backends). To find what IIO contexts
+    are available, the user code must do the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Invoke `iio_create_scan_context()` to create an instance of `iio_scan_context
+    object`. The first argument to this function is a string that is used as a filter
+    (`usb:`, `ip:`, `local:`, `serial:`, or a mix, such as `usb:ip`, where the default
+    (`NULL`) means any backend that is compiled in).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Call `iio_scan_context_get_info_list()` given the previous `iio_scan_context`
+    object as parameter. This will return an array `iio_context_info` object from
+    the `iio_scan_context` object. Each `iio_context_info` object can be examined
+    with `iio_context_info_get_description()` and `iio_context_info_get_uri()` to
+    determine which URI you want to attach to.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Once done, the `info` object array and the `scan` object must be released with
+    `iio_context_info_list_free()` and `iio_scan_context_destroy()`, respectively.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following is a demonstration of scanning available contexts and creating
+    one:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE88]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, if the `CHECK_REMOTE` macro is defined, the code will
+    first scan for available contexts (that is, backends) by filtering USB and network
+    ones. The code first looks for the USB context before looking for a network context.
+    If none is available, it falls back to a local context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In addition, you can get some context-related information using the following
+    APIs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE89]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding APIs, `iio_context_get_version()` returns the version of the
+    backend in use into `major`, `minor`, and `git_tag` output arguments, and `iio_context_get_name()`
+    returns a pointer to a static `NULL`-terminated string corresponding to the backend
+    name, which can be `local`, `xml`, or `network` when the context has been created
+    with the local, XML, and network backends, respectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is a demonstration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE90]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now that the context has been created, and we are able to read its information,
+    the user might be interested in walking through it, that is, navigating the entities
+    this context is made of, for instance, getting the number of IIO devices or getting
+    an instance of a given device.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: A context is a punctual and fixed view of IIO entities on the target. For instance,
+    if a user creates an IIO trigger device after having created the context, this
+    trigger device won't be accessible from this context. Because there is no context
+    synchronization API, the proper way to do things would be to destroy and re-create
+    things or to create the needed dynamic IIO elements at the beginning of the program
+    before creating the context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Walking through and managing IIO devices
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The following are APIs to navigate through the devices in an IIO context:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE91]'
+  prefs: []
+  type: TYPE_PRE
+- en: From a context, `iio_context_get_devices_count()` returns the number of IIO
+    devices in this context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`iio_context_get_device()` returns a handle for an IIO device specified by
+    its index (or ID). This ID corresponds to `<X>` in `/sys/bus/iio/devices/iio:device<X>/`.
+    For example, the ID of the `/sys/bus/iio/devices/iio:device1` device is `1`. If
+    the index is invalid, `NULL` is returned. Alternatively, given a device object,
+    its ID can be retrieved with `iio_device_get_id()`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`iio_context_find_device()` looks for an IIO device by its name. This name
+    must correspond to the name specified in `iio_indev->name` specified in the driver.
+    You can obtain this name either by using a dedicated `iio_device_get_name()` API
+    or by reading the `name` attribute in this device''s sysfs directory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE92]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following is an example of going through all devices and printing their
+    names and IDs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE93]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code example iterates over IIO devices present in the context
+    (a local context) and prints their names and IDs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Walking through and managing IIO channels
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The main channel management APIs are the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE94]'
+  prefs: []
+  type: TYPE_PRE
+- en: We can get the number of available channels from an `iio_device` object thanks
+    to `iio_device_get_channels_count()`. Then, each `iio_channel` object can be accessed
+    with `iio_device_get_channel()`, specifying the index of this channel. For example,
+    on a three-axis (*x*, *y*, *z*) accelerometer, `iio_device_get_channel(iio_device,
+    0)` will correspond to getting channel 0, that is, `accel_x`. On an eight-channel
+    ADC converter, `iio_device_get_channel(iio_device, 0)` will correspond to getting
+    channel 0, that is, `voltage0`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Alternatively, it is possible to look up a channel by its name using `iio_device_find_channel()`,
+    which expects in arguments the channel name and a Boolean, which tells you whether
+    the channel is an output or not. If you remember, in the *Channel attribute naming
+    convention* section, we saw that attribute names respect the following pattern:
+    `{direction}_{type}{index}_{modifier}_{info_mask}`. The subset in this pattern
+    that needs to be used with `iio_device_find_channel()` is `{type}{index}_{modifier}`.
+    Then, depending on the value of the Boolean parameter, the final name will be
+    obtained by adding either `in_` or `out_` as a prefix. For instance, to obtain
+    channel `X` of the accelerometer, we would use `iio_device_find_channel(iio_device,
+    "accel_x", 0)`. For the first channel of the analog-to-digital converter, we would
+    use `iio_device_find_channel(iio_device, "voltage0", 0)`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is an example of going through all devices and all channels of
+    each device:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE95]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code creates a local context and walks through all the devices
+    in this context. Then, for each device, it iterates over channels and prints their
+    name.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Additionally, there are miscellaneous APIs allowing us to obtain channel properties.
+    These are the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE96]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding APIs, the first one checks whether the IIO channel is output
+    or not, and the others mainly return each of the elements the name pattern is
+    made of.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Working with a trigger
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In `libiio`, a trigger is assimilated to a device, as both are represented by
+    `struct iio_device`. The trigger must be created before creating the context,
+    else this trigger won't be seen/available from that context.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In order to do so, you must create the trigger yourself, as we saw in the *IIO
+    trigger and sysfs (user space)* section. Then, to find this trigger from a context,
+    as it is assimilated to a device, you can use one of the device-related lookup
+    APIs that we described in the *Walking through and managing IIO devices* section.
+    In this section, let''s use `iio_context_find_device()`, which as you''ll recall
+    is defined as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE97]'
+  prefs: []
+  type: TYPE_PRE
+- en: This function looks for a device by its name in the given context. This is the
+    reason why the trigger must have been created before creating the context. In
+    parameters, `ctx` is the context from where to look for the trigger and `name`
+    is the name of the trigger, as you would have written it to the `current_trigger`
+    sysfs file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once the trigger found, it must be assigned to a device using `iio_device_set_trigger()`,
+    defined as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE98]'
+  prefs: []
+  type: TYPE_PRE
+- en: This function associates the trigger, `trig`, to the device, `dev`, and returns
+    `0` on success or a negative `errno` code on failure. If the `trig` parameter
+    is `NULL`, then any trigger associated with the given device will be disassociated.
+    In other words, to disassociate a trigger from the device, you should call `iio_device_set_trigger(dev,
+    NULL)`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s see how trigger lookup and association work in a little example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE99]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding example, we first create a local context, and we make sure
+    this context contains at least two devices. Then, from this context, we look for
+    a trigger named `hrtimer-1` and a device named `iio-device-dummy`. Once both are
+    found, we associate the trigger to the device. Finally, when done with the trigger,
+    it is disassociated from the device.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a buffer and reading data samples
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Note that channels we are interested in need to be enabled before creating
+    the buffer. To do so, you can use the following APIs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE100]'
+  prefs: []
+  type: TYPE_PRE
+- en: The first function enables the channel so that its data will be captured and
+    pushed in the buffer. The second one is a helper checking whether a channel has
+    already been enabled or not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In order to disable a channel, you can use `iio_channel_disable()`, defined
+    as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE101]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that we are able to enable the channels, we need their data to be captured.
+    We can create a buffer using `iio_device_create_buffer()`, defined as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE102]'
+  prefs: []
+  type: TYPE_PRE
+- en: This function configures and enables a buffer. In the preceding function, `samples_count`
+    is the total number of data samples that can be stored by the buffer, whatever
+    the number of enabled channels. It corresponds to the `length` attribute described
+    in the *IIO buffer sysfs interface* section. `cyclic`, if `true`, enables cyclic
+    mode. This mode makes sense for output devices only (such as DACs). However, in
+    this section, we deal with input devices only (that is, ADCs).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once you are done with a buffer, you can call `iio_buffer_destroy()` on this
+    buffer, which disables it (thus stopping the capture) and frees the data structure.
+    This API is defined as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE103]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Do note that capturing starts as soon as the buffer is created, that is, after
+    `iio_device_create_buffer()` has succeeded. However, samples are only pushed into
+    the kernel buffers. In order to fetch samples from the kernel buffer to the user-space
+    buffer, we need to use `iio_buffer_refill()`. While `iio_device_create_buffer()`
+    has to be called only once to create the buffer and start the in-kernel continuous
+    capture, `iio_buffer_refill()` must be called every time we need to fetch samples
+    from the kernel buffer. It could be used in the processing loop, for example.
+    The following is its definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE104]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'With `iio_device_create_buffer()`, with the low-speed interface, the kernel
+    allocates a single underlying buffer block (whose size equals `samples_count *
+    nb_buffers * sample_size`) to handle the captures and immediately starts feeding
+    samples inside. This default block count is `4` by default, and can be changed
+    with `iio_device_set_kernel_buffers_count()`, defined as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE105]'
+  prefs: []
+  type: TYPE_PRE
+- en: In high-speed mode, the kernel allocates `nb_buffers` buffer blocks, managed
+    with the FIFO concept of an input queue (empty buffers) and output queue (buffers
+    containing samples) in a way that, upon creation, all the buffers are filled with
+    samples and put in the outgoing queue. When `iio_buffer_refill()` is called, the
+    first buffer's data in the output queue is pushed (or mapped) to user space and
+    this buffer is put back in the input queue waiting to be filled again. At the
+    next call to `iio_buffer_refill()`, the second one is used, and so on, over and
+    over. It must be noted that small buffers result in less latency but more overhead,
+    while large buffers result in less overhead but more latency. The application
+    must make tradeoffs between latency and management overhead. When cyclic mode
+    is `true`, only a single buffer will be created, whatever the number of blocks
+    specified.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In order to read the data samples, the following APIs can be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE106]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following are the meanings and usages of each API listed:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`iio_buffer_end()` returns a pointer corresponding to the user-space address
+    that immediately follows the last sample present in the buffer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_buffer_start()` returns the address of the user-space buffer. Do, however,
+    note that this address might change after `iio_buffer_refill()` (especially with
+    a high-speed interface, where several buffer blocks are used).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_buffer_step()` returns the spacing between sample sets in the buffer.
+    That is, it returns the difference between the addresses of two consecutive samples
+    of one same channel.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_buffer_first()` returns the address of the first sample for a channel
+    or the address of the end of the buffer if no sample for the given channel is
+    present in the buffer.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_buffer_foreach_sample()` iterates over each sample in a buffer and calls
+    a supplied callback for each sample found.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The preceding list of APIs can be split into three families, depending on how
+    the data samples are read.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Buffer pointer reading
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'In this read method, `iio_buffer_first()` is coupled with `iio_buffer_step()`
+    and `iio_buffer_end()` in order to iterate on all the samples of a given channel
+    present in the buffer. This can be achieved in the following manner:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE107]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding example, from within the loop, `ptr` will point to one sample
+    of the channel we're interested in, that is, `chan`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is an example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE108]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code reads the channel data format to check whether the value
+    is repeated or not. This repeat corresponds to `iio_chan_spec.scan_type.repeat`.
+    Then, assuming the code could work with two variants of a converter (the first
+    one coding data on 16 bits and the second coding data on 64 bits), a check for
+    the data length is performed to print in the appropriate format. This length corresponds
+    to `iio_chan_spec.scan_type.storagebits`. Do note that `PRIi16` and `PRIi64` are
+    the integer `printf` formats for `int16_t` and `int64_t`, respectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Callback-based sample reading
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'In callback-based sample reading, `iio_buffer_foreach_sample()` is at the heart
+    of the reading logic. It has the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE109]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This function calls the supplied callback for each sample found in a buffer.
+    `data` is user data, which, if set, will be passed to the callback in the last
+    argument. This function iterates over samples, and each sample is read and passed
+    to a callback, along with the channel from where this sample originates. This
+    callback has the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE110]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The callback receives four arguments, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A pointer to the `iio_channel` structure that produced the sample
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A pointer to the sample itself
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The length of the sample in bytes, that is, the storage bits divided by 8, `iio_chan_spec.scan_type.storagebits/8`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The user-specified pointer optionally passed to `iio_buffer_foreach_sample()`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: This method may be used to read from (in the case of input devices) or write
+    to (in the case of output devices) the buffer. The main difference from the previous
+    method is that the callback function is invoked for each sample of the buffer,
+    not ordered by channels, but in the order that they appear in the buffer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is an example of this kind of callback implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE111]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, in the main code, we loop and iterate over samples in the buffer, as
+    follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE112]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding code, instead of playing with samples directly, delegates the
+    job to a callback.
+  prefs: []
+  type: TYPE_NORMAL
+- en: High-level channel (raw) reading
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The last method in this read series is to use one of the higher-level functions
+    provided by the `iio_channel` class. These are `iio_channel_read_raw()`, `iio_channel_write_raw()`,
+    `iio_channel_read()`, and `iio_channel_write()`, all defined as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE113]'
+  prefs: []
+  type: TYPE_PRE
+- en: The former two will basically copy the first `N` samples of a channel (`chan`)
+    to a user-specified buffer (`dst`), which must have been allocated beforehand
+    (`N` depending on the size of this buffer and a sample's storage size, that is,
+    `iio_chan_spec.scan_type.storagebits / 8`). The difference between the two is
+    that the `_raw` variant won't convert the samples and the user buffer will contain
+    raw data, while the other variant will convert each sample so that the user buffer
+    will contain processed values. These functions kind of demultiplex (since they
+    target one channel's samples among several ones) samples of a given channel.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the other hand, `iio_channel_write_raw()` and `iio_channel_write()` will
+    copy the sample data from the user-specified buffer to the device, by targeting
+    a given channel. These functions multiplex the samples as they gather samples
+    targeting one channel among many. The difference between the two is that the `_raw`
+    variant will copy data as is and the other will convert the data into hardware
+    format before sending it to the device.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s try to use the preceding APIs to read data from a device:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE114]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding example, we first fetch data samples from the kernel using
+    `iio_buffer_refill()`. Then, for each channel, we obtain the data format of this
+    channel using `iio_channel_get_data_format()`, from which we grab the size of
+    a sample for this channel. After that, we use this sample's size to compute the
+    user buffer size to allocate for receiving this channel's samples. Obtaining a
+    channel's sample size allows us to precisely determine the size of the user buffer
+    to allocate.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Walking through user-space IIO tools
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Though we have already gone through the steps required to capture IIO data,
+    it might be tedious and confusing since each step must be performed manually.
+    There are some useful tools you can use to ease and speed up your app development
+    dealing with IIO devices. These are all from the `libiio` package, developed by
+    Analog Devices, Inc. to interface IIO devices, available here: [https://github.com/analogdevicesinc/libiio](https://github.com/analogdevicesinc/libiio).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'User-space applications can easily use the `libiio` library, which under the
+    hood is a wrapper that relies on the following interfaces:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`/sys/bus/iio/devices`, the IIO sysfs interface, which is mainly used for configuration/settings'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The `/dev/iio/deviceX` character device, for data/acquisitions
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The preceding are exactly what we have manually dealt with so far. The tool''s
+    source code can be found under the library''s `tests` directory: [https://github.com/analogdevicesinc/libiio/tree/master/tests](https://github.com/analogdevicesinc/libiio/tree/master/tests)
+    offers tools such as the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `iiod` server daemon, acting as a network backend to serve any application
+    over a network link
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_info` to dump attributes'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`iio_readdev` to read or scan from a device'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We ended this chapter by enumerating tools, which can ease prototyping or device/driver
+    testing. Links pointing to either sources, documentation, or examples of usage
+    of these tools have been mentioned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: After reading this chapter, you are familiar with the IIO framework and vocabulary.
+    You know what channels, devices, and triggers are. You can even play with your
+    IIO device from the user space, through sysfs or a character device. The time
+    to write your own IIO driver has come. There are a lot of available existing drivers
+    that don't support trigger buffers. You can try to add this feature to one of
+    them.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we will play with the GPIO subsystem, which is a basic
+    concept that has been introduced in this chapter as well.
+  prefs: []
+  type: TYPE_NORMAL

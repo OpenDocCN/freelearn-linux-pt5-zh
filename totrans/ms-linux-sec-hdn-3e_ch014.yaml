@@ -1,0 +1,1663 @@
+- en: 13 Logging and Log Security
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Join our book community on Discord
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '[https://packt.link/SecNet](https://packt.link/SecNet)'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![](img/file82.png)'
+  prefs: []
+  type: TYPE_IMG
+- en: System logs are an important part of every IT administrator's life. They can
+    tell you how well your system is performing, how to troubleshoot problems, and
+    what the users—both authorized and unauthorized—are doing on the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter, I'll give you a brief tour of the Linux logging systems, and
+    then show you a cool trick to help make your log reviews easier. Then, I'll show
+    you how to set up a remote logging server, complete with **Transport Layer Security**
+    (**TLS**)-encrypted connections to the clients.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The topics that we will be covering are:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the Linux system log files
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Understanding `rsyslog`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Understanding `journald`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Making things easier with Logwatch
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Setting up a remote log server
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The focus of this chapter is on logging tools that are either already built
+    into your Linux distro or that are available in your distro repositories. Other
+    Packt Publishing books, such as the *Linux Administration Cookbook*, by Adam K.
+    Dean, show you some of the fancier, more advanced third-party log aggregation
+    and analysis tools.
+  prefs: []
+  type: TYPE_NORMAL
+- en: So, if you're ready and raring to go, let's look at those Linux log files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the Linux system log files
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'You''ll find the Linux log files in the `/var/log/` directory. The structure
+    of Linux log files is pretty much the same across all Linux distros. But, in the
+    Linux tradition of trying to keep us all confused, the main log files have different
+    names on different distros. On Red Hat-type systems, the main log file is the
+    `messages` file, and the log for authentication-related events is the `secure`
+    file. On Debian/Ubuntu-type systems, the main log file is the `syslog` file, and
+    the authentication log is the `auth.log` file. Other log files you''ll see include
+    the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`/var/log/kern.log`: On Debian/Ubuntu-type systems, this log contains messages
+    about what''s going on with the Linux kernel. As we saw in *Chapter 4, Securing
+    Your Server with a Firewall - Part 1*, and *Chapter 5, Securing Your Server with
+    a Firewall - Part 2*, this includes messages about what''s going on with the Linux
+    firewall. So, if you want to see whether any suspicious network packets have been
+    blocked, this is the place to look. Red Hat-type systems don''t have this file.
+    Instead, Red Hat systems send their kernel messages to the `messages` file.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/var/log/wtmp` and `/var/run/utmp`: The two files do essentially the same
+    thing. They both record information about users who are logged in to the system.
+    The main difference is that `wtmp` holds historical data from `utmp`. Unlike most
+    Linux log files, these are in binary format, rather than normal text-mode format.
+    The `utmp` file is the only file we''ll look at that isn''t in the `/var/log/`
+    directory.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/var/log/btmp`: This binary file holds information about failed login attempts.
+    The `pam_tally2` module that we looked at in *Chapter 3, Securing Normal User
+    Accounts*, uses the information that''s in this file.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/var/log/lastlog`: This binary file holds information about the last time
+    that users logged in to the system.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/var/log/audit/audit.log`: This text-mode file records information from the
+    auditd daemon. We already discussed it in *Chapter 12*, *Scanning, Hardening,
+    and Auditing*, so I won''t discuss it here.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: There are quite a few other log files that contain information about applications
+    and system boot-ups. But the log files that I've listed here are the main ones
+    we're concerned about when looking at system security.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we've looked at what log files we have, let's look at them in more
+    detail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The system log and the authentication log
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: It doesn't matter whether you're talking about the `syslog` and `auth.log` files
+    on Debian/Ubuntu or the `messages` and `secure` files on RHEL/CentOS/AlmaLinux.
+    On any of these systems, the files are the same, just with different names. The
+    system log files and the authentication log files have the same basic structure
+    and are all plaintext files. This makes it easy to search for specific information
+    with tools that are already built into Linux. It doesn't really matter which virtual
+    machine we use for this, other than to keep the names of the files straight.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To begin, let''s look at a simple message from the system log:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`Jul 1 18:16:12`: This is the date and time that the message was generated.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`localhost`: This is the hostname of the machine that generated the message.
+    This is important because one Linux machine can serve as the central log repository
+    for other Linux machines. By default, messages from other machines will just get
+    dumped into the same log file that the local machine uses. So, we need this field
+    to let us know what''s happening on each machine.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`systemd[1]`: This is the service that generated the message. In this case,
+    it was the `systemd` daemon.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The rest of the line is the specific message.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'There are several ways to extract information from the text-mode log files.
+    For now, we''ll just open the files in `less`, as in this example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: Then, to search for a specific text string, hit the **/** key, type in the string
+    that you want to find, and hit Enter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'So, what kind of security-related information can we expect to find in these
+    files? To start, let''s look at the permissions on the server''s private SSH keys:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This private key, the `ssh_host_rsa_key` file, has to have permissions set
+    for only the root user. But, the `+` sign at the end of the permissions settings
+    denotes that someone has set an **access-control list** (**ACL**) on that file.
+    `getfacl` will show us exactly what''s going on:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, someone has created the `sshdnoroot` user and assigned it the read permission
+    for the server''s private SSH keys. Now, if I try to restart the OpenSSH daemon,
+    it will fail. A peek into the system log—the `syslog` file, in this case—will
+    tell me why:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'So, the SSH daemon won''t start if someone other than the root user has any
+    access permissions for the server''s private keys. But how did this happen? Let''s
+    search through the authentication file—`auth.log`, in this case—to see if there''s
+    a clue:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: Ah, so that `donnie` character did this. Why, this is an outrage! Fire that
+    guy immediately! Oh wait, that's me. On second thought, let's not fire him. But
+    seriously, this shows the value of forcing users to use `sudo` instead of allowing
+    them to do everything from the root shell. If I had done this from the root shell,
+    the authentication log would have shown where I logged in as the root user, but
+    it wouldn't have shown anything I did as the root user. With `sudo`, every root-level
+    action gets logged, along with who did it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are several ways to obtain specific information from the log files. These
+    include:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the search feature of the `less` utility, as I mentioned earlier
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using `grep` to search for text strings through either one file or multiple
+    files at once
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Writing scripts in languages such as `bash`, Python, or `awk`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Here''s an example of using `grep`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, I'm searching through the `syslog` file for all lines that contain
+    the text string `fail`. By default, `grep` is case-sensitive, so this command
+    won't find any instances of `fail` with uppercase letters. Also, by default, `grep`
+    finds text strings that are embedded within other text strings. So, in addition
+    to just finding `fail`, this command will also find `failed`, `failure`, or any
+    other text string that contains the text string `fail`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To make the search case-insensitive, add the `-i` option, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This will find all forms of `fail` in either uppercase or lowercase letters.
+    To only search for the `fail` text string, and to exclude where it''s embedded
+    in other text strings, use the `-w` option, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can combine the two options like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: In general, if you don't know exactly what you're looking for, start off with
+    a more generic search that will probably show you too much. Then, narrow things
+    down until you find what you want.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now, this is all good when you just want to search through the log files for
+    specific information. But it's rather tedious when you need to do your daily log
+    review. Later on, I'll show you a tool that will make that much easier. For now,
+    let's look at the binary log files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The utmp, wtmp, btmp, and lastlog files
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Unlike the system log files and the authentication log files, all of these files
+    are binary files. So, we can't use our normal text tools, such as `less` or `grep`,
+    to read them or extract information from them. Instead, we'll use some special
+    tools that can read these binary files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `w` and `who` commands pull information about who''s logged in and what
+    they''re doing from the `/var/run/utmp` file. Both commands have their own option
+    switches, but you likely won''t ever need them. If you just want to see the list
+    of users who are currently logged in, use `who` like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: It shows me with three different logins. The `tty7` line is my local terminal
+    session, and the `pts/1` and `pts/2` lines are my two remote SSH sessions from
+    the `192.168.0.251` machine. Katelyn and Lionel are remotely logged in from two
+    other machines.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `w` command shows you not only who''s logged in, but also what they''re
+    doing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: This shows five users, but there are really only three since it counts each
+    of my login sessions as a separate user. The `:0` under the `FROM` column for
+    my first login means that this login is at the machine's local console. The `/bin/sh`
+    part shows that I have a terminal window open, and the `/etc/xdg/xfce4/xinitrc
+    -- /etc/X11/xinit/xserverrc` stuff means that the machine is in graphical mode,
+    with the XFCE desktop. The `pts/1` line shows that I've run the `w` command in
+    that window, and the `pts/2` line shows that I'm not doing anything in that window,
+    other than just having the bash shell open.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we see that Katelyn is editing a file. So, I think that she''s all good.
+    But look at Lionel. The `[priv]` in his line indicates that he''s doing some sort
+    of privileged action. To see what that action is, we''ll peek into the authentication
+    file, where we see this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Oh, come now. What fool gave Lionel the privileges to use `visudo`? I mean,
+    we know that Lionel isn''t supposed to have that privilege. Well, we can investigate.
+    Further up in the authentication file, we see this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: This shows that that `donnie` character opened `visudo`, but it doesn't show
+    what edits he made to it. But since this line comes soon after the line where
+    `donnie` created Lionel's account, and no other users have used `visudo`, it's
+    a safe bet that `donnie` is the one who gave Lionel that `visudo` privilege. So,
+    we can surmise that that `donnie` character is a real loser who deserves to be
+    fired. Oh, wait. That was me again, wasn't it? Okay, never mind.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In normal usage, the `last` command pulls information from the `/var/log/wtmp`
+    file, which archives historical data from the `/var/run/utmp` file. Without any
+    option switches, `last` shows when each user has logged in or out, and when the
+    machine has been booted:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To show a list of failed login attempts, use the `-f` option to read the `/var/log/btmp`
+    file. The catch is that this requires `sudo` privileges because we generally want
+    to keep information about failed logins confidential:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Of course, we could see about Katelyn's three failed logins in the `auth.log`
+    or `secure` file, but it's handier and quicker to see about them here.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, there''s the `lastlog` command, which pulls information from—you guessed
+    it—the `/var/log/lastlog` file. This shows a record of all users on the machine,
+    even system users, and when they logged in last:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: There are a lot more logs in the `/var/log/` directory, but I've just given
+    you the quick tour of the logs that pertain to system security. Next, we'll look
+    at the two major logging systems that are built into most Linux distros, starting
+    with the `rsyslog` system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding rsyslog
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The old `syslog` logging system was created back in the 1980s for use on Unix
+    and other Unix-like systems. It finally saw its last days in the Linux world only
+    a few years ago. Nowadays, we use `rsyslog`, which is a bit more robust and has
+    a few more features. It works mainly the same on both Debian/Ubuntu-based and
+    Red Hat-based distros, with only some differences in how the configuration files
+    are set up. But, before we look at the differences, let's look at what's the same.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding rsyslog logging rules
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Logging rules define where to record messages for each particular system service:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'On Red Hat/CentOS/AlmaLinux systems, the rules are stored in the `/etc/rsyslog.conf`
+    file. Just scroll down until you see the `#### RULES ####` section.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: On Debian/Ubuntu systems, the rules are in separate files in the `/etc/rsyslog.d/`
+    directory. The main file that we care about for now is the `50-default.conf` file,
+    which contains the main logging rules.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'To explain the structure of an `rsyslog` rule, let''s look at this example
+    from an AlmaLinux machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`authpriv`: This is the facility, which defines the type of message.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`.`: The dot separates the facility from the level, which is the next field.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`*`: This is the level, which indicates the importance of the message. In this
+    case, we just have a wildcard, which means that all levels of the `authpriv` facility
+    get logged.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`/var/log/secure`: This is the action, which is really the destination of this
+    message. (I have no idea why someone decided to call this an action.)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: When we put this all together, we see that `authpriv` messages of all levels
+    will get sent to the `/var/log/secure` file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here''s a handy list of the predefined `rsyslog` facilities:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`auth`: Messages generated by the authorization system (`login`, `su`, `sudo`,
+    and so forth)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`authpriv`: Messages generated by the authorization system but which are only
+    readable by selected users'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`cron`: Messages generated by the `cron` daemon'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`daemon`: Messages generated by all system daemons (for example, `sshd`, `ftpd`,
+    and so forth)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ftp`: Messages for `ftp`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`kern`: Messages generated by the Linux kernel'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lpr`: Messages generated by the line printer spooling'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`mail`: Messages generated by the mail system'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`mark`: Periodic timestamp message in the system log'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`news`: Messages generated by network news system'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`rsyslog`: Messages generated internally by `rsyslog`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`user`: Messages generated by users'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`local0-7`: Custom messages for writing your own scripts'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Here''s a list of the different levels:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`none`: Disables logging for a facility'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`debug`: Debug only'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`info`: Information'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`notice`: Issues to review'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`warning`: Warning messages'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`err`: Error conditions'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`crit`: Critical conditions'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`alert`: Urgent messages'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`emerg`: Emergency'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Except for the `debug` level, whatever level you set for a facility will cause
+    messages of that level up through `emerg` to get logged. For example, when you
+    set the `info` level, all messages of the `info` levels through `emerg` get logged.
+    With that in mind, let''s look at a more complex example of a logging rule, also
+    from an AlmaLinux machine:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here''s the breakdown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`*.info`: This refers to messages from all facilities of the `info` level and
+    higher.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`;`: This is a compound rule. The semicolons separate the different components
+    of this rule from each other.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`mail.none;authpriv.none;cron.none`: These are the three exceptions to this
+    rule. Messages from the `mail`, `authpriv`, and `cron` facilities will not get
+    sent to the `/var/log/messages` file. These three facilities have their own rules
+    for their own log files. (The `authpriv` rule that we just looked at earlier is
+    one of them.)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The rules on an Ubuntu machine aren't exactly the same as the ones on an AlmaLinux
+    machine. But, if you understand these examples, you won't have any trouble figuring
+    out the Ubuntu rules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If you ever make changes to the `rsyslog.conf` file or add any rules files
+    to the `/etc/rsyslog.d/` directory, you''ll need to restart the `rsyslog` daemon
+    to read in the new configuration. Do that like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now that you have a basic understanding of `rsyslog`, let's look at `journald`,
+    which is the new kid in town.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding journald
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: You'll find the `journald` logging system on any Linux distro that uses the
+    `systemd` ecosystem. Instead of sending its messages to text files, `journald`
+    sends messages to binary files. Instead of using normal Linux text file utilities
+    to extract information, you have to use the `journalctl` utility. At the time
+    of this writing, I don’t know of any Linux distro that has made the complete transition
+    to `journald`. Current Linux distros that use `systemd` run `journald` and `rsyslog`
+    side by side. Currently, the default on RHEL-type systems is for `journald` log
+    files to be temporary files that get erased every time you reboot the machine.
+    (You can configure `journald` to make its log files persistent, but there's probably
+    not much point as long as we still need to keep the old `rsyslog` files.) On Ubuntu,
+    the default is for both `journald` and `rsyslogd` to maintain persistent log files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On RHEL 8/9-type distros, `journald`, instead of `rsyslog`, is now what actually
+    collects log messages from the rest of the operating system. But `rsyslog` is
+    still there, collecting the messages from `journald` and sending them to the old-fashioned
+    `rsyslog` text files. So, the way you do log file management hasn't really changed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It will likely take a few more years to completely transition away from `rsyslog`.
+    One reason is that third-party log aggregation and analysis utilities, such as
+    LogStash, Splunk, and Nagios, are still set up to read text files instead of binary
+    files. Another reason is that, at this point, using `journald` as a remote, central
+    log server is still in a proof-of-concept stage that isn't ready for production
+    use. So, for now, `journald` isn't a suitable substitute for `rsyslog`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Several years ago, the Fedora team released a version of Fedora that only used
+    `journald`, and that left out `rsyslog`. Too many people complained about that,
+    so they had to bring back `rsyslog` for the next version of Fedora.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'To view the `journald` log file in its entirety, use the `journalctl` command.
+    With Ubuntu, the person who installed the operating system has been added to the
+    `adm` group, which allows that person to use `journalctl` without sudo or root
+    privileges. Any users who are added later would only be able to see their own
+    messages. In fact, here''s what happened for Frank:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: To see messages from either the system or from other users, these new users
+    would have to be added to either the `adm` or the `systemd-journal` group, or
+    granted the proper sudo privileges. With RHEL/CentOS/AlmaLinux, no users are automatically
+    added to either the `adm` or `systemd-journal` group. So, initially, only users
+    who have sudo privileges can view the `journald` logs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Doing either `journalctl` or `sudo journalctl`, as appropriate, automatically
+    opens the log in the `less` pager. What you''ll see looks pretty much the same
+    as what you''d see in the normal `rsyslog` log files, with the following exceptions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Long lines run past the right-hand edge of the screen. To see the rest of the
+    lines, use the right cursor key.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: You'll also see color-coding and highlighting to make different types of messages
+    stand out. Messages of `ERROR` level and higher are in red, while messages from
+    `NOTICE` level up to `ERROR` level are highlighted with bold characters.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'There are lots of options that can display different types of information in
+    various formats. For example, to only see messages about the SSH service on CentOS
+    or AlmaLinux, use the `--unit` option, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'You can''t use the grep utility with these binary logs, but you can search
+    for a string with the `-g` option. By default, it''s case-insensitive and finds
+    your desired text string even when it''s embedded in another text string. Here,
+    we see it finding the text string, `fail`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'There are lots more options besides just these. To see them, just do:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now that you've seen the basics of using both `rsyslog` and `journald`, let's
+    look at a cool utility that can help to ease the pain of doing log reviews.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Making things easier with Logwatch
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: You know how important it is to do a daily log review. But you also know how
+    much of a drag it is, and that you'd rather take a severe beating. Fortunately,
+    there are various utilities that can make the job easier. Of the various choices
+    in the normal Linux distro repositories, Logwatch is my favorite.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Logwatch doesn't have the fancy bells and whistles that the third-party log
+    aggregators have, but it's still quite good. Every morning, you'll find a summary
+    of the previous day's logs delivered to your mail account. Depending on how your
+    mail system is configured, you can have the summaries delivered to your user account
+    on the local machine or to an email account that you can access from anywhere.
+    It's as easy as can be to set up, so let's demonstrate with a hands-on lab.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab – installing Logwatch
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: To deliver its messages, Logwatch requires that the machine also has a running
+    mail server daemon. Depending on the options you chose when installing the operating
+    system, you might or might not already have the Postfix mail server installed.
+    When Postfix is set up as a local server, it will deliver system messages to the
+    root user's local account.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To view the Logwatch summaries on the local machine, you'll also need to install
+    a text-mode mail reader, such as mutt.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For this lab, you can use any of your VMs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Install Logwatch, mutt, and Postfix. (On Ubuntu, choose the `local` option
+    when installing Postfix. With CentOS or AlmaLinux, the `local` option is already
+    the default.) For Ubuntu, do this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For CentOS 7, do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For AlmaLinux, do this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On Ubuntu only, create a mail spool file for your user account:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Open the `/etc/aliases` file in your favorite text editor. Configure it to
+    forward the root user''s mail to your own normal account by adding the following
+    line at the bottom of the file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Save the file, and then copy the information from it to a binary file that
+    the system can read. Do that with this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'At this point, you have a fully operational implementation of Logwatch that
+    will deliver daily log summaries with a *low level* of detail. To see the default
+    configuration, look at the default configuration file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To change the configuration, edit the `/etc/logwatch/conf/logwatch.conf` file
+    on CentOS and AlmaLinux, or create the file on Ubuntu. Change to a medium level
+    of logging detail by adding this line:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: Logwatch is a Python script that runs every night on a scheduled basis. So,
+    there's no daemon that you have to restart to make configuration changes take
+    effect.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: Perform some actions that will generate some log entries. You can do that by
+    performing a system update, installing some software packages, and using `sudo
+    fdisk -l` to view the partition configuration.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'If possible, allow your VM to run overnight. In the morning, view your log
+    summary by doing this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: When prompted to create a `Mail` directory in your home directory, hit the *y*
+    key.
+  prefs: []
+  type: TYPE_NORMAL
+- en: End of lab.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Now that you've seen the easy way of doing a log review, let's move on to the
+    final topic of this chapter, which is how to set up a central log server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting up a remote log server
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: So far, we've just been dealing with log files on a local machine. But instead
+    of having to log into each individual machine to review log files, wouldn't it
+    be nice to just have all of the log files from every machine on just one server?
+    Well, you can do that. The best part is that it's easy.
+  prefs: []
+  type: TYPE_NORMAL
+- en: But convenience isn't the only reason to collect log files on one central server.
+    There's also the matter of log file security. If we leave all log files on each
+    individual host, it's easier for network intruders to find the files and modify
+    them to delete any messages about their nefarious activities. (That's easy to
+    do since most log files are just plaintext files that can be edited in a normal
+    text editor.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Hands-on lab – setting up a basic log server
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Setting up the server is identical on Ubuntu, CentOS, and AlmaLinux. There''s
+    only one minor difference in setting up the clients. For best results, ensure
+    that the server VM and the client VM each have a different hostname:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'On the log-collecting server VM, open the `/etc/rsyslog.conf` file in your
+    favorite text editor and look for these lines, which are near the top of the file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Uncomment the bottom two lines and save the file. The stanza should now look
+    like this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Restart the `rsyslog` daemon:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: If the machine has an active firewall, open port `514/tcp`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'Next, configure the client machines. For Ubuntu, add the following line to
+    the bottom of the `/etc/rsyslog.conf` file, substituting the IP address of your
+    own server VM:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For CentOS and AlmaLinux, look for this stanza at the bottom of the `/etc/rsyslog.conf`
+    file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Remove the comment symbols from each line that isn''t obviously a real comment.
+    Add the IP address and port number for the log server VM. The finished product
+    should look like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: Save the file and then restart the `rsyslog` daemon.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On the server VM, verify that messages from both the server VM and the client
+    VM are getting sent to the log files. (You can tell by the different hostnames
+    for different messages.)
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: This is the end of the lab.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: As cool as this is, there are still a couple of flaws with the setup. One is
+    that we're using a non-encrypted, plaintext connection to send the log files to
+    the server. Let's fix that.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating an encrypted connection to the log server
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'We''ll use the `stunnel` package to create our encrypted connection. It''s
+    easy, except that the procedures for Ubuntu and AlmaLinux are different. These
+    differences are:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: With AlmaLinux 8/9, FIPS modules are available free of charge, as I showed you
+    in *Chapter 6*, *Encryption Technologies*. They're not available for CentOS 7,
+    and they're only available for Ubuntu if you're willing to purchase a support
+    contract. So, for now, the only way we can take advantage of FIPS mode in `stunnel`
+    is to set it up on either AlmaLinux 8/9 or some other RHEL 8/9 clone.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: On AlmaLinux, `stunnel` runs as a `systemd` service. On Ubuntu, for some bizarre
+    reason, it's still set up to run with an old-fashioned `init` script. So, we have
+    to deal with two different methods of controlling the `stunnel` daemon.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Let's begin with the AlmaLinux procedure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a stunnel connection on AlmaLinux 9 – server side
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'For this lab, we''re using an AlmaLinux 9 VM that''s been set to run in FIPS-compliant
+    mode (see the steps for that in *Chapter 6*, *Encryption Technologies*):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'On an AlmaLinux VM, install `stunnel`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On the server, within the `/etc/stunnel/` directory, create a new `stunnel.conf`
+    file with the following contents:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On the server, while still within the `/etc/stunnel/` directory, create the
+    `stunnel.pem` certificate file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On the server, open port `30000` on the firewall, and close port `514`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: Port `6514`, which you see in the `stunnel.conf` file, is strictly for internal
+    communication between `rsyslog` and `stunnel`. So, for that, we don't need to
+    open a firewall port. We're configuring `stunnel` to listen on port `30000` on
+    behalf of `rsyslog`, so we no longer need to have port `514` open on the firewall.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Enable and start the `stunnel` daemon by doing this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the `/etc/rsyslog.conf` file, look for this line at the top of the file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Change it to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After saving the file, restart `rsyslog`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: The server is now ready to receive log files from remote clients via an encrypted
+    connection.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Next, we'll configure an AlmaLinux VM to send its logs to this server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating an stunnel connection on AlmaLinux – client side
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'In this procedure, we''ll configure an AlmaLinux machine to send its logs to
+    the log server (it doesn''t matter whether the log server is running on CentOS,
+    AlmaLinux, or Ubuntu):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Install `stunnel`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the `/etc/stunnel/` directory, create the `stunnel.conf` file with the following
+    contents:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the `connect` line, substitute the IP address of your own log server for
+    the one you see here.
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Enable and start the `stunnel` daemon:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'At the bottom of the `/etc/rsyslog.conf` file, look for this line:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Change it to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After saving the file, restart the `rsyslog` daemon:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'On the client, use `logger` to send a message to the log file:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: On the server, verify that the message got added to the `/var/log/messages`
+    file.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: This is the end of the lab.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Let's now turn our attention to Ubuntu.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a stunnel connection on Ubuntu – server side
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: For this, we’ll use an Ubuntu 22.04 VM. I don’t understand why, but Ubuntu still
+    uses an old-style `init` script for `stunnel`, instead of a `systemd` service.
+    So, the commands that you’ll use for this will be different than what you’re used
+    to using.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Install `stunnel`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the `/etc/stunnel/` directory, create the `stunnel.conf` file with the following
+    contents:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'While still in the `/etc/stunnel/` directory, create the `stunnel.pem` certificate:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Start the `stunnel` daemon:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To make it automatically start when you reboot the system, create a cron job
+    for the root user. First, open the crotab editor, like this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE58]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Add this line to the end of the file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE59]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the `/etc/rsyslog.conf` file, look for this line at the top:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Change it to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After saving the file, restart the `rsyslog` daemon:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs: []
+  type: TYPE_PRE
+- en: Using the appropriate `iptables`, `ufw`, or `nftables` command, open port `30000/tcp`
+    on the firewall, and close port `514`.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: This is the end of the lab.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Next, we'll configure the client.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating a stunnel connection on Ubuntu – client side
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'Using this procedure on an Ubuntu client will allow it to send its files to
+    either an AlmaLinux or an Ubuntu log server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Install `stunnel`:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the `/etc/stunnel/` directory, create the `stunnel.conf` file with the following
+    contents:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note that even though we can't use FIPS mode on the Ubuntu clients, we can still
+    have them send log files to an AlmaLinux log server that is configured to use
+    FIPS mode. (So, yes, we can mix and match.)
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'Start the `stunnel` daemon:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE65]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To make it automatically start when you reboot the system, create a cron job.
+    Open the crontab editor by doing:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE66]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Add this line to the end of the file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE67]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'At the bottom of the `/etc/rsyslog.conf` file, look for the line that has the
+    IP address of the log server. Change it to this:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE68]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After saving the file, restart the `rsyslog` daemon:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE69]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Use `logger` to send a message to the log server:'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '[PRE70]'
+  prefs: []
+  type: TYPE_PRE
+- en: On the server, verify that the message is in the `/var/log/messages` or `/var/log/syslog`
+    file, as appropriate.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: End of lab.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Okay, we now have a secure connection, which is a good thing. But the messages
+    from all of the clients still get jumbled up in the server's own log files. Let's
+    fix that.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Separating client messages into their own files
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This is something else that's easy-peasy. We'll just make a couple of simple
+    edits to the `rsyslog` rules on the log server and restart the `rsyslog` daemon.
+    For our demo, I'll use the AlmaLinux 9 VM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Important**'
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: You won’t be able to use Logwatch if you implement this trick. Well, you actually
+    can, except that Logwatch will just take all of the events from all of the client
+    files and jumble them up into one big summary. So, you won’t be able to see which
+    client machines generate the events.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: 'In the RULES section of the `/etc/rsyslog.conf` file, look for this line:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE71]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Change it to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE72]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Above that line, insert this line:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE73]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Do likewise for the `auth` messages:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE74]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, restart `rsyslog`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE75]'
+  prefs: []
+  type: TYPE_PRE
+- en: Look in the `/var/log/` directory, and you’ll see directories for each of the
+    clients that are sending logs to this server. Pretty slick, eh?
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: ''
+  prefs:
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: The trick here is to always have a `$template` line *precede* the affected rule.
+  prefs:
+  - PREF_BQ
+  - PREF_BQ
+  type: TYPE_NORMAL
+- en: And that wraps it up for another chapter. You now know about what to look for
+    in log files, how to make log reviews easier, and how to set up a secure remote
+    log server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: In this chapter, we looked at the different types of log files, with an emphasis
+    on files that contain security-related information. Then, we looked at the basic
+    operation of the `rsyslog` and `journald` logging systems. To make log reviews
+    a bit easier, we introduced Logwatch, which automatically creates a summary of
+    the preceding day's log files. We wrapped things up by setting up a central, remote
+    log server that collects log files from other network hosts.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we'll look at how to do vulnerability scanning and intrusion
+    detection. I'll see you there.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Questions
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Which two of the following are log files that record authentication-related
+    events?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`syslog`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`authentication.log`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`auth.log`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`secure.log`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`secure`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which log file contains the current record about who is logged into the system
+    and what they're doing?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`/var/log/syslog`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`/var/log/utmp`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`/var/log/btmp`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`/var/run/utmp`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following is the main logging system that runs on pretty much every
+    modern Linux distro?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`syslog`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`rsyslog`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`journald`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`syslog-ng`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following is peculiar to RHEL 8/9 and their offspring, such as
+    AlmaLinux 8/9?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On RHEL 8/9 systems, `journald` collects log data from the rest of the system
+    and sends it to `rsyslog`.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On RHEL 8/9 systems, `journald` has completely replaced `rsyslog`.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On RHEL 8/9 systems, `rsyslog` collects data from the rest of the system and
+    sends it to `journald`.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: RHEL 8/9 systems use `syslog-ng`.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following is a consideration when setting up `stunnel`?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On AlmaLinux systems, FIPS mode is not available.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On Ubuntu systems, FIPS mode is not available.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On Ubuntu systems, FIPS mode is available, but only if you purchase a support
+    contract.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On AlmaLinux 8/9, FIPS mode is available, but only if you purchase a support
+    contract.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following two statements are true about `stunnel`?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On RHEL systems, `stunnel` runs as a normal `systemd` service.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On RHEL systems, `stunnel` still runs under an old-fashioned `init` script.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On Ubuntu systems, `stunnel` runs as a normal `systemd` service.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: On Ubuntu systems, `stunnel` runs under an old-fashioned `init` script.
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which file must you edit to have the root user's messages forwarded to your
+    own user account?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: After you edit the file that's referenced in *Question 7*, which command must
+    you run to transfer the information to a binary file that the system can read?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: To create an `stunnel` setup for your remote log server, you must create a security
+    certificate for both the server and for each client.
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'True'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: 'False'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Which of the following commands would you use to find the `fail` text string
+    in `journald` log files?
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo grep fail /var/log/journal/messages`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo journalctl -g fail`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo journalctl -f fail`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo less /var/log/journal/messages`'
+  prefs:
+  - PREF_IND
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: Further reading
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Five open source log management programs: [https://fosspost.org/lists/open-source-log-management](https://fosspost.org/lists/open-source-log-management)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*What Is a SIEM?*: [https://www.tripwire.com/state-of-security/incident-detection/log-management-siem/what-is-a-siem/](https://www.tripwire.com/state-of-security/incident-detection/log-management-siem/what-is-a-siem/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*12 Critical Linux Log Files You Must be Monitoring*: [https://www.eurovps.com/blog/important-linux-log-files-you-must-be-monitoring/](https://www.eurovps.com/blog/important-linux-log-files-you-must-be-monitoring/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Analyzing Linux Logs*: [https://www.loggly.com/ultimate-guide/analyzing-linux-logs/](https://www.loggly.com/ultimate-guide/analyzing-linux-logs/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Linux log files with examples: [https://www.poftut.com/linux-log-files-varlog/](https://www.poftut.com/linux-log-files-varlog/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The `rsyslog` home page: [https://www.rsyslog.com/](https://www.rsyslog.com/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Why Journald?*: [https://www.loggly.com/blog/why-journald/](https://www.loggly.com/blog/why-journald/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Journalctl cheat sheet: [https://www.golinuxcloud.com/view-logs-using-journalctl-filter-journald/](https://www.golinuxcloud.com/view-logs-using-journalctl-filter-journald/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*The Linux Administration Cookbook*, by Adam K. Dean: [https://www.packtpub.com/virtualization-and-cloud/linux-administration-cookbook](https://www.packtpub.com/virtualization-and-cloud/linux-administration-cookbook)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The Logwatch project page: [https://sourceforge.net/projects/logwatch/](https://sourceforge.net/projects/logwatch/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The `stunnel` home page : [https://www.stunnel.org/](https://www.stunnel.org/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Linux Service Management Made Easy with systemd*, by Donald A. Tevault: [https://www.packtpub.com/product/linux-service-management-made-easy-with-systemd/](https://www.packtpub.com/product/linux-service-management-made-easy-with-systemd/)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Answers
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: c, e
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: d
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: b
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: a
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: c
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: a, d
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`/etc/aliases`'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: '`sudo newaliases`'
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: b
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL
+- en: c
+  prefs:
+  - PREF_OL
+  type: TYPE_NORMAL

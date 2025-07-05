@@ -1,0 +1,955 @@
+- en: Tuning a Linux System
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following recipes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identifying services
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Gathering socket data with `ss`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Gathering system I/O usage with `dstat`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Identifying a resource hog with `pidstat`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tuning the Linux kernel with `sysctl`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tuning a Linux system with config files
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Changing scheduler priority using the `nice` command
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: No system runs as fast as we need it to run, and any computer's performance
+    can be improved.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We can improve the performance of a system by turning off unused services, by
+    tuning the kernel parameters, or by adding new hardware.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first step in tuning a system is understanding what the demands are and
+    whether they are being met. Different types of applications have different critical
+    needs. The questions to ask yourself include the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Is the CPU the critical resource for this system? A system doing engineering
+    simulations requires CPU cycles more than other resources.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Is network bandwidth critical for this system? A file server does little computation,
+    but can saturate its network capacity.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Is disk access speed critical for this system? A file server or database server
+    will put more demand on the disks than a calculation engine does.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Is RAM the critical resource for this system? All systems need RAM, but a database
+    server commonly builds large in-memory tables to perform queries, and file servers
+    are more efficient with larger RAM for disk caches.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Has your system been hacked? A system can suddenly become unresponsive because
+    it's running unexpected malware. This is not common on Linux machines, but a system
+    with many users (like a college or business network) is vulnerable to a brute-force
+    password attack.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The next question to ask is: How do I measure usage? Knowing how a system is
+    being used will lead you to the questions, but may not lead you to the answer.
+    A fileserver will cache commonly accessed files in the memory, so one with too
+    little memory may be disk/RAM limited rather than network limited.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Linux has tools for analyzing a system. Many have been discussed in [Chapter
+    8](5ba784d5-fa8b-4840-b4c5-cac906e484f9.xhtml), *The Old-Boy Network*, [Chapter
+    9](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml), *Put on The Monitor's Cap*, and
+    [Chapter 11](5bf336a4-5338-4a7a-b27e-1ebecac4704d.xhtml), *Tracing The Clues*.
+    This chapter will introduce more monitoring tools.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Here is a list of subsystems and tools to examine them. Many (but not all) of
+    these tools have been discussed in this book.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'CPU: `top`, `dstat`, `perf`, `ps`, `mpstat`, `strace`, `ltrace`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Network: `netstat`, `ss`, `iotop`, `ip`, `iptraf`, `nicstat`, `ethtool`, `lsof`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Disk: `ftrace`, `iostat`, `dstat`, `blktrace`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'RAM: top, `dstat`, `perf`, `vmstat`, `swapon`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Many of these tools are part of a standard Linux distribution. The others can
+    be loaded with your package manager.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identifying services
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A Linux system can run hundreds of tasks at a time. Most of these are part of
+    the operating system environment, but you might discover you're running a daemon
+    or two you don't need.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Linux distributions support one of the three utilities that start daemons and
+    services. The traditional `SysV` system uses scripts in `/etc/init.d`. The newer
+    `systemd` daemon uses the same `/etc/init.d` scripts and also uses a `systemctl`
+    call. Some distributions use Upstart, which stores configuration scripts in `/etc/init`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The SysV `init` system is being phased out in favor of the `systemd` suite.
+    The `upstart` utility was developed and used by Ubuntu, but discarded in favor
+    of `systemd` with the 14.04 release. This chapter will focus on `systemd`, since
+    that's the system used by most distributions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The first step is to determine whether your system is using the SysV `init`
+    calls, `systemd`, or `upstart`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Linux/Unix systems must have an initialization process running as `PID 1`.
+    This process executes a fork and exec to start every other process. The `ps` command
+    may tell you which initialization process is running:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the previous example, the system is definitely running `systemd`. However,
+    on some distributions, the SysV `init` program is `sym-linked` to the actual `init`
+    process, and `ps` will always show `/sbin/init`, whether it''s SysV `init`, `upstart`,
+    or `systemd` that''s actually being used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `ps` and `grep` commands give more clues:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Alternatively, they can be used like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: If either of these commands return tasks such as `upstart-udev-bridge` or `systemd/systemd`,
+    the system is running `upstart` or `systemd`, respectively. If there are no matches,
+    then your system is probably running the SysV `init` utility.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `service` command is supported on most distributions. The `-status-all`
+    option will report the current status of all services defined in `/etc/init.d`.
+    The output format varies between distributions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Debian:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'CentOS:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `grep` command will reduce the output to only running tasks:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Debian:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'CentOS:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: You should disable any unnecessary services. This reduces the load on the system
+    and improves the system security.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Services to check for include the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`smbd`, nmbd: These are the Samba daemons used to share resources between Linux
+    and Windows systems.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`telnet`: This is the old, insecure login program. Unless there is an overwhelming
+    need for this, use SSH.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ftp`: This is the old, insecure File Transfer Protocol. Use SSH and scp instead.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`rlogin`: This is remote login. SSH is more secure.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`rexec`: This is remote exec. SSH is more secure.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`automount`: If you are not using NFS or Samba you probably don''t need this.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`named`: This daemon provides **Domain Name Service** (**DNS**). It''s only
+    necessary if the system is defining the local names and IP addresses. You don''t
+    need it to resolve names and access the net.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`lpd`: The **Line Printer Daemon** lets other systems use this system''s printer.
+    If this is not a print server, you don''t need this service.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`nfsd`: This is the **Network File System** daemon. It lets remote machines
+    mount this computer''s disk partitions. If this is not a file server, you probably
+    don''t need this service.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`portmap`: This is part of the NFS support. If the system is not using NFS,
+    you don''t need this.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`mysql`: The **mysql** application is a database server. It may be used by
+    your webserver.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`httpd`: This is the HTTP daemon. It sometimes gets installed as part of a
+    **Server System** set of packages.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: There are several potential ways to disable an unnecessary service depending
+    on whether your system is Redhat or Debian derived, and whether it's running `systemd`,
+    SysV, or Upstart. All of these commands must be run with root privileges.
+  prefs: []
+  type: TYPE_NORMAL
+- en: systemd-based computers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `systemctl` command enables and disables services. The syntax is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Alternatively, it can also be as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To disable an FTP server, use the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: RedHat-based computers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `chkconfig` utility provides a frontend for working with SysV style initialization
+    scripts in `/etc/rc#.d`. The `-del` option disables a service, while the `-add`
+    option enables a service. Note that an initialization file must already exist
+    to add a service.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The syntax is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To disable the HTTPD daemon, use the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: Debian-based computers
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Debian-based systems provide the `update-rc.d` utility to control SysV style
+    initialization scripts. The `update-rc.d` command supports `enable` and `disable`
+    as subcommands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To disable the telnet daemon, use the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: There's more
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: These techniques will find services that have been started at root with the
+    SysV or systemd initialization scripts. However, services may be started manually,
+    or in a boot script, or with `xinetd`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `xinetd` daemon functions in a similar way to init: it starts services.
+    Unlike init, the `xinitd` daemon only starts a service when it''s requested. For
+    services such as SSH, which are required infrequently and run for a long time
+    once started, this reduces the system load. Services such as `httpd` that perform
+    small actions (serve a web page) frequently are more efficient to start once and
+    keep running.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The configuration file for **xinet** is `/etc/xinetd.conf`. The individual service
+    files are commonly stored in `/etc/xinetd.d`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The individual service files resemble this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: A service can be enabled or disabled by changing the value of the `disable`
+    field. If `disable` is `no`, the service is enabled. If disable is `yes`, the
+    service is disabled.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After editing a service file, you must restart `xinetd`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: Gathering socket data with ss
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The daemons started by `init` and `xinetd` may not be the only services running
+    on a system. Daemons can be started by commands in an `init` local file `(/etc/rc.d/rc.local`),
+    a `crontab` entry, or even by a user with privileges.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `ss` command returns socket statistics, including services using sockets,
+    and current socket status.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ss` utility is included in the `iproute2` package that is already installed
+    on most modern distributions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ss` command displays more information than the `netstat` command. These
+    recipes will introduce a few of its features.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Displaying the status of tcp sockets
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'A `tcp` socket connection is opened for every HTTP access, every SSH session,
+    and so on. The `-t` option reports the status of TCP connections:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: This example shows an NFS server connected at IP address `192.168.1.2` and an
+    SSH connection to `192.168.1.4`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `CLOSE-WAIT` socket status means that the `FIN` signal has been sent, but
+    the socket has not been fully closed. A socket can remain in this state forever
+    (or until you reboot). Terminating the process that owns the socket may free the
+    socket, but that's not guaranteed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracing applications listening on ports
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: A service on your system will open a socket in the `listen` mode to accept network
+    connections from a remote site. The SSHD application does this to listen for SSH
+    connections, http servers do this to accept HTTP requests, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If your system has been hacked, it might have a new application listening for
+    instructions from its master.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `-l` option to `ss` will list sockets that are open in the `listen` mode.
+    The `-u` option specifies to report UDP sockets. A `-t` option reports TCP sockets.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This command shows a subset of the listening UDP sockets on a Linux workstation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: This output shows that this system will accept **Remote Procedure Calls** (**sunrpc**).
+    This port is used by the `portmap` program. The `portmap` program controls access
+    to the RPC services and is used by the `nfs` client and server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `ipp` and `ntp` ports are used for **Internet Printing Protocol** and **Network
+    Time Protocol**. Both are useful tools, but may not be required on a given system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Ports `766` and `898` are not listed in `/etc/services`. The `-I` option of
+    the `lsof` command will display the task that has a port open. You may need to
+    have root access to view this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Or:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: This command shows that the tasks listening on port `898` are part of the RPC
+    system, not a hacker.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `ss` command uses system calls to extract information from the internal
+    kernel tables. The known services and ports on your system are defined in `/etc/services`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Gathering system I/O usage with dstat
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Knowing what services are running may not tell you which services are slowing
+    down your system. The top command (discussed in [Chapter 9](39e9cad3-701a-48c5-9b88-59e8b7c0ce41.xhtml),
+    *Put on the Monitor's Cap*) will tell you about CPU usage and how much time is
+    spent waiting for IO, but it might not tell you enough to track down a task that's
+    overloading the system.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tracking I/O and context switches can help trace a problem to its source.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `dstat` utility can point you to a potential bottleneck.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The **dstat** application is not commonly installed. It will need to be installed
+    with your package manager. It requires Python 2.2, which is installed by default
+    on modern Linux systems:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The dstat application displays disk, network, memory usage, and running task
+    information at regular intervals. The default output gives you an overview of
+    the system activity. By default, this report is updated every second on a new
+    line, allowing easy comparison with previous values.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The default output lets you track overall system activity. The application supports
+    more options to track top resource users.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Viewing system activity
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Invoking dstat with no arguments will show CPU activity, disk I/O, network I/O,
+    paging, interrupts, and context switches at one second intervals.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following example shows the default `dstat` output:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: You can ignore the first line. Those values are the initial contents of the
+    tables dstat mines. The subsequent lines show the activity during a time slice.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this sample, the CPU is mostly idle, and there is little disk activity. The
+    system is generating network traffic, but only a few packets a second.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There is no paging on this system. Linux only pages out memory to disk when
+    the main memory is exhausted. Paging lets a system run more applications than
+    it could run without paging, but disk access is thousands of times slower than
+    memory access, so a computer will slow to a crawl if it needs to page.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If your system sees consistent paging activity, it needs more RAM or fewer applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A database application can cause intermittent paging when queries that require
+    building large in-memory arrays are evaluated. It may be possible to rewrite these
+    queries using the IN operation instead of a JOIN to reduce the memory requirement.
+    (This is a more advanced SQL than what is covered in this book.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Context switches** (**csw**) happen with every system call (refer to the
+    strace and ltrace discussion in [Chapter 11](5bf336a4-5338-4a7a-b27e-1ebecac4704d.xhtml),
+    *Tracing the Clues*) and when a timeslice expires and another application is given
+    access to the CPU. A system call happens whenever I/O is performed or a program
+    resizes itself.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: If the system is performing tens of thousands of context switches per second,
+    it's a symptom of a potential problem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How it works
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `dstat` utility is a Python script that collects and analyzes data from
+    the `/proc` filesystem described in [Chapter 10](20129291-0a5b-43a8-ad0c-54c74992d0e3.xhtml),
+    *Administration Calls*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `dstat` utility can identify the top resource user in a category:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**-top-bio Disk Usage**: This reports the process performing the most block
+    I/O'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '-**top-cpu CPU Usage**: This reports the process using the most CPU resources'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**-top-io I/O usage**: This reports the process performing the most I/O (usually
+    network I/O)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**-top-latency System Load**: This shows the process with the highest latency'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**-top-mem Memory Usage**: This shows the process using the most memory'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The following example displays the CPU and Network usage and the top users
+    in each category:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: On a system running an active virtual machine, the VM uses the most CPU time,
+    but not the bulk of the IO. The CPU is spending most of its time in the idle state.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `-c` and `-n` options specify showing the CPU usage and Network usage, respectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Identifying a resource hog with pidstat
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `-top-io` and `-top-cpu` flags will identify a top resource user, but might
+    not provide enough information to identify the problem if there are multiple instances
+    of a resource hog.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `pidstat` program will report per-process statistics, which can be sorted
+    to provide more insight.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `pidstat` application may not be installed by default. It can be installed
+    with this command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The pidstat application has several options for generating different reports:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`-d`: This reports IO statistics'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-r`: This reports page faults and memory utilization'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-u`: This reports CPU utilization'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-w`: This reports task switches'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Report Context Switch activity:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The pidstat application sorts its report by the PID number. The data can be
+    re-organized with the sort utility. The following command displays the five applications
+    that generate the most context switches per second (*Field 4* in the `-w` output):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The pidstat application queries the kernel to get task information. The sort
+    and head utilities reduce the data to pinpoint the program hogging a resource.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tuning the Linux kernel with sysctl
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The Linux kernel has about 1,000 tunable parameters. These default to reasonable
+    values for common usage, which means they are not perfect for anyone.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting started
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `sysctl` command is available on all Linux systems. You must be root to
+    modify kernel parameters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `sysctl` command will change the parameter value immediately, but the value
+    will revert to the original value upon reboot unless you add a line to define
+    the parameter to `/etc/sysctl.conf`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: It's a good policy to change a value manually and test it before modifying `sysctl.conf`.
+    You can make a system unbootable by applying bad values to `/etc/sysctl.conf`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The `sysctl` command supports several options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`-a`: This reports all available parameters'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-p FILENAME`: This reads values from `FILENAME`. By default from `/etc/sysctl.conf`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`PARAM`: This reports the current value of `PARAM`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`PARAM=NEWVAL`: This sets the value of `PARAM`'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Tuning the task scheduler
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The task scheduler is optimized for a desktop environment, where a fast response
+    to a user is more important than overall efficiency. Increasing the time a task
+    stays resident improves the performance of server systems. The following example
+    examines the value of `kernel.sched_migration_cost_ns`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `kernel_sched_migration_cost_ns` (and `kernel.sched_migration_cost` in
+    older kernels) controls how long a task will remain active before being exchanged
+    for another task. On systems with many tasks or many threads, this can result
+    in too much overhead being used for context switching. The default value of `500000`
+    ns is too small for systems running Postgres or Apache servers. It''s recommended
+    that you change the value to 5 ms:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: On some systems (postgres servers in particular), unsetting the `sched_autogroup_enabled`
+    parameter improves performance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tuning a network
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The default values for network buffers may be too small on a system performing
+    many network operations (NFS client, NFS server, and so on).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Examine the values for maximum read buffer memory:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Increase values for network servers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `sysctl` command lets you directly access kernel parameters. By default,
+    most distributions optimize these parameters for a normal workstation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If your system has lots of memory, you can improve performance by increasing
+    the amount of memory devoted to buffers. If it's short on memory, you may want
+    to shrink these. If the system is a server, you may want to keep tasks resident
+    longer than you would for a single-user workstation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `/proc` filesystem is available on all Linux distributions. It includes
+    a folder for every running task and folders for all the major kernel subsystems.
+    The files within these folders can be viewed and updated with `cat`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The parameters supported by sysctl are commonly supported by the `/proc` filesystem
+    as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Thus, `net.core.rmem_max` can also be accessed as `/proc/sys/net/core/rmem_max`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tuning a Linux system with config files
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The Linux system includes several files to define how disks are mounted, and
+    so on. Some parameters can be set in these files instead of using `/proc` or `sysctl`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: There are several files in `/etc` that control how a system is configured. These
+    can be edited with a standard text editor such as `vi` or `emacs`. The changes
+    may not take effect until the system is rebooted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `/etc/fstab` file defines how disks are to be mounted and what options are
+    supported.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Linux system records when a file is created, modified, and read. There is
+    little value in knowing that a file has been read, and updating the `Acessed`
+    timestamp every time a common utility like cat is accessed gets expensive.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `noatime` and `relatime` mount options will reduce disk thrashing:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The preceding example mounts the / partition (which includes `/bin` and `/usr/bin`)
+    with the usual default options, plus the `noatime` parameter to disable updating
+    the disk every time a file is accessed. The `/var` partition (which includes the
+    mail spool folder) has the realtime option set, which will update time at least
+    once every day, but not every time a file is accessed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Changing scheduler priority using the nice command
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Every task on a Linux system has a priority. The priority values range from
+    -20 to 19\. The lower the priority (**-20**), the more CPU time a task will be
+    allocated. The default priority is **0**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Not all tasks need the same priority. An interactive application needs to respond
+    quickly or it becomes difficult to use. A background task run via `crontab` only
+    needs to finish before it is scheduled to run again.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `nice` command will modify a task's priority. It can be used to invoke a
+    task with modified priority. Raising a task's priority value will free resources
+    for other tasks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it...
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Invoking the `nice` command with no arguments will report a task''s current
+    priority:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Invoking the `nice` command followed by another command name will run the second
+    command with a *niceness* of `10`–it will add 10 to the task''s default priority:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Invoking the `nice` command with a value before the command will run the command
+    with a defined *niceness*:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Only a superuser can give a task a higher priority (lower priority number),
+    by assigning a negative niceness value:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: How it works
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `nice` command modifies the kernel's scheduling table to run a task with
+    a greater or lesser priority. The lower the priority value, the more time the
+    scheduler will give to this task.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There's more
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The `renice` command modifies the priority of a running task. Tasks that use
+    a lot of resources, but are not time-critical, can be made *nicer* with this command.
+    The `top` command is useful to find tasks that are utilizing the CPU the most.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `renice` command is invoked with a new priority value and the program ID
+    (PID):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE

@@ -1,0 +1,645 @@
+- en: Chapter 6. Configuring and Using an Automated Installer (AI) Server
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring an AI server and installing a system from it
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: Installing Oracle Solaris 11 from a DVD is a simple and straight forward task,
+    and usually, only a few screens and inputs are required to accomplish the operation.
+    However, when there are many hosts to be installed, this approach might not be
+    enough anymore. In previous versions of Oracle Solaris, there was a nice feature
+    named JumpStart that made this installation process on multiple machines very
+    easy. As we already know, time passed and Oracle introduced a new method that
+    installs any machine (SPARC or x86 platforms) named **Automated Installer** (**AI**).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Concisely, the AI configuration requirement is composed of the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring the AI server that provides the install services; this is the system
+    where all configurations are performed
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configuring a **DHCP** server that offers IP addresses and other network settings
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Configuring an **IPS** repository that has all necessary packages that are required
+    to install the Oracle Solaris 11 host
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Having a client where Oracle Solaris 11 will be installed after leasing a DHCP
+    IP address from the DHCP server
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The installation of a client through AI is not complex. Initially, the client
+    gets booted from the network and requires an IP address from the DHCP server.
+    Then, it gets the boot archive from the AI server and loads its own kernel. With
+    the kernel already loaded, the client downloads the installation program through
+    the HTTP protocol, identifies the installation services, and downloads the installation
+    manifest. Finally, the client is installed using the IPS repository, with the
+    manifest as a guideline that configures the system in an appropriate way. When
+    the installation is complete, the host gets rebooted and the **System Configuration**
+    (**SC)** profile is applied in order to configure the entire machine identification,
+    such as the time zone, DNS, keyboard, and so on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If everything happens properly, Oracle Solaris 11 is installed and starts working.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring an AI server and installing a system from it
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The procedure to install and configure an AI server is very interesting, a little
+    complex, and long. Let's do this!
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting ready
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: This recipe requires a virtual machine (VirtualBox or VMware) that runs Oracle
+    Solaris 11 with 4 GB RAM, a static IP address configuration, an IPS repository
+    configured on the same machine server, and a DHCP server that can also be installed
+    on the same host. Briefly, the AI, DHCP, and IPS servers will be installed on
+    this virtual machine.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Additionally, a second virtual machine with 2 GB RAM, a network interface, and
+    a disk with 20 GB space will be required because it will be used as the client
+    where Oracle Solaris 11 will be installed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another important point is that we have to download the Oracle Solaris 11 Automated
+    Installer (also known as the AI boot image) for x86 from the Oracle website at
+    [http://www.oracle.com/technetwork/server-storage/solaris11/downloads/index.html?ssSourceSiteId=ocomen](http://www.oracle.com/technetwork/server-storage/solaris11/downloads/index.html?ssSourceSiteId=ocomen).
+    This ISO image will be saved on the `/root` directory, and its version must be
+    the same as the Oracle Solaris host that we want to install on the client (in
+    this case, Version 11).
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this example, the AI server will be named `solaris11-1`, and the client machine
+    will be named `solaris11-2ai`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If you are using VirtualBox, I suggest that you download the latest version
+    of VirtualBox and its respective **Extension Pack**, which enables the PXE support
+    for Intel network interfaces. If you do not install the extension pack, this procedure
+    will not work!
+  prefs: []
+  type: TYPE_NORMAL
+- en: How to do it…
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'Configuring the AI service is a two-stage procedure: we have to check the prerequisites
+    and create its step-by-step configuration. As we have seen previously, we have
+    to ensure that a static IP address is configured on an AI server by running the
+    following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As shown previously, the network interface (`net0`) is configured with a static
+    IP address (`ipadm create-addr -T static -a 192.168.1.144/24 net0/v4`), and it
+    is appropriate to verify that you have the Internet access and the DNS client
+    configuration is working. By the way, the DNS client configuration will be changed
+    in the next steps. So, to check the Internet access and current DNS client configuration,
+    execute the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'A very important step is to edit the `/etc/netmask` file and insert the network
+    mask that will be used:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To verify whether this configuration is being used and active, execute the
+    following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'During the installation, the client will receive packages from an IPS repository
+    installed on the same system, so we have to confirm whether this IPS repository
+    is online and is working by executing the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To test whether the IPS repository is really working, we can run a search for
+    a package by running the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The next step requires your attention because there cannot be any existing
+    DHCP configuration in the `/etc/inet` directory (`dhcp4.conf`), and the DHCP server
+    must be disabled, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: Additionally, when we are preparing an AI server, a DNS server must be configured
+    and should be able to resolve the AI-installed server IP addresses. Therefore,
+    let's configure both the DNS server and DNS client, but we are not going to delve
+    into too much detail about the DNS server and client configuration here.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, the client follows the DNS server, and we have to install the DNS server
+    package by running the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the next step, we have to configure the main DNS configuration file in order
+    to make the DNS server resolve hostnames to the IP and vice versa:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'According to the used directories from the `/etc/named.conf` file, it is time
+    to create the same mentioned directories by executing the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'One of the most important steps in order to set the DNS server up is to create
+    a database file for the straight name resolution (the hostname to the IP address)
+    and another database file for the reverse resolution (the IP address to the hostname).
+    Therefore, the first step is to create the straight database by executing the
+    following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now, it''s time to create the reverse database file (the IP address to the
+    hostname) using the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, the DNS server is ready and its service must be enabled by running
+    the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The DNS client is a very important step for our recipe, and it can be configured
+    by executing the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To test whether our DNS server configuration and DNS client configuration are
+    working, we can use the `nslookup` tool to verify them, as shown in the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: Perfect! Both the DNS server and the client are now configured on the AI install
+    server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'From this point, we can start to configure the AI server itself, which requires
+    the multicast service to be enabled, and this can be done by executing the following
+    commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Additionally, the AI server also requires a series of tools to be configured,
+    and we have to install the associated package by running the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now the game begins! We have to configure an AI install service with a name
+    that will be associated with an install image. Later, the install service name
+    will be used by the client to access and deploy the install image. From this point,
+    the install service name will be used as an index in order to find the correct
+    install image. If we wanted to install both SPARC and x86 clients, we should have
+    two install services: the first associated with a SPARC install image and a second
+    one associated with an X86 install image.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To create an AI install service, execute the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'From the previous command, we have the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`-n`: This is the service name'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-s`: This is the path to the AI ISO image'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-i`: This will update the DHCP server starting from 192.168.1.20'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-c`: This install service will serve ten IP addresses'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-d`: This is the directory where the AI ISO image will be unpacked'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'After creating the `borges_ai` install service, the DHCP presents the following
+    configuration file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We can face problems several times, and it would be nice if we could start
+    the entire procedure from scratch and start over again. Therefore, if something
+    goes wrong, it''s feasible to undo the previous step, executing the `installadm
+    install-service` command and executing the previous steps again:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After deleting the AI server configuration, it is also recommended that you
+    remove the `/etc/inet/dhcpd4.conf` file and disable the DHCP server service by
+    executing the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Returning to the configuration steps, an AI install server and its install
+    services are represented by a service from SMF, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To list the existing AI install services, execute the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: The command output shows us that Oracle Solaris 11 has created (by default)
+    an AI install service named `default-i386`, which is an alias for our AI install
+    service named `borges_ai`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Until now, the system has created an AI install service (`borges_ai`), and then,
+    we have had to associate it with one or more clients that will be installed through
+    the AI server. Before accomplishing this task, the MAC address information from
+    these clients must be collected. So, as we are using another virtual machine as
+    the client (`solaris11-2ai`), it's easy to get the MAC information from the virtual
+    machine properties (VirtualBox or VMware).
+  prefs: []
+  type: TYPE_NORMAL
+- en: For example, when working with VirtualBox, you can select the Virtual Machine
+    (Solaris11-1) by navigating to **Settings** | **Network** | **Advanced**.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The MAC address property from VirtualBox is shown in the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![How to do it…](img/00023.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'If we are working with VMware Workstation, it''s possible to get the MAC address
+    from a virtual machine by navigating to **Virtual Machine (Solaris11-1)** | **VM**
+    | **Settings** | **Network Adapter** | **Advanced**, as shown in the following
+    screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![How to do it…](img/00024.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Once we have the MAC address, we use it to add the client (the host that will
+    be installed using AI) by executing the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: The previous output shows us a client with the MAC address `08:00:27:DF:15:A6`,
+    which was bound to an AI install service named `borges_ai`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As the client (MAC `08:00:27:DF:15:A6`) is already assigned to an AI install
+    service, the next step will be to create an AI manifest. What is that? An AI manifest
+    is a file that contains instructions to install and configure AI clients that
+    will be installed using the AI service. As this manifest is an XML file, it would
+    be very hard to create a manifest for each client that needs to use the AI install
+    service, and so a default manifest is provided by each boot image in order to
+    use it for any client of any install service that will use this boot image.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the AI framework, there are two types of manifests, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Default**: This is valid for all clients that do not have any customized
+    manifests. The default manifest is named `default.xml`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Custom**: This is a particular manifest that has an install image associated,
+    and one or more clients can be assigned to it.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: What is the decision factor to choose either a customized manifest or a default
+    one? This is the role of a file named the `criteria` file, which associates clients
+    to either a specific manifest or a default manifest using properties or attributes
+    from these clients.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is an example of a default manifest (`default.xml`) that was
+    installed in the `/export/borges_ai/auto_install` directory when we run the `installadm`
+    create-service command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `default.xml` file is very simple, and it has some good points that are
+    worth mentioning, as shown:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`<ai_instance name="default">`: This element shows us the name of the AI instance'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`<software type="IPS">`: All these packages come from an IPS server'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`<publisher name="solaris">`: This is the IPS publisher name'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`<origin name="http://pkg.oracle.com/solaris/release"/>`: This is the origin
+    URI assigned to the repository that was made available by the publisher (Solaris)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`<name>pkg:/entire@0.5.11-0.build#</name>` and `<name>pkg:/entire@0.5.11-0.175.1</name>`:
+    These are basically the entire IPS package and tell us about the version of the
+    offered Oracle Solaris, and this information will be used to install patches or
+    upgrades'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`<name>pkg:/group/system/solaris-large-server</name>`: This is a package group
+    that contains several tools and important files such as libraries, drivers, and
+    Python, and they should be installed'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'It is interesting to realize that my own system does not have the `solaris-large-server`
+    package installed, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Therefore, according to the previous `default.xml` file (although it is not
+    usually necessary), we have to install the missing package by executing the following
+    command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Returning to the default manifest (`default.xml`) explanation, we have to back
+    up and modify it in order to adapting to our environment that has the following
+    characteristics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The AI instance name (`borges_ai`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The IPS origin URI—`http://solaris11-1.example.com/`—(from the `pkg publisher`
+    command)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Auto reboot (`auto_reboot`) is set to true
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'The code for the previous task is as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'We have created a new manifest named `borges_ai.xml`, but we have to create
+    a `criteria` file in order to associate the client (solaris11-2ai) with this manifest.
+    Usually, there are some good attributes that can be used in a `criteria` file:
+    MAC address, IPv4, platform, architecture (arch), memory (mem), hostname, and
+    so on. Therefore, after a criteria file is created, the rule is that if the client
+    matches any of these criteria files, the associated manifest will be used (in
+    our case, the customized manifest is `borges_ai.xml`). If it does not match, the
+    `default.xml` file manifest is used.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To create a criteria file with the MAC address of the client machine (solaris11-2ai),
+    we can execute the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, we''re able to associate this criteria file (`borges_criteria_ai.xml`)
+    and the customized manifest file (`borges_ai.xml`) with the AI install service
+    (`borges_ai`):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'From the previous command, we note the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`-n`: This is the AI install service name'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-f`: This is the customized manifest file'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`-C`: This is the criteria file'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'An alternative and easier approach to creating a `criteria` file is to associate
+    the client with this `criteria` file and make the necessary customization, specifying
+    the client MAC address as the criteria by running the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'To verify the AI configuration up to this point, execute the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: That is good! The next step is interesting because usually, during Oracle Solaris
+    11 installation, we are prompted to enter many inputs, such as the initial user
+    account, root password, time zone, keyboard, and so on. To answer all these questions
+    once is easy, but when installing 100 machines, this would be a serious problem.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To automate this process, there's a configuration file named **System Configuration
+    profile** (**SC**) that provides any necessary answer during the first boot after
+    the Oracle Solaris 11 installation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To help us with SC profile creation, Oracle Solaris 11 provides some templates
+    of this profile in the `/export/borges_ai/auto_install/sc_profiles` directory.
+    Before modifying it, we are going to copy a template from this directory and highlight
+    some interesting lines, as shown in the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After carefully reading this file, we have the following conclusions:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The initial default username is `jack`, with the password `jack`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The root is a role (this is not a normal account), and its password is `solaris`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The machine name is `solaris`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The active NCP is `Automatic`
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'To adapt this file for our purpose, change the initial default username to
+    `borges` and its password to `oracle123!` (`$5$VPcyGvgl$bt4cybd8cpZdHKWF2tvBn.SPFeJ8YdgvQUqHzWkNLl1`).
+    Additionally, the hostname will be changed to `solaris11-2ai`. Every change can
+    be verified by running the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that the SC profile `sc_borges_ai.xml` has been modified, it is time to
+    create it in the AI service database, to validate its syntax, and to list the
+    result, as done in the following commands:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is wonderful! We have configured the AI server. The `sc_borges_ai.xml`
+    SC profile will be used by our client (solaris11-2ai) according to the established
+    criteria (MAC = `08:00:27:DF:15:A6`).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, it is show time! To test whether the entire AI server configuration
+    is working, we have to turn on the client (the solaris11-2ai virtual machine)
+    and just wait for the whole installation. If everything is working, we will see
+    the following screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![How to do it…](img/00025.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: After selecting **Oracle Solaris 11.1 Automated Install**, the Oracle Solaris
+    11 installation should begin.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![How to do it…](img/00026.jpeg)'
+  prefs: []
+  type: TYPE_IMG
+- en: This is simply outstanding!
+  prefs: []
+  type: TYPE_NORMAL
+- en: An overview of the recipe
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This section was impressive! We learned how to configure an AI install server
+    in order to remotely install a client without any interaction. In the middle of
+    the chapter, we also saw how to configure a DNS server and client.
+  prefs: []
+  type: TYPE_NORMAL
+- en: References
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: '*Installing Oracle Solaris 11 Systems* at [http://docs.oracle.com/cd/E23824_01/html/E21798/docinfo.html#scrolltoc](http://docs.oracle.com/cd/E23824_01/html/E21798/docinfo.html#scrolltoc)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Booting and Shutting Down* *Oracle Solaris 11.1 Systems* at [http://docs.oracle.com/cd/E26502_01/html/E28983/docinfo.html#scrolltoc](http://docs.oracle.com/cd/E26502_01/html/E28983/docinfo.html#scrolltoc)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Configuring a Basic DNS Server + Client in Solaris 11*, *Paul Johnson*, at
+    [http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris11-net-svcs-ips-2086656.html](http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris11-net-svcs-ips-2086656.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '*Exploring Networking, Services, and the New Image Packaging System In Oracle
+    Solaris 11*, *Alexandre Borges*, at [http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris11-net-svcs-ips-2086656.html](http://www.oracle.com/technetwork/articles/servers-storage-admin/solaris11-net-svcs-ips-2086656.html)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL

@@ -1,0 +1,1592 @@
+- en: '*Chapter 14*: Introduction to the Linux Device Model'
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'Until version 2.5, the Linux kernel had no way to describe and manage objects,
+    and its code reusability was not as enhanced as it is now. In other words, there
+    was no device topology, nor organization as we know it is in sysfs nowadays. There
+    was no information on subsystem relationships, nor on how the system is put together.
+    Then came the **Linux Device Model** (**LDM**), which introduced the following
+    features:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The concept of classes. They are used to group devices of the same type or that
+    expose the same functionalities (for example, mice and keyboards are both input
+    devices).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Communication with the user space through a virtual filesystem, allowing you
+    to manage and enumerate devices and the properties they expose from user space.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Object life cycle management using reference counting.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A power management facility, allowing you to handle the order in which devices
+    should shut down.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The reusability of the code. Classes and frameworks expose interfaces, behaving
+    like a contract that any driver that registers with them must respect.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: An **object-oriented** (**OO**)-like programming style and encapsulation in
+    the kernel.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'In this chapter, we will take advantage of LDM and export some properties to
+    the user space through the sysfs filesystem. To do this, we will cover the following
+    topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Introduction to LDM data structures
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Getting deeper inside LDM
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Overview of the device model from sysfs
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Introduction to LDM data structures
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The Linux device model introduced device hierarchy. It is built on top of a
+    few data structures. Among these is the bus, which is represented in the kernel
+    as an instance of `struct bus_type`; the device driver, which is represented by
+    a `struct device_driver` structure; and the device, which is the last element
+    and is represented as an instance of the `struct device` structure. In this section,
+    we will introduce all those structures and learn how they interact each with other.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The bus data structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'A bus is a channel link between devices and the processor. The hardware entity
+    that manages the bus and exports its protocol to devices is called the bus controller.
+    For example, the USB controller provides USB support, while the I2C controller
+    provides I2C bus support. However, the bus controller, being a device on its own,
+    must be registered like any device. It will be the parent of the devices that
+    need to sit on this bus. In other words, every device sitting on the bus must
+    have its parent field pointing to the bus device. A bus is represented in the
+    kernel by the `struct bus_type` structure, which has the following definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Only the elements that are relevant to this book have been listed here; let''s
+    take a look at them in more detail:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`match` is a callback that''s invoked whenever a new device or driver is added
+    to this bus. The callback must be smart enough and should return a nonzero value
+    when there is a match between a device and a driver, both given as parameters.
+    The main purpose of the `match` callback is to allow a bus to determine if a particular
+    device can be handled by a given driver or the other logic if the given driver
+    supports a given device. Most of the time, this verification is done by a simple
+    string comparison (device and driver name, whether it''s a table and device tree-compatible
+    property, and so on). For enumerated devices (PCI, USB), verification is done
+    by comparing the device IDs that are supported by the driver with the device ID
+    of the given device, without sacrificing bus-specific functionality.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`probe` is a callback that''s invoked when a new device or driver is added
+    to this bus after the match has occurred. This function is responsible for allocating
+    the specific bus device structure and calling the given driver''s `probe` function,
+    which is supposed to manage the device (allocated earlier).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`remove` is called when a device leaves this bus.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`suspend` is a method that''s called when a device on the bus needs to be put
+    into sleep mode.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`resume` is called when a device on the bus must be brought out of sleep mode.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`pm` is the set of power management operations for this bus, which may also
+    call driver-specific power management operations.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`drv_groups` is a pointer to a list (array) of `struct attribute_group` elements,
+    each of which has a pointer to a list (array) of `struct attribute` elements.
+    It represents the default attributes of the device drivers on the bus. The attributes
+    that are passed to this field will be given to every driver that''s registered
+    with the bus. Those attributes can be found in the driver'' directory in `/sys/bus/<bus-name>/drivers/<driver-name>`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`dev_groups` represents the default attributes of the devices on the bus. Any
+    attributes that are passed (through the list/array of `struct attribute_group`
+    elements) to this field will be given to every device that''s registered with
+    the bus. Those attributes can be found in the device''s directory in `/sys/bus/<bus-name>/devices/<device-name>`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`bus_group` holds the set (group) of default attributes that are added automatically
+    when the bus is registered with the core.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Apart from defining `bus_type`, the bus driver must define a bus-specific driver
+    structure that extends the generic `struct device_driver`, as well as a bus-specific
+    device structure that extends the generic `struct device` structure. Both are
+    part of the device model core. The bus driver must also allocate a bus-specific
+    device structure for each physical device that's discovered when probing. It's
+    also in charge of setting up the device's bus and parent fields, as well as registering
+    them with the LDM core. These fields must point to the `bus_type` and the `bus_device`
+    structures that are defined in the bus driver The LDM core uses them to build
+    device hierarchy and initialize other fields.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Each bus internally manages two important lists: the list of devices that have
+    been added and sitting on it, and the list of drivers that have been registered
+    with it. Whenever you add/register or remove/unregister a device/driver with the
+    bus, the corresponding list is updated with the new entry. The bus driver must
+    provide helper functions to register/unregister device drivers that can handle
+    devices on that bus, as well as helper functions to register/unregister devices
+    sitting on the bus. These helper functions always wrap the generic functions that
+    are provided by the LDM core, which are `driver_register()`, `device_register()`,
+    `driver_unregister()`, and `device_unregister()`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s start writing a new bus infrastructure called `PACKT`. `PACKT`
+    is going to be our bus; the devices that will be sitting on this bus will be `PACKT`
+    devices, while their drivers will be `PACKT` drivers. Let''s start writing the
+    helpers that will allow us to register the `PACKT` devices and drivers:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that we''ve created the registration helpers, let''s write the only function
+    that allows us to allocate a new `PACKT` device and register this device with
+    the `PACKT` core:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The `packt_device_alloc()` function allocates a bus-specific device structure
+    that must be used to register a `PACKT` device with the bus. At this stage, we
+    should expose the helpers that allow us to allocate a `PACKT` controller device
+    and register it – that is, register a new `PACKT` bus. To do this, we must define
+    the `PACKT` controller data structure, like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding data structure, `name` represents the controller''s name,
+    `dev` represents the underlying struct device associated with this controller,
+    `list` is used to insert this controller into the system''s global list of `PACKT`
+    controllers, and `send_msg` and `recv_msg` are hooks that must be provided by
+    the controller to access the `PACKT` devices that are sitting on it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: In these two functions, we have demonstrated what the controller allocation
+    and registration operations look like. The allocation method allocates memory
+    and does some basic initialization, leaving room for the driver to do the rest.
+    Note that after registering a controller, it will appear under `/sys/devices`
+    in sysfs. Any devices that are added to this bus will appear under `/sys/devices/packt-0/`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Bus registration
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The bus controller is a device itself, and in most cases, buses are memory-mapped
+    platform devices (even buses are, which support device enumeration). For example,
+    the PCI controller is a platform device and so is its respective driver. We should
+    use the `bus_register(struct *bus_type)` function to register a bus with the kernel.
+    The `PACKT` bus structure looks as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now that the basic bus operations have been defined, we need to register the
+    `PACKT` bus framework and make it available for both the controller and slave
+    drivers. The bus controller is a device itself; it must be registered with the
+    kernel and will be used as the parent of the device that''s sitting on the bus.
+    This is done in the bus controller''s probe or `init` function. In the case of
+    the `PACKT` bus, the code would be as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When a device is registered by the bus controller driver, the `parent` member
+    of the device must point to the bus controller device (this should be done by
+    the device driver) and its `bus` property must point to the `PACKT` bus type (this
+    is done by the core) to build the physical device tree. To register a `PACKT`
+    device, you must call `packt_device_register()`, which should take as an argument
+    a `PACKT` device allocated with `packt_device_alloc()`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now that we are done with bus registration, let's look at the driver's infrastructure
+    and see how it is designed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The driver data structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: A driver is a set of methods that allow us to drive a given device. A global
+    device hierarchy allows all the system's devices to be represented in the same
+    way. This makes it simple for the core to navigate the device tree and perform
+    tasks such as properly ordered power management transitions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Each device driver is represented as an instance of `struct device_driver`,
+    which is defined like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s look at the elements in this data structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`name` represents the driver''s name. It can be used for matching, by comparing
+    it with the device''s name.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`bus` represents the bus where this driver sits on. The `bus` driver must fill
+    this field.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`module` represents the module that owns this driver. In 99% of cases, you
+    must set this field to `THIS_MODULE`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`of_match_table` is a pointer to the array of `struct of_device_id`. The `struct
+    of_device_id` structure is used to perform open firmware matches through a special
+    file called the device tree, which is passed to the kernel during the boot process:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: '`suspend` and `resume` are power management callbacks that are invoked to put
+    the device to sleep or wake it up from a sleep state, respectively. The `remove`
+    callback is called when the device is physically removed from the system or when
+    its reference count reaches `0`. The `remove` callback is also called during system
+    reboot.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`probe` is the probe callback that runs when you''re attempting to bind a driver
+    to a device. The bus driver is in charge of calling the device driver''s probe
+    function.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`group` is a pointer to a list (array) of `struct attribute_group` and is used
+    as a default attribute for the driver. Prefer this method instead of creating
+    an attribute separately.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now that we are familiar with the driver data structure and all its elements,
+    let's learn what APIs the kernel provides so that we can register it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Driver registration
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The low-level `driver_register()` function is used to register a device driver
+    with the bus and it is added to the bus's driver list. When a device driver registers
+    with the bus, the core travels through the list of devices on this same bus and
+    calls the bus's match callback for each device that does not have a driver. It
+    does this to find out if there are any devices that the driver can handle.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is the declaration of our driver infrastructure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: In our example, there are two helper macros to get the `PACKT` device and the
+    `PACKT` driver, given a generic `struct device` or `struct driver`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Then comes the structure that''s used to identify a `PACKT` device, which is
+    defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: The device and the device driver are bound together when they match. Binding
+    is the process of associating a device with a device driver, and it is performed
+    by the bus framework.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s get back to registering our drivers with our `PACKT` bus. The drivers
+    must use `packt_register_driver(struct packt_driver *driver)`, which is a wrapper
+    around `driver_register()`. The `driver` parameter must have been filled in before
+    registering the `PACKT` driver. The LDM core provides helper functions for iterating
+    over the list of drivers that have been registered with the bus:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: This helper iterates over the bus's list of drivers and calls the `fn` callback
+    for each driver in the list.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The device data structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`struct device` is the generic data structure that''s used to describe and
+    characterize each device on the system, whether it is physical or not. It contains
+    details about the physical attributes of the device and provides proper linkage
+    information to help build suitable device trees and reference counting:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The preceding data structure has been shortened for the sake of readability.
+    That said, let''s take a look at the elements that have been provided:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`parent` represents the device''s parent and is used to build the device tree
+    hierarchy. When registered with a bus, the bus driver is responsible for setting
+    this field with the bus device.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`bus` represents the bus where this device sits. The bus driver must fill this
+    field.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`type` identifies the device''s type.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`kobj` is the kobject and handles reference counting and device model support.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`of_node` is a pointer to the open firmware (device tree) node associated with
+    the device. It is up to the bus driver to set this field.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`platform_data` is a pointer to the platform data that''s specific to the device.
+    It''s usually declared in a board-specific file during device provisioning.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`driver_data` is a pointer to private data for the driver.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`class` is a pointer to the class that this device belongs to.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`group` is a pointer to a list (array) of `struct attribute_group` and is used
+    as the default attributes for the device. You should use this instead of creating
+    the attributes separately.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`release` is a callback that''s called when the device reference count reaches
+    zero. The bus has the responsibility of setting up this field. The `PACKT` bus
+    driver shows you how to do that.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Now that we have described the device's structure, let's learn how to make it
+    part of the system by registering it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Device registration
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '`device_register()` is a function that''s provided by the LDM core to register
+    a device with the bus. After this call, the bus''s list of drivers is iterated
+    over to find the driver that supports this device; then, this device is added
+    to the bus''s device list. `device_register()` internally calls `device_add()`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The helper function that''s provided by the kernel to iterate over the bus''s
+    device list is `bus_for_each_dev`. It''s defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: Whenever a device is added, the core invokes the matching method of the bus
+    driver (`bus_type->match`). If the matching function succeeds, the core will invoke
+    the probing function of the bus driver (`bus_type->probe`), given that both the
+    device and driver matched as parameters. Then, it is up to the bus driver to invoke
+    the probing method of the device's driver (that is, `driver->probe`). For our
+    `PACKT` bus driver, the function that's used to register a device is `packt_device_register(struct
+    packt_device *packt)`, which internally calls `device_register()`. Here, the parameter
+    is a `PACKT` device that's been allocated with `packt_device_alloc()`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The bus-specific device data structure is then defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, `dev` is the underlying `struct device` structure for
+    the device model, while `name` is the name of the device.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have defined the data structure, let's learn about the underlying
+    mechanisms of LDM.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Getting deeper inside LDM
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: So far, we have discussed buses, drivers, and devices, which were used to build
+    the system device topology. While this is true, the previous topics were the tip
+    of the iceberg. Under the hood, LDM relies on the three lowest level data structures,
+    which are `kobject`, `kobj_type`, and `kset`. These are used to link the objects.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Before we go any further, let''s define some of the terms that will be used
+    throughout this chapter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`struct kobject`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Attribute**: An attribute (or sysfs attribute) appears as a file in sysfs.
+    From within the kernel, it can be mapped to anything: a variable, a device property,
+    a buffer, or anything useful to the driver that may need to be exported to the
+    world.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In this section, we will learn how each of these structures is involved in the
+    device model.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the kobject structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: '`struct kobject`, which means kernel object (also abbreviated as `struct kobject`
+    wandering around somewhere within the kernel. Additionally, a kobject can export
+    one or more attributes, which appear in that Kobject''s sysfs directory as files.
+    Now, let''s get back to the code – `struct kobject` is defined in the kernel like
+    so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding data structure, only the main elements have been listed. Let''s
+    take a look at them in more detail:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`name` is the name of this kobject. It can be modified using the `kobject_set_name(struct
+    kobject *kobj, const char *name)` function. It is used as the name of this `kobject`
+    directory.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`parent` is a pointer to another kobject, which is considered the parent of
+    this kobject. It is used to build topologies and to describe the relationship
+    between objects.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`sd` points to a `struct sysfs_dirent` structure that represents the directory
+    of this kobject in sysfs. `name` will be used as the name of this directory. If
+    `parent` is set, then this directory will be a sub-directory in the parent''s
+    directory.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`kref` provides reference counting for the kobject. It helps track whether
+    an object is still in use or not and potentially releases it if it''s not being
+    used anymore. Alternatively, it can prevent it from being removed if it''s still
+    in use. When it''s used from within a kernel object, its initial value is `1`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ktype` describes the kobject. Every kobject is given a set of default attributes
+    when it is created. The `ktype` element, which belongs to the `struct kobj_type`
+    structure, is used to specify these default attributes. Such a structure allows
+    kernel objects to share common operations (`sysfs_ops`), whether those objects
+    are functionally related or not.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`kset` tells us which set (group) of objects this object belongs to.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Before a kobject can be used, it must be (exclusively) dynamically allocated
+    and then initialized. To do so, drivers can use the `kzalloc()` (or `kmalloc()`)
+    or `kobject_create()` function. With `kzalloc()`, the object is allocated and
+    empty and must be initialized using another API, `kobject_init()`. With `kobject_create()`,
+    allocation and initialization are implicit. These APIs are defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, `kobject_init()` expects, in its first parameter, a kobject
+    that has been initially allocated, via `kzalloc()` for example. The second parameter,
+    `ktype`, is mandatory, so it can't be `NULL`; otherwise, the kernel will complain
+    (`dump_stack()`). `kobject_create()`, on the other hand, expects nothing; it does
+    allocation and initialization implicitly (it calls `kzalloc()` and `kobject_init()`
+    internally). On success, it returns a freshly initialized kobject object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once a kobject has been initialized, the driver can use `kobject_add()` to
+    link this object with the system, creating a sysfs directory entry for this kobject.
+    Where this directory will be created depends on the parent element of the kobject
+    being set or not. That said, if this parent is not set, it can be specified while
+    adding the kobject to the system using `kobject_add()`, which is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding function, `kobj` is the kernel object to be added to the system
+    and `parent` is its parent. The `kobject` directory will be created as a sub-directory
+    of its parent. If `parent` is `NULL`, the directory will be created under `/sys/`
+    directly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Instead of using `kobject_init()` or `kobject_create()` and then `kobject_add()`
+    individually, it is possible to use `kobject_init_and_add()`, which groups their
+    actions. It''s defined like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In the preceding interface, the object needs to be allocated first. There is
+    another helper that will implicitly allocate, initialize, and add the kobject
+    with the system. This function is `kobject_create_and_add()` and it''s defined
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding function takes the name of the kobject that will be used as the
+    directory name, as well as a parent kobject whose created directory will be a
+    sub-directory. Passing `NULL` as the second parameter will result in the directory
+    being created under `/sys/` directly.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'That said, some predefined kobjects in the kernel already represent some directories
+    under `/sys/`. Let''s look at a few of them:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`kernel_kobj`: This kobject is responsible for the `/sys/kernel` directory.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`mm_kobj`: This is responsible for `/sys/kernel/mm`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`fs_kobj`: This is the filesystem kobject and it''s responsible for `/sys/fs`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`hypervisor_kobj`: This is responsible for `/sys/hypervisor`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`power_kobj`: This is a power management kobject that''s used at the origin
+    of `/sys/power`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`firmware_kobj`: This is the firmware kobject that owns the `/sys/firmware`
+    directory.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Once you're done with a kobject, the driver should release it. The low-level
+    function you can use to release a kobject is `kobject_release()`. However, this
+    API does not consider other potential users of the kobject. It is raw and dummy.
+    It is recommended to use `kobject_put()` instead, which will decrement the kobject's
+    reference counter and then release this kobject if the new reference counter value
+    is `0`. Remember that when a kobject is initialized, the reference counter value
+    is set to `1`. Moreover, it is also recommended that users wrap the kobject's
+    usage into the `kobject_get()` and `kobject_put()` functions, where `kobject_get()`
+    will just increment the reference counter value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'These APIs have the following prototypes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, `kobject_get()` takes the kobject to increase the reference
+    counter as a parameter and returns this same kobject once the parameter has been
+    initialized. `kobject_put()` will decrement 1 from the reference counter and,
+    if the new value is `0`, `kobject_release()` will be automatically called on the
+    object, which will release it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code shows how to combine `kobject_create()`, `kobject_init()`,
+    and `kobject_add()` to create and add a kernel object to the system:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As we can see, we could use an all-in-one function, such as `kobject_create_and_add()`,
+    which internally calls `kobject_create()` and `kobject_add()`. The following excerpt
+    from `drivers/base/core.c` shows how to use it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: Keep in mind that for each `struct kobject`, the corresponding kobject directory
+    can be found in `/sys/`, and the upper directory is pointed out by `kobj->parent`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since it is mandatory to provide a `kobj_type` while initializing a kobject,
+    all-in-one helpers use a default and kernel-provided `kobj_type`; that is, `dynamic_kobj_ktype`.
+    Therefore, unless you have a good reason to initialize your `kobj_type` (most
+    of the time, this will be if you wish to populate some default attributes), you
+    should use `kobject_create*()` variants, which use the kernel-provided kobject
+    type instead of `kobject_init*()`, which would require providing your own initialized
+    `kobj_type`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the kobj_type structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: A `struct kobj_type` structure, which means kernel object type, is a data structure
+    that defines the behavior of a kobject element and controls what happens to this
+    kobject when it is created or destroyed. Additionally, a `kobj_type` contains
+    the default attributes of the kobject, as well as the hooks that allow it to operate
+    on these attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Because most devices of the same type have the same attributes, these attributes
+    are isolated and stored in the `ktype` element. This allows them to be managed
+    flexibly. Every kobject must have an associated `kobj_type` structure. Its data
+    structure is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding data structure, `release` is a callback that's called on the
+    release path of the kobject to give drivers a chance to release resources that
+    have been allocated for the kobject. This callback is implicitly run when `kobject_put()`
+    is about to free the kobject. `default_attrs` is an array of pointers to `attribute`
+    structures. This field lists the attributes to be created for every kobject of
+    this type, while `sysfs_ops` provides a set of methods that allow you to access
+    those attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code shows the definition of the `struct sysfs_ops` data structure
+    in the kernel:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, `show` is the callback that's invoked in response to
+    a read operation of an attribute being exposed by this `kobj_type` – that is,
+    whenever an attribute is read from the user space. `buf` is the output buffer.
+    The buffer's size is fixed and is `PAGE_SIZE` in length. The data that must be
+    exposed must be put inside `buf`, preferably using `scnprintf()`. Finally, if
+    the callback succeeds, it must return the size (in bytes) of the data that was
+    written into the buffer, or a negative error if it fails. Each attribute should
+    contain/provide a single, human-readable value or property, according to the sysfs
+    rules; if you have a lot of data to return, you should consider breaking it into
+    numerous attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`store` is called for writing purposes – that is, when users write something
+    into an attribute. Its `buf` parameter is `PAGE_SIZE` at most but it can be smaller.
+    It must return the size (in bytes) of the data that was read from the buffer on
+    success or a negative error on failure (or if an unwanted value is received).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `attr` pointer is passed as an argument into both methods and can be utilized
+    to determine which attribute is being accessed. It is frequent for `show`/`store`
+    methods to perform a series of tests you can perform on the attribute name to
+    achieve that. Other implementations, on the other hand, wrap the attribute's structure
+    in an enclosing data structure that provides the data that's required to return
+    the attribute's value (`struct kobject_attribute`, `struct device_attribute`,
+    `struct driver_attribute`, and `struct class_attribute` are some examples); in
+    this case, the `container_of` macro is used to obtain a pointer to the embedding
+    structure. This is the method that's used by `kobj_sysfs_ops`, which represents
+    the operations that are provided by `dynamic_kobj_ktype`. Both methods are demonstrated
+    in the examples provided with this book.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Understanding the kset structure
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The purpose of `struct kset` is mainly to group related kernel objects together.
+    `kset` stands for kernel object sets, which can be interpreted as a collection
+    of kobjects. In other words, a `kset` gathers related kobjects into a single place,
+    such as all *block devices*.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The `kset` data structure is defined in the kernel like so:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: All the elements in the data structure are quite self-explanatory. Simply put,
+    `list` is a linked list of all kobjects in `kset`, `list_lock` is a spinlock that
+    protects linked list access (while adding or removing kobject elements in `kset`),
+    and `kobj` represents the base class kobject for the set. This kobject will be
+    used as the default parent of kobjects to be added in the set with a `NULL` parent.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Each registered `kset` corresponds to a sysfs directory that''s created on
+    behalf of its `kobj` element. A `kset` can be created and added using the `kset_create_and_add()`
+    function and removed with `kset_unregister()`. The following code shows the definitions
+    for both:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding APIs, `name` is the name of `kset`, which is also used as the
+    name of the directory that will be created for `kset`. The `u` parameter is a
+    pointer to a `struct uevent_ops`, which represents a set of `kset` so that, for
+    example, it can add new environment variables or filter out the uevents if so
+    desired. This parameter can be (and most of the time is) `NULL`. Finally, `parent_kobj`
+    is the parent kobject of `kset`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Adding a kobject to the set is as simple as specifying its `.kset` field for
+    the right `kset`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once you''re done with your `kset`, it can be released with `kset_unregister()`,
+    after which it will be dynamically deallocated when it is no longer in use. The
+    following code will release our example''s `kset`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: Now that we are familiar with kobjects and type structures, let's learn how
+    to deal with non-default sysfs attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Working with non-default attributes
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Attributes are sysfs files that are exported to the user space via kobjects.
+    While default attributes might be enough most of the time, you can add other attributes.
+    An attribute can be readable, writable, or both, from the user space.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'An attribute definition looks as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the attribute data structure, `name` is the name of the attribute, which
+    is also the name of the corresponding file entry. `owner` is the attribute owner
+    – most of the time, this is `THIS_MODULE` – and `mode` specifies the read/write
+    permissions for this attribute in **user-group-other** (**ugo**) format.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Default attributes are very convenient to use but are not flexible enough.
+    Moreover, simple attributes cannot be read or written except by their `kobj_type`
+    sysfs ops, which means that if there are too many attributes, the branches in
+    the show/store functions will be messy. To address this, the kobject core provides
+    a mechanism where each attribute is embedded in an enclosing and special data
+    structure: `struct kobj_attribute`. This data structure exposes the wrapper routines
+    for reading and writing.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`struct kobj_attribute` (defined in `include/linux/kobject.h`) looks as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this data structure, `attr` is the attribute representing the file to be
+    created, `show` is a pointer to a function that will be called when the file is
+    read from the user space, and `store` is a pointer to a function that will be
+    called when the file is written, again from the user space.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Using the enclosing `kobj_attribute` structure makes developments more generic
+    and extends attribute flexibility. This way, a pointer to `attr` is passed to
+    either the `store` or `show` function and can be used not only to determine which
+    attribute is being accessed but also to retrieve the enclosing data structure
+    (that is, `kobj_attribute`) that this attribute's `show`/`store` method can be
+    invoked from. To do so, you can use the `container_of` macro to obtain a pointer
+    to the embedding structure.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is an excerpt from `lib/kobject.c` that demonstrates this generic
+    mechanism in both the `show` and `store` methods of a kernel-provided sysfs operations
+    element: `kobj_sysfs_ops`. This element is also the sysfs operations data structure
+    (the `kobj_type->sysfs_ops` element) that''s used by `dynamic_kobj_ktype`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, the `container_of` macro does everything. This also reassures
+    us that with this approach, we remain compatible with all the bus-, device-, class-,
+    and driver-related kobject implementations, as we will see in the next section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s go back to the APIs. You will probably always know which attributes
+    you wish to expose in advance; thus, the attributes will almost always be declared
+    statically. To help with this, the kernel provides the `__ATTR` macro for initializing
+    `kobj_attribute`. This macro is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding macro definition, `_name` will be stringified and used as the
+    attribute name, `_mode` represents the attribute mode, and `_show` and `_store`
+    are pointers to the attribute's `show` and `store` methods, respectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is an example of two attribute''s declarations, `bar` and `foo`
+    (this example will be used as a base later in this section):'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding example, we have two attributes with the `0660` permission.
+    The first attribute is named `foo`, the second one is named `bar`, and both use
+    the same `show` and `store` methods.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, we must create the underlying file. The low-level kernel APIs that are
+    used to add/remove attributes from the sysfs filesystem are `sysfs_create_file()`
+    and `sysfs_remove_file()`, respectively. They are defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`sysfs_create_file()` returns 0 on success or a negative error on failure.
+    `sysfs_remove_file()` must be given the same parameters to remove the file attributes.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s use these APIs to add our `bar` and `foo` attributes to the system:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Once the preceding code has been executed, the `bar` and `foo` files will be
+    visible in sysfs, in the `/sys/demo` directory. In our example, we used the `__ATTR`
+    macro to define our attributes. We had to specify the name, the mode, and the
+    `show`/`store` methods. The kernel provides convenience macros for the most frequent
+    cases to make specifying attributes and writing code more succinct, readable,
+    and easier. These macros are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`__ATTR_RO(name)`: This assumes that `name_show` is the show callback''s name
+    and sets the mode to `0444`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`__ATTR_WO(name)`: This assumes that `name_store` is the store function''s
+    name and is restricted to mode `0200`, which means root write access only.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`__ATTR_RW(name)`: This assumes that `name_show` and `name_store` are for the
+    `show` and `store` callbacks'' names, respectively, and sets the mode to `0644`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`__ATTR_NULL`: This is used as a list terminator. It sets both names to `NULL`
+    and is used as an end of list indicator (see `kernel/workqueue.c`).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'All these macros only expect the name of the attribute as a parameter. The
+    difference with these macros is that unlike `__ATTR`, whose `store`/`show` function
+    names can be arbitrary, the attributes here are built under the assumption that
+    the `show` and `store` methods are named `<attribute_name>_show` and `<attribute_name>_store`,
+    respectively. The following code demonstrates this with the `__ATTR_RW_MODE` macro,
+    which is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'As we can see, the `.show` and `.store` fields are set with their attribute
+    names suffixed with `_show` and `_store`, respectively. Let''s take a look at
+    the following example:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: The preceding attribute declaration assumes that the `show` and `store` methods
+    are defined as `foo_show` and `foo_store`, respectively.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you need to provide a single store/show operation pair for all the attributes,
+    you should probably define these attributes with `__ATTR`. However, if processing
+    the attributes requires providing a show/store pair per attribute, you can use
+    the other attribute definition macros.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code shows the implementation of the show/store function for
+    our previously defined `foo` and `bar` attributes:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, instead of providing a pair of show/store operations
+    per attribute, we have used the same function pair for all the attributes, and
+    we differentiated the attributes by their respective names. This is a common practice
+    when you're using the generic `kobject_attribute` instead of framework-specific
+    attributes. This is because they sometimes impose different show/store function
+    names for each attribute since they do not rely on the `__ATTR` macro for defining
+    attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Working with binary attributes
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: So far, we have become familiar with the sysfs statement and mentioned that
+    an attribute must store a single property/value in a human-readable text format,
+    as well as that such an attribute has a `PAGE_SIZE` limit. However, there could
+    be situations, although rare, which would require larger data to be exchanged
+    in binary format, for example, all with random access. An example of such a situation
+    is a device firmware transfer, where the user space would upload some binary data
+    to be pushed to the hardware or PCI devices, exposing part or all of their configuration
+    address spaces.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To cover those cases, the sysfs framework provides binary attributes. Note that
+    these attributes are for sending/receiving binary data that is not interpreted/manipulated
+    by the kernel at all. It should *only* be used as a pass-through to and from hardware,
+    with no interpretation by the kernel. The only manipulations you can perform are
+    some checks on the magic number and size, for example.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now, let''s get back to the code A binary attribute is represented using a
+    `struct bin_attribute` and is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, `attr` is the underlying classic attribute for this binary
+    attribute and holds the name, owner, and permissions for the binary attribute.
+    `size` represents the maximum size of the binary attribute (or zero if there is
+    no maximum limit). `private` is a field that can be used for any convenience.
+    Most of the time, it is assigned the buffer of the binary attribute. The `read()`,
+    `write()`, and `mmap()` functions are optional and work similarly to the normal
+    `char` driver equivalents. In their parameters, `filp` is an opened file pointer
+    instance that's associated with the attribute and `kobj` is the underlying `kobject`
+    associated with this this binary attribute. `buffer` is the output or input buffer
+    for read or write operations, respectively. `off` is the same offset argument
+    that's found in all read or write methods for all types of files. It refers to
+    the offset from the start of the file – that is, offset into the binary data.
+    Finally, `count` is the number of bytes to read or write.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: Though binary attributes may not have size limitations, larger data is always
+    requested/sent on a `PAGE_SIZE` chunk basis. This means that, for example, the
+    `write()` function can be called multiple times for a single load. However, this
+    split is handled by the kernel, which means it's transparent for the driver. The
+    disadvantage is that sysfs has no way of signaling the end of a series of write
+    operations, so code that implements a binary attribute must figure it out some
+    other way.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For a binary attribute to be created, it must be allocated and initialized.
+    Like classic attributes, there are two ways to allocate binary attributes – either
+    statically or dynamically. For static allocation, the framework provides the low-level
+    `__BIN_ATTR` macro, which is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: It works similarly to the `__ATTR` macro. In terms of parameters, `_name` is
+    the binary attribute name, `_mode` represents its permissions, `_read` and `_write`
+    are the read and write functions, respectively, and `_size` is the size of the
+    binary attribute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Like classic attributes, binary attributes have their own high-level helper
+    macros to ease the process of defining them. Some of these macros are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'These macros declare a single instance of `struct bin_attribute`, whose corresponding
+    variable is named `bin_attribute_<name>`, as shown in the following `BIN_ATTR`
+    definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Moreover, like classic attributes, these high-level macros expect the read/write
+    methods to be named `<attribute_name>_read` and `<attribute_name>_write`, respectively,
+    as shown in the following `__BIN_ATTR_RW` definition:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'For dynamic allocation, a simple `kzalloc()` is enough. However, dynamically
+    allocated binary attributes must be initialized using `sysfs_bin_attr_init()`,
+    as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: After this, the driver must set other properties, such as the underlying attribute's
+    mode, name, and permission, and optionally the read/write/map functions.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Unlike classic attributes, which can be set up as default attributes, binary
+    attributes must be created explicitly. This can be done using `sysfs_create_bin_file()`,
+    as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This function returns `0` on success or a negative error on failure. Once you''re
+    done with a binary attribute, it can be removed with `sysfs_remove_bin_file()`,
+    which is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The following is an excerpt (whose full version can be found in `drivers/i2c/i2c-slave-eeprom.c`)
+    of a concrete example highlighting the use of a binary attribute that''s been
+    allocated and initialized dynamically:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Upon unloading the path of the module or when the device leaves, the associated
+    binary file is removed, as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Then, when it comes to implementing the read/write function, data can be moved
+    back and forth using `memcpy()`, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding excerpt, the offset (the `off` parameter) points to where the
+    data should be read/written, and `count` determines the size of this data.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The concept of attribute group
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'So far, we have learned how to individually add (binary) attributes by calling
+    the `sysfs_create_file()` or `sysfs_create_bin_file()` function. While this is
+    enough if we have a few attributes to add, it may become painful as the number
+    of attributes grows, either upon adding or removing them. The driver will have
+    to loop over the attributes to create each of them or invoke `sysfs_create_file()`
+    as many times as there are attributes. Here is where the attribute group comes
+    in. It relies on the `struct attribute_group` structure, which is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE52]'
+  prefs: []
+  type: TYPE_PRE
+- en: If it is unnamed, an attribute group will place all the attributes directly
+    in the kobject's directory when defining a group of attributes. If, however, a
+    `name` is supplied, a subdirectory will be created for the attributes, with the
+    directory's name being the name of the attribute group. `is_visible()` is an optional
+    callback that intends to return the permissions associated with a specific attribute
+    in the group. It will be called repeatedly for each (non-binary) attribute in
+    the group. This callback must then return the read/write permission of the attribute,
+    or `0` if the attribute is not supposed to be accessed at all. `is_bin_visible()`
+    is the counterpart of `is_visible()` for binary attributes. The returned value/permission
+    will replace the static permissions that have been defined in `struct attribute`.
+    The `attrs` element is a pointer to a `NULL` terminated list of attributes, while
+    `bin_attrs` is its counterpart for binary attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The kernel functions that are used to add/remove group attributes to/from the
+    filesystem are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE53]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Back to our demo example with standard attributes, the two `bar` and `foo`
+    attributes can be embedded into a `struct attribute_group`. This will allow us
+    adding these to the system in a single shot, using one function call as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE54]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Finally, to create the attributes in a single shot, we need to use `sysfs_create_group()`,
+    as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE55]'
+  prefs: []
+  type: TYPE_PRE
+- en: Here, we have demonstrated the importance of creating a group of attributes
+    and how easy it is to use their APIs. While we have been generic so far, in the
+    next section, we'll learn how to create framework-specific attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating symbolic links
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Drivers can create/remove symbolic links on existing kobjects (directories)
+    using `sysfs_{create|remove}_link()` functions, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE56]'
+  prefs: []
+  type: TYPE_PRE
+- en: This allows an object to exist in more than one place or even create a shortcut.
+    The `create` function will create a symbolic link called `name` that points to
+    the remote `target` kobject's sysfs entry. The link will be created in the `kobj`
+    kobject directory. A well-known example is devices appearing in both `/sys/bus`
+    and `/sys/devices` since a bus controller is first a device on its own before
+    exposing a bus. However, note that any symbolic links that are created will be
+    persistent (unless the system is rebooted), even after target removal. Thus, the
+    driver must consider that when the associated device leaves the system or when
+    the module is unloaded.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Overview of the device model from sysfs
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: sysfs is a non-persistent virtual filesystem that provides a global view of
+    the system and exposes the kernel objects hierarchy (topology) using their kobjects.
+    Each kobject shows up as a directory. The files in these directories represent
+    the kernel variables that are exported by the related kobject. These files are
+    called attributes and can be read or written.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If any registered kobject creates a directory in sysfs, where the directory
+    is created depends on the parent of this kobject (which is also a kobject, thus
+    highlighting internal object hierarchies). In sysfs, top-level directories represent
+    the common ancestors of object hierarchies or the subsystems that the objects
+    belong to.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'These top-level sysfs directories can be found in the `/sys/` directory, as
+    follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE57]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`block` contains a directory per block device on the system. Each of these
+    contains subdirectories for partitions on the device. `bus` contains the registered
+    bus on the system. `dev` contains the registered device nodes in a raw way (no
+    hierarchy), with each being a symbolic link to the real device in the `/sys/devices`
+    directory. The `devices` directory gives the real view of the topology of devices
+    in the system. `firmware` shows a system-specific tree of low-level subsystems
+    such as ACPI, EFI, and OF (device tree). `fs` lists the filesystems that are used
+    on the system. `kernel` holds the kernel configuration options and status information.
+    Finally, `module` is a list of loaded modules and `power` is the system power
+    management control interface from the user space.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Each of these directories corresponds to a kobject, some of which are exported
+    as kernel symbols. These are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`kernel_kobj`, which corresponds to `/sys/kernel`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`power_kobj`, which corresponds to `/sys/power`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`firmware_kobj`, which corresponds to `/sys/firmware`. It''s exported in the
+    `drivers/base/firmware.c` source file.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`hypervisor_kobj`, which corresponds to `/sys/hypervisor`. It''s exported in
+    the `drivers/base/hypervisor.c` source file.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`fs_kobj`, which corresponds to `/sys/fs`. This is exported in the `fs/namespace.c`
+    source file.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: For the rest, `class/`, `dev/` and `devices/` are created at boot time by the
+    `devices_init()` function in `drivers/base/core.c` in the kernel sources, `block/`
+    is created in `block/genhd.c`, and `bus/` is created as a `kset` in `drivers/base/bus.c`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Creating device-, driver-, bus- and class-related attributes
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: So far, we have learned how to create dedicated kobjects to populate attributes
+    inside. However, the device, driver, bus, and class frameworks provide attribute
+    abstractions and file creation, where the attributes that are created are directly
+    tied to the respective framework in the appropriate kobject directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To do so, each framework provides a framework-specific attribute data structure
+    that encloses the default attribute and allows us to provide a custom show/store
+    callback. These are `struct device_attribute`, `struct driver_attribute`, `struct
+    bus_atttribute`, and `struct class_attribute` for the device, driver, bus, and
+    class frameworks, respectively. They are defined like `kboj_attribute` is but
+    use different names. Let''s look at their respective data structures:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Devices have the following attribute data structure:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE58]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Classes have the following attribute data structure:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE59]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'The bus framework has the following attribute data structure:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE60]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: 'Devices have the following attribute data structure:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE61]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: The preceding device-specific data structure's `show` function takes an additional
+    `count` parameter, whereas the others do not.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'They can be dynamically allocated with `kzalloc()` and initialized by setting
+    the fields of their inner attribute elements and providing the appropriate callback
+    functions. However, each framework provides a set of macros to statically allocate,
+    initialize, and assign a single instance of their respective attribute data structure.
+    Let''s look at these macros:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The bus infrastructure provides the following macros:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE62]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: With these bus framework-specific macros, the resulting bus attribute variable
+    is named `bus_attr_<_name>`. For example, the variable name that results from
+    `BUS_ATTR_RW(foo)` will be `bus_attr_foo` and will be of the `struct bus_attribute`
+    type.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For drivers, the following macros are provided:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE63]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: These driver-specific attribute definition macros will name the resulting variable
+    using the `driver_attr_<_name>` pattern. Therefore, the variable that results
+    from `DRIVER_ATTR_RW(foo)` will be of the `struct driver_attribute` type and will
+    be named `driver_attr_foo`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The class framework works with the following macros:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE64]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Using these class-specific macros, the resulting variable will be of the `struct
+    class_atribute` type and will be named based on the `class_attr_<_name>` pattern.
+    Thus, the resulting variable name of `CLASS_ATTR_RW(foo)` will be `class_attr_foo`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, device-specific attributes can be statically allocated and initialized
+    using the following macros:'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '[PRE65]'
+  prefs:
+  - PREF_IND
+  type: TYPE_PRE
+- en: Device-specific attributes definition macros use their own pattern for variable
+    names, which is `dev_attr_<_name>`. Thus, for example, `DEVICE_ATTR_RO(foo)` will
+    result in a `struct device_attribute` object named `dev_attr_foo`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Because all these macros are built on top of `__ATTR_RW`, `__ATTR_RO`, and `__ATTR_WO`,
+    they statically allocate and initialize a single instance of the framework-specific
+    attribute data structure and assume the show/store functions are named `<attribute_name>_show`
+    and `<attribute_name>_store`, respectively (remember, this is because they do
+    not rely on the `__ATTR` macro). There is an exception for `DEVICE_ATTR()`, which
+    uses the show/store function as it was passed, without any suffix or prefix. This
+    exception is because `DEVICE_ATTR` relies on `__ATTR` to define attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'As we have seen, all these framework-specific macros use a predefined prefix
+    to name the resulting framework-specific attribute object variable. Let''s take
+    a look at the following class attribute:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE66]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This will create a static variable of the `struct class_attribute` type named
+    `class_attr_foo` and will assume that its show and store functions are named `foo_show`
+    and `foo_store`, respectively. This can be referenced in a group using its inner
+    attribute element, as shown here:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE67]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'The most important thing when it comes to creating the respective files is
+    that the driver can select the appropriate API from the following list:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE68]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Here, the `device`, `driver`, `bus`, and `class` arguments are the respective
+    device, driver, bus, and class entities that the attribute must be added to. Moreover,
+    the attribute will be created in the directory that corresponds to the inner kobject
+    of each entity, as shown in the following code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE69]'
+  prefs: []
+  type: TYPE_PRE
+- en: To kill two birds with one stone, the preceding code also shows that `device_create_file()`,
+    `bus_create_file()`, `driver_create_file()` and `class_create_file()` all make
+    an internal call to `sysfs_create_file()`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once you''re done with each respective attribute object, the appropriate removal
+    method must be invoked. The following code shows the possible options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE70]'
+  prefs: []
+  type: TYPE_PRE
+- en: Each of these APIs expects the same arguments as those that are passed when
+    the attributes are created.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that you know how the inner show/store functions of the `kobj_atribute`
+    elements are invoked, it should be obvious to you how those framework-specific
+    show/store functions are invoked as well.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Let's have a look at the device's implementation. The device framework has an
+    internal `kobj_type` that implements device-specific show and store functions.
+    These functions take in the inner attribute element as one of their arguments.
+    After that, the `container_of` macro retrieves a pointer for the enclosing data
+    structure (which is the framework-specific attribute data structure) that the
+    framework-specific show and store functions are invoked from.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following is an excerpt from `drivers/base/core.c` that shows the device-specific
+    `sysfs_ops` implementation:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE71]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Note that in the preceding code, `to_dev_attr()`, which is the macro that makes
+    use of `container_of`, is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE72]'
+  prefs: []
+  type: TYPE_PRE
+- en: The principle is the same for the bus (in `drivers/base/bus.c`), driver (in
+    `drivers/base/bus.c`), and class (in `drivers/base/class.c`) attributes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Making a sysfs attribute poll- and select-compatible
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Though this is not a requirement for dealing with sysfs attributes, the main
+    idea here is to allow the `poll()` or `select()` system calls to be used on a
+    given attribute to passively wait for a change. This change could be firmware
+    becoming available, an alarm notification, or information that the attribute value
+    has changed. While the user would sleep on the file waiting for a change, the
+    driver must invoke `sysfs_notify()`to release any sleeping user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'This notification API is defined as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE73]'
+  prefs: []
+  type: TYPE_PRE
+- en: If the `dir` parameter is not `NULL`, it is used to find a subdirectory from
+    within the directory of `kobj`, which contains the attribute (presumably created
+    by `sysfs_create_group`). This call will cause any polling process to wake up
+    and process the event (which might be reading the new value, handling the alarm,
+    and so on).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs: []
+  type: TYPE_NORMAL
+- en: There will be no notifications without this function call; therefore, any polling
+    process will end up waiting indefinitely (unless a timeout was specified in the
+    system call).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The following code, which shows the `store()` function of an attribute, is
+    provided with this book:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE74]'
+  prefs: []
+  type: TYPE_PRE
+- en: In the preceding code, it makes sense to call `sysfs_notify()` once the value
+    has been updated so that the user code can read the accurate value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The user code can directly pass the opened attribute file to `poll()` or `select()`
+    without having to read the initial content of this attribute. Doing so is at the
+    convenience of the developer. However, note that upon notification, `poll()` returns
+    `POLLERR|POLLPRI` (as are flags, which users must request while invoking `poll()`),
+    while `select()` returns the file descriptor, whether it is waiting for read,
+    write, or exception events.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: By completing this chapter, you should be familiar with LDM, its data structures
+    (bus, class, device, and driver), and its low-level data structures, which are
+    `kobject`, `kset`, `kobj_type`, and `attributes` (or a group of these). You should
+    now know how objects are represented within the kernel (device topology) and be
+    able to create an attribute (or group) that exposes your device or driver features
+    and properties through sysfs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the next chapter, we will cover the **IIO** (**Industrial I/O**) framework,
+    which heavily uses the power of sysfs.
+  prefs: []
+  type: TYPE_NORMAL

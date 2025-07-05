@@ -1,0 +1,2033 @@
+- en: Chapter 8. LDAP and the Web
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: 'The book thus far has been focused on the LDAP services themselves. In this
+    chapter we will look at integrating LDAP with other services. The focus of this
+    chapter will be on integrating OpenLDAP and LDAP-enabled web services. The goal
+    is not only to provide some concrete examples of certain web services, but also
+    to give a general idea as to the common features of LDAP-enabled applications.
+    We will make use primarily of the Apache web server, and of the phpLDAPadmin tool.
+    In this chapter, we will cover the following topics:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The basics of LDAP-enabled applications
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Using OpenLDAP for Apache authentication
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Other features of Apache's LDAP module
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Installing and configuring phpLDAPadmin
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Managing a directory server through the web interface
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: We will conclude with some general guidance on integrating OpenLDAP and LDAP-aware
+    applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The LDAP-Aware Application
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: What does it mean to say of an application that it is LDAP-aware? An LDAP-aware
+    application is an application that can make use of directory information by contacting
+    a directory server over the LDAP protocol and performing LDAP operations.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While the most common use of directory services is authentication, it is certainly
+    not the only thing LDAP can be used for. Some DNS servers use a directory server
+    to store zone information. Sendmail and Postfix can use LDAP to store information
+    on mail routing. Mozilla Thunderbird, Microsoft Outlook, and many other mail clients
+    treat LDAP servers as address books. All of these applications are rightly considered
+    LDAP-enabled applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: While there are many LDAP-aware applications, not all of them support the LDAP
+    v3 protocol in spite of the fact that LDAP v3 has been around for a decade (see
+    RFC 2251). Many LDAP-aware applications still use version 2 of the LDAP protocol,
+    which lacks some important features, like StartTLS support and SASL binding.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The common feature of an LDAP-enabled application is the ability to connect
+    to and bind to a directory server. And this is the feature that most often requires
+    configuration. For that reason, most LDAP-enabled applications will need at minimum
+    the following pieces of information:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A DN that will be used to bind to the directory.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A password to use when binding.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Information about the location of the LDAP server. This may be in the form of
+    an `ldap` URL (`ldap://directory.example.com:389`) or a host and port pair (`host=directory.example.com`,
+    `port=389`).
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Some applications may need additional info, such as a search filter or a list
+    of attributes to request.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If the DN is for the Anonymous user (which is an empty string), then password
+    must not be set.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Of course, asking users to remember a full DN when they are normally accustomed
+    to remembering only a login ID might not be a successful strategy. For this reason,
+    many LDAP-enabled applications will use the traditional two-stage authentication,
+    consisting of performing two simple binds.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Such an application will prompt a user for a login ID (usually mapped to the
+    `uid` attribute in OpenLDAP) and a password. Then, the application will bind as
+    an initial DN (often this DN will be anonymous), and then perform a search for
+    the specified login attribute, in order to get the full DN. Then, the application
+    will rebind with the newly-located DN and the user's supplied password.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In Chapter 5, we covered the different methods of binding to OpenLDAP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this case, the application itself is not doing the password verification.
+    It sends the password to the directory server, and the directory server does the
+    appropriate authentication.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In rarer cases, applications may attempt a SASL bind instead of a simple bind.
+    Then the application will not need the full DN. Instead, it will just need the
+    SASL-specific information for the user (such as login ID and password for DIGEST-MD5,
+    or an X.509 certificate for the SASL EXTERNAL mechanism).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Applications that just use LDAP for authentication usually only need to perform
+    the bind operation (or operations). Once the application knows that the user can
+    successfully bind, the application has found out all it needs to know from the
+    LDAP server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Other applications (such as an address book or a DNS server) may continue to
+    interact with the LDAP server to perform searches, or even to change the directory
+    information tree.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In this chapter we will first look at the Apache web server's ability to use
+    OpenLDAP as an authentication source. Then we will move on to services that perform
+    more substantial interactions with the directory server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Apache and LDAP
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: The Apache web server ([http://httpd.apache.org](http://httpd.apache.org)) is
+    the most frequently used web server on the Internet. It runs on most of the major
+    operating systems, and is known for its stability and rich feature set. Almost
+    every Linux distribution includes Apache as a supported package.
+  prefs: []
+  type: TYPE_NORMAL
+- en: At the time of writing, Apache 2.2 is the version distributed with Ubuntu. But
+    Apache 2.0 is still widely in use. Since configuration of LDAP between these two
+    versions is slightly different, I will focus on Apache 2.2 but include tips on
+    configuring the older Apache 2.0.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A Short Guide to Installing Apache
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Apache has an excellent manual, and the basic configuration provided with Ubuntu
+    (and most other distributions, as well) is ready for basic use with very little
+    configuration. So in this section, I will provide a very basic guide to getting
+    started with Apache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To learn more, you may want to consult the Apache website ([http://httpd.apache.org](http://httpd.apache.org)),
+    the Ubuntu Apache configuration documentation ([https://help.ubuntu.com/7.04/server/C/httpd.html](https://help.ubuntu.com/7.04/server/C/httpd.html)),
+    or one of the many guides, online and in print, on configuring Apache.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To install apache on Ubuntu, you will only need to run one command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE0]'
+  prefs: []
+  type: TYPE_PRE
+- en: Installation of Apache will likely require that several other dependencies be
+    installed, but `apt-get` will resolve the dependencies and merely prompt us to
+    allow these to be installed.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If you built OpenLDAP from source, you may be prompted to install another (possibly
+    older) version of the LDAP libraries to satisfy package dependencies. Doing so
+    will not harm your current LDAP applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In the previous version of Apache, version 1.3, an extra module (`mod_ldap`)
+    needed to be installed in order to get LDAP support, but from Apache 2.0 onwards,
+    LDAP support is included in the core Apache distribution. Later, we will install
+    the PHP module to gain web server support for the PHP language, but for now we
+    need no additional packages.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The Apache configuration files are located, in Ubuntu, in the `/etc/apache2`
+    directory. The directory layout looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE1]'
+  prefs: []
+  type: TYPE_PRE
+- en: The important ones, as far as we are concerned here, are highlighted.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `apache2.conf` file contains the basic settings for Apache. Apache can perform
+    virtual hosting, where one server instance can host multiple different websites
+    (on different IP addresses or host names). The `apache2.conf` file contains configuration
+    information that applies to the core server and all hosted sites.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Like OpenLDAP, Apache's code is modular. Apart from the basic functionality
+    of the server, features can be implemented in separate modules and loaded into
+    the server at startup. When a module is installed, the module's configuration
+    files are put in the `mods-available/` directory. To turn on a module one need
+    only create a symbolic link in the `mods-enabled/` directory to the module's configuration
+    files at `mods-available/` and, when Apache restarts, it will load the desired
+    module. To further simplify this process there are two tools, `a2enmod` and `a2dismod`,
+    that can be used (respectively) for enabling and disabling Apache modules.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The method described here applies to Ubuntu, Debian, and a few other Apache
+    distributions, but is not universal. Consult your system documentation for specific
+    notes on how to enable or disable modules on your server. It is usually as simple
+    as adding a line or two to one of the Apache configuration files.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, the virtual-host (or site-) specific configuration files are located
+    at `sites-available/`. Such configuration files contain parameters that are specific
+    to the particular virtual host, but not to the server generally. For example,
+    say we want to host two websites on our Apache instance: `www.example.com` and
+    `www.anothersite.com`. Each of these two sites would have a separate configuration
+    file (usually eponymously called `www.example.com` and `www.anothersite.com`)
+    in the `sites-available/` directory.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: But simply having sites in the `sites-available/` folder is not enough to enable
+    the site. As with modules, Apache checks the sites-enabled directory to see what
+    sites it should activate at startup. Enabling a site takes nothing more than adding
+    a symbolic link from the desired configuration file at `sites-available/` in the
+    `sites-enabled/` directory. Again, the Apache utilities `a2ensite` and `a2dissite`
+    can be used to manage those links.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Ubuntu comes configured out of the box with a default website. The configuration
+    file is at `sites-available/default`, and it is already linked to `sites-enabled/`.
+    We need not change this configuration file to have a basic web server running.
+    All we need to do to get Apache going is start it up:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE2]'
+  prefs: []
+  type: TYPE_PRE
+- en: You should now be able to browse the default website by pointing a web browser
+    to the IP address of the server, for example `http://192.168.0.211`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring LDAP Authentication
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: 'The HTML files that this website serves are located at `/var/www/`. Let''s
+    create a new directory in this folder, and then add password protection to it:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE3]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Inside of this new directory, let''s create a new XHTML page called `index.html`:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE4]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This is just a simple, no-frills webpage that will set the title to `Insiders
+    Only` and display the message: `This` `page` `is` `private`, `and` `only` `authenticated`
+    `users` `should` `be` `able` `to` `access` `it`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '**Granting Permissions**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Apache runs as the user www-data. In order to serve the page to clients, Apache
+    will need to be able to read the directory and the page. You may need to set the
+    correct file system permissions with chmod. Directories will need to have read
+    and execute permissions for www-data, and HTML files will need read access.
+  prefs: []
+  type: TYPE_NORMAL
+- en: At this point you should be able to access this page by appending the directory
+    name to the URL we accessed. In our example, the website URL was `http://192.168.0.211`.
+    To access the `private/` directory's index page, we should be able to use the
+    URL `http://192.168.0.211/private`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Of course, since we have not yet configured authentication for this directory,
+    we will be able to see the page without first logging in.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now that we have our new folder and HTML page, we can go about securing it from
+    prying eyes. To do this, we will configure Apache to load the LDAP modules and
+    then add a few lines to the `sites-available/default` file to turn on LDAP authentication
+    for that folder and its contents.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Loading the Modules
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The LDAP features for Apache are all implemented as Apache modules. By default,
+    they are not turned on though they are installed. That is, the code is present
+    on the server, and the default configuration files are located at `/etc/apache2/mods-available`,
+    but no symbolic links to those files are present at `/etc/apache2/mods-enabled`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Between Apache 2.0 and Apache 2.2, the names of these modules changed to better
+    reflect what they are used for.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To enable the correct modules in Apache 2.2, run the `a2enmod` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE5]'
+  prefs: []
+  type: TYPE_PRE
+- en: This will add a link in `mods-enabled` to `mods-available/auth_ldap.load`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the older Apache 2.0, we will need to run a similar command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE6]'
+  prefs: []
+  type: TYPE_PRE
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '**Why the Difference?**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: One of the major improvements introduced in Apache 2.2 is the reworking of the
+    "Authentication, Authorization, and Access Control" features. The result of this
+    reworking is a cleaner separation of authentication (AuthN) from authorization
+    (AuthZ). This separation is reflected in module names.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we will need to restart the server so that it will load and configure
+    the module:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE7]'
+  prefs: []
+  type: TYPE_PRE
+- en: Once that has been done we are ready to move on to the site's configuration
+    file and add some protection to the new `/var/www/private` directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Editing the default Configuration File
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The `default` configuration file is around 45 lines long. It contains all of
+    the configuration directives necessary for running a rudimentary web server.The
+    Ubuntu documentation explains the directives in this file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'We are interested in creating a portion of the configuration file with this
+    structure:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE8]'
+  prefs: []
+  type: TYPE_PRE
+- en: A `<Directory>` section indicates that the configuration directives enclosed
+    within the tag apply specifically to the named directory (`/path/on/file/system`
+    in the given example) and its contents.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The path that is contained inside the `<Directory>` tag is the file system path,
+    not the relative path component from the URL. That is, our `private/` directory
+    is located at `/var/www/private/` on the file system, but it's URL is `http://192.168.0.211/private`
+    (and its relative URL, the part of the URL after the server section, is `/private/`).
+    In the `<Directory>` tag, we would use `/var/www/private/`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Since the parameters between the `<Directory>` and `</Directory>` tags apply
+    only to the contents of that directory, a directory section can fine-tune permissions,
+    features, and services at the directory level. We will create our own `<Directory>`
+    section to add LDAP authentication to the `private/` directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To set this up we will need a mixture of parameters from the Apache's `mod_auth`
+    and `mod_access` modules, which provide basic authentication and authorization
+    services and are loaded by default, and the `ldap_auth` module, which we just
+    loaded in the last section.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Again, there is a difference between the Apache 2.0 configuration and the Apache
+    2.2 configuration. We will first take a close look at the Apache 2.2, and also
+    provide a brief example of an Apache 2.0 configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The Directory Section—Apache 2.2
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'Now we are ready to create a new `<Directory>` section that will apply to the
+    `/var/www/private` directory. We will add the following just above the `</VirtualHost>`
+    line in the `default` configuration file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE9]'
+  prefs: []
+  type: TYPE_PRE
+- en: The `<Directory>` section applies to our newly-created `private/` directory,
+    and the directives specified in this section will force web users to authenticate
+    when they try to access the `private/` directory or anything in it.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first two parameters are part of Apache's built-in `mod_auth_basic` module.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first parameter in the `<Directory>` section is `AuthType`. This parameter
+    controls how the password information is sent from the client to the server and
+    there are two possible values: `Basic` and `Digest`. If `Basic` is specified then
+    passwords will be sent to the server in cleartext. Unfortunately, many HTTP clients
+    only support `Basic`. `Digest` is more secure (setting it will instruct the client
+    to hash the password before sending), but it is not as widely supported. Since
+    this module uses an LDAP simple bind, the password must be sent unencrypted, which
+    means that only `Basic` is currently supported.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '**Encrypting HTTP Traffic**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The best way of securing this authentication process is by configuring Apache
+    to use SSL/TLS when communicating with the client. The Ubuntu Apache documentation
+    and the official Apache project documentation both cover this.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The value of the `AuthName` field is sent to the browser as a way of indicating
+    what the authentication is for. For example, when a web browser tries to access
+    a file inside the `private/` directory, the user will be prompted for authentication
+    information with a dialog box that looks something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![The Directory Section—Apache 2.2](img/1021_08_01.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The `AuthName` appears in the first line of the dialog: **Enter username and
+    password for "LDAP" at http://localhost**. In general, the value of `AuthName`
+    ought to be a hint to indicate to the user what she or he is logging in to.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Moving on to the next line in the `<Directory>` section, `AuthBasicProvider`
+    specifies which service will be used for basic authentication. Along with LDAP,
+    Apache supports flat files, hash-style databases, relational databases and other
+    sources.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We want to use LDAP authentication. In Apache 2.2, LDAP authentication (AuthN)
+    and Authorization (AuthZ) services are provided by the module `mod_authnz_ldap`.
+    To use the `mod_authnz_ldap` authentication source, the `AuthBasicProvider` parameter
+    should have the value `ldap`. This means that when the client attempts to authenticate
+    to the web server, an LDAP source will be used to process the authentication tokens.
+    In other words, username and password will be verified against the directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once authentication has successfully occurred, the next phase is *authorization*.
+    During this phase the web server determines whether the authenticated user can
+    access the requested resource. The next two parameters apply to the authorization
+    process.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `Require` directive specifies what requirements must be met for a user to
+    be granted access to the requested resource. Later, we will examine ways to require
+    that the user have a particular attribute or be a member of a particular group
+    in the directory information tree. But in our example the requirement, `valid-user`,
+    requires only that the user exists in the specified source (the directory in this
+    case) and that the user can successfully authenticate.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`AuthzLDAPAuthoritative` indicates whether LDAP alone ought to be used as a
+    source of authorization information. By default this is on, which will cause Apache
+    to use one of the `ldap-*` `Require` values. But in the previous example all we
+    want to do is make sure that the user is a valid user—that is, that the user successfully
+    authenticated. That alone is sufficient authorization for us. Validity checking,
+    in this way, is provided outside of the `mod_authnz_ldap` module, so we need to
+    turn off the `AuthzLDAPAuthoritative` flag:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE10]'
+  prefs: []
+  type: TYPE_PRE
+- en: In order to use the `valid-user` value for the `require` parameter, we need
+    to turn `AuthzLDAPAuthoritative` off so that another module (`mod_auth_basic`)
+    can be used to handle authorization. In this case, LDAP will only do the authentication
+    step.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The next three directives are LDAP-specific:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE11]'
+  prefs: []
+  type: TYPE_PRE
+- en: '`AuthLDAPBindDN` and `AuthLDAPBindPassword` specify what DN and password Apache
+    should use to perform a simple bind to the LDAP server. When a new authentication
+    request comes in, Apache will bind to SLAPD with this DN and password and then
+    search the directory information tree to get the DN of the user who is trying
+    to authenticate. In other words, the bind DN and password are used for the first
+    phase of the two-stage authentication discussed in the first part of this chapter.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If `AuthLDAPBindDN` and `AuthLDAPBindPassword` are omitted, Apache will bind
+    as the Anonymous user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: For this application, the `uid=Authenticate` system account will be used to
+    access the directory. This provides a degree of security (since we don't have
+    to allow anonymous binding and searching), and it can also provide a better audit
+    trail of who accessed what in the directory.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Your SLAPD ACLs will need to be configured in such a way as to allow this DN
+    to bind from the Apache server or else the first stage of authentication will
+    fail.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The third `mod_authnz_ldap` directive is `AuthLDAPURL`. This parameter takes
+    as its value an LDAP URL, complete with a base DN, a search type, a search pattern,
+    and the attributes to be returned.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In the previous example we used this LDAP URL: `ldap://localhost/ou=Users,dc=example,dc=com?uid??(objectclass=inetOrgPerson)`.
+    Apache uses this URL to extract all of the information it will need to search
+    for the DN of the user.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: When a user logs in, as seen in the login dialog box a few pages back, Apache
+    will get a username and a password. The username should map to the `uid` attribute
+    of that user's LDAP record, and the password should match the value of the `userPassword`
+    attribute (after SLAPD hashes it of course).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once it has received this information, Apache will bind as the DN in `AuthLDAPBindDN`,
+    and execute a search based on the LDAP URL above, with the goal of getting the
+    DN for the user who is trying to log in.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Note that it is Apache that does all of the LDAP communication, not the browser.
+    At no point does the web browser connect directly to the LDAP server. This means
+    that the directory can be secured behind a firewall. As long as Apache can contact
+    it, LDAP authentication can be used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'While LDAP URLs are covered in more detail in [Appendix B](apb.html "Appendix B. LDAP
+    URLs"), we will take a brief look at the one we have just seen to understand its
+    function. The protocol section says that Apache is to make an unencrypted LDAP
+    connection:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE12]'
+  prefs: []
+  type: TYPE_PRE
+- en: An SSL LDAP connection can be made by using `ldaps://` instead of `ldap://`.
+    (And you may also need the `LDAPTrustedGlobalCert` parameter to indicate where
+    the certificate authority file for the LDAP certificate is located.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Tip
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: '**Using StartTLS instead of LDAPS**'
+  prefs: []
+  type: TYPE_NORMAL
+- en: StartTLS (rather than LDAPS) is the preferred way of making an SSL/TLS connection
+    to the directory. To use StartTLS in Apache 2.2 add the directive `LDAPTrustedMode
+    TLS` to the `<Directory>` section. Again, you may need the `LDAPTrustedGlobalCert`
+    parameter or other SSL/TLS parameters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'After the protocol section of the URL comes the host:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE13]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, SLAPD is running on the same server as Apache, so `localhost`
+    (or `127.0.0.1`) will cause Apache to use the loopback interface to connect to
+    SLAPD.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The next section is the base DN, the DN where SLAPD will start its search for
+    the user:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE14]'
+  prefs: []
+  type: TYPE_PRE
+- en: Since our users are all under the `ou=Users,dc=example,dc=com` branch, that
+    is what we will use for our base DN.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The rest of the parameters are all separated by question marks (`?`) instead
+    of slashes. After the base DN comes the attribute that SLAPD will search for:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE15]'
+  prefs: []
+  type: TYPE_PRE
+- en: In this case, the name that the user sent to the directory should be her or
+    his UID, so we want to look for the `uid` attribute. Similarly, you can use `cn`
+    or any other attribute provided that you know it will return no more than one
+    match.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For Apache authentication to work an identifying attribute must return a unique
+    DN. The operating principle for this is as follows: if a search for an entry were
+    to return more than one, Apache would have no way of knowing which of the records
+    was the appropriate one for the authenticating user. Therefore, if a search returns
+    with multiple DNs Apache will consider the authentication attempt to have failed,
+    and will not allow the user to access the site.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: After `uid` comes an empty parameter, indicated by the presence of two separators
+    in a row`(??)` `??:`
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE16]'
+  prefs: []
+  type: TYPE_PRE
+- en: This section, which is left blank, can be used to specify the search scope.
+    By leaving this empty, we are accepting the default scope, which is `sub` (subtree).
+    A subtree scope instructs SLAPD to look for any records that appear in or subordinate
+    to the base DN. Other options are `base`, `one`, and `children`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The last field is the filter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE17]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This indicates that only records with the `inetOrgPerson` object class should
+    be searched. When Apache processes the URL, it will construct a search filter
+    that combines the username search with the given filter. The result is something
+    like this: `(&(uid=matt)(objectclass=inetOrgPerson))`, where `matt` is the name
+    of the user trying to log in.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Against our directory information tree, the search should return one DN, `uid=matt,
+    ou=users,dc=example,dc=com`. When the DN is returned to Apache it will then perform
+    a second bind, this time as `uid=matt,ou=users,dc=example,dc=com` with the password
+    submitted by the user. If this bind succeeds then Apache will grant the user access.
+  prefs: []
+  type: TYPE_NORMAL
+- en: With these parameters in the `<Directory>` section, we have now configured Apache
+    to only allow web users to see information in the `private/` directory if they
+    exist in the directory information tree and can supply the information necessary
+    to successfully bind.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Changes in Apache 2.0
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'To get basically the same behavior in Apache 2.0, we need to make a few minor
+    changes to the configuration:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE18]'
+  prefs: []
+  type: TYPE_PRE
+- en: This file differs from the Apache 2.2 configuration only in that it is missing
+    the `AuthBasicProvider` and the `AuthzLDAPAuthoritative` parameters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Other Features of the Require Parameter
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In the previous section we used the `Require` `valid-user` parameter to enforce
+    the authorization requirement that any user that tried to access that section
+    of the site be present in the directory information tree and be able to successfully
+    bind.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'But there are other options that the `Require` parameter will take. We will
+    briefly see each. Apache 2.0 used different names for these and I have put them
+    in parentheses after the name that Apache 2.2 uses:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`valid-user`: This requires that the user is present in the directory and can
+    bind. This option is the same in both 2.0 and 2.2.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ldap-user` (`ler`): This requires that the user be in the list of users. For
+    example, `Require` `ldap-user` `matt` `dave` would only allow users who are valid
+    and who have the UID `matt` or the UID `dave`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ldap-dn` (`dn`): This requires that the DN be an exact match to the one in
+    the `Require` parameter. For example, `Require` `ldap-dn` `uid=matt,ou=users,dc=example,dc=com`
+    would require that the user be valid and have the DN `uid=matt,ou=users,dc=example,dc=com`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ldap-group` (`group`): This requires that the user be valid and a member of
+    the specified group. We will look at this directive more closely later.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ldap-attribute`: This parameter is named the same in both 2.0 and 2.2\. For
+    a user to gain access if this is used in a `Require` parameter, the user must
+    be valid and must have the attribute as asserted in this parameter. For example,
+    `Require` `ldap-attribute` `departmentNumber=001` will only grant access to users
+    who are valid, and also have the attribute `departmentNumber` with the attribute
+    value `001`.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`ldap-filter` (*new* *in* *Apache* *2.2*): This takes an LDAP filter and grants
+    access if a user is valid and if the user''s record is returned when an LDAP search
+    is executed with that filter.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Configuring group-based access can be slightly more complicated than the other
+    `Require` directives. A basic use of this requirement looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE19]'
+  prefs: []
+  type: TYPE_PRE
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: In Apache 2.0, `ldap-group` should be replaced by `group`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: According to this directive, in order to authenticate, the user must be a member
+    of the group `cn=Admins,ou=groups,dc=example,dc=com`. When a web user attempts
+    to log in, Apache will bind as the user in `AuthLDAPBindDN`, do its search for
+    the user's DN, bind as that user, and then (again as the user in `AuthLDAPBindDN`)
+    check to make sure that that user is in the `cn=Admins` group.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In order to allow this group search to operate correctly, the user in `AuthLDAPBindDN`
+    must have access to group entries. (Our ACLs in Chapter 4 did not allow this.)
+    You might need to add a rule like this to your ACLs:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE20]'
+  prefs: []
+  type: TYPE_PRE
+- en: This will allow anyone (including the Anonymous user) the ability to read entries
+    in the `ou=groups` subtree.
+  prefs: []
+  type: TYPE_NORMAL
+- en: How does Apache know what type of group attribute to look for? The `groupOfNames`
+    object class uses the `member` attribute, while the `groupOfUniqueNames` object
+    class uses the `uniqueMember` attribute. Both are standard LDAP object classes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Apache checks both `member` and `uniqueMember` attributes. But the case may
+    arise where you need to treat another attribute as a member attribute. `seeAlso`,
+    `owner`, and `roleOccupant` are all standard attributes that could be so treated,
+    and you can also define another one in a custom schema. In such cases, you can
+    use the `AuthLDAPGroupAttribute` parameter in the `<Directory>` section to indicate
+    to Apache what attribute it should treat as a membership attribute.
+  prefs: []
+  type: TYPE_NORMAL
+- en: phpLDAPadmin
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: We have configured Apache to use its built-in LDAP modules to perform authentication
+    with the help of a directory server. Now we are going to turn to a more complex
+    web-based application, **phpLDAPadmin**. phpLDAPadmin is an application, written
+    in PHP, designed to help manage a directory server. While it is known to work
+    on other directory servers, it was developed against OpenLDAP.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Prerequisites
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: Before we can install phpLDAPadmin, we will need to install a few other packages.
+    In the first part of this chapter we looked at Apache. This (or some other web
+    server) is required to run phpLDAPadmin. Additionally, some recent version of
+    PHP (we will use PHP 5) is needed, along with the PHP LDAP module.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'For example, to install PHP 5, we would run the following command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE21]'
+  prefs: []
+  type: TYPE_PRE
+- en: Installing PHP may require the satisfaction of several other dependencies, but
+    `apt-get` will take care of the heavy lifting for you.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: If you built OpenLDAP from source, you may be prompted to install another (possibly
+    older) version of the LDAP libraries to satisfy package dependencies. Doing so
+    will not harm your current LDAP applications.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once PHP is installed, you can restart Apache, and then move on to installing
+    phpLDAPadmin.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Installing phpLDAPadmin
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The easiest way to install phpLDAPadmin is to use the package in the Ubuntu
+    repository.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'phpLDAPadmin is included in the *universe* repository in Ubuntu. This means
+    that as long as you have the universe repository enabled in your sources (see
+    `/etc/apt/sources.list`), you can install it with a simple `apt-get` command:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE22]'
+  prefs: []
+  type: TYPE_PRE
+- en: phpLDAPadmin will be installed on the file system at `/usr/share/phpldapadmin`,
+    and Apache is configured to direct requests for [http://hostname/phpldapadmin](http://hostname/phpldapadmin)
+    to the phpLDAPadmin application. The Apache configuration is located at `/etc/phpldapadmin/apache.conf`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'It is also easy to install phpLDAPadmin from the source distribution available
+    at [http://phpldapadmin.sourceforge.net](http://phpldapadmin.sourceforge.net).
+    Once the web server and PHP are installed, it is simply a matter of unpacking
+    the source code into a folder under the web server''s web root directory (for
+    example `/var/www/`). For complete instructions, see the installation guide on
+    the official phpLDAPadmin documentation wiki: [http://wiki.phpldapadmin.info/tiki-index.php?page_ref_id=6](http://wiki.phpldapadmin.info/tiki-index.php?page_ref_id=6).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once phpLDAPadmin is installed, we can move on to configuration.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Is Your Package Broken?
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Some versions of the Ubuntu phpLDAPadmin (notably `phpldapadmin_0.9.8.3-7`)
+    shipped with a missing configuration file. Because of this, during the installation,
+    you may see an error like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE23]'
+  prefs: []
+  type: TYPE_PRE
+- en: The problem is that the file `/etc/phpldapadmin/apache.conf` (which is linked
+    to `/etc/apache2/conf.d/phpldapadmin`) is missing.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Fortunately, we can create a suitable one-line `apache.conf` file in the `/etc/phpldapadmin`
+    directory. The purpose of this configuration file is to map a suitable URI for
+    phpLDAPadmin to the absolute path on the file system where the phpLDAPadmin scripts
+    are.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To create this mapping, we need to put only the following line in the `/etc/phpldapadmin/apache.conf`
+    file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE24]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'After saving this change simply restart the web server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE25]'
+  prefs: []
+  type: TYPE_PRE
+- en: Apache should then restart without an error.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring phpLDAPadmin
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: The phpLDAPadmin configuration file is at `/etc/phpldapadmin/config.php`. phpLDAPadmin
+    uses a config file format that, while common in PHP and Perl applications, may
+    seem daunting to one who is used to editing the typical name/value parameter files
+    that most UNIX applications use.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are two major ways in which this configuration file differs from the
+    standard type:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The way default configuration options are handled
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The form of a configuration parameter
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Regarding the first, phpLDAPadmin has two configuration files, one that stores
+    all of the default settings (`/usr/share/phpldapadmin/lib/config_default.php`),
+    and one intended for administrators to edit (`/etc/phpldapadmin/config.php`).
+    Administrators should only change this second config file. The `config_default.php`
+    file should not be altered.
+  prefs: []
+  type: TYPE_NORMAL
+- en: When phpLDAPadmin attempts to access a setting, it will first check to see if
+    there is a custom setting in the custom settings file (`config.php`). If one is
+    found, that setting will be used. If one is not found, the value of the default
+    setting is used.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The advantage of this technique is that upgrades to phpLDAPadmin need not make
+    any changes to the custom configuration file. Only the default file is modified.
+    The downside is that sometimes new parameters are added, but go unnoticed, since
+    the administrator's configuration file remains unchanged.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The second difference, the form of the configuration parameter, is based in
+    part on the first. Instead of using a simple text file to store parameters, phpLDAPadmin
+    uses PHP variables to store information. In this sense, the `config.php` configuration
+    file is actually a piece of code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are some clear advantages in doing this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: All of the built-in PHP features can be used in the configuration file (including
+    dynamically evaluated scripts)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: No special configuration file parser is needed, making code size smaller and
+    run time faster
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: But there are definitely some drawbacks to this method, and the main one is
+    that readability of the file can be greatly diminished. The default configuration
+    file, for example, is almost 400 lines long and contains code (though only a smattering)
+    mixed with configuration parameters.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Another drawback is that straightforward configuration of the application will
+    still require some knowledge of the PHP language.
+  prefs: []
+  type: TYPE_NORMAL
+- en: As we look at the configuration file, I will not assume working knowledge of
+    PHP, and will explain some of the constructs in the configuration file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A Basic Look at Configuration Parameters
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The configuration parameters in phpLDAPadmin can look daunting at first. In
+    this section, I will explain the format of each type of configuration parameter.
+    Each section gives a very brief example of what the parameter form looks like,
+    followed by a more lengthy description of what is going on.
+  prefs: []
+  type: TYPE_NORMAL
+- en: If you are not a programmer, don't get discouraged if not all of this makes
+    sense. The important thing is that you understand the structure of each of the
+    configuration directives.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Since this is not a PHP tutorial, I will only briefly introduce the concepts
+    that are necessary to understand what we are doing when we set parameters. For
+    more information on PHP, the PHP team maintains a very good online manual that
+    can be accessed at [http://www.php.net/manual/en/](http://www.php.net/manual/en/).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Configuration parameters in phpLDAPadmin''s `config.php` file take one of three
+    forms: a variable setting, a function call, or an array setting.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting a variable
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'Setting a variable is the simplest of the three. In brief, a variable assignment
+    looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE26]'
+  prefs: []
+  type: TYPE_PRE
+- en: This is how variable definitions work.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In PHP, all variable names are prefixed with a dollar sign (`$`). The equals
+    sign (`=`) is used to assign a value to a variable. String values should be enclosed
+    in single quotes (`''`) or double quotes (`"`). Numbers (integers or floating
+    point) need not be enclosed in quotation marks of any sort. Every line should
+    end with a semi-colon (`;`). Here are two examples:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE27]'
+  prefs: []
+  type: TYPE_PRE
+- en: The first sets the value of the `$name` variable to the string `Matt`. The second
+    sets the value of the `$favorite_number` variable to the integer `7`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are only a few of these simple configuration parameters in `config.php`.
+    Most take the form of the more complex PHP statements.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Calling a function
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'The second form of a configuration parameter in phpLDAPadmin''s configuration
+    file uses a function call. Briefly, a function call looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE28]'
+  prefs: []
+  type: TYPE_PRE
+- en: A function may have zero or more parameters, and the number is determined by
+    the programmer.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Functions can be attached to objects. An object, roughly speaking, is a container
+    for data and functions. phpLDAPadmin is an object-oriented program, meaning that
+    it makes frequent use of objects to organize the functional units of the source
+    code.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To call a function that is attached to the object, you will need to use the
+    arrow (access) operator (`->`), which is composed of a dash (`-`) and a greater-than
+    sign (`>`). This indicates that the function is a *member* of the object. Here''s
+    an example taken from the phpLDAPadmin configuration file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE29]'
+  prefs: []
+  type: TYPE_PRE
+- en: The first line takes the variable named `$i`, and assigns it the value `0`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The second line creates a new `LDAPServers` object, and assigns it to the variable
+    `$ldapservers`. Now, anytime we work with the variable `$ldapservers` we are actually
+    working with an object that has all of the member functions and variables defined
+    in the `LDAPServers` class. The `LDAPServers` class describes the servers that
+    phpLDAPadmin will connect to.
+  prefs: []
+  type: TYPE_NORMAL
+- en: You can think of a class as defining all of the parts of a machine, and the
+    object as an instance of that machine. Once we have our copy of our LDAPServers
+    machine, we can access the data stored in the machine, and also use the machine's
+    functions to perform certain tasks.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'According to the class definition for this object, it has a handful of member
+    functions, including the `SetValue()` function. This function stores data in the
+    `$ldapservers` object. So the third line in the given example sets some information
+    about the LDAP server:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE30]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This line uses the `SetValue()` function of `$ldapservers`. The `SetValue()`
+    function takes four different pieces of information:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The number for the server (the value of `$i`, in this case)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A string representing what sort of setting this is (`'server'`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A string that names the property being set (`'name'`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A string representing the value of the property (`'My` `LDAP` `Server'`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Later we will talk about what each one of these does. For the time being, though,
+    the important thing is to understand the general form of the function: `$object->function(`
+    `param_1,` `param_2);`. A function can have as many parameters as the programmer
+    decides upon.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: For the most part, the comments in the configuration file will guide us as to
+    what sorts of parameters each function will need. You should not need to look
+    at any other piece of code to figure out what to put in an object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Now let's take a look at the list kind of directive.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Setting an Array Value
+  prefs:
+  - PREF_H4
+  type: TYPE_NORMAL
+- en: 'The last sort of configuration parameter in phpLDAPadmin is the array. There
+    are two basic forms of setting an array value:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE31]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'An **array** is an organized collection of information. PHP has two different
+    kinds of arrays: an indexed array (where things are stored in a numbered sequence)
+    and a map (where things are stored in name/value pairs).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'An indexed array can be created like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE32]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This creates an array with three items, `''a''`, `''b''`, and `''c''`. The
+    first one, `''a''`, is stored in the first slot of the array and can be accessed
+    by index number:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE33]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Note that the first index number is zero, not one. This would return the value
+    `''a''`. The second one can be accessed using the index number of the second item:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE34]'
+  prefs: []
+  type: TYPE_PRE
+- en: This would return `'b'`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'In a map-type array, instead of using a number for an index, some string (or
+    other object) can be used. For example, we can create an map this way:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE35]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This creates an array with two items, one named `First` `Name` and one named
+    `Last` `Name`. Now, instead of accessing them by index, I can access them by name:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE36]'
+  prefs: []
+  type: TYPE_PRE
+- en: This would return `'Matt'`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Once an array is created using the `array()` function, you can add elements
+    to an array by assigning a value to an array slot. For an indexed array, this
+    might look like the following:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE37]'
+  prefs: []
+  type: TYPE_PRE
+- en: This would put `'d'` at the fourth position (0, 1, 2, **3**) in the array.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Likewise, adding a value to a map is similar, except in place of the index
+    number, you use a key name:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE38]'
+  prefs: []
+  type: TYPE_PRE
+- en: This adds the name `'Dave'` to the array item with the key name `'First` `Name'`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Finally, arrays can be nested inside of each other. Again, here is an example
+    from the phpLDAPadmin config file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE39]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'In this example the `$queries` array is an indexed array where each value is
+    a mapped array. So `$queries[0][''name'']` and `$queries[1][''name'']` represent
+    two different name values. Each name value is stored in a different slot in the
+    indexed array. Think of the array as being structured like this bit of pseudo-code:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE40]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Now we have two different queries (both stored in the same indexed array):
+    Query 0 and Query 1\. Each query has its own name and base.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: These are the basic features of arrays—the features that we will be using to
+    configure phpLDAPadmin. Now we are ready to move on to the actual configuration
+    of phpLDAPadmin.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Configuring the LDAP Server Settings
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The first thing we need to do is configure phpLDAPadmin to connect to our LDAP
+    server. This is done using the `$ldapservers` object.
+  prefs: []
+  type: TYPE_NORMAL
+- en: In my installation, Apache and OpenLDAP are running on the same server, so I
+    will configure phpLDAPadmin to connect to the local instance.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To begin this part of the configuration we need to locate the `$ldapservers`
+    object in the configuration file. The line we are concerned with looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE41]'
+  prefs: []
+  type: TYPE_PRE
+- en: It is located on line 63 of our default configuration file.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This defines the `$ldapservers` object. The rest of our configuration directives
+    for our LDAP server need to go below this line.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first thing to do is set up the information about our LDAP connection.
+    We want to giver our LDAP server a name, host and port info, and information on
+    whether we want this connection to be encrypted with TLS:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE42]'
+  prefs: []
+  type: TYPE_PRE
+- en: This names our server `Example.Com`, and sets it up to connect to `localhost`
+    on the default LDAP port `389` without any SSL/TLS encryption.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The `$i` in the given functions indicates the number of the LDAP server that
+    we are configuring. `$i` is set to `0`, indicating that this is the first LDAP
+    server we are configuring. Where we would have to configure a second LDAP server,
+    we would change `$i` to `1` and then continue with a second batch of the same
+    sorts of directives.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The second parameter, `'server'`, indicates that we are setting server parameters.
+    The third parameter (`'name'`, `'host'`, `'port'`, and `'tls`') indicates the
+    exact server parameter we are setting, and the fourth parameter contains the value
+    to be assigned to the parameter.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note that the TLS setting is for turning on and off StartTLS (see Chapter 4).
+    If you want to use LDAPS (SSL-based LDAP), then use an LDAP URL, `'ldaps://example.com',`
+    in the host setting and set the port to the correct LDAPS port (`636` by default).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Next, we need to tell phpLDAPadmin where to store login information. This information
+    is stored in the `auth_type` parameter:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE43]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'When a user logs into phpLDAPadmin, information used for binding to LDAP gets
+    stored. There are three places where this information can be stored:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: A cookie in the web browser ('`cookie'`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: A server session variable (`'session'`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: (The information can be added by hand to) the configuration file (`'config'`)
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: In general, we should store the information in a session variable (as the given
+    example does). If you should choose cookie-based storage make sure you also set
+    `$config->custom->session['blowfish']` to a string of random characters. The string
+    is used as a key for the Blowfish cipher and it must be at least 32-characters
+    long. A longer key is better.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: For information on the blowfish cipher, see [http://www.schneier.com/blowfish.html](http://www.schneier.com/blowfish.html).
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The next parameter sets the list of naming contexts (base DNs) that phpLDAPadmin
+    should display:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE44]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'This sets up only one context DN: `dc=example,dc=com`. While this setting is
+    necessary on some LDAP servers, OpenLDAP should not need it. OpenLDAP publishes
+    a list of contexts in the Root DSE record, and phpLDAPadmin can get the information
+    from there. In fact, that is the default configuration for phpLDAPadmin, so the
+    setting can be left off or set to this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE45]'
+  prefs: []
+  type: TYPE_PRE
+- en: This creates an empty list of contexts (`array()`), and causes phpLDAPadmin
+    to look up the supported contexts in the Root DSE.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'There are just two parameters left to look at:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE46]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Let''s see these two settings:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The first setting disables anonymous binding. This will prevent users from accessing
+    phpLDAPadmin without logging in first. Even if this is allowed though, the ACLs
+    in SLAPD will still prevent such users from modifying the directory information
+    tree.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: The second setting sets the default password hash to be used. Instead of using
+    the LDAP Password Modify extended operation, phpLDAPadmin attempts to directly
+    modify the `userPassword` attribute. In order to do this it must perform all of
+    the encryption and base-64 encoding before sending the update to SLAPD. This setting
+    tells phpLDAPadmin which hashing algorithm should be used when modifying passwords.
+    OpenLDAP uses SSHA by default, and so we should set phpLDAPadmin to do the same.
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: If you set a different value in `slapd.conf` using the password-hash directive,
+    you should set the same value here.
+  prefs:
+  - PREF_IND
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: Not all of the cipher options in phpLDAPadmin are supported by OpenLDAP (or
+    any other LDAP server, for that matter). You should not use the blowfish cipher
+    for passwords. OpenLDAP does not support that cipher and phpLDAPadmin incorrectly
+    labels it as a `crypt` hash.
+  prefs: []
+  type: TYPE_NORMAL
+- en: While there are many other configurable parameters in the phpLDAPadmin configuration
+    file, we have the basics configured. We can now test out the phpLDAPadmin tool
+    with our web browser.
+  prefs: []
+  type: TYPE_NORMAL
+- en: A First Look at phpLDAPadmin
+  prefs:
+  - PREF_H2
+  type: TYPE_NORMAL
+- en: With PHP installed, Apache restarted, and phpLDAPadmin configured, we are now
+    ready to connect to phpLDAPadmin. Ubuntu installs phpLDAPadmin so that it is available
+    at the URL [http://<hostname or IP address>/phpldapadmin/](http://<hostname or
+    IP address>/phpldapadmin/). In this case I am running the web browser on the same
+    machine as the Apache server, so `http://localhost/phpldapadmin` points to the
+    phpLDAPadmin tool.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'When phpLDAPadmin first loads, it will look something like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A First Look at phpLDAPadmin](img/1021_08_02.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The left-hand frame is the navigation frame for phpLDAPadmin. The computer icon
+    accompanied by the text **Example.Com** indicates the server that we configured.
+    If phpLDAPadmin has been configured with multiple hosts, then the left frame will
+    list them all.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here is the screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A First Look at phpLDAPadmin](img/1021_08_03.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: At the top section, just below the version banner (**phpLDAPadmin – 0.9.8.3**),
+    there are six links. The **Home** link points to this page. **Request feature**,
+    **Donate**, and **Report a bug** all point to various places on the external phpLDAPadmin
+    website. **Help** loads an internal page that in turn points back to the phpLDAPadmin
+    forum website.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, the **Purge caches** link can be used to purge the internal caches
+    of copies of LDAP data that phpLDAPadmin uses to optimize performance. This may
+    be necessary if phpLDAPadmin displays an old copy of some piece of data when it
+    should display a more recent update.
+  prefs: []
+  type: TYPE_NORMAL
+- en: To log in to our server, click on the **Login...** link beneath the **Example.Com**
+    icon. This will load the login screen in the main frame on the right side.
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![A First Look at phpLDAPadmin](img/1021_08_04.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Note that unlike Apache by default, phpLDAPadmin by default requires that you
+    enter your entire DN to log in. It then binds directly as that DN.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'The warning message **Warning: This web connection is unencrypted** indicates
+    that the connection between the browser and the web server is HTTP and not the
+    encrypted HTTPS. For an application like this, it is a good idea to configure
+    Apache to use HTTPS. For more information, see [http://httpd.apache.org/docs/2.0/ssl/](http://httpd.apache.org/docs/2.0/ssl/).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'If the `anon_bind` parameter in the phpLDAPadmin `conf.php` file is set to
+    `true` instead of `false`, users will also be able to check a box to log in as
+    the Anonymous user:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE47]'
+  prefs: []
+  type: TYPE_PRE
+- en: In that case they will not need to enter either a DN or a password, but phpLDAPadmin
+    will allow them to browse the directory information tree to the extent allowed
+    by the ACLs.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Navigating phpLDAPadmin
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Once you have logged in, the navigation frame will display a list of directory
+    information trees hosted on this directory server, as shown in the screenshot:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Navigating phpLDAPadmin](img/1021_08_05.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Beneath **Example.Com**, there is now a list of seven links:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**schema**: Clicking this displays the entire schema (from `cn=subschema`)
+    that this LDAP server supports.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**search**: This loads the main search form for performing simple LDAP searches.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**refresh**: This refreshes the data currently displayed in the tree beneath.
+    If entries get added, but don''t immediately show up, clicking **refresh** should
+    do the trick.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**info**: The **info** link loads the Root DSE information (decoded to make
+    it easier for humans to read) in the main frame. This can be a very useful resource
+    for finding out about the directory server. (See [Appendix C](apc.html "Appendix C. Useful
+    LDAP Commands") for more information about the Root DSE.)'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**import**: This uploads an LDIF file, and then attempts to add the entries
+    to the directory server (via an LDAP add operation).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**export**: Using this link you can download a copy of the contents of the
+    directory. This too uses the LDAP protocol, which means that it is subject to
+    ACLs and might not export everything. In other words, it is not a replacement
+    for `slapcat`. It does have the added advantage though, of being able to export
+    to LDIF, DSML (an XML format), CSV (comma separated version), and VCARD.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**logout**: This link logs the current user out of phpLDAPadmin.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: Underneath this list of links are the base entries for the two directory information
+    trees currently hosted on this server, the `cn=log` tree,which holds the accesslog,
+    and the `dc=example,dc=com` tree which holds the directory entries we have been
+    creating throughout this book.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'Both of these trees show up because the base DN set in config.php looks like
+    this: `$ldapservers->SetValue(` `$i,` `''server'',` `''base'',` `array());`. This
+    caused phpLDAPadmin to use information from the Root DSE to determine which directory
+    information trees were hosted here. The Root DSE returned two: `cn=log` and `dc=example,dc=com`.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Clicking on a plus (`+`) icon expands that part of the tree, and shows the
+    subordinate entries:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Navigating phpLDAPadmin](img/1021_08_06.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Navigating the directory information tree then, can be done quickly and efficiently
+    through the left-pane navigation.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Each entry in the tree has only the RDN portion of the DN displayed. Through
+    viewing the hierarchy one can build the full DN, but if you wish to display the
+    full DN by default you can set the following parameter in the `config.php` file:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE48]'
+  prefs: []
+  type: TYPE_PRE
+- en: Conversely, if you want to show just the value of the RDN, without the `attr=`
+    part, you can set it to `%rdnValue` in the given parameter instead.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Viewing and Modifying a Record
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'To view an entire record, simply click on the desired entry in the hierarchy
+    view in the left-hand navigation frame. For example, if we click on `cn=Admins`
+    the full record will be displayed in the main frame:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Viewing and Modifying a Record](img/1021_08_07.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'This screen provides a number of tools for manipulating a record, as well as
+    a full display of all of the record''s attributes. The tools are as follows:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '**Refresh**: This refreshes the current record. This may be useful in situations
+    where the entry may have changed since the last time this page was loaded.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Copy or move this entry**: This can be used to relocate (or make a copy of)
+    the entry to another location in the directory information tree.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Delete this entry**: This runs an LDAP delete on the record, removing it
+    from the directory information tree.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Compare with another entry**: This shows a side-by-side editable view of
+    two different records in the directory. This can be useful to visually scan two
+    records, or to look at one record as a reference for creating another.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Create a child entry**: This creates a new entry that is subordinate to the
+    presently selected one.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Export**: This performs the same function as the **Export** link in the left
+    navigation pane except that it selects the present entry by default, instead of
+    requiring the user to select a point to export.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Show internal attributes**: This displays the operational attributes for
+    the selected record. Of course, operational attributes cannot be modified by a
+    client application and so these attributes will be read-only.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Rename**: This allows you to change the RDN of an entry (such as we have
+    done with the `ldapmodrdn` command line tool).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '**Add new attribute**: Using this, you can add new attributes to an entry.
+    phpLDAPadmin allows you to pick from a list of attributes that the object classes
+    of the current record allows a record to have. In other words, there is no danger
+    of accidentally selecting an attribute that is not allowed for that record.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'Beneath this selection of tools is a display of all of the attributes for the
+    current record:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Viewing and Modifying a Record](img/1021_08_08.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'The `cn=Admins` group record has the following (non-operational) attributes:
+    `cn`, `member`, `objectclass`, and `ou`. phpLDAPadmin analyzes the record and
+    presents options that are fitting for the record.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'First, `cn` cannot be modified since it is used in the RDN (as is noted on
+    the far right-hand side). Also, it is labeled as **required**. Clicking on the
+    **rename** link will do the same thing as the **rename** option in the list of
+    tools: it will prompt me to perform a `modrdn` operation.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Under the `member` attribute, which is also required, there are two values:
+    the DNs of the users who are members of this group.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: The arrows (![Viewing and Modifying a Record](img/1021_08_icon_arrow.jpg))to
+    the left of the DNs are links pointing to the records of those users. If you click
+    on the link it will load a page similar to this one that allows you to edit the
+    record for that DN.
+  prefs: []
+  type: TYPE_NORMAL
+- en: On the other side of the member DN fields are icons that look like a directory
+    with a magnifying class (![Viewing and Modifying a Record](img/1021_08_icon_find.jpg)).
+    Clicking on this will allow you to navigate the directory tree to find another
+    DN to place in this field.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We will look at that dialog in just a moment. But first, we will look into adding
+    a new group member to our group by adding a new attribute value.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Looking at the **member** section of the record display, we can add a new member
+    by clicking on the **add value** link. This will bring up an attribute editing
+    screen:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Viewing and Modifying a Record](img/1021_08_09.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The attribute editing screen is used to add a new attribute to an existing record.
+    At the top of the screen, we can see some basic information about what attribute
+    (**member**) we are adding to which record (**cn=Admins**).
+  prefs: []
+  type: TYPE_NORMAL
+- en: Next, the attribute editor lists the existing values of the attribute (since
+    this group already has two members). Finally, there is a single-text input box
+    to allow us to enter a new member.
+  prefs: []
+  type: TYPE_NORMAL
+- en: phpLDAPadmin examines the schema for this attribute and displays the schema
+    description as well as a human-readable description of the syntax.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Also, since the value of this field is a DN, the find icon (the folder image
+    with the magnifying glass) appears on the right side. We can click that icon to
+    bring up the find dialog, and in that window we can navigate the directory information
+    tree in search of the DN we want to add. This is what it will look like:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Viewing and Modifying a Record](img/1021_08_10.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Clicking on a plus sign (`+`) icon will expand that branch of the tree, while
+    clicking on the DN itself will insert that DN into the field on the attribute
+    editing screen.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: This finding dialog is used frequently in phpLDAPadmin, and provides a simple
+    tree navigation tool for locating entries within the directory information tree.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Now we have the desired value in the new `member` field:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Viewing and Modifying a Record](img/1021_08_11.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Clicking the **Add New Value** button will provisionally add this attribute
+    to our `cn=Admin` group, and return us to the record view. Our new addition is
+    shwon on the main record view:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Viewing and Modifying a Record](img/1021_08_12.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Now we have three members. At the bottom of this page is a button labeled **save
+    changes**. This button saves any changes made directly to fields on this page,
+    but it is not needed to save the new group member—the user `uid=barbara` has already
+    been added to the group.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Notice that the `objectClass` field does not allow modification of structural
+    object classes. That is because LDAP does not allow changing an entry's structural
+    object class. However, new object classes (auxiliary ones) can be added using
+    the **add value** link.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Also, next to each object class is an information icon (![Viewing and Modifying
+    a Record](img/1021_08_icon_info.jpg))—a blue circle with a white letter `i`.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Clicking on this icon will load the schema viewer for that object class, which
+    displays helpful information about an object class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Viewing and Modifying a Record](img/1021_08_13.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The schema viewer shows all of the information stored in the LDAP schema, but
+    in a much more human-friendly way than the schema files we looked at in Chapter
+    6\. The schema viewer provides an interface to view object classes, attribute
+    definitions, matching rules, and syntax information. In this case it is showing
+    the `groupOfNames` object class. Attributes and superior object classes are linked
+    which makes it much easier to navigate through the schemas. Additionally, there
+    is a **Jump to an objectClass** drop-down list that provides a fast way to look
+    at some of the other object classes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Adding a New Record
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: New records can be added from many points in phpLDAPadmin. Anywhere there is
+    a star icon (![Adding a New Record](img/1021_08_icon_star.jpg)), it denotes a
+    position where a new subordinate record can be added.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Let''s add a simple user account. To do this we will use the tree view in the
+    left-hand navigation pane to locate the `ou=Users` branch:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Adding a New Record](img/1021_08_14.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: Clicking on the star icon (**Create new entry here**) will load the record creation
+    view into the main frame. From here we can begin defining our new user's entry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first thing to do is select a structural object class for our new user.
+    phpLDAPadmin gives us a list to choose from:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Adding a New Record](img/1021_08_15.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The phpLDAPadmin system has a number of pre-defined templates for adding new
+    entries but our LDAP server is not configured with all of the object classes that
+    phpLDAPadmin supports. (Many of these schemas are defined, though, in the `/etc/ldap/schemas/`
+    directory.)
+  prefs: []
+  type: TYPE_NORMAL
+- en: Attempting to add a **User Account** (which uses the `posixUser` object class,
+    as defined in `nis.schema`) will cause problems when you try to create the user.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Those that are defined in phpLDAPadmin but are disabled in the template definition
+    are marked with a white arrow on a black circle; they cannot be selected.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Note
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: 'New custom templates can be created and added easily. Templates are simple
+    XML files stored at `/etc/phpldapadmin/templates/`. To add a new template, just
+    create a new XML file (or copy and modify an existing one), save it in the `templates/`
+    directory, and then use the **Purge cache** tool in phpLDAPadmin to force a reload
+    of the XML files. See the bundle of examples included with this book (available
+    at the Packt website: [http://www.packtpub.com](http://www.packtpub.com)).'
+  prefs: []
+  type: TYPE_NORMAL
+- en: We want to create a new `inetOrgPerson` object. Since there is no pre-defined
+    template for an `inetOrgPerson`, we will use the **Custom** template.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The first thing to do is create the DN and decide on a structural object class:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Adding a New Record](img/1021_08_16.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Our new user''s UID will be `mary` and, as always, we will be using `uid` as
+    the attribute in the RDN. The user will be in the `ou=Users` organizational unit.
+    And we want to select `inetOrgPerson` (and `person` and `organizationalPerson`)
+    from the list of object classes. Clicking **Proceed >>** will bring us to the
+    next screen, where we can fill out a number of attribute values. Here is the next
+    screen:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Adding a New Record](img/1021_08_17.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: The required attributes are at the top of the form. After that, there is a section
+    for selecting multiple optional attributes and giving them values. If you add
+    a `userPassword` value here, it will be properly encrypted and stored on the directory
+    server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Scrolling to the bottom of this page there is a button labeled **Create Object**.
+    Clicking that will perform an LDAP add operation on the directory server.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once the new user is created phpLDAPadmin will display the entry.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Other templates streamline this process by automatically selecting the correct
+    object classes and narrowing down the available attributes to just those used
+    most often.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Searching with phpLDAPadmin
+  prefs:
+  - PREF_H3
+  type: TYPE_NORMAL
+- en: The last task we are going to look at with phpLDAPadmin is **searching**. phpLDAPadmin
+    comes with a set of searching utilities that can be used to find information in
+    the directory information tree.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'To get to the search screen, click on **search** in the left-hand navigation
+    frame. This will take you to the basic search screen:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Searching with phpLDAPadmin](img/1021_08_18.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: 'Here, we will search for any entries whose UID starts with the string `ma`.
+    Pressing the **Search** button will execute the search, which, for our directory,
+    returns four records:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Searching with phpLDAPadmin](img/1021_08_19.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: This returned all of the users who had a UID that starts with `ma`. Note that,
+    by default, the search will check all available directory contexts. That might
+    mean that one directory information tree will have zero search results and another
+    may have a host of matches.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Sometimes it is nice to have more control over the LDAP search though. Clicking
+    the **Advanced Search Form** link at the top of the simple search screen will
+    load a search screen with more options:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Searching with phpLDAPadmin](img/1021_08_20.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: This allows us to explicitly set the base DN, the scope, and the search filter,
+    as well as specify a list of attributes that we want returned. In short, this
+    search form contains the fields we are accustomed to seeing in other LDAP applications,
+    like the `ldapsearch` command-line client.
+  prefs: []
+  type: TYPE_NORMAL
+- en: This too will return a list of items matching our specification.
+  prefs: []
+  type: TYPE_NORMAL
+- en: The third search option is **Predefined Searches**. This tool is especially
+    helpful for running searches with the same parameters time after time.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'The searches are predefined at the bottom of the `config.php` file in the `/etc/phpldapadmin/`
+    directory. The predefined search section begins like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE49]'
+  prefs: []
+  type: TYPE_PRE
+- en: The first line sets up a query counter and the second line creates a new array
+    of queries. We are going to add configuration directives to the `$queries` array.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'A search definition looks like this:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE50]'
+  prefs: []
+  type: TYPE_PRE
+- en: 'Each line adds a new name/value pair to the first slot in the `$queries` array
+    (remember, `$q` is `0`, which indicates the first slot of the array). By now,
+    the format of such a filter ought to look pretty familiar:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '`name`: The human-readable name of the pre-defined search.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`base`: The base DN that the search will start with.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`scope`: The search scope (base, one, sub, children).'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`filter`: The LDAP filter.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: '`attributes`: The list of attributes that should be returned to the user. Note
+    that the attribute list is enclosed by quotes and values are separated by commas.'
+  prefs:
+  - PREF_UL
+  type: TYPE_NORMAL
+- en: 'If we were to create a second filter, we would first increment the `$q` variable,
+    and then define a new set of parameters:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '[PRE51]'
+  prefs: []
+  type: TYPE_PRE
+- en: The line `$q++` changes the value of `$q` from `0` to `1`, putting the next
+    five parameters in the next indexed slot of the `$queries` array.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Once we have defined the filters and saved the file, we are ready to test them
+    out. There is no need to restart Apache or SLAPD; phpLDAPadmin reads its configuration
+    file with every new request, and will pick up our changes immediately.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Here is the screen for **Predefined Searches**:'
+  prefs: []
+  type: TYPE_NORMAL
+- en: '![Searching with phpLDAPadmin](img/1021_08_21.jpg)'
+  prefs: []
+  type: TYPE_IMG
+- en: With the predefined search, all we must do to run it is select the desired search
+    from the drop down list at the top of the page and press the **Search** button.
+    Since the filter is stored in the configuration file, phpLDAPadmin doesn't need
+    any additional information from us.
+  prefs: []
+  type: TYPE_NORMAL
+- en: We've now looked at the main features of phpLDAPadmin, a well-developed tool
+    for managing an LDAP directory through a web interface.
+  prefs: []
+  type: TYPE_NORMAL
+- en: phpLDAPadmin is not the only Open Source program for managing directory servers.
+    There are standard desktop tools like GQ ([http://gq-project.org](http://gq-project.org)),
+    and dozens of other web-based LDAP tools. There are also plugins to bring LDAP
+    support to other popular web-based applications (like Squirrelmail, Joomla, and
+    OpenCms).
+  prefs: []
+  type: TYPE_NORMAL
+- en: There are also tools available to bring LDAP services to other authentication
+    tools. For example, the `libpam-ldap` package provides **PAM (Pluggable Authentication
+    Modules)** with the capabilities for performing LDAP lookups. And **saslauthd**,
+    an SASL daemon that provides authentication services, can also be configured to
+    connect to an LDAP server for authentication purposes.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Finally, there are a whole host of DNS servers, mail servers, file servers,
+    and other packages that can be configured to use LDAP to store and retrieve information,
+    particularly authentication information.
+  prefs: []
+  type: TYPE_NORMAL
+- en: Summary
+  prefs:
+  - PREF_H1
+  type: TYPE_NORMAL
+- en: In this chapter, we have looked at configuring other tools to interoperate with
+    OpenLDAP. We began with the Apache web server, using LDAP as a source of authentication
+    and authorization. Next we installed phpLDAPadmin, a web-based program for managing
+    directory servers. We looked at the main features and did some custom tuning.
+  prefs: []
+  type: TYPE_NORMAL
+- en: 'Of course, this is only scratching the surface of the applications that are
+    LDAP-enabled. The information presented in this chapter should get you going on
+    implementing any LDAP-enabled application, since they all require the same basic
+    configuration information: host, port, bind information, and search filters.'
+  prefs: []
+  type: TYPE_NORMAL
+- en: To find out more about LDAP-enabled applications, you may want to take a look
+    at some of the Open Source package websites like Freshmeat.Net ([http://freshmeat.net](http://freshmeat.net))
+    and Source Forge ([http://sourceforge.net](http://sourceforge.net)).
+  prefs: []
+  type: TYPE_NORMAL
