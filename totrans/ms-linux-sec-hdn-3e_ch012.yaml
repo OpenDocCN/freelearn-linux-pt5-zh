@@ -1,178 +1,259 @@
 - en: 11 Kernel Hardening and Process Isolation
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 11 内核强化与进程隔离
 - en: Join our book community on Discord
+  id: totrans-1
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 加入我们的书籍社区，在 Discord 上
 - en: '[https://packt.link/SecNet](https://packt.link/SecNet)'
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://packt.link/SecNet](https://packt.link/SecNet)'
 - en: '![](img/file69.png)'
+  id: totrans-3
   prefs: []
   type: TYPE_IMG
+  zh: '![](img/file69.png)'
 - en: Although the Linux kernel is already fairly secure by design, there are still
     a few ways to lock it down even more. It's simple to do, once you know what to
     look for. Tweaking the kernel can help prevent certain network attacks and certain
     types of information leaks. (But fear not – you don't have to recompile a whole
     new kernel to take advantage of this.)
+  id: totrans-4
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然 Linux 内核本身设计上已经相当安全，但仍有一些方法可以进一步锁定它。一旦你知道该寻找什么，这些操作非常简单。调整内核可以帮助防止某些网络攻击和某些类型的信息泄露。（但别担心——你不需要重新编译整个内核就能利用这些方法。）
 - en: With process isolation, our aim is to prevent malicious users from performing
     either a vertical or a horizontal privilege escalation. By isolating processes
     from each other, we can help prevent someone from taking control of either a root
     user process or a process that belongs to some other user. Either of these types
     of privilege escalation could help an attacker either take control of a system
     or access sensitive information.
+  id: totrans-5
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过进程隔离，我们的目标是防止恶意用户进行垂直或水平权限提升。通过将进程彼此隔离，我们可以帮助防止某人控制根用户进程或其他用户的进程。这两种类型的权限提升都可能帮助攻击者控制系统或访问敏感信息。
 - en: In this chapter, we'll take a quick tour of the `/proc` filesystem and show
     you how to configure certain parameters within it to help beef up security. Then,
     we'll turn to the subject of process isolation and talk about various methods
     to ensure that processes remain isolated from each other.
+  id: totrans-6
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将快速浏览`/proc`文件系统，并向你展示如何配置其中的某些参数，以帮助增强安全性。然后，我们将讨论进程隔离的话题，介绍确保进程相互隔离的各种方法。
 - en: 'In this chapter, we''ll cover the following topics:'
+  id: totrans-7
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将涵盖以下主题：
 - en: Understanding the `/proc` filesystem
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 理解`/proc`文件系统
 - en: Setting kernel parameters with `sysctl`
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`sysctl`设置内核参数
 - en: Configuring the `sysctl.conf` file
+  id: totrans-10
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 配置`sysctl.conf`文件
 - en: An overview of process isolation
+  id: totrans-11
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 进程隔离概述
 - en: Control groups
+  id: totrans-12
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 控制组
 - en: Namespace isolation
+  id: totrans-13
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 命名空间隔离
 - en: Kernel capabilities
+  id: totrans-14
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 内核能力
 - en: SECCOMP and system calls
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: SECCOMP 和系统调用
 - en: Using process isolation with Docker containers
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 Docker 容器的进程隔离
 - en: Sandboxing with Firejail
+  id: totrans-17
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 Firejail 进行沙箱化
 - en: Sandboxing with Snappy
+  id: totrans-18
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 Snappy 进行沙箱化
 - en: Sandboxing with Flatpak
+  id: totrans-19
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 Flatpak 进行沙箱化
 - en: So, if you're ready and raring, we'll start by looking at the `/proc` filesystem.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以，如果你准备好了，我们将从查看`/proc`文件系统开始。
 - en: Understanding the /proc filesystem
+  id: totrans-21
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 理解`/proc`文件系统
 - en: If you `cd` into the `/proc/` directory of any Linux distro and take a look
     around, you'll be excused for thinking that there's nothing special about it.
     You'll see files and directories, so it looks like it could just be another directory.
     In reality, though, it's very special. It's one of several different **pseudo-filesystems**
     on the Linux system. (The definition of the word pseudo is *fake*, so you can
     also think of it as a fake filesystem.)
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你`cd`进入任何 Linux 发行版的`/proc/`目录并四处查看，你可能会认为这里没什么特别的。你会看到文件和目录，所以它看起来可能只是另一个目录。但实际上，它是非常特别的。它是
+    Linux 系统上几种**伪文件系统**之一。（伪这个词的定义是*假*，所以你也可以把它看作一个假文件系统。）
 - en: 'If you were to pull the primary operating system drive out of a Linux machine
     and mount it as the secondary drive on another machine, you''ll see a `/proc/`
     directory on that drive, but you won''t see anything in it. That''s because the
     contents of the `/proc/` directory are created from scratch every time you boot
     a Linux machine, and then cleared out every time you shut down the machine. Within
     `/proc/`, you''ll find two general classes of information:'
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你把 Linux 机器的主操作系统驱动器取出并将其作为第二个驱动器安装到另一台机器上，你会看到该驱动器上有一个`/proc/`目录，但你不会看到任何内容。这是因为`/proc/`目录的内容是每次启动
+    Linux 机器时从头开始创建的，然后每次关闭机器时都会清空。在`/proc/`目录中，你会发现两类常见的信息：
 - en: Information about user-mode processes
+  id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 关于用户模式进程的信息
 - en: Information about what's going on at the kernel-level of the operating system
+  id: totrans-25
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 关于操作系统内核级别活动的信息
 - en: We'll look at user-mode processes first.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将首先查看用户模式进程。
 - en: Looking at user-mode processes
+  id: totrans-27
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 查看用户模式进程
 - en: 'If you invoke the `ls` command within `/proc/`, you''ll see a whole bunch of
     directories that have numbers as their names. Here''s a partial listing from my
     CentOS VM:'
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你在 `/proc/` 中调用 `ls` 命令，你会看到一大堆以数字命名的目录。以下是我在 CentOS 虚拟机上的部分列出：
 - en: '[PRE0]'
+  id: totrans-29
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: Each of these numbered directories corresponds to the **Process ID** (**PID**)
     number of a user-mode process. On any Linux system, PID 1 is always the `init`
     system process, which is the first user-mode process that starts when you boot
     a machine.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个这些编号的目录对应于用户模式进程的 **进程 ID**（**PID**）编号。在任何 Linux 系统中，PID 1 始终是 `init` 系统进程，它是开机启动时第一个启动的用户模式进程。
 - en: On Debian/Ubuntu systems, the name of PID 1 is `init`. On `RHEL/CentOS/AlmaLinux`
     systems, it's called `systemd`. All of these distros run the `systemd` `init`
     system, but the Debian/Ubuntu folk have chosen to retain the old `init` name for
     PID 1.
+  id: totrans-31
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 在 Debian/Ubuntu 系统中，PID 1 的名称是`init`。在 `RHEL/CentOS/AlmaLinux` 系统中，它叫做`systemd`。所有这些发行版都运行
+    `systemd` `init` 系统，但 Debian/Ubuntu 用户选择保留旧的 `init` 名称作为 PID 1。
 - en: 'Within each numbered directory, you''ll see various files and subdirectories
     that contain information about a particular running process. For example, in the
     `1` directory, you''ll see what pertains to the `init` process. Here''s the partial
     listing:'
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 在每个编号目录中，你会看到包含特定正在运行的进程信息的各种文件和子目录。例如，在 `1` 目录中，你会看到与 `init` 进程相关的内容。以下是部分列出：
 - en: '[PRE1]'
+  id: totrans-33
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'As you see, there are a few symbolic links that we can''t access without root
     privileges. When we use `sudo`, we can see where the symbolic links point:'
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 如你所见，有一些符号链接我们没有 root 权限无法访问。当我们使用 `sudo` 时，我们可以看到这些符号链接指向哪里：
 - en: '[PRE2]'
+  id: totrans-35
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: You can use the `cat` command to view the contents of some of these items, but
     not all of them. However, even when you can view the contents, you won't be able
     to make much sense of what's there, unless you're an operating system programmer.
     Rather than trying to view the information directly, you're better off using either
     `top` or `ps`, which pull their information from `/proc/` and parse it so that
     humans can read it.
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以使用 `cat` 命令查看其中一些项目的内容，但并不是所有的都能查看。然而，即使你能够查看内容，除非你是操作系统程序员，否则很难理解其中的含义。与其直接查看这些信息，不如使用
+    `top` 或 `ps`，它们从 `/proc/` 获取信息并进行解析，使得人类可以阅读。
 - en: I'm assuming that most of you are already familiar with `top` and `ps`. For
     those who aren't, here's the short explanation.
+  id: totrans-37
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 我假设你们中的大多数人已经熟悉 `top` 和 `ps`。对于那些不熟悉的人，下面是简短的说明。
 - en: ''
+  id: totrans-38
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
@@ -180,49 +261,69 @@
     There are loads of option switches that can show you different amounts of information.
     My favorite `ps` command is `ps aux`, which provides a fairly complete set of
     information about each process.'
+  id: totrans-39
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: '`ps` 提供了一个静态的、关于你机器进程的显示。它有许多选项开关，可以显示不同量的信息。我最喜欢的 `ps` 命令是 `ps aux`，它提供了关于每个进程的相当完整的信息。'
 - en: ''
+  id: totrans-40
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
 - en: '`top` provides a dynamic, constantly changing display of the machine''s processes.
     Some option switches are available, but just invoking `top` without any options
     is usually all you need.'
+  id: totrans-41
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: '`top` 提供了一个动态的、不断变化的机器进程显示。虽然有一些选项开关可以使用，但通常只需调用 `top` 而不带任何选项即可。'
 - en: Next, let's look at the kernel information.
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们来看一下内核信息。
 - en: Looking at kernel information
+  id: totrans-43
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 查看内核信息
 - en: 'Within the top level of `/proc/`, the files and directories that have actual
     names contain information about what''s going on with the Linux kernel. Here''s
     a partial view:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 `/proc/` 的顶层，带有实际名称的文件和目录包含有关 Linux 内核运行状态的信息。以下是部分视图：
 - en: '[PRE3]'
+  id: totrans-45
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'As with the user-mode stuff, you can use `cat` to look at some of the different
     files. For example, here''s a partial output of the `cpuinfo` file:'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 就像在用户模式下的操作一样，你可以使用 `cat` 来查看一些不同的文件。例如，以下是 `cpuinfo` 文件的部分输出：
 - en: '[PRE4]'
+  id: totrans-47
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: Here, you can see the type and speed rating of my CPU, its cache size, and the
     fact that this CentOS VM is only running on one of the host machine's eight CPU
     cores. (Doing this on the Fedora host operating system would show information
     about all eight of the host machine's cores.)
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，你可以看到我的 CPU 的类型和速度评级、缓存大小，以及这个 CentOS 虚拟机只运行在主机机器的八个 CPU 核心中的一个上。（在 Fedora
+    主机操作系统上执行此操作会显示关于主机机器所有八个核心的信息。）
 - en: Yes, you did read that right. I wrote parts of the original version of this
     book on an antique, Opteron-equipped HP workstation from 2009\. I got it from
     eBay for a very cheap price, and it runs beautifully with the LXDE spin of Fedora.
@@ -231,116 +332,174 @@
     how cheap I really am.) Sadly though, the RHEL 9-type distros won’t run on the
     first generation of x86_64 CPUs, so I’m now using something newer to write this
     *Third Edition*.
+  id: totrans-49
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 是的，你没看错。我在一本旧版书的部分章节中，曾用一台配备 Opteron 处理器的 2009 年款 HP 工作站进行写作。我是从 eBay 上以非常便宜的价格买到的，它与
+    Fedora 的 LXDE 版本运行得非常流畅。而你在本书其他部分看到的 openSUSE 机器正是与此同款，来自同一个供应商。（所以，现在你知道我到底有多节俭了。）然而，很遗憾的是，RHEL
+    9 类型的发行版无法在第一代 x86_64 CPU 上运行，所以现在我用的是一台更新的机器来写这本 *第三版*。
 - en: 'However, for our present purposes, we don''t need to go into the nitty-gritty
     details of everything that''s in `/proc/`. What''s more important to our present
     discussion is the different parameters that can be set from within `/proc/`. For
     example, within the `/proc/sys/net/ipv4/` directory, we can see lots of different
     items that can be tweaked to change IPv4 network performance. Here''s a partial
     listing:'
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，针对我们目前的讨论，我们无需深入了解 `/proc/` 中的每一个细节。对我们讨论来说，更重要的是可以从 `/proc/` 内部设置的不同参数。例如，在
+    `/proc/sys/net/ipv4/` 目录中，我们可以看到许多不同的项，它们可以调整以改变 IPv4 网络性能。以下是部分列表：
 - en: '[PRE5]'
+  id: totrans-51
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'We can use the `cat` command to view each of these parameters, like so:'
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以使用 `cat` 命令查看每个参数，像这样：
 - en: '[PRE6]'
+  id: totrans-53
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'So, the `icmp_echo_ignore_all` parameter is set to `0`, which means that it''s
     disabled. If I were to ping this machine from another machine, assuming that the
     firewall is configured to allow that, this machine would respond to the pings.
     Here are several ways to change that if need be:'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以，`icmp_echo_ignore_all` 参数被设置为 `0`，这意味着它被禁用。如果我从另一台机器 ping 这台机器，假设防火墙配置允许这种操作，这台机器将响应
+    ping 请求。如果需要更改此设置，以下是几种方法：
 - en: '`echo` a new value into the parameter from the command line.'
+  id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 从命令行使用 `echo` 向参数输入新值。
 - en: Use the `sysctl` utility from the command line.
+  id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用命令行中的 `sysctl` 工具。
 - en: Configure the `/etc/sysctl.conf` file.
+  id: totrans-57
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 配置 `/etc/sysctl.conf` 文件。
 - en: Add a new `.conf` file that contains the new configuration to the `/etc/sysctl.d/`
     directory.
+  id: totrans-58
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 将一个包含新配置的 `.conf` 文件添加到 `/etc/sysctl.d/` 目录中。
 - en: Run a command from within a shell script.
+  id: totrans-59
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 从 shell 脚本中运行命令。
 - en: Let's go ahead and look at these different methods in detail.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们继续详细查看这些不同的方法。
 - en: Setting kernel parameters with sysctl
+  id: totrans-61
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 使用 sysctl 设置内核参数。
 - en: 'The traditional method that you''ll see in older Linux textbooks is to `echo`
     a value into a `/proc/` parameter. This doesn''t directly work with `sudo`, so
     you''ll need to use the `bash -c` command to force the command to execute. Here,
     you can see me changing the value for the `icmp_echo_ignore_all` parameter:'
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 你在旧版 Linux 教科书中看到的传统方法是 `echo` 一个值到 `/proc/` 参数中。这不能直接与 `sudo` 一起使用，因此你需要使用
+    `bash -c` 命令强制执行命令。你可以看到我正在更改 `icmp_echo_ignore_all` 参数的值：
 - en: '[PRE7]'
+  id: totrans-63
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: With the value set to `1`, this machine will now ignore all ping packets, regardless
     of how the firewall is configured. Any value you set like this is temporary and
     will go back to its default setting when you reboot the machine.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 当值设置为 `1` 时，这台机器将忽略所有 ping 数据包，无论防火墙如何配置。像这样设置的任何值都是临时的，重启机器后将恢复为默认设置。
 - en: 'Next in the list after this one is the `icmp_echo_ignore_broadcasts` setting,
     which looks like this:'
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 列表中的下一个设置是 `icmp_echo_ignore_broadcasts`，它的设置如下：
 - en: '[PRE8]'
+  id: totrans-66
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: It's already enabled by default, so out of the box, Linux is already immune
     to **Denial-of-Service** (**DoS**) attacks that involve ICMP broadcast flooding.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下已经启用，所以开箱即用时，Linux 已经能抵抗 **拒绝服务**（**DoS**）攻击，这些攻击涉及 ICMP 广播洪泛。
 - en: Configuring `/proc/` parameters with `echo` is old hat, and personally, I don't
     like to do it. It's better to use `sysctl`, which is the more modern way of doing
     business. It's easy to use, and you can read all about it in the `sysctl` man
     page.
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 `echo` 配置 `/proc/` 参数已经过时，个人而言，我不喜欢这么做。最好使用 `sysctl`，这是更现代的操作方式。它易于使用，你可以在
+    `sysctl` 的手册页中阅读到更多信息。
 - en: 'To see a list of all the parameter settings, just do this:'
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 要查看所有参数设置的列表，只需执行以下操作：
 - en: '[PRE9]'
+  id: totrans-70
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'To set a parameter, use the `-w` option to write the new value. The trick to
     this is that the forward slashes in the directory path are replaced by dots, and
     you ignore the `/proc/sys/` part of the path. So, to change the `icmp_echo_ignore_all`
     value back to `0`, we''ll do this:'
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 要设置一个参数，可以使用`-w`选项写入新值。诀窍在于，目录路径中的正斜杠被替换为点，并且忽略`/proc/sys/`路径部分。因此，要将`icmp_echo_ignore_all`值更改回`0`，我们需要执行以下操作：
 - en: '[PRE10]'
+  id: totrans-72
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: In this case, the change is permanent because I'm just changing the parameter
     back to its default setting. Normally, though, any changes we make like this only
     last until we reboot the machine. Sometimes, that's okay. Other times, we might
     need to make the changes permanent.
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，变更是永久性的，因为我只是将参数更改回其默认设置。不过，通常情况下，我们进行的任何更改只会持续到重启机器为止。有时，这样就可以了。而有时，我们可能需要使更改永久生效。
 - en: Configuring the sysctl.conf file
+  id: totrans-74
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 配置sysctl.conf文件
 - en: There are some significant differences between the default configurations of
     Ubuntu and CentOS/AlmaLinux. They all use the `/etc/sysctl.conf` file, but on
     CentOS and AlmaLinux, that file doesn't have anything except for some explanatory
@@ -356,33 +515,48 @@
     the `systemd-analyze cat-config sysctl.d` command to view a summary of the kernel
     settings that are defined in these files. (To see the complete list of kernel
     settings though, you’ll still need to use the `sysctl -a` command.)
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: Ubuntu和CentOS/AlmaLinux的默认配置之间有一些显著的差异。它们都使用`/etc/sysctl.conf`文件，但在CentOS和AlmaLinux中，该文件除了些许解释性注释外并没有其他内容。Ubuntu和CentOS/AlmaLinux都在`/usr/lib/sysctl.d/`目录下有包含默认设置的文件，但CentOS和AlmaLinux的文件比Ubuntu的更多。在Ubuntu中，你会在`/etc/sysctl.d/`目录下找到其他带有默认值的文件。而在CentOS和AlmaLinux中，该目录只包含一个指向`/etc/sysctl.conf`文件的符号链接。此外，你会发现一些内容是硬编码到Linux内核中的，并未在任何配置文件中提到。典型的Linux方式是，每个发行版都有不同的配置方法，确保用户感到困惑。唯一一致的是，在任何虚拟机上，你都可以使用`systemd-analyze
+    cat-config sysctl.d`命令查看在这些文件中定义的内核设置的摘要。（不过，要查看完整的内核设置列表，你仍然需要使用`sysctl -a`命令。）
 - en: In the `/usr/lib/sysctl.d/README` file on the AlmaLinux machine, you’ll find
     additional information about how this works.
+  id: totrans-76
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 在AlmaLinux机器的`/usr/lib/sysctl.d/README`文件中，你将找到有关该如何工作的额外信息。
 - en: Now, with the introductory part out of the way, let’s see if we can make sense
     of all this.
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，介绍部分已经结束，让我们看看能否弄清楚这一切。
 - en: Configuring sysctl.conf – Ubuntu
+  id: totrans-78
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 配置sysctl.conf – Ubuntu
 - en: In the `/etc/sysctl.conf` file on an Ubuntu machine, you'll see lots of comments
     and a few examples of things that you can tweak. The comments provide good explanations
     of what the various settings do. So, we'll start with it.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Ubuntu机器的`/etc/sysctl.conf`文件中，你会看到许多注释和一些可以调整的示例。注释很好地解释了各种设置的作用。因此，我们将从这里开始。
 - en: 'Much of this file contains settings that can help improve networking security.
     Toward the top of the file, we see this:'
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 该文件的大部分内容包含了有助于提高网络安全性的设置。在文件的顶部，我们看到：
 - en: '[PRE11]'
+  id: totrans-81
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: A spoofing attack involves a bad actor who sends you network packets with spoofed
     IP addresses. Spoofing can be used for a few different things, such as DoS attacks,
     anonymous port scanning, or tricking access controls. These settings, when enabled,
@@ -392,14 +566,20 @@
     the case. It is enabled in another file. If you look in the `/etc/sysctl.d/10-network-security.conf`
     file, you'll see it enabled there. So, there's no need to uncomment these two
     lines.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 伪造攻击是指恶意行为者向你发送带有伪造IP地址的网络数据包。伪造可以用于几种不同的目的，如DoS攻击、匿名端口扫描或欺骗访问控制。启用这些设置时，操作系统会验证它是否能访问数据包头中的源地址。如果无法访问，则会拒绝该数据包。你可能会想知道为什么这是禁用的，因为它看起来是件好事。然而，事实并非如此。它在另一个文件中已启用。如果你查看`/etc/sysctl.d/10-network-security.conf`文件，你会看到它在那里已启用。所以，不需要取消注释这两行。
 - en: 'Next, we see this:'
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们看到的是：
 - en: '[PRE12]'
+  id: totrans-84
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'One form of DoS attack involves sending massive amounts of SYN packets to a
     target machine, without completing the rest of the three-way handshake. This can
     cause the victim machine to have lots of half-open network connections, which
@@ -411,58 +591,89 @@
     files, other than the disabled setting in the `sysctl.conf` file. However, a `sudo
     sysctl -a` command on the 22.04 machine will show us that SYN cookies are indeed
     enabled:'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 一种DoS攻击形式是向目标机器发送大量SYN数据包，但没有完成剩余的三次握手。这可能导致受害机器有大量半开连接，最终耗尽机器接受更多合法连接的能力。启用SYN
+    cookies可以帮助防止这种攻击。在我用来写这本书前一版的Ubuntu 18.04上，SYN cookies在`/etc/sysctl.d/10-network-security.conf`文件中已经启用。而在Ubuntu
+    22.04上，除了`sysctl.conf`文件中的禁用设置外，其他任何`sysctl`配置文件中都找不到该设置。然而，在22.04机器上运行`sudo sysctl
+    -a`命令，会显示SYN cookies确实已启用：
 - en: '[PRE13]'
+  id: totrans-86
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'To find where this is set, we’ll need to do a bit of clever detective work.
     In the `/boot/` directory of the 22.04 machine, you’ll see one `config` file for
     each installed kernel. When I used `grep -i` to perform a case-insensitive search
     for the `syncookies` text string in one of the `config` files, I couldn’t find
     anything. So, I broadened the search for all `syn` text strings. Here’s what that
     looks like:'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 要找到这个设置的位置，我们需要做一些巧妙的侦探工作。在22.04机器的`/boot/`目录下，你会看到每个已安装内核都有一个`config`文件。当我使用`grep
+    -i`执行不区分大小写的搜索，在某个`config`文件中查找`syncookies`文本字符串时，我什么也没找到。于是我将搜索范围扩展到所有包含`syn`的文本字符串。这是搜索结果：
 - en: '[PRE14]'
+  id: totrans-88
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: So, we see that on Ubuntu 22.04, the developers chose to hard-code the SYN cookies
     setting into the kernel rather than to set it in a `sysctl` configuration file.
     So, as we saw before with the Ubuntu 18.04 machine, there’s no need to uncomment
     the `syncookies` line in the `sysctl.conf` file.
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以，我们看到，在Ubuntu 22.04上，开发者选择将SYN cookies的设置硬编码到内核中，而不是将其设置在`sysctl`配置文件中。正如我们之前在Ubuntu
+    18.04机器上看到的那样，`sysctl.conf`文件中不需要取消注释`syncookies`这一行。
 - en: 'Here''s the next thing we see:'
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来我们看到的是：
 - en: '[PRE15]'
+  id: totrans-91
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: Uncommenting this line would allow network packets to flow from one network
     interface to another in machines that have multiple network interfaces. Unless
     you're setting up a router or a Virtual Private Network server, leave this setting
     as is.
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 取消注释这一行将允许网络数据包在具有多个网络接口的机器之间流动。除非你在设置路由器或虚拟私人网络服务器，否则保持这个设置不变。
 - en: 'We''ve been looking at nothing but IPv4 stuff so far. Here''s one for IPv6:'
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们只看到了IPv4的内容。接下来我们来看一个关于IPv6的：
 - en: '[PRE16]'
+  id: totrans-94
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: In general, you'll also want to leave this one commented out, as it is now.
     Disabling **Stateless Address Autoconfiguration** on machines in an IPv6 environment
     would mean that you'd need to either set up a DHCPv6 server or set static IPv6
     addresses on all hosts.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 一般来说，你也会希望将这行保持为注释状态，就像现在这样。在IPv6环境中禁用**无状态地址自动配置**意味着你需要设置一个DHCPv6服务器，或者为所有主机设置静态IPv6地址。
 - en: 'The next section controls ICMP redirects:'
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一节控制ICMP重定向：
 - en: '[PRE17]'
+  id: totrans-97
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'Allowing ICMP redirects can potentially allow a **Man-in-the-Middle** (**MITM**)
     attack to be successful. Uncommenting the two lines in the top section of this
     snippet would completely disable ICMP redirects. The bottom line in the bottom
@@ -471,22 +682,33 @@
     there''s nothing about this in any of the other configuration files, secure redirects
     are actually enabled by default. We can see this by filtering our `sysctl -a`
     output through `grep`:'
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 允许 ICMP 重定向可能会让 **中间人攻击**（**MITM**）成功。取消注释此片段顶部两行代码将完全禁用 ICMP 重定向。底部部分的最后一行允许重定向，但仅限于来自受信任网关的重定向。这行代码有些迷惑人，因为即使它被注释掉，并且其他配置文件中没有涉及此内容，安全重定向实际上默认是启用的。我们可以通过使用
+    `grep` 过滤 `sysctl -a` 输出，来看到这一点：
 - en: '[PRE18]'
+  id: totrans-99
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: Here, we can see that secure redirects are enabled on all network interfaces.
     But if you're sure that your machine will never get used as a router, it's still
     best to completely disable ICMP redirects. (We'll do that in just a bit.)
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这里，我们可以看到所有网络接口上都启用了安全重定向。但是，如果你确定你的机器永远不会作为路由器使用，最好还是完全禁用 ICMP 重定向。（稍后我们会做这个操作。）
 - en: 'The final networking item in this file involves Martian packets:'
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 本文件中的最后一个网络项涉及火星数据包：
 - en: '[PRE19]'
+  id: totrans-102
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: Now, if you're as old as I am, you might remember a really silly television
     show from the '60s called *My Favorite Martian*. But, this setting has nothing
     to do with that. Martian packets have a source address that normally can't be
@@ -498,15 +720,23 @@
     enable logging for them either by uncommenting the line in the preceding snippet
     or by placing an override file in the `/etc/sysctl.d/` directory. (We'll also
     do that in just a bit.)
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，如果你和我一样年纪大，可能记得60年代有一个很傻的电视节目叫做 *My Favorite Martian*。不过，这个设置和那个没有任何关系。火星数据包的源地址通常不能被特定的网络接口接受。例如，如果你的面向互联网的服务器接收到带有私有
+    IP 地址或回环设备地址的数据包，那就是一个火星数据包。为什么它们被称为火星数据包呢？因为有人说这些数据包不是来自地球。无论如何，火星数据包可能会消耗网络资源，所以了解它们是很有帮助的。你可以通过取消注释前面代码片段中的那一行，或者在
+    `/etc/sysctl.d/` 目录下放置一个覆盖文件来启用日志记录功能。（我们稍后也会做这个。）
 - en: 'The following snippet is a kernel parameter for the **Magic system request
     key**:'
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下代码片段是 **Magic 系统请求键** 的内核参数：
 - en: '[PRE20]'
+  id: totrans-105
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: When this parameter is enabled, you can perform certain functions, such as shutting
     down or rebooting the system, sending signals to processes, dumping process debug
     information, and several other things, by pressing a sequence of **Magic Keys**.
@@ -520,188 +750,284 @@
     that can't be remotely accessed from a serial console, this might not be a big
     deal. However, for a machine that's out in the open or that can be accessed from
     a serial console, you might want to disable this. (We'll do that in a bit as well.)
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 当启用此参数时，你可以通过按下特定的 **Magic 键** 序列来执行某些功能，例如关闭或重启系统、向进程发送信号、转储进程调试信息以及其他几个功能。你可以通过按下
+    Alt + SysReq + 命令键的组合键来实现。（SysReq 键是一些键盘上的 PrtScr 键，而命令键是触发某些特定命令的键。）将此值设置为 `0`
+    会完全禁用此功能，设置为 `1` 会启用所有 Magic 键功能，设置大于 `1` 的值只会启用特定的功能。在本文件中，此选项似乎是禁用的，但实际上它在 `/etc/sysctl.d/10-magic-sysrq.conf`
+    文件中是启用的。如果你正在处理一台被锁在机房中且无法通过串口控制台远程访问的服务器，这可能不是什么大问题。然而，对于一台暴露在外或可以通过串口控制台访问的机器，你可能希望禁用此功能。（稍后我们也会进行此操作。）
 - en: 'Under certain circumstances, bad guys could possibly create links to sensitive
     files so that they can easily access them. Link protection is turned on in the
     `/etc/sysctl.d/10-link-restrictions.conf` file on Ubuntu 18.04, and in the `/usr/lib/sysctl.d/99-protect-links.conf`
     file on Ubuntu 22.04\. Here’s what that looks like on 22.04:'
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 在某些情况下，攻击者可能会创建指向敏感文件的链接，从而轻松访问它们。链接保护功能在 Ubuntu 18.04 的`/etc/sysctl.d/10-link-restrictions.conf`文件中启用，而在
+    Ubuntu 22.04 的`/usr/lib/sysctl.d/99-protect-links.conf`文件中启用。以下是 22.04 上的设置示例：
 - en: '[PRE21]'
+  id: totrans-108
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: That pretty much covers what we have in Ubuntu. Now, let's look at CentOS and
     AlmaLinux.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 这基本上覆盖了 Ubuntu 中的设置。接下来，我们来看看 CentOS 和 AlmaLinux。
 - en: Configuring sysctl.conf – CentOS and AlmaLinux
+  id: totrans-110
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 配置 sysctl.conf – CentOS 和 AlmaLinux
 - en: On CentOS and AlmaLinux, the `/etc/sysctl.conf` file is empty, except for a
     few comments. These comments tell you to look elsewhere for the default configuration
     files and to make changes by creating new configuration files in the `/etc/sysctl.d/`
     directory.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 CentOS 和 AlmaLinux 中，`/etc/sysctl.conf` 文件为空，仅包含一些注释。这些注释告诉你查找其他地方的默认配置文件，并通过在`/etc/sysctl.d/`目录中创建新的配置文件来进行更改。
 - en: The default security settings for CentOS and AlmaLinux are pretty much the same
     as they are for Ubuntu, except they're configured in different places. For example,
     on CentOS and AlmaLinux, the spoof protection (`rp_filter`) parameters and the
     link protection parameters are in the `/usr/lib/sysctl.d/50-default.conf` file.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: CentOS 和 AlmaLinux 的默认安全设置与 Ubuntu 非常相似，唯一的区别在于它们的配置位置不同。例如，在 CentOS 和 AlmaLinux
+    中，防伪（`rp_filter`）参数和链接保护参数位于`/usr/lib/sysctl.d/50-default.conf`文件中。
 - en: 'By piping a `sysctl -a` command into `grep`, you''ll also see that SYN cookies
     are enabled:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过将`sysctl -a`命令传递给`grep`，你也能看到 SYN cookies 已启用：
 - en: '[PRE22]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'The same is true for `secure_redirects`:'
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: '`secure_redirects` 的情况也是如此：'
 - en: '[PRE23]'
+  id: totrans-116
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'As was the case with Ubuntu, the SYN cookies setting is hard-coded into the
     Linux kernel, as we see here:'
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 就像在 Ubuntu 中一样，SYN cookies 设置是硬编码到 Linux 内核中的，正如我们在这里看到的：
 - en: '[PRE24]'
+  id: totrans-118
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: Okay, so far so good. Let’s continue on.
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 好的，到目前为止一切顺利。我们继续进行。
 - en: Setting additional kernel-hardening parameters
+  id: totrans-120
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 设置额外的内核硬化参数
 - en: What we've seen so far isn't too bad. Most of the parameters that we've looked
     at are already set to their most secure values. But is there room for improvement?
     Indeed there is. You wouldn't know it by looking at any of the configuration files,
     though. On Ubuntu, CentOS, and AlmaLinux, quite a few items have default values
     that aren't set in any of the normal configuration files. The best way to see
     this is to use a system scanner, such as **Lynis**.
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们看到的情况还不错。我们查看的多数参数已经设置为最安全的值。但是否还有改进的空间？确实有。虽然通过查看任何配置文件你是看不出来的，但在 Ubuntu、CentOS
+    和 AlmaLinux 中，有很多项目的默认值并未在任何常规配置文件中设置。查看这些问题的最佳方法是使用系统扫描工具，例如**Lynis**。
 - en: Lynis is a security scanner that shows lots of information about a system. (We'll
     cover it in more detail in *Chapter 14*, *Vulnerability Scanning and Intrusion
     Detection*.) For now, we'll just cover what it can tell us about hardening the
     Linux kernel.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: Lynis 是一个安全扫描工具，可以显示系统的许多信息。（我们将在*第14章*，*漏洞扫描与入侵检测*中详细介绍它。）现在，我们只讨论它如何帮助我们加固
+    Linux 内核。
 - en: 'After you run a scan, you''ll see a `[+] Kernel Hardening` section in the screen
     output. It''s fairly lengthy, so here''s just part of it:'
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 扫描完成后，你会在屏幕输出中看到一个`[+] Kernel Hardening`部分。它相当长，这里只是其中的一部分：
 - en: '[PRE25]'
+  id: totrans-124
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: Everything that's marked as `OK` is as it should be for best security. What's
     marked as `DIFFERENT` should be changed to the suggested `exp:` value that's within
     the pair of parentheses. (**exp** stands for **expected**.) Let's do that now
     in a hands-on lab.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有标记为`OK`的项表示最佳安全配置。标记为`DIFFERENT`的项应更改为建议的`exp:`值，括号中的**exp**代表**期望的**值。让我们现在在动手实验中进行这些更改。
 - en: Hands-on lab – scanning kernel parameters with Lynis
+  id: totrans-126
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 动手实验 – 使用 Lynis 扫描内核参数
 - en: 'Lynis is in the normal repositories for Ubuntu and in the EPEL repository for
     CentOS and AlmaLinux. It''s always a few versions behind what you can get directly
     from the author''s website, but for now, that''s okay. When we get to *Chapter
     14*, *Vulnerability Scanning and Intrusion Detection*, I''ll show you how to get
     the newest version. Let''s get started:'
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: Lynis 在 Ubuntu 的正常仓库中可用，在 CentOS 和 AlmaLinux 的 EPEL 仓库中也能找到。虽然它总是比从作者网站上直接下载的版本落后几个版本，但目前这没问题。当我们进入*第14章*，*漏洞扫描与入侵检测*时，我会展示如何获取最新版本。现在我们开始吧：
 - en: 'Install Lynis from the repository for Ubuntu, like this:'
+  id: totrans-128
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 从 Ubuntu 的软件仓库中安装 Lynis，如下所示：
 - en: '[PRE26]'
+  id: totrans-129
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Do this for CentOS 07:'
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于 CentOS 07，请执行以下操作：
 - en: '[PRE27]'
+  id: totrans-131
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'Do this for AlmaLinux 8 or 9:'
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于 AlmaLinux 8 或 9，执行以下操作：
 - en: '[PRE28]'
+  id: totrans-133
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'Scan the system by using the following command:'
+  id: totrans-134
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用以下命令扫描系统：
 - en: '[PRE29]'
+  id: totrans-135
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'When the scan completes, scroll back up to the `[+] Kernel Hardening` section
     of the output. Copy and paste the `sysctl` key pairs into a text file. Save it
     as `secure_values.conf` in your own home directory. The contents of the file should
     look something like this:'
+  id: totrans-136
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 扫描完成后，向上滚动回`[+] Kernel Hardening`部分的输出。将`sysctl`键对复制并粘贴到文本文件中。将其保存为`secure_values.conf`文件，保存在你自己的主目录中。文件内容应如下所示：
 - en: '[PRE30]'
+  id: totrans-137
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'Use `grep` to send all of the `DIFFERENT` lines to a new file. Name it `60-secure_values.conf`:'
+  id: totrans-138
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`grep`将所有`DIFFERENT`行发送到一个新文件。命名为`60-secure_values.conf`：
 - en: '[PRE31]'
+  id: totrans-139
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'Edit the `60-secure_values.conf` file to convert it into the `sysctl` configuration
     format. Set each parameter to the `exp` value that''s currently within the pairs
     of parentheses. The finished product should look something like this:'
+  id: totrans-140
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`60-secure_values.conf`文件，将其转换为`sysctl`配置格式。将每个参数设置为当前在括号内的`exp`值。最终文件应如下所示：
 - en: '[PRE32]'
+  id: totrans-141
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'Copy the file to the `/etc/sysctl.d/` directory:'
+  id: totrans-142
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将该文件复制到`/etc/sysctl.d/`目录：
 - en: '[PRE33]'
+  id: totrans-143
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'Reboot the machine to read in the values from the new file:'
+  id: totrans-144
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重启机器以读取新文件中的值：
 - en: '[PRE34]'
+  id: totrans-145
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: Repeat *step 2*. Most items should now show up with their most secure values.
     However, you might see a few `DIFFERENT` lines come up. That's okay; just move
     the lines for those parameters into the main `/etc/sysctl.conf` file and reboot
     the machine again.
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 重复*步骤 2*。大多数项目现在应该显示出它们最安全的值。然而，你可能会看到一些`DIFFERENT`行出现。没关系；只需将这些参数的行移动到主`/etc/sysctl.conf`文件中，然后再次重启机器。
 - en: That's the end of the lab—congratulations!
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 这就是实验的结束——恭喜你！
 - en: 'We''ve already talked about some of the items that we changed in this procedure.
     Here''s a breakdown of the rest of them:'
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们已经讨论了一些在这个过程中更改的项目。以下是其余项目的详细说明：
 - en: '`kernel.dmesg_restrict = 1`: By default, any non-privileged user can run the
     `dmesg` command, which allows the user to view different types of kernel information.
     Some of this information could be sensitive, so we want to set this parameter
     to `1` so that only someone with root privileges can use `dmesg`.'
+  id: totrans-149
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kernel.dmesg_restrict = 1`：默认情况下，任何非特权用户都可以运行`dmesg`命令，这个命令允许用户查看不同类型的内核信息。其中一些信息可能是敏感的，因此我们希望将此参数设置为`1`，使得只有具有
+    root 权限的人才能使用`dmesg`。'
 - en: '`kernel.kptr_restrict = 2`: This setting prevents `/proc` from exposing kernel
     addresses in memory. Setting this to `0` completely disables it, while setting
     it to `1` prevents non-privileged users from seeing the address information. Setting
@@ -711,34 +1037,48 @@
     running. If you absolutely have to do performance monitoring, you might have to
     set this to `0`. (That''s not as bad as it might sound, because having the `kernel.dmesg_restrict
     = 1` setting in place can help mitigate this issue.)'
+  id: totrans-150
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kernel.kptr_restrict = 2`：此设置防止`/proc`暴露内存中的内核地址。将其设置为`0`会完全禁用它，而将其设置为`1`则会阻止非特权用户查看地址信息。将其设置为`2`，如我们所做的，防止任何人查看地址信息，无论其权限等级如何。不过，需要注意的是，将其设置为`1`或`2`可能会阻止某些性能监控程序（例如`perf`）的运行。如果你必须进行性能监控，可能需要将其设置为`0`。（这并不像听起来那么糟糕，因为启用了`kernel.dmesg_restrict
+    = 1`设置可以帮助缓解这个问题。）'
 - en: '`kernel.yama.ptrace_scope = 1 2 3`: This places restrictions on the `ptrace`
     utility, which is a debugging program that the bad guys can also use. `1` restricts
     `ptrace` to only debugging parent processes. `2` means that only someone with
     root privileges can use `ptrace`, while `3` prevents anyone from tracing processes
     with `ptrace`.'
+  id: totrans-151
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`kernel.yama.ptrace_scope = 1 2 3`：这会对`ptrace`工具进行限制，`ptrace`是一个调试程序，黑客也可以使用它。`1`限制`ptrace`仅调试父进程。`2`意味着只有具有
+    root 权限的人才能使用`ptrace`，而`3`则阻止任何人使用`ptrace`追踪进程。'
 - en: In this section, you learned how to configure various kernel parameters to help
     lock down your system. Next, we'll lock things down even more by restricting who
     can view process information.
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，你学习了如何配置各种内核参数以帮助加固你的系统。接下来，我们将通过限制谁能查看进程信息来进一步加固系统。
 - en: Preventing users from seeing each others' processes
+  id: totrans-153
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 防止用户看到彼此的进程
 - en: 'By default, users can use a utility such as `ps` or `top` to see everyone else''s
     processes, as well as their own. To demonstrate this, let''s look at the following
     partial output from a `ps aux` command:'
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，用户可以使用像 `ps` 或 `top` 这样的工具查看其他用户的进程，以及自己的进程。为了演示这一点，下面是 `ps aux` 命令的部分输出：
 - en: '[PRE35]'
+  id: totrans-155
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: Even with just my normal user privileges, I can view processes that belong to
     the root user and various system users, as well as my own. (And if any of my cats
     were logged in, I'd also be able to view their processes.) This information can
@@ -747,45 +1087,66 @@
     reveal some sensitive information. The best way to deal with this is to mount
     the `/proc` filesystem with the `hidepid` option, as long as you’re not working
     with some sort of RHEL 9-type distro.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 即使只是拥有普通用户权限，我也可以查看属于 root 用户和其他系统用户的进程，以及我自己的进程。（如果我的猫也登录了，我还可以查看它们的进程。）这些信息对管理员来说很有用，但也可能帮助坏人。这些信息可以帮助黑客计划对系统的攻击，甚至可能泄露一些敏感信息。应对这一问题的最佳方法是使用
+    `hidepid` 选项挂载 `/proc` 文件系统，只要你不是在使用某种 RHEL 9 类型的发行版。
 - en: This feature has been disabled for the RHEL 9-type distros. So, don’t try this
     on any of your AlmaLinux 9 machines. Not only will it not work, it could break
     your machine.
+  id: totrans-157
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 这个功能在 RHEL 9 类型的发行版中已被禁用。所以，不要在任何 AlmaLinux 9 机器上尝试这个方法。它不仅不起作用，可能还会破坏你的机器。
 - en: 'On an Ubuntu, CentOS 7, or AlmaLinux 8 VM, you can do this by adding a line
     to the end of the `/etc/fstab` file, like so:'
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 Ubuntu、CentOS 7 或 AlmaLinux 8 虚拟机上，你可以通过在 `/etc/fstab` 文件末尾添加一行来实现这一点，如下所示：
 - en: '[PRE36]'
+  id: totrans-159
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'Then, remount `/proc`, like so:'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，重新挂载 `/proc`，如下所示：
 - en: '[PRE37]'
+  id: totrans-161
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: Now, any user who doesn't have `sudo` privileges can only view his or her own
     processes. (Pretty slick, eh?)
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，任何没有 `sudo` 权限的用户只能查看自己的进程。（很巧妙，对吧？）
 - en: 'The three values for the `hidepid` option are as follows:'
+  id: totrans-163
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: '`hidepid` 选项的三个值如下：'
 - en: ''
+  id: totrans-164
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
 - en: '`0`: This is the default, which allows all users to see each others'' processes.'
+  id: totrans-165
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: '`0`：这是默认设置，允许所有用户查看彼此的进程。'
 - en: ''
+  id: totrans-166
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
@@ -793,28 +1154,38 @@
     `/proc`. However, users will only be able to `cd` into their own process directories.
     Also, they''ll only be able to see their own process information with `ps` or
     `top`.'
+  id: totrans-167
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: '`1`：这允许所有用户查看 `/proc` 中其他用户的进程目录。然而，用户只能进入自己的进程目录（`cd`）。此外，他们只能使用 `ps` 或 `top`
+    查看自己的进程信息。'
 - en: ''
+  id: totrans-168
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
 - en: '`2`: This hides all other users'' process information, including the process
     directories within `/proc`.'
+  id: totrans-169
   prefs:
   - PREF_BQ
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: '`2`：这会隐藏所有其他用户的进程信息，包括 `/proc` 中的进程目录。'
 - en: Now that you've seen the inner workings of the `/proc` filesystem and how to
     configure it for best security, let's look at **process isolation**.
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，既然你已经了解了 `/proc` 文件系统的内部工作原理以及如何为最佳安全配置它，让我们来看一下**进程隔离**。
 - en: Understanding process isolation
+  id: totrans-171
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 理解进程隔离
 - en: A primary objective of any network intruder is to gain the privileges that are
     required to perform his or her dirty deeds. This normally involves logging in
     as a normal user and then performing some sort of **privilege escalation**. A
@@ -825,29 +1196,41 @@
     Access Control and Mandatory Access Control can help out, but we also want to
     isolate processes from each other and ensure that processes run with only the
     lowest possible privileges.
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 网络入侵者的主要目标是获得执行恶意行为所需的权限。这通常涉及以普通用户身份登录，然后进行某种形式的**权限提升**。**垂直提升**涉及获得 root
+    权限，而**水平提升**则是获得其他普通用户的权限。如果其他普通用户在其可以访问的文件夹中有敏感文档，那么水平提升可能就足以满足入侵者的需求。自主访问控制（DAC）和强制访问控制（MAC）可以提供帮助，但我们还希望将进程相互隔离，并确保进程仅以最低的权限运行。
 - en: When planning a defense against these types of attacks, consider that the attacks
     could come from either outsiders or insiders. So yes, you do need to guard against
     attacks from your organization's own employees.
+  id: totrans-173
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 在规划针对这些类型攻击的防御时，考虑到攻击可能来自外部或内部。因此，是的，你确实需要防范来自公司员工的攻击。
 - en: In this section, we'll look at the various Linux kernel features that facilitate
     process isolation. Then, we'll look at some cool ways to use these features.
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这一节中，我们将探讨Linux内核中促进进程隔离的各种功能。然后，我们将探讨一些有趣的使用这些功能的方式。
 - en: Understanding Control Groups (cgroups)
+  id: totrans-175
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 理解控制组（cgroups）
 - en: Control Groups, more commonly called **cgroups**, were introduced back in 2010
     in Red Hat Enterprise Linux 6\. Originally, they were just an add-on feature,
     and a user had to jump through some hoops to manually create them. Nowadays, with
     the advent of the `systemd` `init` system, cgroups are an integral part of the
     operating system, and each process runs in its own cgroup by default.
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 控制组，更常见的叫法是**cgroups**，最早是在2010年Red Hat Enterprise Linux 6中引入的。最初，它们只是一个附加功能，用户必须手动创建它们。如今，随着`systemd`
+    `init`系统的出现，cgroups已经成为操作系统的一个重要组成部分，每个进程默认运行在自己的cgroup中。
 - en: When I wrote the first two editions of this book, all enterprise-grade `systemd`-based
     Linux distros were running **cgroups Version 1**. Now though, they’ve all switched
     to **cgroup Version 2**. (Yes, that really is *cgroups* for Version 1, and *cgroup*
@@ -857,142 +1240,207 @@
     and that the names of some of the parameters that you can set are different. If
     you want to read more about cgroups, check out my other book, *Linux Service Management
     Made Easy with systemd*.
+  id: totrans-177
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 当我编写这本书的前两版时，所有企业级的`systemd`基础Linux发行版都在运行**cgroups Version 1**。然而现在，它们都已切换到**cgroup
+    Version 2**。（是的，Version 1是*cgroups*，Version 2是*cgroup*，我也不知道为什么。）尽管这两个版本在架构上有较大的差异，但它们的使用方法差别不大。主要的不同在于Version
+    2提供了更多的功能，并且可以设置的一些参数名称不同。如果你想深入了解cgroups，可以阅读我的另一本书《*Linux服务管理与systemd简明教程*》。
 - en: With cgroups, processes run in their own kernel space and memory space. Should
     the need arise, an administrator can easily configure a cgroup to limit the resources
     that the process can use. This is not only good for security, but also for tuning
     system performance.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用cgroups时，进程运行在它们自己的内核空间和内存空间中。如果需要，管理员可以轻松配置一个cgroup来限制该进程可以使用的资源。这不仅有助于安全性，也有助于优化系统性能。
 - en: 'So, what is a cgroup? Well, it''s really just a collection of processes that
     are grouped together for a particular purpose. Here''s what you can do with cgroups:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 那么，什么是cgroup？嗯，它其实就是一组进程，为了某个特定目的而聚集在一起。以下是你可以用cgroups做的事情：
 - en: '**Set resource limits**: For each cgroup, you can set resource limits for CPU
     usage, I/O usage, and memory usage.'
+  id: totrans-180
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**设置资源限制**：对于每个cgroup，你可以设置CPU使用、I/O使用和内存使用的资源限制。'
 - en: '**Perform different accounting functions**: You can measure resource usage
     for each cgroup, which makes it easy to bill specific customers for the resources
     that they use.'
+  id: totrans-181
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**执行不同的计费功能**：你可以衡量每个cgroup的资源使用情况，这使得根据客户使用的资源来收费变得更加容易。'
 - en: '**Prioritize resources**: You can set limits on a user who''s hogging resources
     like crazy.'
+  id: totrans-182
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**优先分配资源**：你可以为一个疯狂占用资源的用户设置限制。'
 - en: '**Freezing, checkpointing, and restarting**: These functions are handy for
     troubleshooting. They allow you to stop a process, take a snapshot of the system
     state, and restore a system state from a backup.'
+  id: totrans-183
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**冻结、检查点和重启**：这些功能对于故障排除非常有用。它们允许你停止一个进程，拍摄系统状态快照，并从备份中恢复系统状态。'
 - en: '**Assign processes to specific CPU cores**: This is one of the cool features
     that come with Version 2.'
+  id: totrans-184
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**将进程分配到特定的CPU核心**：这是Version 2的一项酷炫功能。'
 - en: 'There''s not enough space to look at all of these functions, but that''s okay.
     Right now, our primary interest is setting resource limits. With only some minor
     exceptions, things work the same on all `systemd`-based Linux distros. For now,
     let’s look at it on an AlmaLinux 9 machine. To start, we’ll install the Apache
     web server package, like this:'
+  id: totrans-185
   prefs: []
   type: TYPE_NORMAL
+  zh: 没有足够的空间来查看所有这些功能，但没关系。现在，我们主要关注的是设置资源限制。除了少数几个例外，所有基于`systemd`的Linux发行版在这方面的工作方式基本相同。目前，让我们在一台AlmaLinux
+    9机器上查看这个功能。首先，我们会安装Apache web服务器包，如下所示：
 - en: '[PRE38]'
+  id: totrans-186
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'By default, each cgroup on the system has no defined resource limits. The first
     step in defining them is to enable accounting for CPU usage, memory usage, and
     I/O usage. We could do that by hand-editing the `systemd` service file for each
     service that we want to limit, but it''s easier to just run a `systemctl` command,
     like so:'
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，系统中的每个cgroup没有定义的资源限制。定义资源限制的第一步是启用CPU使用、内存使用和I/O使用的会计功能。我们可以通过手动编辑每个服务的`systemd`服务文件来实现这一点，但更简单的方法是直接运行`systemctl`命令，如下所示：
 - en: '[PRE39]'
+  id: totrans-188
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: 'We''ve just turned on the accounting functions for the Apache web server on
     our AlmaLinux 9 machine. (The command would be the same on an Ubuntu machine,
     except that we would have `apache2.service` instead of `httpd.service`.) Now,
     when we look in the `/etc/systemd/system.control/` directory, we''ll see that
     we''ve created an `httpd.service.d` directory. Within that directory are the files
     that turn on our accounting functions:'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们刚刚在我们的AlmaLinux 9机器上为Apache web服务器开启了会计功能。（在Ubuntu机器上执行的命令也是一样，只不过我们使用`apache2.service`代替`httpd.service`。）现在，当我们查看`/etc/systemd/system.control/`目录时，我们会看到创建了一个`httpd.service.d`目录。在该目录下是启用会计功能的文件：
 - en: '[PRE40]'
+  id: totrans-190
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'Inside each file, we can see two lines that modify the original `httpd.service`
     file in order to turn on accounting. For example, here''s the one for `CPUAccounting`:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个文件中都有两行，用于修改原始的`httpd.service`文件，以启用会计功能。例如，这是`CPUAccounting`的设置：
 - en: '[PRE41]'
+  id: totrans-192
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: 'Now that we''ve enabled accounting for the Apache service, we can place some
     resource limits on it. (By default, there are no limits.) Let''s say that we want
     to limit Apache to only 40% of CPU usage and 500 MB of memory usage. We''ll set
     both limits with the following command:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经为Apache服务启用了会计功能，我们可以为其设置一些资源限制。（默认情况下，没有限制。）假设我们希望将Apache的CPU使用限制为40%并将内存使用限制为500
+    MB。我们可以通过以下命令设置这两个限制：
 - en: '[PRE42]'
+  id: totrans-194
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'This command created two more files in the `/etc/systemd/system.control/httpd.service.d/`
     directory:'
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个命令在`/etc/systemd/system.control/httpd.service.d/`目录中创建了另外两个文件：
 - en: '[PRE43]'
+  id: totrans-196
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Let''s `cat` one of them, just to see the format of the files:'
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们使用`cat`命令查看其中一个文件，看看文件的格式：
 - en: '[PRE44]'
+  id: totrans-198
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: We can allocate resources to other services in the same manner. For example,
     if this were a **Linux-Apache-MySQL/MariaDB-PHP** (**LAMP**) server, we could
     allocate a portion of the remaining CPU and memory resources to the PHP service,
     and the rest to the MySQL/MariaDB service.
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以用相同的方式为其他服务分配资源。例如，如果这是一个**Linux-Apache-MySQL/MariaDB-PHP**（**LAMP**）服务器，我们可以将剩余的CPU和内存资源的一部分分配给PHP服务，其余的分配给MySQL/MariaDB服务。
 - en: LAMP is the bedrock for many popular Content Management Systems, such as WordPress
     and Joomla.
+  id: totrans-200
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: LAMP是许多流行内容管理系统（例如WordPress和Joomla）的基础。
 - en: 'We can also place resource limits on user accounts. For example, let''s limit
     Katelyn to 20% of CPU usage and 500 MB of memory usage. First, we need to get
     Katelyn''s User ID number. We''ll do that with the `id` command:'
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还可以为用户账户设置资源限制。例如，让我们将Katelyn的CPU使用限制为20%和内存使用限制为500 MB。首先，我们需要获取Katelyn的用户ID号。我们可以通过`id`命令来完成：
 - en: '[PRE45]'
+  id: totrans-202
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: 'So, her UID is `1001`. Let''s enable accounting for her and set her limits:'
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以，她的UID是`1001`。让我们为她启用会计功能并设置限制：
 - en: '[PRE46]'
+  id: totrans-204
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: If we look in the `/etc/systemd/system.control/user-1001.slice.d/` directory,
     we'll see the same set of files that were created for the `httpd` service.
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们查看`/etc/systemd/system.control/user-1001.slice.d/`目录，我们会看到为`httpd`服务创建的相同文件集。
 - en: I've already mentioned the difference between doing this on CentOS/AlmaLinux
     and Ubuntu. That is, certain services have different names on each distro. In
     this case, the service is `httpd.service` on CentOS/AlmaLinux and `apache2.service`
     on Ubuntu. Other than that, things work the same for Ubuntu, CentOS 8, and AlmaLinux
     8/9.
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 我之前已经提到过在CentOS/AlmaLinux和Ubuntu上进行此操作的区别。也就是说，某些服务在不同发行版中的名称不同。在这种情况下，CentOS/AlmaLinux上的服务名是`httpd.service`，而Ubuntu上则是`apache2.service`。除此之外，Ubuntu、CentOS
+    8和AlmaLinux 8/9的操作方式是相同的。
 - en: On CentOS 7, there's no `system.control` directory within the `/etc/systemd/`
     directory. Instead, the `httpd.service.d` directory is created within the `/etc/systemd/system/`
     directory. When I tried to set limits for Katelyn for the first time, again with
@@ -1002,89 +1450,126 @@
     8/9, the files aren't persistent across reboots. This means that if you need to
     set user resource limits on CentOS 7, you need to be aware that they'll disappear
     once you reboot the machine.
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 CentOS 7 中，`/etc/systemd/` 目录下没有 `system.control` 目录。相反，`httpd.service.d`
+    目录是在 `/etc/systemd/system/` 目录下创建的。当我第一次尝试为 Katelyn 设置限制时，依然使用 UID `1001`，CentOS
+    7 不允许我这么做，直到 Katelyn 登录并激活她的 `slice`。她的文件被创建在 `/run/systemd/system/user-1001.slice.d/`
+    目录中，该目录仅包含短暂的运行时文件。因此，与 AlmaLinux 8/9 不同，这些文件在重启后不会保留。这意味着，如果你需要在 CentOS 7 上设置用户资源限制，你需要意识到它们会在重启机器后消失。
 - en: 'There''s a lot more to cgroups than what I have space to present here. But
     that''s okay. In this section, we''ve looked at two ways cgroups can enhance security:'
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: cgroups 远不止我在这里展示的内容，但这没关系。在本节中，我们已经看了 cgroups 如何增强安全性的两种方式：
 - en: They provide process isolation.
+  id: totrans-209
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它们提供进程隔离。
 - en: Using them to limit resource usage can help prevent DoS attacks.
+  id: totrans-210
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用它们来限制资源使用可以帮助防止 DoS 攻击。
 - en: Next up, we'll take a brief look at the concepts of namespaces and namespace
     isolation.
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们将简要了解命名空间和命名空间隔离的概念。
 - en: Understanding namespace isolation
+  id: totrans-212
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 理解命名空间隔离
 - en: '**Namespaces** are a kernel security feature that was introduced in Linux kernel
     version 2.4.19, all the way back in 2002\. A namespace allows a process to have
     its own set of computer resources that other processes can''t see. They''re especially
     handy for times when you might have multiple customers sharing resources on the
     same server. The processes for each user will have their own namespaces. Currently,
     there are seven types of namespaces:'
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: '**命名空间** 是一种内核安全特性，最早在 2002 年 Linux 内核版本 2.4.19 中引入。命名空间允许一个进程拥有自己的计算资源集，其他进程无法看到这些资源。它们在多个用户共享同一台服务器资源时尤其有用。每个用户的进程将拥有自己的命名空间。目前，有七种类型的命名空间：'
 - en: '**Mount (mnt)**: This is the original namespace, which was introduced in Linux
     kernel 2.4.19\. At the time, this was the only namespace. This allows each process
     to have its own root filesystem that no other processes can see, unless you choose
     to share it. This is a good way of preventing information leakage.'
+  id: totrans-214
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**挂载 (mnt)**：这是最早的命名空间，于 Linux 内核 2.4.19 引入。那时，这是唯一的命名空间。它允许每个进程拥有自己的根文件系统，其他进程无法看到，除非你选择共享它。这是防止信息泄漏的好方法。'
 - en: '**UTS**: The UTS namespace allows each process to have its own unique hostname
     and domain name.'
+  id: totrans-215
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**UTS**：UTS 命名空间允许每个进程拥有自己独特的主机名和域名。'
 - en: '**PID**: Every running process can have its own set of PID numbers. PID namespaces
     can be nested so that a parent namespace can see the PIDs of child namespaces.
     (Note that child namespaces can''t see into the parent namespaces.)'
+  id: totrans-216
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**PID**：每个正在运行的进程可以拥有自己的一组 PID 编号。PID 命名空间可以进行嵌套，以便父命名空间可以看到子命名空间的 PID（注意：子命名空间不能看到父命名空间）。'
 - en: '**Network (net)**: This allows you to create a whole virtual network for each
     process. Each virtual network can have its own subnets, virtual network interfaces,
     routing tables, and firewalls.'
+  id: totrans-217
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**网络 (net)**：这允许你为每个进程创建一个完整的虚拟网络。每个虚拟网络可以拥有自己的子网、虚拟网络接口、路由表和防火墙。'
 - en: '**Interprocess Communication** **(ipc)**: This also prevents data leakage by
     preventing two processes from sharing the same memory space. Each running process
     can access its own memory space, but other processes will be blocked.'
+  id: totrans-218
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**进程间通信 (ipc)**：这也通过防止两个进程共享相同的内存空间来防止数据泄漏。每个运行中的进程可以访问自己的内存空间，但其他进程将被阻止。'
 - en: '**Control group (cgroup)**: This namespace hides the identity of the cgroup
     of which a process is a member.'
+  id: totrans-219
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**控制组 (cgroup)**：此命名空间隐藏进程所属 cgroup 的身份。'
 - en: '**User**: The User namespace allows a user to have different levels of privilege
     on different processes. For example, a user could have root-level privileges on
     one process, but only normal-user privileges on another process.'
+  id: totrans-220
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**用户**：用户命名空间允许用户在不同进程中具有不同级别的权限。例如，用户在一个进程中可以拥有 root 权限，而在另一个进程中则仅拥有普通用户权限。'
 - en: 'To see these namespaces, just go into any numbered directory within the `/proc`
     filesystem and view the contents of the `ns` directory. Here''s an example from
     one of my machines:'
+  id: totrans-221
   prefs: []
   type: TYPE_NORMAL
+  zh: 要查看这些命名空间，只需进入 `/proc` 文件系统中的任何一个编号目录，并查看 `ns` 目录的内容。以下是我某台机器上的一个示例：
 - en: '[PRE47]'
+  id: totrans-222
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: The sharp-eyed among you will see that there's an extra item in this directory
     that we haven't covered. The `pid_for_children` item tracks PIDs in child namespaces.
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 眼尖的你会注意到，在这个目录中有一个我们尚未讨论的额外项。`pid_for_children` 项用于跟踪子命名空间中的 PID。
 - en: Although it's certainly possible for you to create your own namespaces, you
     likely never will, unless you're a software developer. Most likely, you'll just
     use products that have namespace technologies already built into them. Some modern
@@ -1093,40 +1578,59 @@
     (We'll look at this a bit later.) Then, there's Docker, which uses namespaces
     to help isolate Docker containers from each other and from the host operating
     system.
+  id: totrans-224
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然你当然可以创建自己的命名空间，但除非你是软件开发人员，否则很可能永远不会这么做。大多数情况下，你只会使用已经内置了命名空间技术的产品。一些现代 Web
+    浏览器使用命名空间为每个打开的标签页创建一个沙盒。你可以使用像 Firejail 这样的产品，在它自己的安全沙盒内运行一个普通程序。（我们稍后会讨论这个问题。）还有
+    Docker，使用命名空间帮助隔离 Docker 容器之间以及容器与主机操作系统之间的关系。
 - en: We've just had a high-level overview of what namespaces are all about. Next,
     let's look at kernel capabilities.
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们刚刚对命名空间有了一个高层次的概览。接下来，让我们看看内核能力。
 - en: Understanding kernel capabilities
+  id: totrans-226
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 理解内核能力
 - en: When you perform a `ps aux` command — or a `sudo ps aux` command if you've mounted
     `/proc` with the `hidepid=1` or `hidepid=2` option — you'll see many processes
     that are owned by the root user. This is because these processes have to access
     some sort of system resource that unprivileged users can't access. However, having
     services run with full root privileges can be a bit of a security problem. Fortunately,
     there are some ways to mitigate that.
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 当你执行 `ps aux` 命令时——或者如果你以 `hidepid=1` 或 `hidepid=2` 选项挂载了 `/proc`，则执行 `sudo
+    ps aux` 命令——你会看到许多由 root 用户拥有的进程。这是因为这些进程必须访问一些普通用户无法访问的系统资源。然而，让服务以完全 root 权限运行可能会带来一些安全问题。幸运的是，有一些方法可以缓解这个问题。
 - en: 'For example, any web server service, such as Apache or Nginx, needs to start
     with root privileges in order to bind to ports `80` and `443`, which are privileged
     ports. However, both Apache and Nginx mitigate this problem by either dropping
     root privileges once the service has started or by spawning child processes that
     belong to a non-privileged user. Here, we can see that the main Apache process
     spawns child processes that belong to the non-privileged `apache` user:'
+  id: totrans-228
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，任何网络服务器服务，如 Apache 或 Nginx，都需要以 root 权限启动，以便绑定到 `80` 和 `443` 端口，这些都是特权端口。然而，Apache
+    和 Nginx 都通过在服务启动后降低 root 权限，或通过生成属于非特权用户的子进程来缓解这个问题。在这里，我们可以看到主 Apache 进程生成了属于非特权
+    `apache` 用户的子进程：
 - en: '[PRE48]'
+  id: totrans-229
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: But not all software can do this. Some programs are designed to run with root
     privileges all the time. For some cases — not all, but some — you can fix that
     by applying a kernel capability to the program executable file.
+  id: totrans-230
   prefs: []
   type: TYPE_NORMAL
+  zh: 但并不是所有软件都能做到这一点。有些程序设计为始终以 root 权限运行。在某些情况下——并不是所有情况，但有些——你可以通过为程序可执行文件应用内核能力来解决这个问题。
 - en: Capabilities allow the Linux kernel to divide what the root user can do into
     distinct units. Let's say that you've just written a cool custom program that
     needs to access a privileged network port. Without capabilities, you'd either
@@ -1135,59 +1639,91 @@
     once it's been started. By applying the appropriate capability, a non-privileged
     user would be able to start it, and it would run with only the privileges of that
     user. (More about that later.)
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 能力允许 Linux 内核将 root 用户可以执行的操作划分为不同的单位。假设你刚刚编写了一个很酷的自定义程序，它需要访问一个特权网络端口。如果没有能力，你就必须以
+    root 权限启动该程序，并让它以 root 权限运行，或者不得不编写代码使其在启动后能够放弃 root 权限。通过应用适当的能力，非特权用户也能启动该程序，并且程序只会以该用户的权限运行。（稍后会详细介绍。）
 - en: 'There are too many capabilities to list here (there are about 40 in all), but
     you can see the full list with this command:'
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: 能力种类太多，无法在这里一一列举（总共有大约 40 种），但你可以使用以下命令查看完整列表：
 - en: '[PRE49]'
+  id: totrans-233
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: Returning to our previous example, let's say that we need to use Python to set
     up a very primitive web server that any non-privileged user can start. (We have
     to do this with Python 2, because it doesn't work with Python 3.) Let’s do this
     on an AlmaLinux 8 machine, because Python 2 isn’t available for either AlmaLinux
     9 or Ubuntu 22.04.
+  id: totrans-234
   prefs: []
   type: TYPE_NORMAL
+  zh: 回到我们之前的例子，假设我们需要使用 Python 设置一个非常基础的 Web 服务器，任何非特权用户都可以启动。 （我们必须使用 Python 2，因为它在
+    Python 3 中无法工作。）我们在 AlmaLinux 8 机器上做这个操作，因为 Python 2 在 AlmaLinux 9 和 Ubuntu 22.04
+    中都不可用。
 - en: 'The command for running a simple Python web server is:'
+  id: totrans-235
   prefs: []
   type: TYPE_NORMAL
+  zh: 运行一个简单的 Python 网络服务器的命令是：
 - en: '[PRE50]'
+  id: totrans-236
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: 'However, this won''t work because it needs to bind to port `80`, which is the
     privileged port that''s normally used by web servers. At the bottom of the output
     from this command, you''ll see the problem:'
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，这样做不行，因为它需要绑定到 `80` 端口，这是一个特权端口，通常由 Web 服务器使用。在此命令的输出底部，你将看到问题所在：
 - en: '[PRE51]'
+  id: totrans-238
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'Prefacing the command with `sudo` will fix the problem and allow the web server
     to run. However, we don''t want that. We''d much rather allow non-privileged users
     to start it, and we''d much rather have it run without root user privileges. The
     first step in fixing this is to find the Python executable file, like so:'
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: 在命令前加上`sudo`可以解决问题并允许网络服务器运行。然而，我们并不希望这样做。我们更希望允许非特权用户启动它，而且更希望它在没有 root 用户权限的情况下运行。解决这个问题的第一步是找到
+    Python 可执行文件，如下所示：
 - en: '[PRE52]'
+  id: totrans-240
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: 'Most times, the `python` or `python2` command is a symbolic link that points
     to another executable file. We''ll verify that with a simple `ls -l` command:'
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 大多数情况下，`python` 或 `python2` 命令是一个符号链接，指向另一个可执行文件。我们可以通过简单的 `ls -l` 命令来验证这一点：
 - en: '[PRE53]'
+  id: totrans-242
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: 'So, the `python2` link points to the `python2.7` executable file. Now, let''s
     see if there are any capabilities assigned to this file:'
+  id: totrans-243
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以，`python2` 链接指向 `python2.7` 可执行文件。现在，让我们查看这个文件是否分配了任何能力：
 - en: '[PRE54]'
+  id: totrans-244
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'No output means that there are none. When we consult the capabilities man page,
     we''ll find that the `CAP_NET_BIND_SERVICE` capability seems to be what we need.
     The one-line description for it is: *bind a socket to Internet domain privileged
@@ -1195,154 +1731,230 @@
     set that on the `python2.7` executable file and see what happens. Since we used
     `getcap` to look at the file capabilities, you can probably guess that we''ll
     use `setcap` to set a capability. (And, you''d be correct.) Let''s do that now:'
+  id: totrans-245
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果没有输出，意味着没有能力设置。当我们查看能力的 man 页面时，我们会发现 `CAP_NET_BIND_SERVICE` 能力似乎就是我们需要的。它的单行描述是：*将套接字绑定到互联网域特权端口*（*端口号小于
+    1024*）。好的，这听起来不错。那么，让我们在 `python2.7` 可执行文件上设置这个能力，看看会发生什么。既然我们使用 `getcap` 来查看文件能力，你可能猜到我们将使用
+    `setcap` 来设置一个能力。（你猜得对。）现在我们来做吧：
 - en: '[PRE55]'
+  id: totrans-246
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'The `+ep` at the end of the capability name means that we''re adding the capability
     as **effective** (activated) and **permitted**. Now, when I try to run this web
     server with just my own normal privileges, it will work just fine:'
+  id: totrans-247
   prefs: []
   type: TYPE_NORMAL
+  zh: 能力名称末尾的 `+ep` 表示我们将能力设置为 **有效**（激活）和 **允许**。现在，当我尝试仅使用我自己的正常权限运行这个 Web 服务器时，它将正常工作：
 - en: '[PRE56]'
+  id: totrans-248
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: 'When I use Firefox on my host machine to connect to this server, I will see
     a file and directory listing of everything that''s in my home directory:'
+  id: totrans-249
   prefs: []
   type: TYPE_NORMAL
+  zh: 当我在主机上使用 Firefox 连接到这个服务器时，我将看到我的主目录中所有文件和目录的列表：
 - en: '![Figure 11.1: Directory listing with SimpleHTTPServer](img/file70.png)'
+  id: totrans-250
   prefs: []
   type: TYPE_IMG
+  zh: '![图 11.1：使用 SimpleHTTPServer 的目录列表](img/file70.png)'
 - en: 'Figure 11.1: Directory listing with SimpleHTTPServer'
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 11.1：使用 SimpleHTTPServer 的目录列表
 - en: 'Linux capabilities can also be quite useful in other ways. On any Linux system,
     the ping utility needs root privileges in order to craft the network packets that
     it needs to do its job. However, everybody and his brother can use ping as just
     a normal user. If you look at the ping executable file on certain Linux distros,
     you''ll see that two capabilities have been assigned to it by the Linux maintainers,
     as we see here on a CentOS 7 machine:'
+  id: totrans-252
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 能力在其他方面也非常有用。在任何 Linux 系统上，ping 工具需要 root 权限才能构造它所需的网络数据包。然而，任何人都可以作为普通用户使用
+    ping。如果你查看某些 Linux 发行版上的 ping 可执行文件，你会看到它已经被 Linux 维护者分配了两个能力，就像在 CentOS 7 机器上看到的那样：
 - en: '[PRE57]'
+  id: totrans-253
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: Note that neither of these capabilities is set for either AlmaLinux 8 or 9,
     and only the `cap_net_raw` capability is set for Ubuntu 22.04.
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，在 AlmaLinux 8 或 9 中，这两种能力都没有设置，只有 `cap_net_raw` 能力在 Ubuntu 22.04 中设置了。
 - en: 'As cool as all this seems, there are some downsides:'
+  id: totrans-255
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管这一切看起来很酷，但也有一些缺点：
 - en: Trying to figure out exactly which capabilities a program needs isn't always
     straightforward. In fact, it can require a good bit of experimentation before
     you can get things right.
+  id: totrans-256
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 确定一个程序究竟需要哪些能力并不是总能一目了然。实际上，这可能需要一些实验，才能弄清楚正确的设置。
 - en: Setting capabilities isn't a cure-all. A lot of times, you'll see that setting
     a specific capability still won't allow the program to do what you need it to
     do. Indeed, there may not even be a capability that will allow the program to
     function without root privileges as you want it to.
+  id: totrans-257
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置能力并不是万能的。很多时候，你会发现设置了特定的能力仍然不能让程序做你需要它做的事。实际上，可能没有任何一种能力能让程序在不需要 root 权限的情况下按你希望的方式运行。
 - en: Performing a system update could replace executable files to which you’ve assigned
     capabilities. (With ping, we don't have to worry about this since the capabilities
     were set by the Linux maintainers.)
+  id: totrans-258
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 执行系统更新可能会替换你为可执行文件分配的能力。（对于 ping，我们不必担心这一点，因为能力是由 Linux 维护者设置的。）
 - en: Okay, so there's a good chance that you might never actually have to set any
     capabilities. However, this is one of the tools that my IoT Security client uses
     to help lock down IoT devices, so this does have a practical use. And besides,
     capabilities are a building block for some of the technologies that we'll look
     at a bit later.
+  id: totrans-259
   prefs: []
   type: TYPE_NORMAL
+  zh: 好吧，所以你很可能永远不需要设置任何能力。不过，这是我在物联网安全领域客户用来帮助锁定物联网设备的工具之一，因此它确实有实际用途。而且，能力是我们稍后将要探讨的某些技术的构建块。
 - en: Hands-on lab – setting a kernel capability
+  id: totrans-260
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 实验室操作 – 设置内核能力
 - en: 'For this lab, you''ll allow a normal user to run a Python web server. You’ll
     need to use Python 2 for this, which isn’t in the newest Linux distros. (Python
     3 won’t work.) So for this one, use your AlmaLinux 8 VM. Let''s get started:'
+  id: totrans-261
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于这个实验，你将允许普通用户运行 Python 网页服务器。你需要使用 Python 2，而最新的 Linux 发行版中并不包含它。（Python 3
+    不行。）所以，使用你的 AlmaLinux 8 虚拟机开始吧。让我们开始吧：
 - en: 'If Apache is installed on your virtual machine, ensure that it''s stopped:'
+  id: totrans-262
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果 Apache 已安装在你的虚拟机上，确保它已经停止：
 - en: '[PRE58]'
+  id: totrans-263
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: 'Install Python 2:'
+  id: totrans-264
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 安装 Python 2：
 - en: '[PRE59]'
+  id: totrans-265
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: 'From within your own home directory, attempt to start the Python `SimpleHTTPServer`
     with just your normal user privileges, and note the error message:'
+  id: totrans-266
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 从你自己的主目录开始，尝试以普通用户权限启动 Python `SimpleHTTPServer`，并记录错误信息：
 - en: '[PRE60]'
+  id: totrans-267
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: 'See if any capabilities are set on the Python executable file:'
+  id: totrans-268
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查看 Python 可执行文件上是否设置了任何能力：
 - en: '[PRE61]'
+  id: totrans-269
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: 'Set the `CAP_NET_BIND_SERVICE` capability on the Python executable file:'
+  id: totrans-270
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在 Python 可执行文件上设置 `CAP_NET_BIND_SERVICE` 能力：
 - en: '[PRE62]'
+  id: totrans-271
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: Repeat *Steps 3* and *4*. This time, it should work.
+  id: totrans-272
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重复 *步骤 3* 和 *4*。这次，应该能成功。
 - en: Ensure that port `80` is open on the virtual machine firewall and use your host
     machine's web browser to access the server.
+  id: totrans-273
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确保虚拟机防火墙上的端口 `80` 是开放的，并使用主机机器的网页浏览器访问服务器。
 - en: Shut down the web server using Ctrl + C.
+  id: totrans-274
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用 Ctrl + C 关闭网页服务器。
 - en: 'View the capabilities that have been assigned to the `ping` executable:'
+  id: totrans-275
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查看 `ping` 可执行文件上分配的能力：
 - en: '[PRE63]'
+  id: totrans-276
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: Review the capabilities of the man page, especially the part about the various
     capabilities that are there.
+  id: totrans-277
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查阅 man 页面中的能力部分，特别是关于各种能力的内容。
 - en: That's the end of the lab – congratulations!
+  id: totrans-278
   prefs: []
   type: TYPE_NORMAL
+  zh: 实验结束了 – 恭喜你！
 - en: So far, you've seen how to set file capabilities and what they can and can't
     do for you. Next, we'll look at how to control system calls.
+  id: totrans-279
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，你已经了解了如何设置文件能力以及它们能为你做什么、不能做什么。接下来，我们将探讨如何控制系统调用。
 - en: Understanding SECCOMP and system calls
+  id: totrans-280
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 理解 SECCOMP 和系统调用
 - en: 'Multiple system calls, or **syscalls**, happen pretty much every time you run
     any command on a Linux machine. Each syscall takes a command from a human user
     and passes it to the Linux kernel. This tells the Linux kernel that it needs to
@@ -1354,26 +1966,41 @@
     So, an ARM CPU won''t have exactly the same set of syscalls as an x86_64 CPU.
     The best way to see the list of syscalls that are available on your machine is
     to look at the man page, like this:'
+  id: totrans-281
   prefs: []
   type: TYPE_NORMAL
+  zh: 每次你在 Linux 机器上运行任何命令时，都会发生多个系统调用（**syscalls**）。每个系统调用都会接收用户输入的命令，并将其传递给 Linux
+    内核。这告诉 Linux 内核需要执行某种特权操作。打开或关闭文件、写入文件，或更改文件权限和所有权，都是需要进行系统调用的操作之一。大约有 330 个系统调用内建于
+    Linux 内核中。我无法准确说出确切数量，因为新的系统调用会不时添加进来。除此之外，系统调用在不同的 CPU 架构之间也有所不同。因此，ARM CPU 和
+    x86_64 CPU 的系统调用集并不完全相同。查看您机器上可用的系统调用列表的最佳方法是查看 man 页面，如下所示：
 - en: '[PRE64]'
+  id: totrans-282
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: Note that each individual syscall has its own man page.
+  id: totrans-283
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 请注意，每个单独的系统调用都有其自己的 man 页面。
 - en: 'To get an idea of how this works, here''s the `strace` command, which shows
     the syscalls that get made by a simple `ls` command:'
+  id: totrans-284
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了理解这如何运作，这里是 `strace` 命令，它展示了简单的 `ls` 命令所调用的系统调用：
 - en: '[PRE65]'
+  id: totrans-285
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: In all, 22 syscalls are made from just doing `ls`. (Due to formatting restrictions,
     I can't show all of them here.)
+  id: totrans-286
   prefs: []
   type: TYPE_NORMAL
+  zh: 总共，执行 `ls` 只需调用 22 个系统调用。（由于格式限制，我无法在这里显示所有的系统调用。）
 - en: '**Secure Computing** (**SECCOMP**), originally created for the Google Chrome
     web browser, allows you to either enable just a certain subset of syscalls that
     you want for a process to use or disable certain syscalls that you want to prevent
@@ -1381,16 +2008,23 @@
     developer, you probably won''t be working with this directly all that much. However,
     this is yet another building block for the technologies that are used daily by
     normal humans.'
+  id: totrans-287
   prefs: []
   type: TYPE_NORMAL
+  zh: '**安全计算**（**SECCOMP**），最初为 Google Chrome 浏览器创建，允许你启用进程所需的某些系统调用子集，或者禁用你希望防止进程使用的某些系统调用。除非你是软件开发人员或
+    Docker 容器开发人员，否则你可能不会直接与它打交道。然而，这仍然是普通人日常使用的技术的另一个构建模块。'
 - en: Next, let's put all this cool stuff into perspective by looking at how it's
     used in real life.
+  id: totrans-288
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，让我们通过看看这些技术如何在实际生活中应用，来更好地理解它们。
 - en: Using process isolation with Docker containers
+  id: totrans-289
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用 Docker 容器进行进程隔离
 - en: Container technology has been around for quite some time, but it took Docker
     to make containers popular. Unlike a virtual machine, a container doesn't contain
     an entire operating system. Rather, a container contains just enough of an operating
@@ -1399,23 +2033,32 @@
     What makes containers so popular is that you can pack a lot more of them onto
     a physical server than you can with virtual machines. So, they're great for cutting
     the cost of running a data center.
+  id: totrans-290
   prefs: []
   type: TYPE_NORMAL
+  zh: 容器技术已经存在了一段时间，但正是 Docker 让容器变得流行。与虚拟机不同，容器不包含完整的操作系统。容器只包含足够的操作系统部分，以便在其独立的沙箱中运行应用程序。容器没有自己的操作系统内核，因此它们使用主机
+    Linux 机器的内核。容器之所以如此受欢迎，是因为你可以在一台物理服务器上放置比虚拟机更多的容器。因此，它们非常适合降低数据中心的运行成本。
 - en: Docker containers use the technologies that we've covered in this chapter. Kernel
     capabilities, cgroups, namespaces, and SECCOMP all help Docker containers remain
     isolated from both each other and from the host operating system, unless we choose
     otherwise. By default, Docker containers run with a reduced set of capabilities
     and syscalls, and Docker developers can reduce all that even more for the containers
     that they create.
+  id: totrans-291
   prefs: []
   type: TYPE_NORMAL
+  zh: Docker 容器使用了我们在本章中介绍的技术。内核功能、cgroups、命名空间和 SECCOMP 都帮助 Docker 容器在默认情况下保持彼此以及与主机操作系统的隔离，除非我们选择更改这一点。默认情况下，Docker
+    容器运行时具有减少的功能和系统调用集，Docker 开发人员可以为他们创建的容器进一步减少这些。
 - en: I can't go into the nitty-gritty details about how all this works in Docker
     because it would require explaining the development process for Docker containers.
     That's okay, though. In this section, you'll understand what to look out for if
     someone wants to deploy Docker containers in your data center.
+  id: totrans-292
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 我无法详细讲解 Docker 中所有这些技术如何运作，因为这需要解释 Docker 容器的开发过程。不过没关系，在这一部分中，你将理解如果有人想在你的数据中心部署
+    Docker 容器，你需要注意哪些问题。
 - en: But as good as all that sounds, Docker security is far from perfect. As I demonstrated
     in *Chapter 10*, *Implementing Mandatory Access Control with SELinux and AppArmor*,
     any non-privileged member of the `docker` group can mount the root filesystem
@@ -1424,30 +2067,45 @@
     privileges extend to the mounted root filesystem of the host machine. In the demo,
     I showed you that only an effective Mandatory Access Control system, specifically
     SELinux, could stop Katelyn from taking control of the entire host machine.
+  id: totrans-293
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管这些听起来都很不错，但 Docker 的安全性远非完美。正如我在*第 10 章*中演示的，*使用 SELinux 和 AppArmor 实现强制访问控制*，`docker`
+    组的任何非特权成员都可以将主机的根文件系统挂载到他或她自己创建的容器中。通常情况下，`docker` 组的非特权成员在容器内拥有 root 权限，这些权限会扩展到挂载的主机根文件系统中。在演示中，我向你展示了，只有一个有效的强制访问控制系统，特别是
+    SELinux，才能阻止 Katelyn 控制整个主机。
 - en: To address this rather serious design flaw, the developers at Red Hat created
     their own Docker replacement. They call it `podman`, and it's available in the
     RHEL 8/9 and AlmaLinux 8/9 repositories. Security is much improved in `podman`,
     and the type of attack that I demonstrated for you doesn't work with it, even
     without SELinux. Personally, I wouldn't even consider anything other than Podman
     for running containers.
+  id: totrans-294
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了解决这个相当严重的设计缺陷，Red Hat 的开发人员创建了自己的 Docker 替代品。他们称之为 `podman`，它可以在 RHEL 8/9
+    和 AlmaLinux 8/9 的软件库中找到。`podman` 的安全性大大提高了，即使没有 SELinux，我在演示中展示的那种攻击也无法对其生效。就个人而言，我甚至不会考虑除
+    Podman 之外的任何容器运行方式。
 - en: Podman used to only be available for RHEL and Fedora-type Linux distros. It’s
     now also available for most other Linux distros.
+  id: totrans-295
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: Podman 曾经仅在 RHEL 和 Fedora 类型的 Linux 发行版上可用。现在，它已在大多数其他 Linux 发行版上也可用。
 - en: Now that I've given you a high-level overview of how the process isolation technologies
     are used in Docker, let's look at how they're used in technologies that a mere
     mortal is more likely to use. We'll begin with Firejail.
+  id: totrans-296
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，既然我已经给你概述了 Docker 中如何使用进程隔离技术，让我们来看看这些技术在普通人更有可能使用的技术中是如何运作的。我们将从 Firejail
+    开始。
 - en: Sandboxing with Firejail
+  id: totrans-297
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用 Firejail 进行沙箱化
 - en: '**Firejail** uses namespaces, SECCOMP, and kernel capabilities to run untrusted
     applications in their own individual sandboxes. This can help prevent data leakage
     between applications, and it can help prevent malicious programs from damaging
@@ -1457,61 +2115,95 @@
     it first. Firejail is meant for use on single-user desktop systems, so we''ll
     need to use a desktop version of Linux. So, go ahead and set up an AlmaLinux 9
     VM with the Gnome desktop.'
+  id: totrans-298
   prefs: []
   type: TYPE_NORMAL
+  zh: '**Firejail** 使用命名空间、SECCOMP 和内核能力将不可信的应用程序运行在各自独立的沙箱中。这可以帮助防止应用程序之间的数据泄露，也能帮助防止恶意程序破坏你的系统。它在
+    Debian 及其衍生版的正常软件库中，包括适用于 Raspberry Pi 设备的 Raspbian，以及可能包括 Ubuntu 系列的所有成员。在 Red
+    Hat 方面，它在 EPEL 库中，因此你需要先安装它。Firejail 主要用于单用户桌面系统，因此我们需要使用 Linux 的桌面版本。所以，先去设置一个带有
+    Gnome 桌面的 AlmaLinux 9 虚拟机。'
 - en: In the previous edition of this book, I demoed this with Lubuntu, which at the
     time was Ubuntu with the LXDE desktop. (Lubuntu has since switched to the LXQT
     desktop.) Unfortunately, the Ubuntu distros are now set up to install certain
     packages as Snap packages, which aren’t compatible with Firejail. So, for this
     edition, I’ve switched to AlmaLinux 9 in order to make the demo work.
+  id: totrans-299
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 在本书的上一版中，我用 Lubuntu 演示了这一点，当时 Lubuntu 是带有 LXDE 桌面的 Ubuntu。（Lubuntu 现在已经切换到 LXQT
+    桌面。）不幸的是，Ubuntu 发行版现在默认将某些软件包安装为 Snap 包，而这些 Snap 包与 Firejail 不兼容。因此，在本版中，我切换到了
+    AlmaLinux 9，以使演示能够正常进行。
 - en: 'Before we get too far along, let''s consider some of the use cases for Firejail:'
+  id: totrans-300
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们深入之前，先来考虑一下 Firejail 的一些使用场景：
 - en: You want to make doubly sure that your web browser doesn't leak sensitive information
     when you access your bank's web portal.
+  id: totrans-301
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 你希望确保你的网络浏览器在访问银行的网页门户时不会泄露敏感信息。
 - en: You need to run untrusted applications that you've downloaded from the Internet.
+  id: totrans-302
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 您需要运行从互联网下载的不受信任的应用程序。
 - en: 'To install Firejail on your AlmaLinux 9 machine, use these commands:'
+  id: totrans-303
   prefs: []
   type: TYPE_NORMAL
+  zh: 要在您的 AlmaLinux 9 机器上安装 Firejail，请使用以下命令：
 - en: '[PRE66]'
+  id: totrans-304
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: 'This installs Firejail, along with a whole bunch of profiles for different
     applications. When you invoke an application with Firejail, it will automatically
     load the correct profile for that application, if one exists. If you invoke an
     application that doesn''t have a profile, Firejail will just load a generic one.
     To see the profiles, `cd` into `/etc/firejail/` and take a look:'
+  id: totrans-305
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将安装 Firejail，以及各种不同应用程序的配置文件。当您使用 Firejail 调用一个应用程序时，如果存在相应的配置文件，它将自动加载正确的配置文件。如果调用一个没有配置文件的应用程序，Firejail
+    将加载一个通用的配置文件。要查看配置文件，请 `cd` 进入 `/etc/firejail/` 并查看：
 - en: '[PRE67]'
+  id: totrans-306
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: 'To easily count the number of profiles, just do this:'
+  id: totrans-307
   prefs: []
   type: TYPE_NORMAL
+  zh: 要轻松计算配置文件的数量，只需执行以下操作：
 - en: '[PRE68]'
+  id: totrans-308
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: Subtracting the `total 4996` line from the top of the output gives us a total
     of 1,230 profiles.
+  id: totrans-309
   prefs: []
   type: TYPE_NORMAL
+  zh: 从输出顶部的 `total 4996` 行减去，我们得到了 1,230 个配置文件的总数。
 - en: 'The simplest way to use Firejail is to preface the name of the application
     you want to run with `firejail`. Let''s start with Firefox:'
+  id: totrans-310
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 Firejail 的最简单方法是在要运行的应用程序名称前加上 `firejail`。我们先从 Firefox 开始：
 - en: '[PRE69]'
+  id: totrans-311
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: The main problem with Firejail is that it doesn't work well consistently. A
     few years ago, a client had me do a writeup about Firejail, and I got it to mostly
     work on my Fedora workstation and on my Raspberry Pi with Raspbian. But even with
@@ -1520,43 +2212,65 @@
     watch videos on several different sites, including YouTube. Dropbox and Keepass
     didn't work at all under Firejail, even though there are specific profiles for
     both of them.
+  id: totrans-312
   prefs: []
   type: TYPE_NORMAL
+  zh: Firejail 的主要问题在于其一致性不佳。几年前，一位客户让我写了一份关于 Firejail 的报告，我在我的 Fedora 工作站和搭载 Raspbian
+    的 Raspberry Pi 上大部分时间都能让它工作。但即使对于它能工作的程序，我也失去了一些重要的功能。例如，在我的 Fedora 机器上使用 Firejail
+    运行网络浏览器时，我无法在包括 YouTube 在内的多个不同网站上观看视频。Dropbox 和 Keepass 在 Firejail 下根本无法工作，尽管它们都有特定的配置文件。
 - en: On a Lubuntu virtual machine, running Firefox under Firejail just gave me a
     blank browser page, regardless of where I tried to surf. So, I installed `chromium-browser`
     and tried it. It worked much better, and I could even watch YouTube videos with
     it. Then, I installed LibreOffice, which seemed to run fine with Firejail.
+  id: totrans-313
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 Lubuntu 虚拟机上，使用 Firejail 运行 Firefox 只会给我一个空白的浏览器页面，无论我尝试去哪里冲浪。所以，我安装了 `chromium-browser`
+    并尝试了它。它表现得更好，我甚至可以用它观看 YouTube 视频。然后，我安装了 LibreOffice，它似乎在 Firejail 下运行良好。
 - en: 'Among the many options that Firejail offers is the option to ensure that programs
     run either without any kernel capabilities enabled or with just the capabilities
     that you specify. Something that the man page recommends is to drop all capabilities
     for any programs that don''t require root privileges. So, for Chromium, we''d
     do this:'
+  id: totrans-314
   prefs: []
   type: TYPE_NORMAL
+  zh: Firejail 提供的众多选项中包括确保程序运行时没有启用任何内核能力或仅使用您指定的能力。手册建议的一点是对于不需要 root 权限的程序，放弃所有能力。因此，对于
+    Chromium，我们会这样做：
 - en: '[PRE70]'
+  id: totrans-315
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE70]'
 - en: 'So, what if you just want to start your applications from the **Start** menu,
     the way that you normally would, but still have Firejail protection? For that,
     you can do this:'
+  id: totrans-316
   prefs: []
   type: TYPE_NORMAL
+  zh: 那么，如果您只想像通常一样从“开始”菜单启动应用程序，但仍然希望有 Firejail 保护怎么办？对此，您可以这样做：
 - en: '[PRE71]'
+  id: totrans-317
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE71]'
 - en: 'This command creates symbolic links in the `/usr/local/bin/` directory for
     each program that has a Firejail profile. They look something like this:'
+  id: totrans-318
   prefs: []
   type: TYPE_NORMAL
+  zh: 此命令在 `/usr/local/bin/` 目录中为每个具有 Firejail 配置文件的程序创建符号链接。它们看起来像这样：
 - en: '[PRE72]'
+  id: totrans-319
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE72]'
 - en: If you find that a program doesn't work under Firejail, just go into `/usr/local/bin/`
     and delete the link for it.
+  id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果发现某个程序在 Firejail 下不工作，只需进入 `/usr/local/bin/` 并删除其链接。
 - en: Now, you'll want to be aware of a very curious thing with the Firejail documentation.
     In both the Firejail man page and on the main page of the Firejail website, it
     says that you can use Firejail to sandbox desktop applications, server applications,
@@ -1565,121 +2279,183 @@
     systems. That's because, in order to do its job, the Firejail executable has to
     have the SUID permission bit set. The Firejail developers consider it a security
     risk to allow multiple users to access a machine with this SUID program.
+  id: totrans-321
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，你需要注意 Firejail 文档中的一个非常有趣的地方。在 Firejail 的手册页和 Firejail 网站的主页上都提到，你可以使用 Firejail
+    对桌面应用程序、服务器应用程序以及用户登录会话进行沙箱化。然而，如果你点击 Firejail 网站上的**文档**标签，你会看到它写着 Firejail 仅适用于单用户桌面系统。这是因为，为了执行其任务，Firejail
+    可执行文件必须设置 SUID 权限位。Firejail 开发人员认为允许多个用户访问带有此 SUID 程序的机器是一种安全风险。
 - en: All right, that's enough talk. Let's get some practice in.
+  id: totrans-322
   prefs: []
   type: TYPE_NORMAL
+  zh: 好了，话不多说。让我们开始动手练习吧。
 - en: Hands-on lab – using Firejail
+  id: totrans-323
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 实验练习——使用 Firejail
 - en: 'For this lab, you''ll use an AlmaLinux 9 virtual machine with the Gnome desktop.
     Let''s get started:'
+  id: totrans-324
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于这个实验，你将使用带有 Gnome 桌面的 AlmaLinux 9 虚拟机。让我们开始吧：
 - en: Create an AlmaLinux virtual machine with the Gnome desktop option.
+  id: totrans-325
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个带有 Gnome 桌面选项的 AlmaLinux 虚拟机。
 - en: 'Install the EPEL repository and update the VM with these commands:'
+  id: totrans-326
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用以下命令安装 EPEL 仓库并更新虚拟机：
 - en: '[PRE73]'
+  id: totrans-327
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE73]'
 - en: Then, reboot the machine.
+  id: totrans-328
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，重启机器。
 - en: 'Install Firejail, LibreOffice, and Chromium:'
+  id: totrans-329
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 安装 Firejail、LibreOffice 和 Chromium：
 - en: '[PRE74]'
+  id: totrans-330
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE74]'
 - en: 'In one terminal window, start Chromium without any kernel capabilities:'
+  id: totrans-331
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在一个终端窗口中，启动 Chromium，但不使用任何内核功能：
 - en: '[PRE75]'
+  id: totrans-332
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE75]'
 - en: Surf to various websites to see if everything works as it should.
+  id: totrans-333
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 浏览不同的网站，看看一切是否都能按预期正常运行。
 - en: 'In another terminal window, start LibreOffice, also without any capabilities:'
+  id: totrans-334
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在另一个终端窗口中，启动 LibreOffice，同样没有任何功能：
 - en: '[PRE76]'
+  id: totrans-335
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE76]'
 - en: Create the various types of LibreOffice documents and try out various LibreOffice
     functions to see how much still works properly.
+  id: totrans-336
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建各种类型的 LibreOffice 文档，并尝试使用不同的 LibreOffice 功能，看看哪些仍然能够正常工作。
 - en: Shut down both Chromium and LibreOffice.
+  id: totrans-337
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 关闭 Chromium 和 LibreOffice。
 - en: 'Configure Firejail so that it automatically sandboxes every application you
     start, even if you do this from the normal **Start** menu:'
+  id: totrans-338
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 配置 Firejail，使其能够自动对每个启动的应用程序进行沙箱化，即使你是通过正常的**开始**菜单来启动：
 - en: '[PRE77]'
+  id: totrans-339
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE77]'
 - en: 'Look at the symbolic links that were created:'
+  id: totrans-340
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查看已创建的符号链接：
 - en: '[PRE78]'
+  id: totrans-341
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE78]'
 - en: Try to open Firefox from the normal menu and verify whether or not it works.
     Then, shut down Firefox.
+  id: totrans-342
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 尝试从正常菜单打开 Firefox，并验证它是否能够正常工作。然后，关闭 Firefox。
 - en: 'To be able to run Firefox without Firejail, just delete its symbolic link from
     the `/user/local/bin/` directory, like so:'
+  id: totrans-343
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 为了能在没有 Firejail 的情况下运行 Firefox，只需从 `/user/local/bin/` 目录中删除其符号链接，如下所示：
 - en: '[PRE79]'
+  id: totrans-344
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE79]'
 - en: Try to run Firefox again. You should see that it starts normally.
+  id: totrans-345
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 再次尝试运行 Firefox。你应该会看到它正常启动。
 - en: You've completed this lab – congratulations!
+  id: totrans-346
   prefs: []
   type: TYPE_NORMAL
+  zh: 你已经完成了这个实验——祝贺你！
 - en: There are a lot more Firejail options than what I can show you here. For more
     information, see the Firejail man page and the documentation on the Firejail website.
+  id: totrans-347
   prefs: []
   type: TYPE_NORMAL
+  zh: Firejail 有很多更多的选项，我无法在这里一一展示。欲了解更多信息，请查看 Firejail 的手册页和 Firejail 网站上的文档。
 - en: So far, you've seen both the good and the bad of using Firejail. Next up, we'll
     look at a couple of universal packaging systems for Linux.
+  id: totrans-348
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，你已经看到了使用 Firejail 的优点和缺点。接下来，我们将看看几个适用于 Linux 的通用打包系统。
 - en: Sandboxing with Snappy
+  id: totrans-349
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用 Snappy 进行沙箱化
 - en: In the Windows world and the Mac world, operating systems and the applications
     that they can run are sold independently of each other. So, you buy a computer
     that runs either Windows or macOS, and then you buy the applications separately.
     When it comes to doing updates, you have to update the operating system, and then
     update each application separately.
+  id: totrans-350
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 Windows 和 Mac 世界中，操作系统与它们能够运行的应用程序是独立销售的。因此，你购买一台运行 Windows 或 macOS 的计算机，然后单独购买应用程序。更新时，你必须先更新操作系统，再分别更新每个应用程序。
 - en: In the Linux world, most applications that you'll ever need are in the repositories
     of your Linux distro. To install an application, you just use your distro's package
     management utility – `apt`, `yum`, `dnf`, or whatever else – to install it. However,
@@ -1693,13 +2469,17 @@
     hard for application developers, because each family of Linux distros uses its
     own packaging format. So, wouldn't it be nice to have a universal packaging format
     that works across all Linux distros, and that can be kept up to date with ease?
+  id: totrans-351
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Linux世界中，大多数你需要的应用程序都在你的Linux发行版的仓库中。要安装一个应用程序，你只需使用发行版的包管理工具——`apt`、`yum`、`dnf`或其他工具——进行安装。然而，这既是福也是祸。它的确使得跟踪你的应用程序和保持最新的错误修复及安全更新变得更容易。但除非你使用的是像Arch这样的滚动更新发行版，否则在Linux发行版生命周期结束之前，应用程序包将会过时。这是因为发行版维护者使用的是在发行版发布时当前的应用程序版本，并且不会在下一个版本发布之前升级到新版本。这也使得应用程序开发者感到困难，因为每个Linux发行版家族使用的是不同的打包格式。那么，难道我们不希望有一个通用的打包格式，可以在所有Linux发行版上使用，并且能轻松保持更新吗？
 - en: Universal packaging began several years ago with `AppImage` packages. However,
     they never really caught on that well, and they don't provide any sandboxing features.
     So, this is all I'll say about them.
+  id: totrans-352
   prefs: []
   type: TYPE_NORMAL
+  zh: 通用打包格式的出现始于几年前的`AppImage`包。然而，这些包并没有真正流行开来，而且它们没有提供任何沙箱功能。所以，关于它们我就只说这么多。
 - en: Next came Ubuntu's Snappy system, which allows developers to create snap packages
     that are supposed to run on any system on which the Snappy system can be installed.
     Each snap application runs in its own isolated sandbox, which helps protect the
@@ -1708,8 +2488,10 @@
     snap packages for servers that contain multiple services. The `snapd` daemon constantly
     runs in the background, automatically updating both itself and any installed snap
     applications.
+  id: totrans-353
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来是Ubuntu的Snappy系统，它允许开发者创建可以在任何安装了Snappy系统的系统上运行的snap包。每个snap应用都运行在自己的隔离沙箱中，这有助于保护系统免受恶意程序的侵害。每个snap包都是一个自包含的单元，这意味着你不需要担心安装依赖项。你甚至可以为包含多个服务的服务器创建snap包。`snapd`守护进程始终在后台运行，自动更新自己以及任何已安装的snap应用程序。
 - en: As good as this all sounds, there are a couple of things about Snappy that make
     it a bit controversial. First, the Ubuntu folk refuse to release the source code
     for the Snappy application server. So, it's not possible to look at the source
@@ -1720,8 +2502,10 @@
     freedom, which the whole GNU/Linux ecosystem is supposed to represent. However,
     the Canonical folk do it this way to verify the security of snap packages that
     get served out.
+  id: totrans-354
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管这一切听起来很不错，但Snappy有一些让人争议的地方。首先，Ubuntu的开发团队拒绝发布Snappy应用服务器的源代码。因此，无法查看源代码，也无法搭建自己的本地Snappy服务器。如果你开发snap包并希望部署它们，即使仅仅是在你自己的本地网络上，你也别无选择，只能使用由Canonical（Ubuntu的母公司）运营的中央snap包门户。这显然违背了软件自由的原则，而软件自由正是整个GNU/Linux生态系统应当代表的。然而，Canonical的开发团队这么做是为了验证所提供的snap包的安全性。
 - en: Secondly, even though snap packages are sandboxed in order to protect the system,
     other weird things can happen. Soon after the Snappy system came online, a package
     developer got caught sneaking some Monero mining software into one of his packages.
@@ -1730,183 +2514,264 @@
     customers. After that, the Canonical folk stepped up their efforts to scan packages
     that get uploaded to the portal, in order to prevent that sort of thing from happening
     again.
+  id: totrans-355
   prefs: []
   type: TYPE_NORMAL
+  zh: 其次，尽管 snap 包已经被沙箱化以保护系统，但仍然可能发生其他奇怪的事情。Snappy 系统上线不久后，一位包开发者被发现偷偷将 Monero 挖矿软件捆绑进他的包中。虽然他只是想通过此方式变现自己的努力，并没有恶意，但在不告知潜在用户的情况下将这种东西偷偷塞进包中显然不好。之后，Canonical
+    的开发人员加大了对上传到门户网站的包进行扫描的力度，以防止此类事件的再次发生。
 - en: And then, there's the matter of user control. A user can delay snap updates
     for up to 60 days, but can’t turn them off altogether. At some point, the `snapd`
     daemon will update your installed packages, whether or not you really want it
     to.
+  id: totrans-356
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，还有用户控制的问题。用户可以将 snap 更新延迟最多 60 天，但无法完全关闭更新。在某个时刻，`snapd` 守护进程将会更新你安装的软件包，无论你是否希望更新。
 - en: And lastly, the practice of making each snap package a self-contained unit and
     storing the three previous versions of every snap increases disk space usage.
     Each package contains all the linked libraries that its application uses, which
     means that you might have multiple packages that all use the same libraries. This
     isn't necessarily that big of a deal with today's modern, large capacity hard
     drives, but it could be a problem if you're low on disk space.
+  id: totrans-357
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，每个 snap 包都作为一个独立单元，并且保存每个 snap 的前三个版本，这增加了磁盘空间的使用。每个包都包含它的应用程序所使用的所有链接库，这意味着你可能会有多个包使用相同的库。这在今天的大容量硬盘上不一定是大问题，但如果磁盘空间不足，可能就会成为一个问题。
 - en: If you're running any recent version of Ubuntu, you’ll have the Snappy service
     running already. At some point (I forget when), the Ubuntu folk started including
     Snappy in a default installation of Ubuntu Server. It’s now also installed by
     default in the desktop versions of Ubuntu. In fact, Ubuntu now automatically uses
     Snappy to install certain packages, such as Firefox and Chromium, even if you
     use a normal `sudo apt install` command to install them.
+  id: totrans-358
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你正在运行任何最近版本的 Ubuntu，Snappy 服务已经在后台运行。某个时候（我记得不太清楚），Ubuntu 开发人员开始在 Ubuntu Server
+    的默认安装中包含 Snappy。现在，它也默认安装在 Ubuntu 桌面版中。事实上，Ubuntu 现在会自动使用 Snappy 安装某些软件包，比如 Firefox
+    和 Chromium，即使你使用普通的`sudo apt install`命令来安装它们。
 - en: Snappy is also available in the repositories of many non-Ubuntu distros. It's
     in the normal repositories for Fedora, and in the EPEL repositories for Red Hat
     and all of its offspring. (Note though that I gave up on using snaps on my Fedora
     systems, because it was causing too many weird problems with SELinux.)
+  id: totrans-359
   prefs: []
   type: TYPE_NORMAL
+  zh: Snappy 也在许多非 Ubuntu 的发行版的仓库中可用。在 Fedora 的正常仓库中有，在 Red Hat 及其所有衍生版的 EPEL 仓库中也有。（不过要注意，我已经放弃在我的
+    Fedora 系统上使用 snaps，因为它导致了 SELinux 出现太多奇怪的问题。）
 - en: 'So, how can Snappy be useful to a busy administrator? Well, let''s say that
     your pointy-haired boss has just told you to set up a Nextcloud server so that
     employees can have a central place to store their documents. However, you''re
     in a time crunch, and you don''t want to jump through the hoops of setting up
     all the individual components of a LAMP system. No problem – just install a snap.
     First, let''s see what''s available for our Ubuntu server:'
+  id: totrans-360
   prefs: []
   type: TYPE_NORMAL
+  zh: 那么，Snappy 如何对忙碌的管理员有所帮助呢？假设你的老板刚刚告诉你要搭建一个 Nextcloud 服务器，方便员工有一个集中存储文档的地方。但是，你时间紧迫，不想花时间逐个设置
+    LAMP 系统的所有组件。没问题——只需安装一个 snap。首先，让我们看看在 Ubuntu 服务器上可以使用的 snap：
 - en: '[PRE80]'
+  id: totrans-361
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE80]'
 - en: 'There are quite a few choices. We can use the `info` option to narrow things
     down a bit:'
+  id: totrans-362
   prefs: []
   type: TYPE_NORMAL
+  zh: 有不少选择。我们可以使用`info`选项来稍微缩小范围：
 - en: '[PRE81]'
+  id: totrans-363
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE81]'
 - en: 'It looks like this is what I need. So, let''s install it:'
+  id: totrans-364
   prefs: []
   type: TYPE_NORMAL
+  zh: 看起来这个正是我需要的。那么，接下来让我们安装它：
 - en: '[PRE82]'
+  id: totrans-365
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE82]'
 - en: We’re not worried about using `sudo` here, because snap will prompt you for
     a password for this particular operation. Note that for other snap operations,
     this doesn’t work, so you’ll need to use `sudo`.
+  id: totrans-366
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们这里不担心使用`sudo`，因为 snap 在执行这个操作时会提示你输入密码。请注意，对于其他 snap 操作，这种方式不适用，因此你需要使用`sudo`。
 - en: 'To start it, just do this:'
+  id: totrans-367
   prefs: []
   type: TYPE_NORMAL
+  zh: 要启动它，只需执行以下操作：
 - en: '[PRE83]'
+  id: totrans-368
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE83]'
 - en: 'Finally, from a desktop machine, navigate to the IP address of the **Nextcloud**
     server and **create an admin account**. Once you''ve filled in all the details,
     click **Finish Setup**:'
+  id: totrans-369
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，从桌面机器上，导航到**Nextcloud**服务器的IP地址并**创建一个管理员账户**。填写完所有信息后，点击**完成设置**：
 - en: '![Figure 11.2: Nextcloud](img/file71.png)'
+  id: totrans-370
   prefs: []
   type: TYPE_IMG
+  zh: '![图 11.2：Nextcloud](img/file71.png)'
 - en: 'Figure 11.2: Nextcloud'
+  id: totrans-371
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 11.2：Nextcloud
 - en: Simple, right? Imagine how long that would have taken doing it the old-fashioned
     way. The only slight catch is that it's running on an unencrypted HTTP connection,
     so you definitely don't want to expose this to the Internet. (There is a way to
     reconfigure this to use an encrypted connection, but that’s beyond the scope of
     this topic.)
+  id: totrans-372
   prefs: []
   type: TYPE_NORMAL
+  zh: 很简单，对吧？想象一下，如果用传统方式来做，这需要花多长时间。唯一的小问题是它在一个未加密的HTTP连接上运行，因此你肯定不想将其暴露到互联网上。（有方法可以重新配置它以使用加密连接，但这超出了本话题的范围。）
 - en: 'The Snapcraft store is Canonical''s official repository for snap packages.
     Anyone who wants to can create an account and upload his or her own snaps. There
     are plenty of applications there for desktop/workstations, servers, and IoT devices.
     Several different machine architectures, including x86_64, ARM, and PowerPC, are
     supported. (So yes, this can even be useful for your Raspberry Pi device.) This
     can be seen in the following screenshot:'
+  id: totrans-373
   prefs: []
   type: TYPE_NORMAL
+  zh: Snapcraft商店是Canonical官方的snap包仓库。任何人都可以创建一个账户并上传自己的snap包。这里有许多适用于桌面/工作站、服务器和物联网设备的应用程序。支持多种不同的机器架构，包括x86_64、ARM和PowerPC。（所以，是的，这对于你的Raspberry
+    Pi设备也很有用。）这可以从下面的截图中看到：
 - en: '![Figure 11.3: The Snapcraft store](img/file72.png)'
+  id: totrans-374
   prefs: []
   type: TYPE_IMG
+  zh: '![图 11.3：Snapcraft商店](img/file72.png)'
 - en: 'Figure 11.3: The Snapcraft store'
+  id: totrans-375
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 11.3：Snapcraft商店
 - en: That's pretty much all there is to it. Despite the controversies, it's still
     a pretty cool concept.
+  id: totrans-376
   prefs: []
   type: TYPE_NORMAL
+  zh: 这几乎就是全部内容。尽管存在争议，但这仍然是一个相当酷的概念。
 - en: If you have to deploy IoT devices, you might want to look into Ubuntu Core.
     It's a stripped-down version of Ubuntu that consists wholly of snap packages.
     Space doesn't permit me to cover it in detail here, but you can read all about
     it at [https://ubuntu.com/core](https://ubuntu.com/core).
+  id: totrans-377
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 如果你需要部署物联网设备，可能需要考虑Ubuntu Core。它是一个精简版的Ubuntu，完全由snap包组成。由于篇幅所限，我不能在这里详细介绍，但你可以在[https://ubuntu.com/core](https://ubuntu.com/core)阅读详细信息。
 - en: Now that you've seen how to work with Ubuntu's Snappy system, we'll look at
     Fedora's Flatpak system.
+  id: totrans-378
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在你已经了解了如何使用Ubuntu的Snappy系统，我们将来看一下Fedora的Flatpak系统。
 - en: Sandboxing with Flatpak
+  id: totrans-379
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 使用Flatpak的沙箱机制
 - en: The Flatpak system, which was created by the Fedora Linux team, works toward
     the same goal as Ubuntu's Snappy system, but there are significant differences
     in their implementation. You can have one or both systems running on any given
     Linux machine. With either system, you can create a universal package that runs
     on any machine that has Snappy or Flatpak installed. And, both systems run each
     of their applications in their own security sandbox.
+  id: totrans-380
   prefs: []
   type: TYPE_NORMAL
+  zh: Flatpak系统是由Fedora Linux团队创建的，目标与Ubuntu的Snappy系统相同，但它们在实现上有显著的差异。你可以在任何给定的Linux机器上运行其中一个或两个系统。使用任一系统，你都可以创建一个通用包，能够在任何安装了Snappy或Flatpak的机器上运行。而且，两个系统都会在各自的安全沙箱中运行每个应用程序。
 - en: 'However, as I mentioned previously, there are differences:'
+  id: totrans-381
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，正如我之前提到的，存在一些差异：
 - en: Instead of having each application package entirely self-contained, Flatpak
     installs shared runtime libraries that the application can access. This helps
     cut down on disk space usage.
+  id: totrans-382
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 与每个应用程序包完全自包含不同，Flatpak安装了共享的运行时库，应用程序可以访问这些库。这有助于减少磁盘空间的使用。
 - en: The Fedora folk operate a central repository that they call Flathub. However,
     they also made the server code available for anyone who wants to set up his or
     her own Flatpak repository.
+  id: totrans-383
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Fedora团队运营着一个名为Flathub的中央仓库。不过，他们也将服务器代码公开，供任何人设置自己的Flatpak仓库。
 - en: Flatpak requires just a tiny bit more effort to set up because after you install
     it, you have to configure it to use the desired repository.
+  id: totrans-384
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Flatpak的设置需要稍微多一点的工作，因为安装后，你必须配置它以使用所需的仓库。
 - en: The Snapcraft store has packages for server, desktop, and IoT use. Flathub mainly
     has desktop applications.
+  id: totrans-385
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Snapcraft商店提供适用于服务器、桌面和物联网（IoT）使用的包，而Flathub主要提供桌面应用程序。
 - en: 'Depending on which distro you''re running, you may or may not already have
     the Flatpak system installed. On Debian/Ubuntu systems, install it with these
     commands:'
+  id: totrans-386
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据你运行的发行版，你可能已经安装了Flatpak系统，也可能没有。在Debian/Ubuntu系统上，可以使用以下命令安装它：
 - en: '[PRE84]'
+  id: totrans-387
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE84]'
 - en: On RHEL, CentOS, AlmaLinux, and Fedora systems, there's a good chance that it's
     already installed. If it isn't, just install it with the normal `yum` or `dnf`
     commands. After you've installed Flatpak, go to the Flatpak **Quick Setup** page
     to see how to configure it. Click on the icon for the distro that you're running
     and follow the directions.
+  id: totrans-388
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 RHEL、CentOS、AlmaLinux 和 Fedora 系统上，很有可能它已经安装好了。如果没有安装，只需使用常规的 `yum` 或 `dnf`
+    命令安装。安装完 Flatpak 后，前往 Flatpak **快速设置** 页面查看如何配置它。点击你使用的发行版的图标，并按照说明操作。
 - en: 'You''ll find the **Quick Setup** page here: [https://flatpak.org/setup/](https://flatpak.org/setup/).'
+  id: totrans-389
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 你可以在这里找到 **快速设置** 页面：[https://flatpak.org/setup/](https://flatpak.org/setup/)。
 - en: After installing the repository, restart the machine. After the machine has
     rebooted, you'll be ready to install some applications. To pick one, go to the
     Flathub website and browse until you find something you want.
+  id: totrans-390
   prefs: []
   type: TYPE_NORMAL
+  zh: 安装完仓库后，重启机器。机器重启后，你就可以开始安装一些应用程序了。要选择一个，前往 Flathub 网站并浏览，直到找到你想要的应用。
 - en: 'You''ll find Flathub here: [https://flathub.org/home](https://flathub.org/home).'
+  id: totrans-391
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: 你可以在这里找到 Flathub：[https://flathub.org/home](https://flathub.org/home)。
 - en: 'Let''s say that you''ve browsed through the Productivity apps and found the
     Bookworm e-book reader. Click on the link to go to the **Bookworm** app page.
     You''ll see an **Install** button at the top of it. If you click on that button,
@@ -1914,32 +2779,47 @@
     need to type a command at the command line. Your best bet is to scroll down to
     the bottom of the page, where you''ll see the command that will both download
     and install the app at the same time:'
+  id: totrans-392
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设你已经浏览了生产力类应用，并找到了 Bookworm 电子书阅读器。点击链接进入 **Bookworm** 应用页面。你会看到页面顶部有一个 **安装**
+    按钮。如果点击该按钮，你将下载 **Bookworm** 的安装文件。要安装它，你仍然需要在命令行中输入命令。最好的方法是滚动到页面底部，在那里你将看到同时下载和安装应用的命令：
 - en: '![Figure 11.4: The Flathub repository](img/file73.png)'
+  id: totrans-393
   prefs: []
   type: TYPE_IMG
+  zh: '![图 11.4：Flathub 仓库](img/file73.png)'
 - en: 'Figure 11.4: The Flathub repository'
+  id: totrans-394
   prefs: []
   type: TYPE_NORMAL
+  zh: 图 11.4：Flathub 仓库
 - en: There's also the command to run the app, but you might not need it. Depending
     on which distro you're running, you might or might not have an icon created for
     you in your **Start** menu.
+  id: totrans-395
   prefs: []
   type: TYPE_NORMAL
+  zh: 还有运行应用的命令，但你可能不需要它。根据你使用的发行版，可能会为你在 **开始** 菜单中创建一个图标，也可能不会。
 - en: Flatpak sometimes requires admin privileges, and sometimes it doesn’t. Whenever
     it does, it will prompt you for a password, so there’s no need to preface your
     `flatpak` commands with `sudo`.
+  id: totrans-396
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: Flatpak 有时需要管理员权限，有时则不需要。每当需要时，它会提示你输入密码，所以无需在 `flatpak` 命令前加上 `sudo`。
 - en: 'Unlike Snappy, Flatpak doesn''t automatically update its apps. You''ll have
     to do that yourself by periodically implementing this command:'
+  id: totrans-397
   prefs: []
   type: TYPE_NORMAL
+  zh: 与 Snappy 不同，Flatpak 不会自动更新其应用程序。你需要定期执行以下命令来手动更新：
 - en: '[PRE85]'
+  id: totrans-398
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE85]'
 - en: In this section, you looked at the basics of using the Snappy and Flatpak universal
     packaging systems. With each one, developers can package their applications just
     once, instead of doing it multiple times with multiple types of packages. End
@@ -1948,77 +2828,97 @@
     And, in keeping with the overall context of this book, understand that by running
     applications in their own isolated sandboxes, both of these systems provide an
     extra measure of application security.
+  id: totrans-399
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，你了解了如何使用 Snappy 和 Flatpak 通用打包系统的基础知识。使用这两个系统时，开发人员只需打包一次应用，而不是为多种包类型分别打包。最终用户可以使用这些应用，从而保证它们始终保持最新，而不必依赖于发行版仓库中的旧版本。而且，在本书的总体背景下，理解通过在独立的沙盒中运行应用，这两种系统都提供了额外的应用安全措施。
 - en: Summary
+  id: totrans-400
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 总结
 - en: So, another big chapter is behind us, and we've seen lots of cool stuff. We
     started by looking at the `/proc` filesystem and at how to configure some of its
     settings for the best security possible. After that, we looked at how cgroups,
     namespaces, kernel capabilities, and SECCOMP can be used to isolate processes
     from each other. We wrapped this chapter up with some examples of utilities and
     package management systems that use these cool technologies.
+  id: totrans-401
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以，另一个重要的章节已经过去，我们看到了很多很酷的内容。我们从查看 `/proc` 文件系统开始，了解如何配置其中的一些设置以实现最佳的安全性。接着，我们查看了如何使用
+    cgroups、命名空间、内核能力和 SECCOMP 来隔离进程。我们以一些使用这些酷技术的实用程序和包管理系统示例结束了这一章。
 - en: In the next chapter, we'll talk about the different ways you can scan, audit,
     and harden your systems. I'll see you there.
+  id: totrans-402
   prefs: []
   type: TYPE_NORMAL
 - en: Questions
+  id: totrans-403
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: Which of the following is true?
+  id: totrans-404
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`/proc` is just like any other directory in the Linux filesystem.'
+  id: totrans-405
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`/proc` is the only pseudo-filesystem in Linux.'
+  id: totrans-406
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`/proc` is one of several pseudo-filesystems in Linux.'
+  id: totrans-407
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: You can set values for `/proc` parameters with the `systemctl` command.
+  id: totrans-408
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Which of the following commands would you use to set a value for a `/proc` parameter?
+  id: totrans-409
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo systemctl -w`'
+  id: totrans-410
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo sysctl -w`'
+  id: totrans-411
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo procctl -w`'
+  id: totrans-412
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo sysctl -o`'
+  id: totrans-413
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo systemctl -o`'
+  id: totrans-414
   prefs:
   - PREF_IND
   - PREF_OL
@@ -2026,355 +2926,455 @@
 - en: You need a program executable to run with one specific root privilege, without
     having to grant any root privileges to the person who will be running it. What
     would you do?
+  id: totrans-415
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: Add a namespace.
+  id: totrans-416
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Create a SECCOMP profile.
+  id: totrans-417
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Add the SUID permission.
+  id: totrans-418
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Add a kernel capability.
+  id: totrans-419
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Where would you find information about user processes?
+  id: totrans-420
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: In the numbered subdirectories of the `/proc` filesystem.
+  id: totrans-421
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: In the alphabetically named subdirectories of the `/proc` filesystem.
+  id: totrans-422
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: In the `/dev` directory.
+  id: totrans-423
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: In each user's home directory.
+  id: totrans-424
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: What is a syscall?
+  id: totrans-425
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: It tells the Linux kernel to perform a privileged action on behalf of a user.
+  id: totrans-426
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: It calls new system information into the kernel.
+  id: totrans-427
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: It keeps track of everything that the system kernel is doing.
+  id: totrans-428
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: It isolates calls to system resources from each other.
+  id: totrans-429
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: On non-RHEL 9-type Linux distros, what is the best way to allow users to only
     see information about their own processes?
+  id: totrans-430
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: Add the `hidepid=2` option to the kernel startup parameters in the GRUB configuration.
+  id: totrans-431
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Add the `nopid=1` option to the kernel startup parameters in the GRUB configuration.
+  id: totrans-432
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Add the `nopid=1` option to the `/etc/fstab` file.
+  id: totrans-433
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Add the `hidepid=1` option to the `/etc/fstab` file.
+  id: totrans-434
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Which of the following commands would you use to see which kernel parameters
     need to be changed for the best security?
+  id: totrans-435
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo audit system`'
+  id: totrans-436
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo lynis audit system`'
+  id: totrans-437
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo system audit`'
+  id: totrans-438
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo lynis system audit`'
+  id: totrans-439
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Which of the following commands would allow a non-privileged user to start a
     Python web server on `Port 80` without using root privileges?
+  id: totrans-440
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo setcap ''CAP_NET_SERVICE+ep'' /usr/bin/python2.7`'
+  id: totrans-441
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo setcap ''CAP_NET_BIND_SERVICE+ep'' /usr/bin/python2.7`'
+  id: totrans-442
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo getcap ''CAP_NET_BIND_SERVICE+ep'' /usr/bin/python2.7`'
+  id: totrans-443
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: '`sudo setcap ''CAP_NET_SERVICE+ep'' /usr/bin/python2.7`'
+  id: totrans-444
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: What is a major difference between the Snappy and Flatpak systems?
+  id: totrans-445
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: There are none.
+  id: totrans-446
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Flatpak packages are completely self-contained, but Snappy packages have you
     install separate runtime packages.
+  id: totrans-447
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Snappy packages are completely self-contained, but Flatpak packages have you
     install separate runtime packages.
+  id: totrans-448
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Flatpak packages run in their own sandbox, but Snappy packages don't.
+  id: totrans-449
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Snappy packages run in their own sandbox, but Flatpak packages don't.
+  id: totrans-450
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: You need to limit the number of syscalls that your Docker container can make.
     How would you do that?
+  id: totrans-451
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
 - en: Create the container in its own cgroup and configure the syscall limits for
     that cgroup.
+  id: totrans-452
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Create the container in its own namespace and configure the syscall limits for
     that namespace.
+  id: totrans-453
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Run the container under Firejail.
+  id: totrans-454
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Create the container with a SECCOMP profile.
+  id: totrans-455
   prefs:
   - PREF_IND
   - PREF_OL
   type: TYPE_NORMAL
 - en: Further reading
+  id: totrans-456
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
 - en: 'Exploring the `/proc` filesystem: [https://www.tecmint.com/exploring-proc-file-system-in-linux/](https://www.tecmint.com/exploring-proc-file-system-in-linux/)'
+  id: totrans-457
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Linux kernel security subsystem wiki: [https://kernsec.org/wiki/index.php/Main_Page](https://kernsec.org/wiki/index.php/Main_Page)'
+  id: totrans-458
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Linux Magic System Request Key Hacks: [https://www.kernel.org/doc/html/latest/admin-guide/sysrq.html](https://www.kernel.org/doc/html/latest/admin-guide/sysrq.html)'
+  id: totrans-459
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Linux to get kernel "lockdown" feature: [https://www.zdnet.com/article/linux-to-get-kernel-lockdown-feature/](https://www.zdnet.com/article/linux-to-get-kernel-lockdown-feature/)'
+  id: totrans-460
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Protect hard and symbolic links in RHEL/CentOS: [https://www.tecmint.com/protect-hard-and-symbolic-links-in-centos-rhel/](https://www.tecmint.com/protect-hard-and-symbolic-links-in-centos-rhel/)'
+  id: totrans-461
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Log suspicious Martian packets: [https://www.cyberciti.biz/faq/linux-log-suspicious-martian-packets-un-routable-source-addresses/](https://www.cyberciti.biz/faq/linux-log-suspicious-martian-packets-un-routable-source-addresses/)'
+  id: totrans-462
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Protect against the usage of ptrace: [https://linux-audit.com/protect-ptrace-processes-kernel-yama-ptrace_scope/](https://linux-audit.com/protect-ptrace-processes-kernel-yama-ptrace_scope/)'
+  id: totrans-463
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Introduction to Linux Control Groups (cgroups) Version 1: [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/chap-introduction_to_control_groups](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/chap-introduction_to_control_groups)'
+  id: totrans-464
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'RHEL 7: How to get started with cgroups Version 1: [https://www.certdepot.net/rhel7-get-started-cgroups/](https://www.certdepot.net/rhel7-get-started-cgroups/)'
+  id: totrans-465
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Introduction to cgroup Version 2: [https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/monitoring_and_managing_system_status_and_performance/setting-limits-for-applications_monitoring-and-managing-system-status-and-performance](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/monitoring_and_managing_system_status_and_performance/setting-limits-for-applications_monitoring-and-managing-system-status-and-performance)'
+  id: totrans-466
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Limit CPU Usage on Ubuntu 19.10 with `systemd` cgroups: [https://youtu.be/_AODvcO5Q_8](https://youtu.be/_AODvcO5Q_8)'
+  id: totrans-467
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Control Groups versus Namespaces: [https://youtu.be/dTOT9QKZ2Lw](https://youtu.be/dTOT9QKZ2Lw)'
+  id: totrans-468
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'How to manage Linux file capabilities: [https://www.howtoforge.com/how-to-manage-linux-file-capabilities/](https://www.howtoforge.com/how-to-manage-linux-file-capabilities/)'
+  id: totrans-469
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'getcap, setcap, and file capabilities: [https://www.insecure.ws/linux/getcap_setcap.html](https://www.insecure.ws/linux/getcap_setcap.html)'
+  id: totrans-470
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
 - en: 'Docker security features – SECCOMP profiles: [https://blog.aquasec.com/new-docker-security-features-and-what-they-mean-seccomp-profiles](https://blog.aquasec.com/new-docker-security-features-and-what-they-mean-seccomp-profiles)'
+  id: totrans-471
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'Docker 安全功能 – SECCOMP 配置文件: [https://blog.aquasec.com/new-docker-security-features-and-what-they-mean-seccomp-profiles](https://blog.aquasec.com/new-docker-security-features-and-what-they-mean-seccomp-profiles)'
 - en: 'Docker documentation – Docker Security: [https://docs.docker.com/engine/security/security/](https://docs.docker.com/engine/security/security/)'
+  id: totrans-472
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'Docker 文档 – Docker 安全性: [https://docs.docker.com/engine/security/security/](https://docs.docker.com/engine/security/security/)'
 - en: 'Firejail website: [https://firejail.wordpress.com/](https://firejail.wordpress.com/)'
+  id: totrans-473
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'Firejail 网站: [https://firejail.wordpress.com/](https://firejail.wordpress.com/)'
 - en: 'Firejail documentation: [https://firejail.wordpress.com/documentation-2/](https://firejail.wordpress.com/documentation-2/)'
+  id: totrans-474
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'Firejail 文档: [https://firejail.wordpress.com/documentation-2/](https://firejail.wordpress.com/documentation-2/)'
 - en: 'Introduction to App Packages on Linux: [https://fosspost.org/education/app-packages-linux-snap-flatpak-appimage](https://fosspost.org/education/app-packages-linux-snap-flatpak-appimage)'
+  id: totrans-475
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'Linux 上的应用包介绍: [https://fosspost.org/education/app-packages-linux-snap-flatpak-appimage](https://fosspost.org/education/app-packages-linux-snap-flatpak-appimage)'
 - en: 'The Ubuntu snap Usage Tutorial: [https://tutorials.ubuntu.com/tutorial/basic-snap-usage#0](https://tutorials.ubuntu.com/tutorial/basic-snap-usage#0)'
+  id: totrans-476
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'Ubuntu snap 使用教程: [https://tutorials.ubuntu.com/tutorial/basic-snap-usage#0](https://tutorials.ubuntu.com/tutorial/basic-snap-usage#0)'
 - en: 'How to manage snap updates: [https://snapcraft.io/blog/how-to-manage-snap-updates](https://snapcraft.io/blog/how-to-manage-snap-updates)'
+  id: totrans-477
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '如何管理 snap 更新: [https://snapcraft.io/blog/how-to-manage-snap-updates](https://snapcraft.io/blog/how-to-manage-snap-updates)'
 - en: 'The Official Canonical Snapcraft Store: [https://snapcraft.io/](https://snapcraft.io/)'
+  id: totrans-478
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '官方 Canonical Snapcraft 商店: [https://snapcraft.io/](https://snapcraft.io/)'
 - en: 'The future of Linux desktop application delivery is Flatpak and Snap: [https://www.zdnet.com/article/the-future-of-linux-desktop-application-delivery-is-flatpak-and-snap/](https://www.zdnet.com/article/the-future-of-linux-desktop-application-delivery-is-flatpak-and-snap/)'
+  id: totrans-479
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'Linux 桌面应用交付的未来是 Flatpak 和 Snap: [https://www.zdnet.com/article/the-future-of-linux-desktop-application-delivery-is-flatpak-and-snap/](https://www.zdnet.com/article/the-future-of-linux-desktop-application-delivery-is-flatpak-and-snap/)'
 - en: 'Flathub: [https://flathub.org/home](https://flathub.org/home)'
+  id: totrans-480
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'Flathub: [https://flathub.org/home](https://flathub.org/home)'
 - en: 'Three approaches to secrets management for Flatpak applications: [https://opensource.com/article/19/11/secrets-management-flatpak-applications](https://opensource.com/article/19/11/secrets-management-flatpak-applications)'
+  id: totrans-481
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'Flatpak 应用的三种密钥管理方法: [https://opensource.com/article/19/11/secrets-management-flatpak-applications](https://opensource.com/article/19/11/secrets-management-flatpak-applications)'
 - en: Answers
+  id: totrans-482
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 答案
 - en: c
+  id: totrans-483
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: c
 - en: b
+  id: totrans-484
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: b
 - en: d
+  id: totrans-485
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: d
 - en: a
+  id: totrans-486
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: a
 - en: a
+  id: totrans-487
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: a
 - en: d
+  id: totrans-488
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: d
 - en: b
+  id: totrans-489
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: b
 - en: b
+  id: totrans-490
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: b
 - en: c
+  id: totrans-491
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: c
 - en: d
+  id: totrans-492
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: d
