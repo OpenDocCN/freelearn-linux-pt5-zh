@@ -1,7 +1,9 @@
 - en: '*Chapter 7*: Understanding the Concept of Platform Devices and Drivers'
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '*第七章*：理解平台设备和驱动程序的概念'
 - en: The Linux kernel handles devices by using the concept of buses, that is, the
     links between the CPU and these devices. Some buses are smart enough and embed
     a discoverability logic to enumerate devices sitting on them. With such buses,
@@ -9,14 +11,19 @@
     they have enumerated as well as the resources (such as interrupt lines and memory
     regions) they need to work correctly. PCI, USB, and SATA buses all come under
     this family of discoverable buses.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux 内核通过使用总线的概念来管理设备，也就是说，CPU 与这些设备之间的连接。一些总线足够智能，内嵌了发现逻辑来枚举连接在其上的设备。在这种总线下，Linux
+    内核在启动初期会请求这些总线返回它们枚举的设备以及它们所需的资源（如中断线和内存区域），以便设备能够正常工作。PCI、USB 和 SATA 总线都属于这类可发现总线。
 - en: Unfortunately, the reality is not always so beautiful. There are a number of
     devices that the CPU is still unable to detect. Most of these non-discoverable
     devices are on-chip, although some of them sit on slow or dumb buses that do not
     support device discoverability.
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 不幸的是，现实并不总是如此美好。仍有许多设备是 CPU 无法检测到的。这些不可发现的设备大多数位于芯片上，虽然有一些设备位于速度较慢或没有设备发现支持的总线上。
 - en: As a result, the kernel must provide mechanisms for receiving information about
     the hardware and users must inform the kernel where these devices can be found.
     In the Linux kernel, these non-discoverable devices are known as **platform devices**.
@@ -24,277 +31,401 @@
     bus, the Linux kernel has implemented the concept of a **platform bus** (also
     referred to as a **pseudo platform bus**) in order to maintain the paradigm according
     to which devices are always connected to CPUs through buses.
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，内核必须提供接收硬件信息的机制，用户必须向内核提供这些设备的位置信息。在 Linux 内核中，这些不可发现的设备被称为 **平台设备**。由于它们不位于
+    I2C、SPI 或任何不可发现总线等已知总线上，Linux 内核实现了 **平台总线**（也称为 **伪平台总线**）的概念，以维持设备始终通过总线连接到
+    CPU 的范式。
 - en: 'In this chapter, we will learn how and where to instantiate platform devices
     as well as their resources, and learn how to write their drivers, that is, platform
     drivers. To achieve that, the chapter will be split into the following topics:'
+  id: totrans-4
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将学习如何以及在哪里实例化平台设备及其资源，并学习如何编写它们的驱动程序，即平台驱动程序。为此，本章将分为以下几个主题：
 - en: Understanding the platform core abstraction in the Linux kernel
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 理解 Linux 内核中的平台核心抽象
 - en: Dealing with platform devices
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 处理平台设备
 - en: Platform driver abstraction and architecture
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 平台驱动程序抽象及架构
 - en: Example of writing a platform driver from scratch
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 从零开始编写平台驱动程序的示例
 - en: Understanding the platform core abstraction in the Linux kernel
+  id: totrans-9
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 理解 Linux 内核中的平台核心抽象
 - en: 'To cover the long list of non-discoverable devices that are being increasingly
     used as **System on Chips** (**SoCs**) are becoming more and more popular, the
     platform core has been introduced. Within this framework, the three most important
     data structures are as follows: the one representing the platform device, another
     representing its resource, and the final data structure, representing the platform
     driver.'
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了涵盖随着 **系统芯片**（**SoCs**）越来越流行，越来越多使用的不可发现设备，平台核心已被引入。在此框架下，最重要的三个数据结构如下：表示平台设备的一个，表示其资源的另一个，最后一个数据结构表示平台驱动程序。
 - en: 'A platform device is represented in the kernel as an instance of `struct platform_device`,
     defined in `<linux/platform_device.h>` as follows:'
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 平台设备在内核中表示为 `struct platform_device` 的一个实例，该结构在 `<linux/platform_device.h>`
+    中定义，如下所示：
 - en: '[PRE0]'
+  id: totrans-12
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: In the previous data structure, `name` is the platform device name. The name
     assigned to the platform device must be chosen with care. Platform devices are
     matched against their respective drivers in the pseudo platform bus matching function,
     that is, `platform_match()`. In this function, under certain circumstances (no
     device tree or ACPI support and no `id` table match), matching falls back to name
     matching, comparing the driver's name and the platform device's name.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 在之前的数据结构中，`name` 是平台设备的名称。分配给平台设备的名称必须小心选择。平台设备在伪平台总线匹配函数中与相应的驱动程序进行匹配，即 `platform_match()`。在此函数中，在某些情况下（没有设备树或
+    ACPI 支持且没有 `id` 表匹配），匹配会回退到名称匹配，比较驱动程序的名称和平台设备的名称。
 - en: '`dev` is the underlying device structure for the Linux device model, and `id`
     is used to extend this device name. The following describes how `id` is used:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: '`dev`是Linux设备模型的底层设备结构，`id`用于扩展该设备名称。以下描述了`id`的使用方式：'
 - en: 'Where `id` is `-1` (which corresponds to the `PLATFORM_DEVID_NONE` macro),
     the underlying device name will be the same as the platform device name. The platform
     core will do the following:'
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 当`id`为`-1`（对应`PLATFORM_DEVID_NONE`宏）时，底层设备名称将与平台设备名称相同。平台核心将执行以下操作：
 - en: '[PRE1]'
+  id: totrans-16
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Where `id` is `-2` (which corresponds to the `PLATFORM_DEVID_AUTO` macro),
     the kernel will automatically generate a valid ID and will name the underlying
     device as follows:'
+  id: totrans-17
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 当`id`为`-2`（对应`PLATFORM_DEVID_AUTO`宏）时，内核将自动生成一个有效的ID，并将底层设备命名如下：
 - en: '[PRE2]'
+  id: totrans-18
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'In any other case, `id` will be used as follows:'
+  id: totrans-19
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在其他情况下，`id`将按如下方式使用：
 - en: '[PRE3]'
+  id: totrans-20
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: '`resource` is an array of resources assigned to the platform device, and `num_resources`
     is the number of elements in that array.'
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: '`resource`是分配给平台设备的资源数组，`num_resources`是该数组中元素的数量。'
 - en: In the case of a platform device and driver matching by ID table, `pdev->id_entry`,
     which is of the `struct platform_device_id` type, will point to the matching ID
     table entry that caused the platform driver to match with this platform device.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 在平台设备和驱动通过ID表匹配的情况下，`pdev->id_entry`（其类型为`struct platform_device_id`）将指向匹配的ID表条目，从而使平台驱动与该平台设备匹配。
 - en: Regardless of how platform devices have been registered, they need to be driven
     by appropriate drivers, that is, platform drivers. Such drivers must implement
     a set of callbacks that are used by the platform core as and when devices appear/disappear
     on the platform bus.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 无论平台设备如何注册，它们都需要由合适的驱动程序驱动，即平台驱动。这些驱动程序必须实现一组回调函数，平台核心将在设备出现在平台总线时调用这些回调函数。
 - en: 'Platform drivers are represented in the Linux kernel as an instance of `struct
     platform_driver`, defined as follows:'
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 平台驱动在Linux内核中以`struct platform_driver`的实例形式表示，定义如下：
 - en: '[PRE4]'
+  id: totrans-25
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'The following describes the elements used in this data structure:'
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下描述了该数据结构中使用的元素：
 - en: '`probe()`: This is the function that gets called when a device claims your
     driver after a match occurs. Later, we will see how `probe` is called by the core.
     Its declaration is as follows:'
+  id: totrans-27
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`probe()`: 这是在设备与驱动匹配后，设备请求使用你的驱动时调用的函数。稍后我们将看到核心如何调用`probe`。其声明如下：'
 - en: '[PRE5]'
+  id: totrans-28
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: The kernel is responsible for providing the `platform_device` parameter. `probe`
     is called by the bus driver when the device driver is registered in the kernel.
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核负责提供`platform_device`参数。当设备驱动程序在内核中注册时，`probe`由总线驱动程序调用。
 - en: '`remove()`: This is called to get rid of the driver when it is no longer needed
     by devices and its declaration looks like the following:'
+  id: totrans-30
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`remove()`: 当驱动程序不再被设备需要时，调用该函数以移除驱动，声明形式如下：'
 - en: '[PRE6]'
+  id: totrans-31
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: '`driver` is the underlying driver structure for the device model and must be
     provided with a name (which must be chosen with care as well), an owner, and some
     other fields (such as a device tree matching table), which we will see later.
     When it comes to the platform driver, before the driver and device match, the
     `platform_device.name` and `platform_driver.driver.name` fields must be identical.'
+  id: totrans-32
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`driver`是设备模型的底层驱动结构，必须提供名称（名称的选择必须谨慎）、所有者和一些其他字段（如设备树匹配表），稍后我们会看到。在平台驱动方面，在驱动和设备匹配之前，`platform_device.name`和`platform_driver.driver.name`字段必须相同。'
 - en: '`id_table` is one of the ways provided by the platform driver to the bus code
     to bind actual devices to the driver. The other way is via the device tree, which
     will be discussed in the *Provisioning supported devices in the driver* section.'
+  id: totrans-33
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`id_table`是平台驱动提供给总线代码的绑定实际设备到驱动的方式之一。另一种方式是通过设备树，这将在*在驱动中提供支持的设备*章节中讨论。'
 - en: Now that we have introduced both platform device and platform driver data structures,
     let's move beyond this and try to understand how they are created and registered
     with the system.
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经介绍了平台设备和平台驱动数据结构，让我们超越这些，尝试理解它们是如何创建和注册到系统中的。
 - en: Dealing with platform devices
+  id: totrans-35
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理平台设备
 - en: Before we start writing platform drivers, this section will teach you how and
     where to instantiate platform devices. Only after that will we delve into the
     platform driver implementation. Platform device instantiation in the Linux kernel
     has existed for a long time and has been improved all over the kernel versions,
     and we will discuss the specificities of each instantiation method in this section.
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 在开始编写平台驱动之前，本节将教你如何以及在哪里实例化平台设备。只有在此之后，我们才会深入研究平台驱动的实现。Linux内核中的平台设备实例化已存在很长时间，并在各个内核版本中得到了改进，我们将在本节讨论每种实例化方法的具体细节。
 - en: Allocating and registering platform devices
+  id: totrans-37
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 分配和注册平台设备
 - en: Since there is no way for platform devices to make themselves known to the system,
     they must be populated manually and registered with the system along with their
     resources and private data. In the early platform core days, platform devices
     were declared in the board file, `arch/arm/mach-*` (which is `arch/arm/mach-imx/mach-imx6q.c`
     for i.MX6), and made known to the kernel with `platform_device_add()` or `platform_device_register()`,
     depending on how each platform device has been allocated.
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于平台设备无法使自己为系统所知，因此它们必须手动填充并与其资源和私有数据一起注册到系统中。在平台核心早期，平台设备在板文件`arch/arm/mach-*`中声明（对于i.MX6而言，是`arch/arm/mach-imx/mach-imx6q.c`），并通过`platform_device_add()`或`platform_device_register()`使内核知道，具体取决于每个平台设备的分配方式。
 - en: This leads us to conclude that there are two methods for allocating and registering
     platform devices.
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 这使我们得出结论，分配和注册平台设备有两种方法。
 - en: 'A static method, which entails enumerating platform devices in the code and
     calling `platform_device_register()` on each of them for their registration. This
     API is defined as follows:'
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 一种静态方法，涉及在代码中列举平台设备，并对每个设备调用`platform_device_register()`进行注册。此API定义如下：
 - en: '[PRE7]'
+  id: totrans-41
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'One example of such usage is the following:'
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 这样的使用示例如下：
 - en: '[PRE8]'
+  id: totrans-43
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'With static registration, platform devices are statically initialized and passed
     to `platform_device_register()`. This method also allows for the addition of bulk
     platform devices. The corresponding code can use `platform_add_devices()`, which
     accepts an array of pointers to platform devices and the number of elements in
     the array. This function is defined as follows:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 在静态注册中，平台设备被静态初始化并传递给`platform_device_register()`。此方法还允许批量添加平台设备。相应的代码可以使用`platform_add_devices()`，该函数接受指向平台设备的指针数组和数组中的元素数量。此函数定义如下：
 - en: '[PRE9]'
+  id: totrans-45
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'On the other hand, dynamic allocation requires an initial call to `platform_device_alloc()`
     to dynamically allocate and initialize the platform device, defined as follows:'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一方面，动态分配需要首先调用`platform_device_alloc()`来动态分配和初始化平台设备，定义如下：
 - en: '[PRE10]'
+  id: totrans-47
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: In parameters, `name` is the base name of the device we're adding, and `id`
     is the instance ID of the platform device. In the event of success, this function
     returns a valid platform device object, or `NULL` on error.
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 在参数中，`name`是我们要添加的设备的基本名称，`id`是平台设备的实例ID。如果成功，则此函数返回有效的平台设备对象，出错时返回`NULL`。
 - en: 'Platform devices allocated in this way are registered with the system using
     the `platform_device_add()` API exclusively, defined as follows:'
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 以这种方式分配的平台设备使用`platform_device_add()` API进行注册，定义如下：
 - en: '[PRE11]'
+  id: totrans-50
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: As an only parameter, the platform device has been allocated using `platform_device_alloc()`.
     In the event of success, this function returns `0`, or a negative error code in
     the event of failure.
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 作为唯一参数，平台设备已使用`platform_device_alloc()`进行分配。如果成功，则此函数返回`0`，如果失败则返回负错误代码。
 - en: 'If platform device registration with `platform_device_add()` fails, you should
     release the memory occupied by the platform device structure using `platform_device_put()`,
     defined as follows:'
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果使用`platform_device_add()`进行平台设备注册失败，则应使用`platform_device_put()`释放平台设备结构占用的内存，定义如下：
 - en: '[PRE12]'
+  id: totrans-53
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'The following is an example of how it is used:'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是如何使用它的示例：
 - en: '[PRE13]'
+  id: totrans-55
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'That said, whatever way the platform device has been allocated and registered,
     it must be unregistered with `platform_device_unregister()`, defined as follows:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 也就是说，无论平台设备以何种方式分配和注册，都必须使用`platform_device_unregister()`进行注销，定义如下：
 - en: '[PRE14]'
+  id: totrans-57
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: Do note that `platform_device_unregister()` internally calls `platform_device_put()`.
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，`platform_device_unregister()`内部调用`platform_device_put()`。
 - en: Now that we know how to instantiate platform devices in the traditional way,
     let's see how minimalistic it could be to achieve the same goal by adopting another
     approach, the device tree.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们知道了如何通过传统方式实例化平台设备，接下来让我们看看采用另一种方法——设备树，来实现相同目标会有多简洁。
 - en: How not to allocate platform devices to your code
+  id: totrans-60
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何不将平台设备分配给你的代码
 - en: As we said earlier, platform devices used to be populated either in board files
     or from other drivers. There was no flexibility in using this method. Adding/removing
     platform devices would require, in the best case, recompiling a module, and, in
     the worst case, recompiling the whole kernel. This deprecated method is not portable
     either.
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们之前所说，平台设备曾经是通过板文件或其他驱动程序进行填充的。使用这种方法时没有灵活性。添加/删除平台设备，最好的情况是重新编译一个模块，最坏的情况是重新编译整个内核。这个已弃用的方法也不可移植。
 - en: Nowadays, there is the device tree, which has existed for quite a long time
     now. This mechanism is used to declare non-discoverable devices present in the
     system. As a standalone entity, it can be built independently from the kernel
     or other modules. It turns out that this could be the best alternative for populating
     platform devices.
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 如今，设备树已经存在了相当长的一段时间。这个机制用于声明系统中存在的非可发现设备。作为一个独立的实体，它可以独立于内核或其他模块构建。事实证明，这可能是填充平台设备的最佳替代方案。
 - en: This is achieved by declaring these platform devices as nodes in the device
     tree, under a node whose compatible string property is `simple-bus`. This compatible
     string means the node is regarded as a bus that requires no specific handling
@@ -303,36 +434,54 @@
     the address information in the device tree. Then Linux, in its implementation,
     ends up creating a platform device for each first-level sub-node under the node
     that has `simple-bus` in the `compatible` property.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是通过将这些平台设备声明为设备树中的节点来实现的，声明的位置是一个兼容字符串属性为 `simple-bus` 的节点。这个兼容字符串意味着该节点被视为一个总线，不需要特定的处理或驱动程序。而且，它还表示没有办法动态探测这个总线，唯一找到这个总线下子设备的方法是通过设备树中的地址信息。然后，在
+    Linux 的实现中，最终会为每个在 `compatible` 属性中包含 `simple-bus` 的节点下的第一层子节点创建一个平台设备。
 - en: 'The following is a demonstration:'
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是一个演示：
 - en: '[PRE15]'
+  id: totrans-65
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: In the preceding example, only the `bar` and `foz` nodes will be registered
     as platform devices. `baz` will not (its direct parent does not have `simple-bus`
     in a compatible string). Thus, if there is any platform driver with `company,
     product` and/or `labcsmart,something` in their compatible matching table, then
     these platform devices will be probed.
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上面的示例中，只有 `bar` 和 `foz` 节点会被注册为平台设备。`baz` 节点不会（因为它的直接父节点没有在兼容字符串中包含 `simple-bus`）。因此，如果存在任何平台驱动程序，其兼容性匹配表中有
+    `company, product` 和/或 `labcsmart,something`，那么这些平台设备将会被探测到。
 - en: 'The common use is under the SoC node or on-chip memory mapped buses to declare
     on-chip devices. Another frequent usage is to declare regulator devices, as follows:'
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 常见的用法是将 SoC 节点或片上内存映射总线下的设备声明为片上设备。另一个常见用法是声明稳压器设备，如下所示：
 - en: '[PRE16]'
+  id: totrans-68
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: In the preceding example, two platform devices will be registered, each corresponding
     to a fixed regulator.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上面的示例中，将会注册两个平台设备，每个设备对应一个固定的稳压器。
 - en: Working with platform resources
+  id: totrans-70
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 与平台资源的交互
 - en: At the opposite end of hot-pluggable devices that are enumerated, and which
     advertise resources they need, the kernel has no idea of what platform devices
     are present on your system, what they are capable of, or what they need in order
@@ -340,198 +489,296 @@
     to the kernel about the resources required by a given platform device would be
     welcome. Such resources could be IRQ lines, DMA channels, memory regions, I/O
     ports, and so on.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 在与热插拔设备相对的端，热插拔设备会列举其所需的资源并进行广告宣传，而内核对系统中存在哪些平台设备、它们的功能或它们所需的资源以确保正常工作一无所知。没有自动协商过程，因此，任何有关给定平台设备所需资源的信息提供给内核都会受到欢迎。这些资源可能包括
+    IRQ 行、DMA 通道、内存区域、I/O 端口等等。
 - en: 'From within the platform code, a resource is represented as an instance of
     a struct resource, defined in `include/linux/ioport.h` as follows:'
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 在平台代码中，资源被表示为一个 `struct resource` 实例，它在 `include/linux/ioport.h` 中定义，如下所示：
 - en: '[PRE17]'
+  id: totrans-73
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: In the preceding data structure, `start`/`end` point to the beginning/end of
     the resource. They indicate where I/O or memory regions begin and terminate. Because
     IRQ lines, buses, and DMA channels do not have ranges, it is usual to assign the
     same value to `start`/`end`.
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前述数据结构中，`start`/`end` 指向资源的起始/结束。它们指示I/O或内存区域的起始和终止位置。因为IRQ线、总线和DMA通道没有范围，所以通常将
+    `start`/`end` 赋予相同的值。
 - en: '`flags` is a mask that characterizes the type of resource, for example, `IORESOURCE_BUS`.
     Possible values are as follows:'
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: '`flags` 是一个掩码，用于描述资源的类型，例如 `IORESOURCE_BUS`。可能的值如下：'
 - en: '`IORESOURCE_IO` for PCI/ISA I/O ports'
+  id: totrans-76
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IORESOURCE_IO` 用于PCI/ISA I/O端口'
 - en: '`IORESOURCE_MEM` for memory regions'
+  id: totrans-77
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IORESOURCE_MEM` 用于内存区域'
 - en: '`IORESOURCE_REG` for register offsets'
+  id: totrans-78
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IORESOURCE_REG` 用于寄存器偏移量'
 - en: '`IORESOURCE_IRQ` for IRQ lines'
+  id: totrans-79
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IORESOURCE_IRQ` 用于IRQ线'
 - en: '`IORESOURCE_DMA` for DMA channels'
+  id: totrans-80
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IORESOURCE_DMA` 用于DMA通道'
 - en: '`IORESOURCE_BUS` for a bus'
+  id: totrans-81
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`IORESOURCE_BUS` 用于总线'
 - en: Finally, the `name` element identifies or describes the resource, since the
     resource can be extracted by name.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，`name` 元素标识或描述资源，因为可以通过名称提取资源。
 - en: Assigning such resources to a platform device can be done in two ways, first,
     in the same compilation unit where the platform device has been declared and registered,
     and second, from the device tree.
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 将这些资源分配给平台设备可以通过两种方式进行，首先，在声明和注册平台设备的同一编译单元中进行，其次，从设备树中进行。
 - en: In this section, we have described the resource and shown their usage. Let's
     now see how they can be fed to the platform device in the next section.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们描述了资源并展示了它们的使用方法。接下来让我们看看它们如何在下一节中提供给平台设备。
 - en: Platform resource provisioning – the old and deprecated way
+  id: totrans-85
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 平台资源配置 - 旧的和已弃用的方法
 - en: This method is to be used with kernels that do not support the device tree or
     when such a choice does not exist. It is mainly used with a **multi-function device**
     (**MFD**), where a master (the enclosing) chip shares its resources with subdevices.
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 此方法用于不支持设备树的内核或者不存在这种选择时。它主要用于**多功能设备**（**MFD**），其中主（外围）芯片与子设备共享其资源。
 - en: 'With this method, resources are provided in the same way as platform devices.
     The following is an example:'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过这种方法，资源的提供方式与平台设备相同。以下是一个示例：
 - en: '[PRE18]'
+  id: totrans-88
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: The preceding excerpt shows three resources (two of the memory type and one
     of the IRQ type) whose types can be identified with `IORESOURCE_IRQ` and `IORESOURCE_MEM`.
     The first one is a 4 KB memory region, while the second is also a memory region
     whose range is defined by a macro, and finally, the IRQ 90\.
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 前文摘录显示了三种资源（两种内存类型和一种IRQ类型），它们的类型可以用 `IORESOURCE_IRQ` 和 `IORESOURCE_MEM` 进行标识。第一个是4
+    KB的内存区域，而第二个也是一个内存区域，其范围由宏定义，最后是IRQ 90。
 - en: 'Assigning these resources to a platform device is a straightforward operation.
     If the platform device has been allocated statically, the resources should be
     assigned in the following manner:'
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 将这些资源分配给平台设备是一个简单的操作。如果平台设备已静态分配，则应以以下方式分配资源：
 - en: '[PRE19]'
+  id: totrans-91
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'For a dynamically allocated platform device, this is done from within a function,
     and it should be something like the following:'
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于动态分配的平台设备，这是在函数内部完成的，应该类似以下内容：
 - en: '[PRE20]'
+  id: totrans-93
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'There are several helper functions for getting data out of the resource array;
     these include the following:'
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 有几个辅助函数可从资源数组中获取数据；这些包括以下内容：
 - en: '[PRE21]'
+  id: totrans-95
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'The `n` parameter says which resource of that type is desired, with zero indicating
     the first one. Thus, for example, a driver could find its second MMIO region with
     the following:'
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: '`n` 参数表示所需类型的资源中的哪一个，其中零表示第一个。因此，例如，驱动程序可以使用以下内容找到其第二个MMIO区域：'
 - en: '[PRE22]'
+  id: totrans-97
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: The use of this function is explained in the *Handling resources* section of
     [*Chapter 5*](B17934_05_Epub.xhtml#_idTextAnchor082), *Understanding and Leveraging
     the Device Tree*.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 此函数的使用方法在《第5章》的*处理资源*部分中有解释，*理解和利用设备树*。
 - en: Understanding the concept of platform data
+  id: totrans-99
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 理解平台数据的概念
 - en: The struct resource that we have used so far is adequate to instantiate resources
     for a simple platform device, but many devices are more complex than that. This
     data structure can only encode a limited number of types of information. As an
     extension to that, `platform_device.device.platform_data` is used to assign any
     other extra information to the platform device.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们使用的 `struct resource` 足以为简单的平台设备实例化资源，但许多设备比这复杂得多。这种数据结构只能编码有限类型的信息。作为扩展，`platform_device.device.platform_data`
+    用于为平台设备分配任何其他额外信息。
 - en: Data can be enclosed in a bigger structure and assigned to this extra field.
     This data can be of whatever type the driver can understand, but most of the time,
     they are other data types that are not a part of the resource types we enumerated
     in the preceding section. These can be regulator constraints or even pointers
     to per-device functions, for example.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 数据可以被包含在一个更大的结构体中，并分配到这个额外的字段中。这些数据可以是驱动程序能够理解的任何类型，但大多数情况下，它们是我们在前面章节中列举的资源类型之外的其他数据类型。例如，这些数据可能是调节器约束或甚至是指向每个设备函数的指针。
 - en: 'Let''s describe, in the following code block, extra platform data that corresponds
     to a set of pointers to functions that are private to the platform device type:'
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们在下面的代码块中描述与一组指向特定于平台设备类型的函数的指针对应的额外平台数据：
 - en: '[PRE23]'
+  id: totrans-103
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'For a statically allocated platform device, we would execute the following
     command:'
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于静态分配的平台设备，我们将执行以下命令：
 - en: '[PRE24]'
+  id: totrans-105
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'If the platform device was found to be allocated dynamically, it would be assigned
     using the `platform_device_add_data()` helper, defined as follows:'
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果平台设备被发现是动态分配的，它将通过`platform_device_add_data()`助手进行分配，定义如下：
 - en: '[PRE25]'
+  id: totrans-107
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: The preceding function returns `0` in the event of success. `data` is the data
     to use as platform data, and `size` is the size of this data.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述函数在成功时返回`0`。`data`是用作平台数据的数据，`size`是该数据的大小。
 - en: 'Back to our example of a set of functions, we would do the following:'
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 回到我们之前举的函数集合的例子，我们将执行以下操作：
 - en: '[PRE26]'
+  id: totrans-110
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'From within the platform driver, the platform device will have its `pdev->dev.platform_dat`
     element pointing to the platform data. Although we would dereference this field,
     it is recommended to use the kernel-provided function, `dev_get_platdata()`, defined
     as follows:'
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 在平台驱动程序中，平台设备将其`pdev->dev.platform_dat`元素指向平台数据。虽然我们可以取消引用这个字段，但建议使用内核提供的函数`dev_get_platdata()`，定义如下：
 - en: '[PRE27]'
+  id: totrans-112
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'Then, to get back the enclosing set of function structures, the driver could
     do the following:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，为了获取包含的函数结构集，驱动程序可以执行以下操作：
 - en: '[PRE28]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: There is no way for the driver to check the type of data that is passed. Drivers
     must simply assume that they have been supplied a structure of the expected type
     because the platform data interface lacks any sort of type checking.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 驱动程序无法检查传递的数据类型。驱动程序只能假设它们已被提供了一个预期类型的结构，因为平台数据接口缺乏任何类型检查。
 - en: Platform resource provisioning – the new and recommended way
+  id: totrans-116
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 平台资源配置 – 新的推荐方法
 - en: The first resource provisioning method has a few drawbacks, including the fact
     that any change would require a rebuilding of either the kernel or the module
     that has changed and this could increase the kernel size.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一种资源配置方法有一些缺点，包括任何更改都需要重新构建内核或已更改的模块，这可能会增加内核的大小。
 - en: With the arrival of the device tree, things have become simpler. To keep things
     compatible, memory regions, interrupts, and DMA resources specified in the device
     tree are converted into an instance of struct resources by the platform core so
@@ -540,23 +787,29 @@
     been populated the traditional way or from the device tree. This can be verified
     in the *Handling resources* section of [*Chapter 5*](B17934_05_Epub.xhtml#_idTextAnchor082),
     *Understanding and Leveraging the Device Tree*.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 随着设备树的到来，事情变得更简单了。为了保持兼容性，设备树中指定的内存区域、中断和DMA资源会被平台核心转换为`struct resources`实例，以便`platform_get_resource()`、`platform_get_resource_by_name()`，甚至`platform_get_irq()`都可以返回适当的资源，无论该资源是通过传统方式填充的还是来自设备树的。这可以在[*第5章*](B17934_05_Epub.xhtml#_idTextAnchor082)中的*处理资源*部分得到验证，*理解和利用设备树*。
 - en: Needless to say, the device tree allows passing any type of information that
     the driver may need to know. Such data types can be used to pass any device-/driver-specific
     data. This can be accomplished by reading the *Extracting application-specific
     data* section, still in [*Chapter 5*](B17934_05_Epub.xhtml#_idTextAnchor082),
     *Understanding and Leveraging the Device Tree*.
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 不用多说，设备树允许传递驱动程序可能需要了解的任何类型的信息。这些数据类型可用于传递任何设备/驱动程序特定的数据。这可以通过阅读[*第5章*](B17934_05_Epub.xhtml#_idTextAnchor082)中的*提取特定应用数据*部分来实现，*理解和利用设备树*。
 - en: However, the device tree code is unaware of the specific structure used by a
     given driver for its platform data, so it will be unable to provide that information
     in that form. To pass such extra data, drivers can use the `.data` field in the
     `of_device_id` entry that caused the platform device and the driver to match.
     This field could then point to the platform data. See the *Provisioning supported
     devices in the driver* section in this chapter.
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，设备树代码并不知道给定驱动程序为其平台数据使用的具体结构，因此无法以这种形式提供这些信息。为了传递额外的数据，驱动程序可以使用`of_device_id`条目中的`.data`字段，该条目促使平台设备和驱动程序匹配。该字段可以指向平台数据。请参见本章中的*驱动程序中支持设备的配置*部分。
 - en: Drivers expecting platform data in the traditional way should check the `platform_device->dev.platform_data`
     pointer. If there is a non-null value there, this means that the device was instantiated
     in the traditional way along with the platform data and the device tree was not
@@ -566,171 +819,243 @@
     In this case, the driver will find a `device_node` pointer in the platform device's
     `dev.of_node` field. The various device tree access routines (most notably `of_get_property()`)
     can then be used to pull the required data from the device tree.
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 传统方式下期望平台数据的驱动程序应检查`platform_device->dev.platform_data`指针。如果那里有非空值，这意味着设备是通过传统方式实例化的，并且没有使用设备树；在这种情况下，应继续使用平台数据。如果设备是从设备树代码实例化的，`platform_data`指针将为`NULL`，表明必须直接从设备树获取信息。在这种情况下，驱动程序将在平台设备的`dev.of_node`字段中找到`device_node`指针。然后，可以使用各种设备树访问例程（最显著的是`of_get_property()`）从设备树中提取所需的数据。
 - en: Now that we are familiar with platform resource provisioning, let's learn how
     to design a platform device driver.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经熟悉了平台资源配置，接下来让我们学习如何设计一个平台设备驱动程序。
 - en: Platform driver abstraction and architecture
+  id: totrans-123
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 平台驱动程序抽象和架构
 - en: Let's get warned before going further. Not all platform devices are handled
     by platform drivers (or, should I say, pseudo platform drivers). Platform drivers
     are dedicated to devices not based on conventional buses. I2C devices or SPI devices
     are platform devices, but rely on I2C or SPI buses, respectively, and not on platform
     buses. Everything needs to be done manually with the platform driver.
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 在继续之前，让我们先提醒一下。并非所有平台设备都由平台驱动程序处理（或者，应该说，由伪平台驱动程序处理）。平台驱动程序专用于那些不依赖传统总线的设备。I2C设备或SPI设备是平台设备，但分别依赖I2C或SPI总线，而不是平台总线。所有操作都需要通过平台驱动程序手动完成。
 - en: Probing and releasing the platform devices
+  id: totrans-125
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 探测和释放平台设备
 - en: 'The platform driver entry point is the probe method, invoked after a match
     with a platform device has occurred. This probe method has the following prototype:'
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 平台驱动程序的入口点是探测方法，该方法在与平台设备匹配后被调用。该探测方法的原型如下：
 - en: '[PRE29]'
+  id: totrans-127
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: '`pdev` corresponds to the platform device that has been instantiated in the
     traditional way or a fresh one allocated by the platform core because of the associated
     device tree node having a direct parent with `simple-bus` in its compatible property.
     Platform data and resources, if any, will also be set accordingly. If the platform
     device in the parameter is the one expected by the driver, this method must return
     `0`. Otherwise, an appropriate negative error code must be returned.'
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: '`pdev`对应的是通过传统方式实例化的或由于相关设备树节点的直接父节点具有`simple-bus`兼容属性而由平台核心分配的新平台设备。如果有，平台数据和资源也将相应地设置。如果参数中的平台设备是驱动程序所期望的设备，则此方法必须返回`0`。否则，必须返回适当的负错误代码。'
 - en: Whether the platform device has been instantiated the traditional way or from
     the device tree, its resources can be extracted using conventional platform core
     APIs, `platform_get_resource()`, `platform_get_resource_by_name()`, or even `platform_get_irq()`,
     and similar APIs.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 无论平台设备是通过传统方式实例化还是通过设备树实例化，都可以使用常规的平台核心API（如`platform_get_resource()`、`platform_get_resource_by_name()`，甚至`platform_get_irq()`等）提取其资源。
 - en: The probe method must request any resource (GPIOs, clocks, IIO channels, and
     so on) and data required by the driver. If mappings need to be done, the probe
     method is the appropriate place to do that.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 探测方法必须请求驱动程序所需的任何资源（如GPIO、时钟、IIO通道等）和数据。如果需要进行映射，探测方法是执行此操作的合适位置。
 - en: 'Everything that has been done in the `probe` method must be undone when the
     device leaves the system or when the platform driver is unregistered. The `remove`
     method is the appropriate place to achieve that. It must have the following prototype:'
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: '`probe`方法中完成的所有操作必须在设备离开系统或取消注册平台驱动程序时撤消。`remove`方法是实现这一点的适当位置。它必须具有以下原型：'
 - en: '[PRE30]'
+  id: totrans-132
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: This function must return `0` only if everything has been undone and cleaned
     up. Otherwise, an appropriate error code must be returned so that users can be
     informed. In the parameter, the same platform device that has been passed to the
     `probe` function.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 此函数必须仅在所有操作均已撤消并清理完成时返回`0`。否则，必须返回适当的错误代码，以便通知用户。参数中包括已传递给`probe`函数的相同平台设备。
 - en: In the *Example of writing a platform driver from scratch* section, we discuss
     all the tips and particularities of implementing the `probe` and `remove` methods.
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 在*从头开始编写平台驱动程序的示例*部分中，我们讨论了实现`probe`和`remove`方法的所有技巧和特殊情况。
 - en: Now that the driver callbacks are ready, we can populate the devices that are
     going to be handled by this driver.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在驱动程序回调已准备就绪，我们可以填充由此驱动程序处理的设备。
 - en: Provisioning supported devices in the driver
+  id: totrans-136
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 驱动程序中支持的设备供应
 - en: Our platform driver is useless on its own. To make it useful to devices, it
     must inform the kernel what devices it can manage. To achieve that, an ID table
     must be provided, assigned to the `platform_driver.id_table` field. This will
     allow platform device matching. However, to extend this feature to module autoloading,
     the same table must be given to `MODULE_DEVICE_TABLE` so that module aliases are
     generated.
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的平台驱动程序本身是无用的。要使其对设备有用，必须告知内核它可以管理哪些设备。为实现此目的，必须提供ID表，分配给`platform_driver.id_table`字段。这将允许平台设备匹配。但是，为了将此功能扩展到模块自动加载，必须将相同的表提供给`MODULE_DEVICE_TABLE`，以便生成模块别名。
 - en: 'Back to the code, each entry in that table is of the `struct platform_device_id`
     type, defined as follows:'
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 回到代码，该表中的每个条目均为`struct platform_device_id`类型，定义如下：
 - en: '[PRE31]'
+  id: totrans-139
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'In the preceding data structure, `name` is a descriptive name for the device,
     and `driver_data` is the driver state value. It can be set with a pointer to a
     per-device data structure. The following is an example, an excerpt from `drivers/mmc/host/mxs-mmc.c`:'
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上述数据结构中，`name`是设备的描述性名称，`driver_data`是驱动程序状态值。它可以设置为指向每个设备数据结构的指针。以下是一个示例，摘自`drivers/mmc/host/mxs-mmc.c`：
 - en: '[PRE32]'
+  id: totrans-141
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: When `mxs_ssp_ids` is assigned to the `platform_driver.id_table` field, platform
     devices will be able to match this driver based on their name matching any `platform_device_id.name`
     entry. `platform_device.id_entry` will point to the entry in this table that triggered
     the match.
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: 当将`mxs_ssp_ids`分配给`platform_driver.id_table`字段时，平台设备将能够根据它们的名称与任何`platform_device_id.name`条目匹配此驱动程序。`platform_device.id_entry`将指向触发匹配的此表中的条目。
 - en: 'To allow matching platform devices declared in the device tree using their
     compatible string, the platform driver must set `platform_driver.driver.of_match_table`
     with a list of elements of `struct of_device_id`; then, to allow module autoloading
     from device tree matching as well, this device tree match table must be given
     to `MODULE_DEVICE_TABLE`. The following is an example:'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 要允许匹配通过其兼容字符串在设备树中声明的平台设备，平台驱动程序必须使用`struct of_device_id`元素的列表设置`platform_driver.driver.of_match_table`。然后，为了允许从设备树匹配进行模块自动加载，必须将此设备树匹配表提供给`MODULE_DEVICE_TABLE`。以下是一个示例：
 - en: '[PRE33]'
+  id: totrans-144
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: If `of_device_id` is set in the driver, the matching is judged by any `of_device_id.compatible`
     element matching the value of the compatible property in the device node. To get
     the `of_device_id` entry that caused the match, the driver should call `of_match_device()`,
     passing as parameters the device tree match table and the underlying device structure,
     `platform_device.dev`.
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果在驱动程序中设置了`of_device_id`，则匹配是通过与设备节点中的兼容属性的任何`of_device_id.compatible`元素匹配来判断的。要获取引起匹配的`of_device_id`条目，驱动程序应调用`of_match_device()`，并传递设备树匹配表和底层设备结构`platform_device.dev`作为参数。
 - en: 'The following is an example:'
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是一个示例：
 - en: '[PRE34]'
+  id: totrans-147
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'After these match tables have been defined, they can be assigned to the platform
     driver structure as follows:'
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 在定义这些匹配表后，它们可以按以下方式分配给平台驱动程序结构：
 - en: '[PRE35]'
+  id: totrans-149
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: With the preceding final platform driver data structure, we give devices a chance
     to match the platform driver based on either the device tree match table, or on
     the ID table, and finally, based on the driver's name.
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前述最终平台驱动程序数据结构中，我们根据设备树匹配表或ID表，最后根据驱动程序名称，为设备提供匹配平台驱动程序的机会。
 - en: Driver initialization and registration
+  id: totrans-151
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 驱动程序初始化和注册
 - en: Registering a platform driver with the kernel is as simple as calling `platform_driver_register()`
     or `platform_driver_probe()` in the module initialization function. Then, to get
     rid of a platform driver that has been registered, the module must call `platform_driver_unregister()`
     to unregister this driver.
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 将平台驱动程序注册到内核中，就像在模块初始化函数中调用`platform_driver_register()`或`platform_driver_probe()`一样简单。然后，为了删除已注册的驱动程序，模块必须调用`platform_driver_unregister()`来取消注册该驱动程序。
 - en: 'The following are the respective prototypes of these functions:'
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是这些函数的各自原型：
 - en: '[PRE36]'
+  id: totrans-154
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'The difference between the two probing functions is as follows:'
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两个探测函数之间的区别如下：
 - en: '`platform_driver_register()` registers and puts the driver into a list of drivers
     maintained by the kernel, meaning that its `probe()` function can be called on
     demand whenever a new match with a platform device occurs. To prevent the driver
     from being inserted and registered in that list, the next function can be used.
     That said, any platform driver registered with `platform_driver_register()` must
     be unregistered with `platform_driver_unregister()`.'
+  id: totrans-156
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`platform_driver_register()`函数将驱动程序注册并将其放入内核维护的驱动程序列表中，这意味着每当出现与平台设备匹配的情况时，内核可以按需调用其`probe()`函数。为了防止驱动程序被插入并注册到该列表中，可以使用下一个函数。也就是说，任何使用`platform_driver_register()`注册的平台驱动程序都必须通过`platform_driver_unregister()`取消注册。'
 - en: 'With `platform_driver_probe()`, the kernel immediately runs the matching loop
     to check whether there are platform devices that can be matched against this platform
     driver and will call the `probe` method for each device with a match. If no device
@@ -740,54 +1065,76 @@
     driver is compiled statically, that is, built-in) when the kernel boot has completed,
     thereby preventing a deferred probe, and reducing the driver''s memory footprint.
     Use this method if you are 100% sure the device is present in the system:'
+  id: totrans-157
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用`platform_driver_probe()`时，内核会立即运行匹配循环，检查是否有平台设备可以与此平台驱动程序匹配，并在每个匹配的设备上调用`probe`方法。如果此时没有找到设备，平台驱动程序将被简单地忽略。该方法防止了延迟探测，因为它不会将驱动程序注册到系统中。在这里，`probe`函数被放置在`__init`段中，该段在内核启动完成后会被释放（前提是驱动程序是静态编译的，即内置驱动程序），从而防止了延迟探测，并减少了驱动程序的内存占用。如果你确信设备在系统中存在，可以使用这种方法：
 - en: '[PRE37]'
+  id: totrans-158
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: The `probe()` procedure can be placed in an `__init` section if the device is
     known not to be hot-pluggable.
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果设备已知不可热插拔，可以将`probe()`过程放置在`__init`段中。
 - en: The appropriate time to register the platform driver is right after the module
     gets loaded, which allows us to say that the appropriate place to do that is from
     the module initialization function. The same goes for unregistering the driver,
     which must be done on the unloading path of the module. Thanks to that, we can
     say that the `module_exit` function is the appropriate place to unregister a platform
     driver.
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 注册平台驱动程序的合适时机是在模块加载后，这使我们可以说，合适的做法是在模块初始化函数中进行注册。同样，取消注册驱动程序也必须在模块的卸载路径中完成。由于这一点，我们可以说，`module_exit`函数是取消注册平台驱动程序的合适位置。
 - en: 'The following is a typical demonstration of simple platform driver registering
     with the platform core:'
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是一个典型的平台驱动程序注册到平台核心的示例：
 - en: '[PRE38]'
+  id: totrans-162
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'Our module does nothing else in the initialization/exit function apart from
     registering/unregistering with the platform driver with the platform bus core.
     This is a frequent situation, where the module init/exit methods are lite and
     dummy. In this case, we can get rid of `module_init()` and `module_exit()`, and
     use the `module_platform_driver()` macro, as follows:'
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的模块在初始化/退出函数中除了通过平台总线核心注册/注销平台驱动程序之外，不做其他操作。这是一个常见的情况，其中模块的初始化/退出方法非常简单。在这种情况下，我们可以去掉`module_init()`和`module_exit()`，而使用`module_platform_driver()`宏，代码如下：
 - en: '[PRE39]'
+  id: totrans-164
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: Although we have only inserted snapshot code in the preceding example, this
     is enough to cover the demonstration of reducing the code and making it cleaner.
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管在前面的示例中我们仅插入了快照代码，但这已经足够演示如何减少代码并使其更简洁。
 - en: To make sure we are on the same knowledge base, let's summarize all the concepts
     we have learned in this chapter into a real platform driver.
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 为确保我们在相同的知识基础上，下面将总结本章所学的所有概念，并将其应用于一个实际的平台驱动程序。
 - en: Example of writing a platform driver from scratch
+  id: totrans-167
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 从头开始编写平台驱动程序的示例
 - en: This section will try to summarize as far as possible the knowledge that has
     been acquired so far throughout the chapter. Now, let's imagine a platform device
     that is memory-mapped and that the memory range through which it can be controlled
@@ -795,65 +1142,95 @@
     device can interrupt the CPU upon completion of its jobs and that this interrupt
     line number is `31`. To keep things simple, let's not require any other resource
     for this device (we could have imagined clocks, DMAs, regulators, and so on).
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节将尽可能总结到目前为止在本章中获得的知识。现在，让我们设想一个内存映射的平台设备，其可以通过的内存范围从`0x02008000`开始，大小为`0x4000`。然后，假设这个平台设备在完成任务后能够中断CPU，且该中断线路编号为`31`。为了简化问题，假设该设备不需要其他资源（我们本可以设想时钟、DMA、调节器等资源）。
 - en: 'To start with, let''s instantiate this platform device from the device tree.
     If you remember, for a node to be registered as a platform device by the platform
     core, the direct parent of this node must have `simple-bus` in its compatible
     string list, and this is what is implemented here:'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，让我们从设备树实例化这个平台设备。如果你记得的话，为了让平台核心将一个节点注册为平台设备，这个节点的直接父节点必须在其兼容性字符串列表中包含`simple-bus`，而这正是这里实现的内容：
 - en: '[PRE40]'
+  id: totrans-170
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'If we had to instantiate this platform device along with its resources in the
     traditional way, we would have to do something like the following, in a file that
     we will call `demo-pdev-init.c`:'
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们需要以传统的方式实例化这个平台设备及其资源，我们将不得不在一个我们称之为`demo-pdev-init.c`的文件中执行类似以下的操作：
 - en: '[PRE41]'
+  id: totrans-172
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: 'In the preceding, we first defined the platform resources. Now we can instantiate
     the platform device and assign these resources as follows, still in `demo-pdev-init.c`:'
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的内容中，我们首先定义了平台资源。现在我们可以实例化平台设备并分配这些资源，如下所示，仍然是在`demo-pdev-init.c`中：
 - en: '[PRE42]'
+  id: totrans-174
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: In the preceding, we commented out the `dev`-related assignment just to show
     that we could have defined a bigger structure with any other information expected
     by the driver and passed this data structure as platform data.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的内容中，我们注释掉了与`dev`相关的赋值操作，目的是为了展示我们本可以定义一个更大的结构体，包含驱动程序期望的任何其他信息，并将这个数据结构作为平台数据传递。
 - en: 'Now that all the data structures are set up, we can register the platform device
     by adding the following content at the bottom of `demo-pdev-init.c`:'
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在所有数据结构都已设置完毕，我们可以通过在`demo-pdev-init.c`的底部添加以下内容来注册平台设备：
 - en: '[PRE43]'
+  id: totrans-177
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: The preceding code does nothing other than register the platform device with
     the system. In this example, we have used static initialization. That said, things
     won't be that much different with dynamic initialization.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 前面的代码除了将平台设备注册到系统中，别无他用。在这个例子中，我们使用了静态初始化。也就是说，动态初始化和静态初始化并没有太大区别。
 - en: 'Now that we are done with platform device instantiation, let''s focus on the
     platform driver itself, whose compilation unit is named `demo-pdriver.c`, and
     add the following header files to it:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们完成了平台设备的实例化，接下来让我们关注平台驱动程序本身，其编译单元名为`demo-pdriver.c`，并向其中添加以下头文件：
 - en: '[PRE44]'
+  id: totrans-180
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: 'Now that the headers that will allow us to support the necessary APIs and to
     use the appropriate data structures are in place, let''s start by enumerating
     the devices that can be matched with this platform driver from the device tree:'
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，必要的头文件已到位，允许我们支持所需的API并使用适当的数据结构，让我们从设备树中开始列举能够与此平台驱动程序匹配的设备：
 - en: '[PRE45]'
+  id: totrans-182
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: In the preceding, the device tree match table enumerates the supported devices
     that are differentiated by their `compatible` property. Here, again, the `.data`
     assignment is commented out just to show how we could have passed platform-specific
@@ -861,91 +1238,131 @@
     platform-specific structure could have been `big_struct_1` or `big_struct_2`.
     This is the way I recommend when you need to pass platform data and still want
     to use the device tree.
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的内容中，设备树匹配表列出了通过`compatible`属性区分的支持设备。同样，`.data`赋值被注释掉，目的是展示如何根据与平台设备匹配的条目传递平台特定数据。这个平台特定的结构体本可以是`big_struct_1`或`big_struct_2`。当你需要传递平台数据并且仍然想使用设备树时，我推荐使用这种方法。
 - en: 'To provide an opportunity for matching using an ID table, we populate such
     a table as follows:'
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了提供使用ID表进行匹配的机会，我们如下所示填充了这样一个表：
 - en: '[PRE46]'
+  id: totrans-185
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: The preceding requires no special comments, except the commented-out part, which
     shows how extra data could be used depending on the device being handled.
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 前述内容不需要特别的注释，除了被注释掉的部分，它展示了如何根据所处理的设备使用额外的数据。
 - en: 'At this stage, we are good to go with the implementation of the probe method.
     Still in our demo platform driver compilation unit, we add the following:'
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个阶段，我们可以继续实现探测方法。仍然在我们的演示平台驱动编译单元中，我们添加了如下内容：
 - en: '[PRE47]'
+  id: totrans-188
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'In the preceding probe method, a lot of things could have been added or done
     differently. The first case is if our driver was device tree-compliant only, and
     that the associated platform device was instantiated from the device tree as well.
     We could have done something like this:'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前述的探测方法中，可以添加很多东西或者以不同的方式处理。第一个情况是如果我们的驱动程序仅符合设备树，并且相关的平台注册设备也从设备树实例化。我们可以这样做：
 - en: '[PRE48]'
+  id: totrans-190
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: In the preceding, we grab a reference to the device tree note associated with
     the platform device, on which we could use whatever device tree-related APIs (such
     as `of_get_property()`) to extract data from there. Next, in the case where a
     platform-specific data structure was passed when provisioning the supported device
     in the match table, we use `of_match_device()` to point to the entry that corresponds
     to the hit and we extract the platform-specific data.
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前述内容中，我们获取了与平台注册设备关联的设备树节点的引用，在此基础上我们可以使用任何与设备树相关的API（如`of_get_property()`）从中提取数据。接下来，在通过匹配表提供受支持设备时，如果传递了平台特定的数据结构，我们使用`of_match_device()`来指向对应匹配项的条目，并提取平台特定数据。
 - en: If the match occurred thanks to the ID table, `pdev->id_entry` would point to
     the entry thanks to which the match occurred, and `pdev->id_entry->driver_data`
     would point to the appropriate bigger structure.
+  id: totrans-192
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果匹配是通过ID表发生的，`pdev->id_entry`将指向发生匹配的条目，`pdev->id_entry->driver_data`将指向适当的更大结构。
 - en: 'However, if the platform data were declared in the traditional method, we would
     use something as follows:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，如果平台数据是以传统方式声明的，我们将使用如下内容：
 - en: '[PRE49]'
+  id: totrans-194
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'Now that we are done with the probe method, I would like to draw your attention
     to a particular point: in that method, we exclusively used the `devm_` prefixed
     function to deal with resources. These are functions that take care of releasing
     the resource at the appropriate time.'
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经完成了探测方法，我想提醒你一个特别的点：在该方法中，我们仅使用了带有`devm_`前缀的函数来处理资源。这些函数会在适当的时机自动释放资源。
 - en: 'What this means is that we don''t require a `remove` method. However, for the
     sake of pedagogy, the following is what our remove method would look like if we
     did not use resource-managed helpers:'
+  id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: 这意味着我们不需要一个`remove`方法。然而，为了教学目的，以下是如果我们不使用资源管理帮助函数时，`remove`方法的实现方式：
 - en: '[PRE50]'
+  id: totrans-197
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: In the preceding, the IRQ resource is released, and the memory mapping is destroyed.
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前述内容中，IRQ资源被释放，内存映射被销毁。
 - en: 'Well now, everything is in place. We can initialize and register the platform
     driver using the following:'
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 好了，现在一切都就绪。我们可以使用以下内容来初始化并注册平台驱动：
 - en: '[PRE51]'
+  id: totrans-200
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'There is another important point you need to consider: the names of the platform
     device, platform driver, and even the device node name in the device tree. They
     are all the same, that is, `demo_pdev`. This is a way to provide an opportunity
     to match even by platform device and platform driver names since matching by name
     is used as a fallback when all of the device tree, ID table, and ACPI matchings
     fail.'
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: 还有一个重要点需要考虑：平台设备、平台驱动以及设备树中的设备节点名称都相同，即`demo_pdev`。这提供了一种即使在设备树、ID表和ACPI匹配失败时，通过平台设备和平台驱动名称进行匹配的机会，因为名称匹配会作为所有其他匹配失败后的后备方案。
 - en: Summary
+  id: totrans-202
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: The kernel pseudo platform bus no longer holds any secrets for you. With a bus
     matching mechanism, you can understand how, when, and why your driver has been
     loaded, as well as which device it was written for. We can implement any probe
@@ -953,9 +1370,13 @@
     device driver is to handle devices, we are now able to populate devices in the
     system, either in the traditional way or from the device tree. To finish in style,
     we implemented a functional platform driver example from scratch.
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核伪平台总线不再对你保留任何秘密。通过总线匹配机制，你可以理解你的驱动程序是如何、何时、为何加载的，以及它是为哪个设备编写的。我们可以根据所需的匹配机制实现任何探测功能。由于设备驱动程序的主要目的是处理设备，我们现在能够在系统中填充设备，无论是通过传统方式还是通过设备树。为了完美收尾，我们从零开始实现了一个功能性平台驱动示例。
 - en: In the next chapter, we will continue learning how to write drivers for non-discoverable
     devices, but sitting on I2C buses this time.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章中，我们将继续学习如何为不可发现的设备编写驱动程序，不过这次是在 I2C 总线上进行。
