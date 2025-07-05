@@ -1,595 +1,880 @@
 - en: Appendix C. Useful LDAP Commands
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 附录 C. 有用的 LDAP 命令
 - en: In the course of this book we looked at all the command line tools that come
     in the OpenLDAP distribution. But the scope of this book requires the discussion
     of each of these tools briefly. There are some advanced uses of these tools that
     can come in handy at times. In this appendix I have provided examples of such
     uses.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本书过程中，我们查看了 OpenLDAP 发布版中所有命令行工具。但本书的范围要求我们简要讨论每个工具。也有一些高级用法，在某些时候可能会很有用。在本附录中，我提供了这些用法的示例。
 - en: In this appendix, we will cover
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本附录中，我们将介绍
 - en: Getting information about the directory using `ldapsearch`
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 `ldapsearch` 获取目录信息
 - en: Creating backups of the directory using two different strategies
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用两种不同策略创建目录备份
 - en: Rebuilding a BDB/HDB database
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 重建 BDB/HDB 数据库
 - en: Getting Information about the Directory
+  id: totrans-6
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 获取目录信息
 - en: Many LDAP servers provide information about their configuration and functional
     abilities. This information is stored in such a way that LDAP clients can directly
     access it using a search operation. For example, a client can fetch the **root
     DSE** record to find out the basic capabilities of the server. It can also access
     the **subschema** of the server and find out what object classes, syntaxes, matching
     rules, and attributes are supported.
+  id: totrans-7
   prefs: []
   type: TYPE_NORMAL
+  zh: 许多 LDAP 服务器提供有关其配置和功能的详细信息。这些信息以一种 LDAP 客户端可以直接访问的方式存储，客户端可以通过搜索操作来获取。例如，客户端可以获取
+    **根 DSE** 记录，以了解服务器的基本功能。它还可以访问服务器的 **子模式**，并了解支持哪些对象类、语法、匹配规则和属性。
 - en: The Root DSE
+  id: totrans-8
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 根 DSE
 - en: 'The **root DSE (DSA-Specific Entry**, where **DSA** stands for **Directory
     Service Agent**) is a special entry that provides information about the server
     itself. The DN of the root DSE is an empty string (""). To retrieve it we need
     a carefully-crafted LDAP search that will set an empty search base and then retrieve
     that root entry:'
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: '**根 DSE（DSA 特定条目）**（其中 **DSA** 代表 **目录服务代理**）是一个特殊条目，提供关于服务器自身的信息。根 DSE 的 DN
+    是一个空字符串（""）。为了获取它，我们需要一个精心设计的 LDAP 查询，该查询将设置空的搜索基准并检索该根条目：'
 - en: '[PRE0]'
+  id: totrans-10
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: Note that the base is set to an empty string, and the search scope is limited
     to the base record. These parameters combined have the effect of requesting only
     the record that has an empty DN. Also, since most of the attributes in the root
     DSE are operational attributes, we need to specify `'+'` at the end of the search.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，基准被设置为空字符串，搜索范围仅限于基准记录。这些参数结合起来的效果是仅请求 DN 为空的记录。此外，由于根 DSE 中大多数属性是操作属性，因此我们需要在搜索的末尾指定
+    `'+'`。
 - en: 'The results of running this search look something like this:'
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 运行此查询的结果大致如下：
 - en: '[PRE1]'
+  id: totrans-13
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Among other things, this record gives us information about what controls, features,
     and extensions are understood by and enabled on the server. For example, there
     is a `supportedFeature` line that reads:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 除其他事项外，该记录为我们提供了有关服务器理解并启用哪些控件、功能和扩展的信息。例如，记录中有一行 `supportedFeature`，内容如下：
 - en: '[PRE2]'
+  id: totrans-15
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: This line indicates that this LDAP server supports an LDAPv3 extension for **Change
     Password** operations as defined in RFC 3062 ([http://www.rfc-editor.org/rfc/rfc3062.txt](http://www.rfc-editor.org/rfc/rfc3062.txt)).
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 这一行表示该 LDAP 服务器支持 RFC 3062 中定义的 LDAPv3 扩展的 **更改密码** 操作（[http://www.rfc-editor.org/rfc/rfc3062.txt](http://www.rfc-editor.org/rfc/rfc3062.txt)）。
 - en: Using this information, a well-crafted LDAP client would be able to perform
     a server-side Change Password operation instead of changing the password on the
     client side and then using a Modify operation to send the change to the server.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用这些信息，一个精心设计的 LDAP 客户端将能够执行服务器端的更改密码操作，而不是在客户端更改密码后再使用修改操作将更改发送到服务器。
 - en: Note
+  id: totrans-18
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: The advantage of the Change Password operation is in the server's storage. If
     the client changes a password through a Modify operation it must know in advance
     what types of encryption are supported on the server, it must do the encrypting
     itself, and then submit the encrypted password to the server. Usually, it is better
     to have the client securely contacting the server (over TLS, for example), and
     then using a Change Password operation so that the server can do the storage.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 更改密码操作的优点在于服务器的存储。如果客户端通过修改操作更改密码，它必须事先知道服务器支持哪些加密类型，它必须自己进行加密，然后将加密后的密码提交到服务器。通常，最好让客户端通过安全的方式（例如通过
+    TLS）与服务器进行连接，然后使用更改密码操作，这样服务器就可以进行存储。
 - en: The root DSE record also points to the configuration (`cn=config`) and subschema
     (`cn=subschema`) records.
+  id: totrans-20
   prefs: []
   type: TYPE_NORMAL
+  zh: 根DSE记录还指向配置（`cn=config`）和子模式（`cn=subschema`）记录。
 - en: The Subschema Record
+  id: totrans-21
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 子模式记录
 - en: The subschema record is stored in `cn=subschema`. This record contains detailed
     information about the schemas supported by the server, including what types of
     matching rules it has available, what sort of syntaxes are allowed in attributes,
     and what attributes and object classes are recognized by the server.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 子模式记录存储在`cn=subschema`中。该记录包含有关服务器支持的模式的详细信息，包括它可用的匹配规则类型、允许在属性中使用的语法类型，以及服务器识别的属性和对象类。
 - en: This information can be used by client applications to correctly craft records
     or searches, and then correctly interpret the responses.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 客户端应用程序可以使用这些信息正确构造记录或搜索，并正确解释响应。
 - en: 'The subschema record can be retrieved with `ldapsearch` using the following
     command:'
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以使用以下命令通过`ldapsearch`检索子模式记录：
 - en: '[PRE3]'
+  id: totrans-25
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: In this example we request the desired record by setting the base DN to `cn=config`,
     and then requesting a search type of `base` (`-b` `'cn=subschema'` `-s` `base`).
     This returns the exact record with the DN `cn=subschema`.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此示例中，我们通过将基础DN设置为`cn=config`，然后请求`base`类型的搜索（`-b` `'cn=subschema'` `-s` `base`），来请求所需的记录。这将返回具有DN为`cn=subschema`的确切记录。
 - en: Also, most of the attributes we want are operational attributes, which means
     they will not be returned in a normal search, so at the end we specify `'+'` to
     indicate that we want the operational attributes.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，我们需要的多数属性是操作属性，这意味着它们不会在正常搜索中返回，因此最后我们指定`'+'`，表示我们需要操作属性。
 - en: 'The record returned looks like this:'
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 返回的记录如下所示：
 - en: '[PRE4]'
+  id: totrans-29
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: A subschema record contains all of the schema information and thus, it may be
     well over a thousand lines.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个子模式记录包含所有的模式信息，因此，它可能会有一千多行。
 - en: Subschema records can be particularly useful to learn about what schemas a server
     supports, or when developing and debugging custom schemas, as discussed in Chapter
     6.
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 子模式记录特别有助于了解服务器支持哪些模式，或者在开发和调试自定义模式时，如第六章所讨论的那样。
 - en: The Configuration Record
+  id: totrans-32
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 配置记录
 - en: An experimental feature of OpenLDAP 2.3 (and one that will probably reach production
     quality in OpenLDAP 2.4) is the ability to store the LDAP configuration inside
     of the directory. To do this you must first re-create your configuration in LDIF
     format using a special configuration schema, and instruct SLAPD to read its configuration
     from this new LDIF file.
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenLDAP 2.3的一个实验性功能（并且这个功能可能在OpenLDAP 2.4中达到生产质量）是将LDAP配置存储在目录中。要实现这一点，必须首先使用特殊的配置模式将配置重新创建为LDIF格式，并指示SLAPD从这个新的LDIF文件中读取其配置。
 - en: 'The configuration is stored inside of the directory with the DN `cn=config`.
     It can be accessed with a search similar to the one used in the previous section:'
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置信息存储在目录中的DN为`cn=config`。可以通过类似前一节使用的搜索来访问：
 - en: '[PRE5]'
+  id: totrans-35
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: In OpenLDAP 2.3, not all of the overlays and features of OpenLDAP work correctly
     with this new configuration style, and that is a significant drawback to its use.
     But improving this alternate configuration mechanism is a priority for development
     in OpenLDAP 2.4.
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 在OpenLDAP 2.3中，并非所有的叠加层和OpenLDAP的功能都能与这种新的配置样式正确配合工作，这对于其使用来说是一个重要的缺点。但改进这种替代配置机制是OpenLDAP
+    2.4开发中的一个优先事项。
 - en: 'What might be the advantages of storing your configuration in the directory?
     Here are a few:'
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 将配置存储在目录中的优势是什么？以下是几个可能的优势：
 - en: Easy access to configuration information through `ldapsearch` and other LDAP
     clients.
+  id: totrans-38
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过`ldapsearch`和其他LDAP客户端轻松访问配置信息。
 - en: The ability to edit configuration information through directory tools like `ldapmodify`.
+  id: totrans-39
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过目录工具如`ldapmodify`编辑配置信息的能力。
 - en: Replication support for SLAPD configuration. You may be able to use SyncRepl
     to synchronize directory configurations across the network.
+  id: totrans-40
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: SLAPD配置的复制支持。你可以使用SyncRepl同步目录配置到网络上。
 - en: 'If you would like to implement the new LDAP-based configuration file format,
     you can learn about it in the LDAP Administrators Guide at the OpenLDAP site:
     [http://www.openldap.org/doc/admin23/slapdconf2.html](http://www.openldap.org/doc/admin23/slapdconf2.html).'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想实现新的基于LDAP的配置文件格式，可以在OpenLDAP网站的LDAP管理员指南中了解：[http://www.openldap.org/doc/admin23/slapdconf2.html](http://www.openldap.org/doc/admin23/slapdconf2.html)。
 - en: Making a Directory Backup
+  id: totrans-42
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 进行目录备份
 - en: There are two common strategies for backing up the contents of your directory.
     One is to make a backup of the directory database. The other is to dump the contents
     of the directory into an LDIF file.
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 有两种常见的备份策略：一种是备份目录数据库，另一种是将目录内容导出到 LDIF 文件中。
 - en: A Backup Copy of the Directory Database
+  id: totrans-44
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 目录数据库的备份副本
 - en: Different backends locate the contents of the directory in different locations.
     For example, the BDB and HDB backends store data in special Berkeley DB database
     files. SQL-based backends store the information in a relational database management
     system. Special backends like the LDAP and Perl backends may not store data at
     all, but might simply access other sources.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 不同的后端将目录的内容存储在不同的位置。例如，BDB 和 HDB 后端将数据存储在特殊的 Berkeley DB 数据库文件中。基于 SQL 的后端将信息存储在关系型数据库管理系统中。像
+    LDAP 和 Perl 这样的特殊后端可能根本不存储数据，而只是访问其他数据源。
 - en: Each of these backends will require a different backup procedure. Here we will
     just look at backing up BDB and HDB databases—the types we've used throughout
     the book.
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个后端将需要不同的备份程序。这里我们只看如何备份 BDB 和 HDB 数据库——这是本书中使用的类型。
 - en: Note
+  id: totrans-47
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: This method is not portable. BDB/HDB files are version sensitive. Each new release
     of OpenLDAP (or of Berkeley DB) may use different structures for these databases,
     so this backup method only works when the backup and the restore are done on the
     same software versions.
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种方法不可移植。BDB/HDB 文件对版本非常敏感。每次 OpenLDAP（或 Berkeley DB）的新版本发布时，可能会使用不同的数据库结构，因此此备份方法仅在备份和恢复使用相同软件版本时有效。
 - en: In Ubuntu these database files are located at `/var/lib/ldap`. All of the files
     in this directory, including the indexes (those that end with the `bdb` extension),
     the main database files (`__db.???`) and the log files (`log.??????????`). It
     is also a good idea to make a copy of the `DB_CONFIG` file, though it rarely changes
     and does not store any directory data.
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 Ubuntu 中，这些数据库文件位于 `/var/lib/ldap`。该目录中的所有文件，包括索引（以 `bdb` 扩展名结尾的文件）、主数据库文件（`__db.???`）和日志文件（`log.??????????`）。最好也备份
+    `DB_CONFIG` 文件，尽管它很少变化，且不存储任何目录数据。
 - en: 'When backing up these files it is best to stop SLAPD. Here''s a very simple
     example using common shell tools:'
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 在备份这些文件时，最好停止 SLAPD。下面是一个使用常见 shell 工具的简单示例：
 - en: '[PRE6]'
+  id: totrans-51
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: This will stop SLAPD and copy all of the files at `/var/lib/ldap/` to `/usr/local/backup/ldap/`.
     Then, SLAPD will be started again.
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将停止 SLAPD 并将 `/var/lib/ldap/` 下的所有文件复制到 `/usr/local/backup/ldap/`。然后，SLAPD
+    会重新启动。
 - en: An LDIF Backup File
+  id: totrans-53
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 一个 LDIF 备份文件
 - en: 'The second, and more portable, strategy for backing up the directory is to
     dump the contents of the directory to an LDIF file. There are several distinct
     advantages to this approach:'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 第二种，更具可移植性的备份策略是将目录的内容导出到 LDIF 文件。此方法有几个明显的优点：
 - en: There is no need to stop SLAPD
+  id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 无需停止 SLAPD
 - en: The output is more portable, and data can be moved from one database backend
     to another, and from one OpenLDAP version to another
+  id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 输出更具可移植性，数据可以从一个数据库后端迁移到另一个，并且可以从一个 OpenLDAP 版本迁移到另一个版本。
 - en: 'There is less redundant data, so backup files are much smaller than the BDB/HDB
     files.To make an LDIF backup file of the contents of a directory server with only
     one database (that is, it has only one directory root), the command is simple:'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 数据冗余较少，因此备份文件比 BDB/HDB 文件要小得多。要创建一个仅包含一个数据库的目录服务器的 LDIF 备份文件（即它只有一个目录根），命令非常简单：
 - en: '[PRE7]'
+  id: totrans-58
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: This command uses `slapcat` to dump the contents of the directory, in the LDIF
     format, into the file `/usr/local/backup/my_directory.ldif`. It can be loaded
     back into the directory using the `slapdadd` tool discussed in Chapter 3.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个命令使用 `slapcat` 将目录的内容以 LDIF 格式导出到文件 `/usr/local/backup/my_directory.ldif`。可以使用第
+    3 章中讨论的 `slapdadd` 工具将其重新加载到目录中。
 - en: 'If your directory contains more than one directory information tree, you will
     need to run the `slapcat` routine once for each server, using the `-b` flag to
     identify the suffix (base DN) of the directory information tree you want to dump:'
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您的目录包含多个目录信息树，您需要对每个服务器运行一次 `slapcat` 程序，并使用 `-b` 标志来指定您要导出的目录信息树的后缀（基础 DN）：
 - en: '[PRE8]'
+  id: totrans-61
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: In this example we backup each directory into its own LDIF file.
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，我们将每个目录备份到各自的 LDIF 文件中。
 - en: Rebuilding a Database (BDB, HDB)
+  id: totrans-63
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 重建数据库（BDB, HDB）
 - en: Sometimes it is necessary to rebuild a backend database. This process differs
     depending on the database backend. For instance, with a SQL backend, it might
     entail dumping, dropping, and re-creating tables in the database.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时需要重建后端数据库。这个过程会根据数据库后端的不同而有所不同。例如，使用 SQL 后端时，可能需要转储、删除并重新创建数据库中的表。
 - en: Note
+  id: totrans-65
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Moving to a new server and transferring contents to a new slave server are also
     processes similar to rebuilding a database, and the differences are mentioned
     within the text here.
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 移动到新服务器并将内容传输到新从属服务器的过程也类似于重建数据库，文中提到了其中的区别。
 - en: The most commonly-used backends for OpenLDAP are the HDB and BDB backends (both
     based on the Berkeley DB lightweight database). In this section, I want to cover
     the process of rebuilding these databases.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenLDAP 最常用的后端是 HDB 和 BDB 后端（两者都基于 Berkeley DB 轻量级数据库）。在这一节中，我将讲解重建这些数据库的过程。
 - en: 'This process consists of five steps:'
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 该过程包含五个步骤：
 - en: Stop SLAPD
+  id: totrans-69
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 停止 SLAPD
 - en: Dump the directory data into a file
+  id: totrans-70
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将目录数据转储到文件中
 - en: Delete the old directory files
+  id: totrans-71
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 删除旧的目录文件
 - en: Create a new database
+  id: totrans-72
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建新数据库
 - en: Start SLAPD
+  id: totrans-73
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 启动 SLAPD
 - en: None of these steps is particularly difficult. In fact, for a small to medium-sized
     directory, this process can be done in less than ten minutes.
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些步骤都不特别困难。实际上，对于一个小型到中型的目录，这个过程可以在不到十分钟的时间内完成。
 - en: Note
+  id: totrans-75
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: '**Moving from Server to Server**'
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: '**从服务器迁移到服务器**'
 - en: Moving a directory from one server to another is done by a process very similar
     to that described here. Only step three, as mentioned later, differs. In this
     case, instead of deleting directory files, the LDIF file would be transferred
     from the original server to the new server. Steps one and two would be run on
     the original server, and steps four and five would be done on the new server.
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 将目录从一台服务器迁移到另一台服务器的过程与这里描述的非常相似。只有步骤三，如后文所述，有所不同。在这种情况下，LDIF 文件会从原始服务器传输到新服务器，而不是删除目录文件。步骤一和二会在原始服务器上执行，步骤四和五会在新服务器上完成。
 - en: 'Step 1: Stop the Server'
+  id: totrans-78
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 步骤 1：停止服务器
 - en: The purpose of stopping the server is to prevent additional changes to the directory
     information tree while we are working on it.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 停止服务器的目的是为了在我们处理目录信息树时，避免对其进行额外的修改。
 - en: Note
+  id: totrans-80
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: If you are just dumping the contents of a master directory to import into a
     shadow server that will use SyncRepl, you need not stop the server. Any changes
     that happen after the directory has been dumped will be retrieved by the shadow
     server during its first LDAP synchronization operation.
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你只是将主目录的内容转储并导入到将使用 SyncRepl 的影子服务器中，你无需停止服务器。目录转储后发生的任何更改都会在影子服务器的第一次 LDAP
+    同步操作中被检索到。
 - en: 'This can be done either by killing the server''s process ID, or by running
     the startup script with the stop command:'
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 这可以通过结束服务器的进程 ID 或运行启动脚本并加上停止命令来完成：
 - en: '[PRE9]'
+  id: totrans-83
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: Now that the server is stopped, we can dump the database.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在服务器已经停止，我们可以转储数据库。
 - en: 'Step 2: Dump the Database'
+  id: totrans-85
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 步骤 2：转储数据库
 - en: In Chapter 3 I covered the OpenLDAP utilities. One of the tools I discussed
     was the `slapcat` program, which is a tool for dumping the contents of the directory
     into an LDIF file. That is the program we will use in this step.
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 在第 3 章中，我讲解了 OpenLDAP 的工具。我们讨论的一个工具是 `slapcat` 程序，它用于将目录内容转储到 LDIF 文件中。这正是我们在本步骤中使用的工具。
 - en: Why use `slapcat` instead of an `ldapsearch`? There are two reasons.
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 为什么使用 `slapcat` 而不是 `ldapsearch`？有两个原因。
 - en: First, `slapcat` preserves all of the attributes (and records for that matter)
     that the LDAP server uses, including the operational attributes that are stored.
     (Those operational attributes that are generated at runtime are not generated
     by `slapcat`, and that is good. We wouldn't want to import those, anyway.)
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，`slapcat` 会保留 LDAP 服务器使用的所有属性（以及记录），包括存储的操作属性。（那些在运行时生成的操作属性不会被 `slapcat`
+    生成，这很好。我们反正不想导入这些属性。）
 - en: Second, `slapcat` accesses the database directly, instead of opening an LDAP
     connection to the server. That means that ACLs, time and size limits, and other
     by products of the LDAP connection are not evaluated, and hence will not alter
     the data.
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 其次，`slapcat` 直接访问数据库，而不是打开与服务器的 LDAP 连接。这意味着 ACL、时间和大小限制，以及 LDAP 连接的其他副产品不会被评估，因此不会更改数据。
 - en: The BDB/HDB database is stored in a small set of files located at `/var/lib/ldap`
     (or `/usr/local/var/openldap-data` if you built from source). Usually access to
     those files is restricted to only the ID of the SLAPD user. By default this is
     `root` or `ldap`. In order to extract information using `slapcat`, you will need
     to have access to those files.
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: BDB/HDB 数据库存储在位于 `/var/lib/ldap`（如果你是从源代码构建的，则为 `/usr/local/var/openldap-data`）的小文件集中。通常只有
+    SLAPD 用户的 ID 可以访问这些文件，默认情况下该用户为 `root` 或 `ldap`。为了使用 `slapcat` 提取信息，你需要访问这些文件。
 - en: 'We have this command:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们有这个命令：
 - en: '[PRE10]'
+  id: totrans-92
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: This command executes `slapcat` as root. The `-l` flag is used to pass in the
     name of the output file. In this case the file `backup.ldif` will be created in
     the `/tmp` directory.
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 该命令以 root 用户身份执行 `slapcat`。`-l` 标志用于传入输出文件的名称。在这种情况下，文件 `backup.ldif` 将被创建在
+    `/tmp` 目录中。
 - en: Note
+  id: totrans-94
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: You may prefer putting the LDIF file in a folder other than `/tmp`, especially
     if you plan on keeping the LDIF file for more than a few minutes.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可能更倾向于将 LDIF 文件放在 `/tmp` 以外的文件夹中，特别是如果你打算保留 LDIF 文件超过几分钟的话。
 - en: In most cases the `-l` flag is the only one you will need. If you have more
     than one backend and you only want to dump one, you can use the `-n` flag to specify
     which backend to dump.
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 在大多数情况下，`-l` 标志是唯一需要使用的。如果你有多个后端，并且只想转储一个后端，可以使用 `-n` 标志指定要转储的后端。
 - en: Once the `slapcat` is complete, we are done with this step.
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦 `slapcat` 完成，我们就完成了这一步。
 - en: Before continuing however, you may want to check the contents of the LDIF file
     to make sure that it is not corrupt. Do this before deleting the database files.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，在继续之前，你可能希望检查 LDIF 文件的内容，以确保它没有损坏。请在删除数据库文件之前执行此操作。
 - en: 'Step 3: Delete the Old Database Files'
+  id: totrans-99
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 第 3 步：删除旧的数据库文件
 - en: If you are re-building a database you will want to delete the old database files
     before building new ones.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你正在重建数据库，你需要在构建新数据库之前删除旧的数据库文件。
 - en: Note
+  id: totrans-101
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: You do not need to do this if you are either migrating from an old server to
     a new server or configuring SyncRepl shadow servers.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你是从旧服务器迁移到新服务器，或者配置 SyncRepl 阴影服务器，则无需执行此操作。
 - en: 'These files are stored at `/var/lib/ldap` (or `/usr/local/var/openldap-data`
     if you built from source). However, not all of the files in that directory should
     be deleted. We only want to delete:'
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些文件存储在 `/var/lib/ldap`（如果你是从源代码构建的，则为 `/usr/local/var/openldap-data`）目录下。然而，并不是该目录中的所有文件都应该被删除。我们只想删除以下文件：
 - en: 'The index files: files that end in ''`.bdb`''.'
+  id: totrans-104
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 索引文件：以 '`.bdb`' 结尾的文件。
 - en: 'The main database files: files named `__db.???`, where the question marks are
     replaced by numbers in sequence (`__db.001`, `__db.002`, and so on).'
+  id: totrans-105
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 主数据库文件：以 `__db.???` 命名的文件，其中问号被顺序的数字替代（如 `__db.001`、`__db.002` 等）。
 - en: 'The `alock` file: a file used internally for storing locking information. (Usually,
     this can be left with no negative consequences, but if SLAPD crashed, this can
     be left in an unstable state.)'
+  id: totrans-106
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`alock` 文件：用于内部存储锁定信息的文件。（通常可以保持不变，不会产生负面后果，但如果 SLAPD 崩溃，这个文件可能会处于不稳定状态。）'
 - en: 'The BDB log files: files named `log.??????????`, where the ten question marks
     are replaced by numbers in sequence: `log.0000000001`, `log.0000000002`, and so
     on.'
+  id: totrans-107
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: BDB 日志文件：以 `log.??????????` 命名的文件，其中十个问号被顺序的数字替代：`log.0000000001`、`log.0000000002`
+    等。
 - en: There is one file we definitely do not want to delete. This is our database
     configuration file, `DB_CONFIG`. Deleting it would cause the BDB engine to use
     its default settings, which are not tuned to our needs, and generally cause OpenLDAP
     to perform poorly.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 有一个文件是我们绝对不想删除的，那就是我们的数据库配置文件 `DB_CONFIG`。删除它会导致 BDB 引擎使用默认设置，这些设置没有针对我们的需求进行调整，通常会导致
+    OpenLDAP 性能不佳。
 - en: 'So, to delete the files, we can do the following:'
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以，为了删除文件，我们可以执行以下操作：
 - en: '[PRE11]'
+  id: totrans-110
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'To reduce the risk of data loss, you may want to backup the `__db.*`, `*.bdb`,
     and `log.*` files before removing them. Or instead of doing an `rm`, you may use
     `mv` to move the files to a different location:'
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了减少数据丢失的风险，你可能希望在删除这些文件之前备份 `__db.*`、`*.bdb` 和 `log.*` 文件。或者，你可以使用 `mv` 命令将文件移动到其他位置，而不是使用
+    `rm` 删除它们：
 - en: '[PRE12]'
+  id: totrans-112
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: Now the database directory has been cleared. We are ready to create new database
     files.
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在数据库目录已经清理完毕，我们可以开始创建新的数据库文件了。
 - en: 'Step 4: Create a New Database'
+  id: totrans-114
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 第 4 步：创建新数据库
 - en: 'The new database can be created and populated with the data all in one step,
     using the `slapadd` utility that we covered in Chapter 3\. Still in the OpenLDAP
     data directory, run the following command:'
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 新数据库可以通过使用我们在第 3 章中介绍的 `slapadd` 工具，在一个步骤中创建并填充数据。仍然在 OpenLDAP 数据目录下，运行以下命令：
 - en: '[PRE13]'
+  id: totrans-116
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: This will create all of the necessary files, import the LDIF file, and handle
     all of the data indexing as well.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将创建所有必要的文件，导入LDIF文件，并处理所有的数据索引。
 - en: Note
+  id: totrans-118
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'If you are running your LDAP server as a user other than root (and it is a
     good idea to do so), you will also need to use `chown` to change the ownership
     on all of the files at `/var/lib/ldap` to be owned by the SLAPD userID: `sudo`
     `chown` `openldap` `*.bdb` `log.*` `__db.*`.'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你以root以外的用户运行LDAP服务器（并且这样做是个好主意），你还需要使用`chown`命令更改`/var/lib/ldap`下所有文件的所有权，使其归SLAPD用户ID所有：`sudo`
+    `chown` `openldap` `*.bdb` `log.*` `__db.*`。
 - en: All we need to do now is restart the server.
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们需要做的就是重启服务器。
 - en: 'Step 5: Restart SLAPD'
+  id: totrans-121
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 第5步：重启SLAPD
 - en: If you stopped the server in step 1 you will need to restart it.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你在步骤1中停止了服务器，你需要重新启动它。
 - en: 'Restart the server in one of the usual ways. Using the init script is usually
     the best way:'
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 以常规方式之一重新启动服务器。使用初始化脚本通常是最好的方法：
 - en: '[PRE14]'
+  id: totrans-124
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: That's all there is to it. Now you should have SLAPD running with a fresh copy
     of the database.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 就是这样。现在你应该已经有了SLAPD，并且数据库已更新。
 - en: Troubleshooting Rebuilds
+  id: totrans-126
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 故障排除重建
 - en: As long as the LDIF file exported with `slapcat` is good, there is not much
     that can go wrong in this process. Even if you have to delete and recreate several
     times, as long as the LDIF file is safe, no important data is at risk.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 只要通过`slapcat`导出的LDIF文件没有问题，这个过程通常不会出错。即使需要删除并重新创建多次，只要LDIF文件安全，重要数据就不会受到威胁。
 - en: If SLAPD is running as a user other than `root`, the main problem with importing
     is usually the permissions on the database files at `/var/lib/ldap`. Permissions
     on the configuration files in `/etc/ldap` directory may also be the source of
     SLAPD failures. Make sure they are owned by the appropriate user.
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果SLAPD是以非`root`用户身份运行的，那么导入过程中的主要问题通常是`/var/lib/ldap`下数据库文件的权限。`/etc/ldap`目录中的配置文件权限也可能是SLAPD失败的原因。确保这些文件归适当的用户所有。
 - en: When switching versions of OpenLDAP, occasionally an old LDIF file will not
     be valid in the new server (this happened between OpenLDAP 2.0 and OpenLDAP 2.2,
     and again between 2.2 and 2.3; it could happen again in the future). While the
     standard schemas are fairly stable over time, operational attributes, which are
     not usually standardized, are more volatile, and do change from release to release.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 在切换OpenLDAP版本时，偶尔旧的LDIF文件在新服务器中无效（这种情况发生在OpenLDAP 2.0和OpenLDAP 2.2之间，又发生在2.2和2.3之间；未来可能还会发生）。虽然标准模式在时间上相对稳定，但操作属性通常没有标准化，变化更为频繁，并且在不同版本之间会有所变化。
 - en: Often, the fix will be tweaking records in the LDIF file to match the attributes
     used in new version. One other common issue has to do with starting up the server.
     Sometimes, when using the init script, you will not be able to get the server
     to start, but no informative message will be sent to the console or the log files.
     (One common reason for the failure to start is the permissions issue I noted earlier).
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，修复方法是调整LDIF文件中的记录，以匹配新版本中使用的属性。另一个常见问题是与启动服务器有关。有时，在使用初始化脚本时，可能无法启动服务器，但不会向控制台或日志文件发送任何有用的消息。（启动失败的一个常见原因是我之前提到的权限问题）。
 - en: 'A good first step in solving startup problems is to run `slapd` from the command
     line, with debugging enabled: `sudo slapd -d trace`.'
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 解决启动问题的一个好的第一步是从命令行运行`slapd`，并启用调试：`sudo slapd -d trace`。
 - en: Summary
+  id: totrans-132
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 摘要
 - en: In this appendix we looked at a couple of useful commands, including some designed
     to get detailed information about the directory server itself. Also, we saw two
     ways of making directory backups, and examined the process of rebuilding a directory
     database.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本附录中，我们介绍了一些有用的命令，包括一些用于获取目录服务器详细信息的命令。此外，我们还介绍了两种制作目录备份的方法，并详细探讨了重建目录数据库的过程。
