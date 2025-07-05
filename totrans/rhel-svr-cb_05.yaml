@@ -1,849 +1,1302 @@
 - en: Chapter 5. Using SELinux
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第五章 使用 SELinux
 - en: 'Here is an overview of the recipes presented in this chapter:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章介绍的配方概览：
 - en: Changing file contexts
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 更改文件上下文
 - en: Configuring SELinux booleans
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 配置 SELinux 布尔值
 - en: Configuring SELinux port definitions
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 配置 SELinux 端口定义
 - en: Troubleshooting SELinux
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 排错 SELinux
 - en: Creating SELinux policies
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建 SELinux 策略
 - en: Applying SELinux policies
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 应用 SELinux 策略
 - en: Introduction
+  id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 简介
 - en: SELinux is a Linux kernel module that allows supporting **mandatory access control**
     (MAC) security policies. The Red Hat implementation of SELinux combines **role-based
     access control** (**RBAC**) with **type enforcement** (**TE**). Optionally, **multilevel
     security** (**MLS**) is also available but isn't widely used as it implements
     fewer policies than the default Red Hat SELinux policies.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 是一个 Linux 内核模块，支持 **强制访问控制**（MAC）安全策略。Red Hat 对 SELinux 的实现将 **基于角色的访问控制**（**RBAC**）与
+    **类型强制**（**TE**）相结合。可选地，**多级安全**（**MLS**）也可以使用，但它并不广泛应用，因为它实现的策略比默认的 Red Hat SELinux
+    策略少。
 - en: SELinux is enabled by default in RHEL 7 and supported for all software packaged
     by Red Hat.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 在 RHEL 7 中默认启用，并且支持所有由 Red Hat 打包的软件。
 - en: The recipes presented in this chapter will not only provide you with a solid
     base to troubleshoot SELinux issues and fix them, but also a peek into how to
     create your own SELinux policies.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章中的配方不仅会为您提供一个坚实的基础，以便排查 SELinux 问题并解决它们，还将带您一窥如何创建您自己的 SELinux 策略。
 - en: Changing file contexts
+  id: totrans-12
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 更改文件上下文
 - en: Files and processes are labeled with a SELinux context, which contains additional
     information about a SELinux user, role type, and level. This information is provided
     by the SELinux kernel module to make access control decisions.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件和进程会被标记上 SELinux 上下文，其中包含有关 SELinux 用户、角色类型和级别的附加信息。这些信息由 SELinux 内核模块提供，用于做出访问控制决策。
 - en: The SELinux user, a unique identity known by the SELinux policy, is authorized
     for a number of roles.
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 用户是一个在 SELinux 策略中已知的唯一身份，并且被授权担任多个角色。
 - en: SELinux roles, as we already alluded to before, are attributes of SELinux users
     and part of the RBAC SELinux policy. SELinux roles are authorized for SELinux
     domains.
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 如前所述，SELinux 角色是 SELinux 用户的属性，并且是 RBAC SELinux 策略的一部分。SELinux 角色被授权用于 SELinux
+    域。
 - en: SELinux types define the type for files and domain for processes. SELinux policies
     define access between types and other files and processes. By default, if there
     is no specific rule in the SELinux policy, access is denied.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 类型定义了文件的类型和进程的域。SELinux 策略定义了类型与其他文件和进程之间的访问。默认情况下，如果 SELinux 策略中没有特定规则，访问会被拒绝。
 - en: The SELinux level is only used when the SELinux type is set to MLS and should
     be avoided altogether on anything other than servers. This set of policies doesn't
     cover the same domains as defined by the default Red Hat SELinux policy. The SELinux
     level is an attribute of MLS and **multi-category security** (**MCS**).
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 级别仅在 SELinux 类型设置为 MLS 时使用，且应避免在除服务器之外的任何设备上使用。这套策略不覆盖与默认 Red Hat SELinux
+    策略中定义的相同的域。SELinux 级别是 MLS 和 **多类别安全**（**MCS**）的属性。
 - en: Getting ready
+  id: totrans-18
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'All files and processes on a system are labeled to represent security-relevant
     information. This information is called the SELinux context. To view the contexts
     of files (and directories), execute the following:'
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 系统上的所有文件和进程都被标记上用于表示安全相关信息的标签，这些信息被称为 SELinux 上下文。要查看文件（和目录）的上下文，请执行以下命令：
 - en: '[PRE0]'
+  id: totrans-20
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: How to do it…
+  id: totrans-21
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: You can temporarily change the context of a file (or files) or permanently change
     their context. The first option allows easy troubleshooting if you need to figure
     out whether changing the context solves your problem. Persistent changes are mostly
     used when your applications refer to data that is not in the standard location—for
     example, if your web server serves data from `/srv/www`.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 您可以暂时更改文件（或多个文件）的上下文，也可以永久更改它们的上下文。第一个选项允许在需要确定更改上下文是否解决问题时进行轻松排错。持久性更改通常用于当您的应用程序引用不在标准位置的数据时——例如，如果您的
+    Web 服务器从 `/srv/www` 提供数据。
 - en: Temporary context changes
+  id: totrans-23
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 临时上下文更改
 - en: Temporary SELinux context changes remain until the file, or the filesystem that
     the file resides on, is relabeled.
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 临时 SELinux 上下文更改将在文件或文件所在的文件系统重新标记时失效。
 - en: 'To change the SELinux user of a file, execute the following:'
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 要更改文件的 SELinux 用户，请执行以下命令：
 - en: '[PRE1]'
+  id: totrans-26
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'To change the SELinux role of a file, execute the following:'
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 要更改文件的 SELinux 角色，请执行以下命令：
 - en: '[PRE2]'
+  id: totrans-28
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'To change the SELinux type of a file, execute the following:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 要更改文件的 SELinux 类型，请执行以下命令：
 - en: '[PRE3]'
+  id: totrans-30
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: Persistent file context changes
+  id: totrans-31
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 持久文件上下文更改
 - en: Changing the application data location doesn't automatically modify SELinux
     contexts to allow your application to access this data.
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 改变应用程序数据位置不会自动修改 SELinux 上下文，以允许你的应用程序访问这些数据。
 - en: 'To permanently relabel files or directories, perform the following:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 要永久重新标记文件或目录，请执行以下操作：
 - en: 'Change the SELinux user for your files or directories via this command:'
+  id: totrans-34
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过此命令更改文件或目录的 SELinux 用户：
 - en: '[PRE4]'
+  id: totrans-35
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'Change the SELinux type of your files or directories by running the following:'
+  id: totrans-36
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过运行以下命令更改文件或目录的 SELinux 类型：
 - en: '[PRE5]'
+  id: totrans-37
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'Finish with this command line by applying the directive to the `files/directories`:'
+  id: totrans-38
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用此命令行并应用指令到 `files/directories`：
 - en: '[PRE6]'
+  id: totrans-39
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: There's more…
+  id: totrans-40
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容…
 - en: 'To show all the available SELinux users, execute the following:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 要显示所有可用的 SELinux 用户，请执行以下命令：
 - en: '[PRE7]'
+  id: totrans-42
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: '![There''s more…](img/00041.jpeg)'
+  id: totrans-43
   prefs: []
   type: TYPE_IMG
+  zh: '![更多内容…](img/00041.jpeg)'
 - en: 'Alternatively, you can install the `setools-console` package and run the following:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 或者，你可以安装 `setools-console` 包并运行以下命令：
 - en: '[PRE8]'
+  id: totrans-45
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: '![There''s more…](img/00042.jpeg)'
+  id: totrans-46
   prefs: []
   type: TYPE_IMG
+  zh: '![更多内容…](img/00042.jpeg)'
 - en: 'To show all the available SELinux types, install the `setools-console` package
     and run the following:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 要显示所有可用的 SELinux 类型，请安装 `setools-console` 包并运行以下命令：
 - en: '[PRE9]'
+  id: totrans-48
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: '![There''s more…](img/00043.jpeg)'
+  id: totrans-49
   prefs: []
   type: TYPE_IMG
+  zh: '![更多内容…](img/00043.jpeg)'
 - en: 'To show the available SELinux roles, install the `setools-console` package
     and run the following:'
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 要显示可用的 SELinux 角色，请安装 `setools-console` 包并运行以下命令：
 - en: '[PRE10]'
+  id: totrans-51
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: '![There''s more…](img/00044.jpeg)'
+  id: totrans-52
   prefs: []
   type: TYPE_IMG
+  zh: '![更多内容…](img/00044.jpeg)'
 - en: The `semanage` tool doesn't have an option to include all files recursively,
     but there is a solution to this. The filename or dirname you specify is actually
     a regular expression filter. So, for example, if you want to recursively include
     all the files in `/srv/www`, you could specify `"/srv/www(/.*)?"`.
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: '`semanage` 工具没有包含所有文件递归操作的选项，但有一种解决方法。你指定的文件名或目录名实际上是一个正则表达式过滤器。例如，如果你想递归包含
+    `/srv/www` 中的所有文件，你可以指定 `"/srv/www(/.*)?"`。'
 - en: Tip
+  id: totrans-54
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: 'For now, there''s no way to change the SELinux role using `semanage`. A way
     to get around this is to change the SELinux user or type using `semanage` and
     then edit it, as follows: `/etc/selinux/targeted/contexts/files/file_contexts.local`.'
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 目前，无法通过 `semanage` 更改 SELinux 角色。解决方法是通过 `semanage` 更改 SELinux 用户或类型，然后进行编辑，方法如下：`/etc/selinux/targeted/contexts/files/file_contexts.local`。
 - en: 'Here''s a wrong SELinux context example of an AVC denial report found in the
     `audit.log` file:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是 `audit.log` 文件中找到的一个错误的 SELinux 上下文示例，涉及 AVC 拒绝报告：
 - en: '[PRE11]'
+  id: totrans-57
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'This command can be explained as follows:'
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 该命令可以解释如下：
 - en: '| Commands | Description |'
+  id: totrans-59
   prefs: []
   type: TYPE_TB
+  zh: '| 命令 | 描述 |'
 - en: '| --- | --- |'
+  id: totrans-60
   prefs: []
   type: TYPE_TB
+  zh: '| --- | --- |'
 - en: '| `type=AVC` | This is the log type |'
+  id: totrans-61
   prefs: []
   type: TYPE_TB
+  zh: '| `type=AVC` | 这是日志类型 |'
 - en: '| `msg=audit(1438884962.645:86)` | This is the log entry timestamp |'
+  id: totrans-62
   prefs: []
   type: TYPE_TB
+  zh: '| `msg=audit(1438884962.645:86)` | 这是日志条目的时间戳 |'
 - en: '| `avc` | This is a repetition of the log type |'
+  id: totrans-63
   prefs: []
   type: TYPE_TB
+  zh: '| `avc` | 这是日志类型的重复 |'
 - en: '| `denied` | This states whether enforcing is enabled |'
+  id: totrans-64
   prefs: []
   type: TYPE_TB
+  zh: '| `denied` | 该字段表示是否启用了强制执行 |'
 - en: '| `{ open }` | This is a permission that causes AVC denial |'
+  id: totrans-65
   prefs: []
   type: TYPE_TB
+  zh: '| `{ open }` | 这是导致 AVC 拒绝的权限 |'
 - en: '| `for pid=1283` | This is the process ID |'
+  id: totrans-66
   prefs: []
   type: TYPE_TB
+  zh: '| `for pid=1283` | 这是进程 ID |'
 - en: '| `comm="httpd"` | This is the process command |'
+  id: totrans-67
   prefs: []
   type: TYPE_TB
+  zh: '| `comm="httpd"` | 这是进程命令 |'
 - en: '| `path="/var/www/html/index.html"` | This is the path that is accessed |'
+  id: totrans-68
   prefs: []
   type: TYPE_TB
+  zh: '| `path="/var/www/html/index.html"` | 这是被访问的路径 |'
 - en: '| `dev="dm-5"` | This blocks the device that the preceding file is located
     on |'
+  id: totrans-69
   prefs: []
   type: TYPE_TB
+  zh: '| `dev="dm-5"` | 这是阻止前述文件所在设备的设备 |'
 - en: '| `ino=1089` | This is the inode of the preceding file |'
+  id: totrans-70
   prefs: []
   type: TYPE_TB
+  zh: '| `ino=1089` | 这是前述文件的 inode |'
 - en: '| `scontext=system_u:system_r:httpd_t:s0` | This is the source SELinux context
     |'
+  id: totrans-71
   prefs: []
   type: TYPE_TB
+  zh: '| `scontext=system_u:system_r:httpd_t:s0` | 这是源 SELinux 上下文 |'
 - en: '| `tcontext=system_u:object_r:user_home_t:s0` | This is the target SELinux
     context |'
+  id: totrans-72
   prefs: []
   type: TYPE_TB
+  zh: '| `tcontext=system_u:object_r:user_home_t:s0` | 这是目标 SELinux 上下文 |'
 - en: '| `tclass=file` | This is the target SELinux class |'
+  id: totrans-73
   prefs: []
   type: TYPE_TB
+  zh: '| `tclass=file` | 这是目标 SELinux 类 |'
 - en: See also
+  id: totrans-74
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: Refer to the man page for *chcon (1)* and *semanage-fcontext (8)* for more information.
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关更多信息，请参考 *chcon (1)* 和 *semanage-fcontext (8)* 的手册页。
 - en: Configuring SELinux booleans
+  id: totrans-76
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 配置 SELinux 布尔值
 - en: SELinux booleans allow you to change the SELinux policy at runtime without the
     need to write additional policies. This allows you to change the policy without
     the need for recompilation, such as allowing services to access NFS volumes.
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 布尔值允许你在运行时更改 SELinux 策略，无需编写额外的策略。这使你可以在无需重新编译的情况下更改策略，例如允许服务访问 NFS
+    卷。
 - en: How to do it…
+  id: totrans-78
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: This is the way to temporarily or permanently change SELinux booleans.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是临时或永久更改 SELinux 布尔值的方法。
 - en: Listing SELinux booleans
+  id: totrans-80
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 列出 SELinux 布尔值
 - en: 'For a list of all booleans and an explanation of what they do, execute the
     following:'
+  id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 要获取所有布尔值及其作用的列表，请执行以下命令：
 - en: '[PRE12]'
+  id: totrans-82
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: '![Listing SELinux booleans](img/00045.jpeg)'
+  id: totrans-83
   prefs: []
   type: TYPE_IMG
+  zh: '![列出 SELinux 布尔值](img/00045.jpeg)'
 - en: 'Now, let''s try to get the value of a particular SELinux boolean. It is possible
     to get the value of a single SELinux boolean without the use of additional utilities,
     such as **grep** and/or **awk**. Simply execute the following:'
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，让我们尝试获取特定 SELinux 布尔值的值。无需使用其他工具，如 **grep** 或 **awk**，即可获取单个 SELinux 布尔值的值。只需执行以下命令：
 - en: '[PRE13]'
+  id: totrans-85
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'This shows you whether or not the boolean is set. Here''s an example:'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将显示布尔值是否已设置。以下是一个示例：
 - en: '[PRE14]'
+  id: totrans-87
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: Changing SELinux booleans
+  id: totrans-88
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 更改 SELinux 布尔值
 - en: 'To set a boolean value to a particular one, use the following command:'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 要将布尔值设置为特定值，请使用以下命令：
 - en: '[PRE15]'
+  id: totrans-90
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'Here''s an example command:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是一个示例命令：
 - en: '[PRE16]'
+  id: totrans-92
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'This command allows you to change the value of the boolean, but it is not persistent
     across reboots. To allow persistence, add the `-P` option to the command line,
     as follows:'
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 该命令允许您更改布尔值的值，但在重启后不会保留。如果希望保持更改，添加 `-P` 选项到命令行，如下所示：
 - en: '[PRE17]'
+  id: totrans-94
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: There's more…
+  id: totrans-95
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: 'If you would like a list of all the bare bones of SELinux booleans and their
     values, `getsebool -a` is an alternative, as follows:'
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您希望查看所有 SELinux 布尔值及其值的列表，`getsebool -a` 是一种替代方法，如下所示：
 - en: '[PRE18]'
+  id: totrans-97
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: '![There''s more…](img/00046.jpeg)'
+  id: totrans-98
   prefs: []
   type: TYPE_IMG
+  zh: '![更多…](img/00046.jpeg)'
 - en: Managing SELinux booleans can be rather complex as there are a lot of booleans,
     and their names are not always simple to remember. For this reason, the `setsebool`,
     `getsebool`, and `semanage` tools come with tab completion. So, whenever you type
     any boolean name, you can use the `tab` key to complete or display the possible
     options.
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 管理 SELinux 布尔值可能相当复杂，因为有很多布尔值，并且它们的名称并不总是容易记住。因此，`setsebool`、`getsebool` 和 `semanage`
+    工具都支持 Tab 键自动补全。因此，每当您输入布尔值名称时，您可以使用 `tab` 键完成或显示可能的选项。
 - en: 'Here''s an example of an AVC denial report found in the `audit.log` file that
     can be solved by enabling a boolean:'
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是一个在 `audit.log` 文件中找到的 AVC 拒绝报告示例，通过启用布尔值可以解决该问题：
 - en: '[PRE19]'
+  id: totrans-101
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: This is an example of a service (`httpd` in this case) accessing a file located
     on an NFS share, which is disabled by default.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是一个服务（此处为 `httpd`）访问位于 NFS 共享上的文件的示例，默认情况下此操作被禁用。
 - en: This can be allowed by setting the `httpd_use_nfs` boolean to "`on`".
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过将 `httpd_use_nfs` 布尔值设置为 "`on`" 可以允许此操作。
 - en: Configuring SELinux port definitions
+  id: totrans-104
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 配置 SELinux 端口定义
 - en: SELinux also controls access to your TCP/IP ports. If your application is confined
     by SELinux, it will also deny access to your ports when starting up the application.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 还控制对 TCP/IP 端口的访问。如果您的应用程序受到 SELinux 限制，它在启动时也会拒绝访问您的端口。
 - en: This recipe will show you how to detect which ports are used by a particular
     SELinux type and change it.
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 本教程将展示如何检测特定 SELinux 类型使用的端口并进行更改。
 - en: How to do it…
+  id: totrans-107
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Let''s allow the HTTP daemon to listen on the nonstandard port `82` through
     the following steps:'
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们通过以下步骤允许 HTTP 守护进程在非标准端口 `82` 上监听：
 - en: 'First, look for the ports that are accessed by HTTP via these commands:'
+  id: totrans-109
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 首先，通过以下命令查找 HTTP 访问的端口：
 - en: '[PRE20]'
+  id: totrans-110
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: The SELinux port assignment we're looking for is `http_port_t`. As you can see,
     only the displayed ports (`80`, `81`, `443`, `488`, `8008`, `8009`, `8443`, and
     `9000`) are allowed to be used to listen on by any process that is allowed to
     use the `http_port_t` type.
+  id: totrans-111
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 我们要查找的 SELinux 端口分配是 `http_port_t`。如您所见，只有显示的端口（`80`、`81`、`443`、`488`、`8008`、`8009`、`8443`
+    和 `9000`）被允许用于任何被允许使用 `http_port_t` 类型的进程进行监听。
 - en: 'Add port `82` to the list of allowed ports, as follows:'
+  id: totrans-112
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将端口 `82` 添加到允许的端口列表中，如下所示：
 - en: '[PRE21]'
+  id: totrans-113
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'Next, verify the port assignment, as follows:'
+  id: totrans-114
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，验证端口分配，如下所示：
 - en: '[PRE22]'
+  id: totrans-115
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: There's more…
+  id: totrans-116
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: In this example, there is reference to the HTTP daemon as the SELinux policy
     governing HTTP daemons is implemented not only for the Apache web server, but
     also for Nginx. So, as long as you use the packages provided by Red Hat, the SELinux
     policies will be used correctly.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个示例中，提到 HTTP 守护进程，因为 SELinux 策略不仅适用于 Apache Web 服务器，还适用于 Nginx。因此，只要您使用的是
+    Red Hat 提供的包，SELinux 策略将被正确使用。
 - en: 'Take a look at the following example of an AVC denial report found in the `audit.log`
     file that is caused because the domain is not allowed to access a certain port:'
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 请查看以下在 `audit.log` 文件中找到的 AVC 拒绝报告示例，该报告表明由于域不被允许访问某个端口而导致问题：
 - en: '[PRE23]'
+  id: totrans-119
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: This AVC denial shows that the `httpd` daemon attempted to listen (`name_bind`)
     on port `82` but was prohibited by SELinux.
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 该 AVC 拒绝显示 `httpd` 守护进程尝试在端口 `82` 上监听（`name_bind`），但被 SELinux 阻止。
 - en: Troubleshooting SELinux
+  id: totrans-121
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: SELinux 故障排除
 - en: Troubleshooting SELinux is not as straightforward as it may seem as at the time
     of writing this book, there is no integration with SELinux to return SELinux-related
     events back to the applications. Usually, you will find that access is denied
     with no further description of it in log files.
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 故障排除并不像看起来那么简单，因为在撰写本书时，与 SELinux 的集成没有将 SELinux 相关事件返回给应用程序。通常情况下，您会发现拒绝访问，并且日志文件中没有进一步的描述。
 - en: Getting ready
+  id: totrans-123
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'Make sure that `setroubleshoot-server` and `setools-console` are installed
     by executing the following command:'
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过执行以下命令确保已安装`setroubleshoot-server`和`setools-console`：
 - en: '[PRE24]'
+  id: totrans-125
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'If you have X server installed on your system, you can also install the GUI,
     as follows:'
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您的系统安装了 X 服务器，还可以安装 GUI，如下所示：
 - en: '[PRE25]'
+  id: totrans-127
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: Make sure that `auditd`, `rsyslog`, and `setroubleshootd` are installed and
     running before reproducing the issue.
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 在重现问题之前，请确保已安装并运行`auditd`、`rsyslog`和`setroubleshootd`。
 - en: How to do it…
+  id: totrans-129
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: There are several ways to detect SELinux issues.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 有几种方法可以检测 SELinux 问题。
 - en: This is a classic issue where the SELinux context of a file is incorrect, causing
     the application trying to access the file to fail.
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是一个典型问题，文件的 SELinux 上下文不正确，导致尝试访问该文件的应用程序失败。
 - en: 'In this case, the context of `/var/www/html/index.html` is set to `system_u:object_r:user_home_t:s0`
     instead of `system_u:object_r:httpd_sys_content_t:s0`, causing `httpd` to throw
     a `404`. Take a look at the following command:'
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，`/var/www/html/index.html` 的上下文设置为`system_u:object_r:user_home_t:s0`而不是`system_u:object_r:httpd_sys_content_t:s0`，导致`httpd`报错`404`。查看以下命令：
 - en: '[PRE26]'
+  id: totrans-133
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: audit.log
+  id: totrans-134
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 审计日志
 - en: 'Use the following command to look for denied or failed entries in the audit
     log:'
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用以下命令查找审核日志中的拒绝或失败条目：
 - en: '[PRE27]'
+  id: totrans-136
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: syslog
+  id: totrans-137
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 系统日志
 - en: 'You can look for SELinux messages in `/var/log/messages` via the following
     command:'
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 您可以通过以下命令在`/var/log/messages`中查找 SELinux 消息：
 - en: '[PRE28]'
+  id: totrans-139
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: ausearch
+  id: totrans-140
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: ausearch
 - en: 'Use the audit search tool to find SELinux errors, as follows:'
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用审核搜索工具查找 SELinux 错误，如下所示：
 - en: '[PRE29]'
+  id: totrans-142
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Once we restore the context of `/var/www/html/index.html` to its original,
     the file is accessible again. Take a look at the following commands:'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦我们将`/var/www/html/index.html`的上下文恢复到原始状态，文件将再次可访问。查看以下命令：
 - en: '[PRE30]'
+  id: totrans-144
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: There's more…
+  id: totrans-145
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: 'It''s not always easy to determine whether a file has the correct context.
     To view the actual SELinux context and compare it to what it should be without
     modifying anything, execute this command:'
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 要确定文件是否具有正确的上下文并查看实际的 SELinux 上下文并与不修改任何内容的预期进行比较，执行以下命令：
 - en: '[PRE31]'
+  id: totrans-147
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: This tells you what the current context is and what it should be.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 这告诉您当前的上下文是什么以及它应该是什么。
 - en: 'As you can see in the preceding syslog example, the output comes with the following
     command:'
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如您在前述系统日志示例中所看到的那样，输出伴随以下命令而来：
 - en: '[PRE32]'
+  id: totrans-150
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'This command provides you with a richer description of the problem:'
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 此命令将为您提供更丰富的问题描述：
 - en: '[PRE33]'
+  id: totrans-152
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: This will actually give you more details about the problem at hand, and it will
     also make a couple of suggestions. Of course, in this case, the real solution
     is to restore the SELinux context of the file.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 这实际上将为您提供有关手头问题的更多详细信息，并提出一些建议。当然，在这种情况下，真正的解决方案是恢复文件的 SELinux 上下文。
 - en: 'If you have installed a graphical desktop environment, you will get a notification
     each time your system encounters an "AVC denied" alert:'
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您安装了图形桌面环境，每当系统遇到“AVC 拒绝”警报时，您将收到通知：
 - en: '![There''s more…](img/00047.jpeg)'
+  id: totrans-155
   prefs: []
   type: TYPE_IMG
+  zh: '![更多内容…](img/00047.jpeg)'
 - en: 'Clicking on the icon will present you with the following dialog:'
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 单击图标将呈现以下对话框：
 - en: '![There''s more…](img/00048.jpeg)'
+  id: totrans-157
   prefs: []
   type: TYPE_IMG
+  zh: '![更多内容…](img/00048.jpeg)'
 - en: 'Clicking on the **Troubleshoot** button will provide you with additional information
     and a (or multiple) possible solution(s) for your problem, as shown in the following
     screenshot:'
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: 点击**故障排除**按钮将为您提供额外信息和（一个或多个）可能的问题解决方案，如下截图所示：
 - en: '![There''s more…](img/00049.jpeg)'
+  id: totrans-159
   prefs: []
   type: TYPE_IMG
+  zh: '![更多内容…](img/00049.jpeg)'
 - en: In this case, the first option (the one marked with a green line) is the correct
     solution.
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，第一个选项（带有绿线标记的选项）是正确的解决方案。
 - en: Some AVC denial messages may not be logged when SELinux denies access. Applications
     and libraries regularly probe for more access than is actually required to perform
     their tasks. In order to not flood the audit logs with these kinds of messages,
     the policy can silence the AVC denials that are without permissions using `dontaudit`
     rules. The downside of this is that it may make troubleshooting SELinux denials
     more difficult.
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 当SELinux拒绝访问时，某些AVC拒绝消息可能不会被记录。应用程序和库经常会探测超出实际需要的更多访问权限。为了避免这些消息淹没审计日志，可以使用`dontaudit`规则使得没有权限的AVC拒绝不被记录。这样做的缺点是，可能会让故障排除SELinux拒绝变得更加困难。
 - en: 'To disable the `dontaudit` rules, execute the following command:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 要禁用`dontaudit`规则，请执行以下命令：
 - en: '[PRE34]'
+  id: totrans-163
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: This will disable the `dontaudit` rules and rebuild the SELinux policy.
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将禁用`dontaudit`规则并重建SELinux策略。
 - en: 'It is advisable to reenable the `dontaudit` rules when you''re done troubleshooting
     as this may flood your disks. You can do this by executing the following command:'
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 在故障排除完成后，建议重新启用`dontaudit`规则，因为否则可能会导致磁盘空间被大量占用。您可以通过执行以下命令来实现：
 - en: '[PRE35]'
+  id: totrans-166
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'To get a full list of `dontaudit` rules, run the following:'
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 要获取完整的`dontaudit`规则列表，请运行以下命令：
 - en: '[PRE36]'
+  id: totrans-168
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'If you know the domain that you wish to check for `dontaudit` rules, add the
     `-s` argument followed by the domain, as shown here:'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您知道想要检查`dontaudit`规则的域，请添加`-s`参数并后跟该域，如下所示：
 - en: '[PRE37]'
+  id: totrans-170
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: See also
+  id: totrans-171
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 参见
 - en: Take a look at the man page for *ausearch (8)*, *matchpathcon (8)*, and *sealert
     (8)* for more information.
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 查看*ausearch (8)*、*matchpathcon (8)*和*sealert (8)*的手册页以获取更多信息。
 - en: Creating SELinux policies
+  id: totrans-173
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建SELinux策略
 - en: In some cases, you'll need to create a new SELinux policy—for instance, when
     installing a piece of software from source. Although I do not recommend installing
     software from source on enterprise systems, this is sometimes your only option
     for company-developed software.
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 在某些情况下，您可能需要创建新的SELinux策略——例如，安装来自源代码的软件。尽管我不建议在企业系统上从源代码安装软件，但在公司开发的软件中，有时这是唯一的选择。
 - en: It is then time to create your own SELinux policy.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后是创建您自己的SELinux策略的时候。
 - en: Getting ready
+  id: totrans-176
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: For this recipe, you need to have `policycoreutils-python` installed.
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于本食谱，您需要安装`policycoreutils-python`。
 - en: How to do it…
+  id: totrans-178
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: We'll use the `denied` entries in the `audit.log` log file to build our SELinux
     policy with `audit2allow`.
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将使用`audit.log`日志文件中的`denied`条目，通过`audit2allow`构建我们的SELinux策略。
 - en: 'In this recipe, we''ll use the same example as in the previous recipe: the
     SELinux context of `/var/www/html/index.html` that is changed to `system_u:object_r:user_home_t:s0`.
     Perform the following steps:'
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我们将使用与前一个食谱相同的示例：将`/var/www/html/index.html`的SELinux上下文更改为`system_u:object_r:user_home_t:s0`。请执行以下步骤：
 - en: 'First, create a human readable policy for verification via the following command:'
+  id: totrans-181
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 首先，通过以下命令创建一个可供验证的人类可读的策略：
 - en: '[PRE38]'
+  id: totrans-182
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'When this policy is validated, you can create a compiled SELinux policy file,
     as follows:'
+  id: totrans-183
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 当该策略经过验证后，您可以创建一个编译后的SELinux策略文件，如下所示：
 - en: '[PRE39]'
+  id: totrans-184
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: How it works…
+  id: totrans-185
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: 'When you generate a module package, two files are created: a type enforcement
     file (`.te`) and a policy package file (`.pp`) file. The `te` file is the human
     readable policy as generated using `audit2allow -m`.'
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 当您生成模块包时，会创建两个文件：一个类型强制文件（`.te`）和一个策略包文件（`.pp`）。`te`文件是通过`audit2allow -m`生成的人类可读的策略。
 - en: The `pp` file is the SELinux policy module package, which will later be used
     to enable the new policy.
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: '`pp`文件是SELinux策略模块包，稍后将用于启用新策略。'
 - en: There's more…
+  id: totrans-188
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多……
 - en: If you believe you have discovered a bug in an existing SELinux policy, you'll
     need to produce a type enforcing and policy package file to report with Red Hat
     Bugzilla.
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您认为已发现现有SELinux策略中的漏洞，您需要生成一个类型强制和策略包文件，报告给Red Hat Bugzilla。
 - en: It's important to make sure that you only parse the correct `AVC denial` entries
     with `audit2allow` as it may result in more access than required. It's a good
     idea to pipe the `AVC denial` entries to a temporary file and remove what is not
     needed before you parse the file with `audit2allow`.
+  id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: 确保只用`audit2allow`解析正确的`AVC拒绝`条目非常重要，因为这可能导致过多的访问权限。建议将`AVC拒绝`条目输出到临时文件中，删除不需要的部分，再使用`audit2allow`解析该文件。
 - en: 'If the policy you generate in this way is not exactly what you need, you can
     always edit the generated `te` policy file, and when you''re done, compile a new
     policy file using the `te` policy file. You can do this as follows:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果通过这种方式生成的策略不完全符合您的需求，您可以随时编辑生成的`te`策略文件，完成后使用该`te`策略文件编译一个新的策略文件。您可以按如下方式操作：
 - en: 'Build a binary policy module out of the policy file through this command:'
+  id: totrans-192
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过以下命令从策略文件构建二进制策略模块：
 - en: '[PRE40]'
+  id: totrans-193
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'Create the SELinux policy module package by executing the following:'
+  id: totrans-194
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过执行以下命令创建 SELinux 策略模块包：
 - en: '[PRE41]'
+  id: totrans-195
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: See also
+  id: totrans-196
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: Take a look at the man page for *audit2allow(1)* for more options on creating
     a policy
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 查看 *audit2allow(1)* 的手册页，了解有关创建策略的更多选项。
 - en: To report bugs, go to [https://bugzilla.redhat.com/](https://bugzilla.redhat.com/).
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 若要报告错误，请访问[https://bugzilla.redhat.com/](https://bugzilla.redhat.com/)。
 - en: Applying SELinux policies
+  id: totrans-199
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 应用 SELinux 策略
 - en: We've learned how to create SELinux policies in the previous recipe. This recipe
     will show you how to apply your newly created SELinux policies.
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 在之前的食谱中，我们学习了如何创建 SELinux 策略。本食谱将向您展示如何应用新创建的 SELinux 策略。
 - en: Getting ready
+  id: totrans-201
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: In order to apply a policy, we need a policy package file (`pp`). This can be
     obtained by parsing AVC denials to `audit2allow` or compiling your own policy
     package file, as explained in the *Create SELinux policies* recipe.
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: 要应用策略，我们需要一个策略包文件（`pp`）。可以通过解析 AVC 拒绝记录到`audit2allow`，或者按照*创建 SELinux 策略*食谱中的说明编译自己的策略包文件来获取此文件。
 - en: How to do it...
+  id: totrans-203
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'Follow these steps:'
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 按照以下步骤操作：
 - en: 'Activate the policy (this can take quite a while, depending on the number of
     policies applied to your system) by running the following command:'
+  id: totrans-205
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过运行以下命令激活策略（根据系统上应用的策略数量，这可能需要相当长的时间）：
 - en: '[PRE42]'
+  id: totrans-206
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'Next, verify that the policy is actually activated via these commands:'
+  id: totrans-207
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，通过以下命令验证策略是否已被激活：
 - en: '[PRE43]'
+  id: totrans-208
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: How it works…
+  id: totrans-209
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: When executing the `semodule` command, the policy file is copied to `/etc/selinux/targeted/modules/active/modules/`,
     and the complete SELinux policy is recompiled and applied.
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: 执行`semodule`命令时，策略文件会被复制到`/etc/selinux/targeted/modules/active/modules/`，并且完整的
+    SELinux 策略将被重新编译并应用。
 - en: Tip
+  id: totrans-211
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: Be careful when applying custom-made policies as these may allow more access
     than required!
+  id: totrans-212
   prefs: []
   type: TYPE_NORMAL
+  zh: 在应用自定义策略时要小心，因为这些策略可能会允许比实际需求更多的访问权限！
 - en: There's more…
+  id: totrans-213
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: 'To remove policies, execute the following command:'
+  id: totrans-214
   prefs: []
   type: TYPE_NORMAL
+  zh: 要删除策略，请执行以下命令：
 - en: '[PRE44]'
+  id: totrans-215
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: This is particularly practical when you want to test the effect with and without
     the policy.
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 这在您想要测试应用了策略和没有应用策略的效果时特别实用。
 - en: 'There''s also a way to upgrade the module without removing it first, which
     is as follows:'
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 还有一种方法可以在不先删除模块的情况下升级它，具体如下：
 - en: '[PRE45]'
+  id: totrans-218
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: See also
+  id: totrans-219
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: Refer to the man page for *semodule (8)* for more information.
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 请参阅 *semodule (8)* 的手册页以获取更多信息。

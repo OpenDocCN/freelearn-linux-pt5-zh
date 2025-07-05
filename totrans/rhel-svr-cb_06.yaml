@@ -1,1090 +1,1637 @@
 - en: Chapter 6. Orchestrating with Ansible
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第 6 章. 使用 Ansible 编排
 - en: 'In this chapter, the following recipes will be addressed:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，将讨论以下食谱：
 - en: Installing Ansible
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 安装 Ansible
 - en: Configuring the Ansible inventory
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 配置 Ansible 清单
 - en: Creating the template for a kickstart file
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建 Kickstart 文件的模板
 - en: Creating a playbook to deploy a new VM with kickstart
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建一个剧本，使用 Kickstart 部署一个新的虚拟机
 - en: Creating a playbook to perform system configuration tasks
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建一个剧本来执行系统配置任务
 - en: Troubleshooting Ansible
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 排查 Ansible 问题
 - en: Introduction
+  id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 介绍
 - en: Ansible is an easy-to-use agentless system configuration management tool. It
     allows us to deploy complex configurations without the hassle of a complex interface
     or language.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible 是一个易于使用的无代理系统配置管理工具。它允许我们在不需要复杂界面或语言的麻烦下，部署复杂的配置。
 - en: Ansible uses playbooks, which are collections of tasks to deploy configurations
     and applications to multiple nodes over SSH in a controlled way. However, it doesn't
     stop there.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible 使用剧本，它是任务集合，用于通过 SSH 以受控方式将配置和应用程序部署到多个节点。然而，它并不仅仅止步于此。
 - en: Ansible's modules, which are used to execute tasks, are all built to be idempotent
     in their execution.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible 的模块，用于执行任务，都是设计成在执行过程中具有幂等性的。
 - en: 'The definition of Idempotence, according to Wikipedia, is as follows:'
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据维基百科，幂等性的定义如下：
 - en: '*Idempotence (/ˌaɪdɨmˈpoʊtəns/ eye-dəm-poh-təns [citation needed]) is the property
     of certain operations in mathematics and computer science that can be applied
     multiple times without changing the result beyond the initial application.*'
+  id: totrans-13
   prefs:
   - PREF_BQ
   type: TYPE_NORMAL
+  zh: '*幂等性 (/ˌaɪdɨmˈpoʊtəns/ eye-dəm-poh-təns [citation needed]) 是数学和计算机科学中某些操作的属性，可以多次应用而不会改变结果，超出初次应用的效果。*'
 - en: In short, any module will detect the changes to be applied and perform them.
     If it doesn't need to change anything, it will not reapply the requested changes
     or interfere with file metadata.
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 简而言之，任何模块都会检测需要应用的更改并执行它们。如果没有任何更改，它将不会重新应用请求的更改，也不会干扰文件的元数据。
 - en: The Ansible company also provides Tower, a paid subscription with extra features,
     as an add-on to Ansible. Tower provides a graphical interface to control your
     Ansible orchestration tool. However, this is out of the scope of this chapter.
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible 公司还提供了 Tower，一个付费订阅服务，带有额外功能，作为 Ansible 的附加组件。Tower 提供了一个图形界面来控制你的 Ansible
+    编排工具。然而，这超出了本章的范围。
 - en: Install Ansible
+  id: totrans-16
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 安装 Ansible
 - en: Ansible is not in the default RHEL 7 repositories, but in this recipe, I will
     show you how to install it in several ways.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible 不在默认的 RHEL 7 仓库中，但在本食谱中，我将展示如何以多种方式安装它。
 - en: Getting ready
+  id: totrans-18
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'Ansible needs the following packages installed:'
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible 需要安装以下软件包：
 - en: Python v2.7 (Ansible doesn't support v3 yet)
+  id: totrans-20
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: Python v2.7（Ansible 目前不支持 v3）
 - en: '`python-httplib2`'
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`python-httplib2`'
 - en: '`python-jinja2`'
+  id: totrans-22
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`python-jinja2`'
 - en: '`python-paramiko`'
+  id: totrans-23
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`python-paramiko`'
 - en: '`python-setuptools`'
+  id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`python-setuptools`'
 - en: '`PyYAML`'
+  id: totrans-25
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`PyYAML`'
 - en: 'So, in order to achieve this, execute the following command:'
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，为了实现这一点，执行以下命令：
 - en: '[PRE0]'
+  id: totrans-27
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: As RHEL 7 and some other major distributions come preinstalled with Python (yum
     requires it, as do most of the Red Hat tools), we don't have to include it in
     the preceding command.
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于 RHEL 7 和一些其他主要发行版预安装了 Python（yum 和大多数 Red Hat 工具都需要它），因此我们无需在上述命令中包含它。
 - en: How to do it…
+  id: totrans-29
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做...
 - en: In this recipe, I will cover the three most used methods of installing Ansible.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本食谱中，我将介绍三种最常用的安装 Ansible 的方法。
 - en: Installing the latest tarball
+  id: totrans-31
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 安装最新的 tarball
 - en: 'This method is quite simple as you just download the tarball and extract it
     in a location of your choosing. Perform the following steps:'
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 这种方法非常简单，你只需要下载 tarball 并将其解压到你选择的位置。执行以下步骤：
 - en: 'Grab the latest tarball located at [http://releases.ansible.com/ansible/](http://releases.ansible.com/ansible/)
     via the following command:'
+  id: totrans-33
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过以下命令获取位于 [http://releases.ansible.com/ansible/](http://releases.ansible.com/ansible/)
+    的最新 tarball：
 - en: '[PRE1]'
+  id: totrans-34
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Extract the tarball to `/opt`, as follows:'
+  id: totrans-35
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将 tarball 解压到 `/opt`，如下所示：
 - en: '[PRE2]'
+  id: totrans-36
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Now, create a symbolic link for easy access using this command:'
+  id: totrans-37
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，使用以下命令创建一个符号链接，便于访问：
 - en: '[PRE3]'
+  id: totrans-38
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'Add the Ansible binaries and man pages to your environment''s path by executing
     the following:'
+  id: totrans-39
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过执行以下命令，将 Ansible 的二进制文件和手册页添加到环境的路径中：
 - en: '[PRE4]'
+  id: totrans-40
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'Next, source the Ansible PATH and MANPATH by running this command line:'
+  id: totrans-41
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，通过运行此命令行来设置 Ansible 的 PATH 和 MANPATH：
 - en: '[PRE5]'
+  id: totrans-42
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'Finally, use the following command to regenerate the man pages:'
+  id: totrans-43
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 最后，使用以下命令重新生成手册页：
 - en: '[PRE6]'
+  id: totrans-44
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: Installing cutting edge from Git
+  id: totrans-45
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 从 Git 安装最新版本
 - en: Git makes keeping your local copy of Ansible up to date quite simple.
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: Git 使得保持本地 Ansible 副本的更新变得非常简单。
 - en: 'It automatically updates/removes files where needed. Perform the following
     steps:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 它会自动更新/删除需要的文件。执行以下步骤：
 - en: 'Make sure `git` is installed using this command:'
+  id: totrans-48
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确保已安装`git`，使用以下命令：
 - en: '[PRE7]'
+  id: totrans-49
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'Clone the Ansible `git` repository to `/opt`, as follows:'
+  id: totrans-50
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将Ansible的`git`仓库克隆到`/opt`，方法如下：
 - en: '[PRE8]'
+  id: totrans-51
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: '![Installing cutting edge from Git](img/00050.jpeg)'
+  id: totrans-52
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![从Git安装前沿版本](img/00050.jpeg)'
 - en: 'Add the Ansible binaries and man pages to your environment''s path, through
     the following command:'
+  id: totrans-53
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过以下命令将Ansible二进制文件和man页添加到环境路径中：
 - en: '[PRE9]'
+  id: totrans-54
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'Now, source the Ansible PATH and MANPATH via this command:'
+  id: totrans-55
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，通过此命令设置Ansible的PATH和MANPATH：
 - en: '[PRE10]'
+  id: totrans-56
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Finally, using the following line, regenerate the man pages:'
+  id: totrans-57
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 最后，使用以下命令重新生成man页：
 - en: '[PRE11]'
+  id: totrans-58
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: Installing Ansible from the EPEL repository
+  id: totrans-59
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 从EPEL仓库安装Ansible
 - en: 'Installing from a repository has the advantage that you can keep your version
     of Ansible up to date along with your system. Here are the steps you need to perform:'
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 从仓库安装的好处是，你可以使你的Ansible版本和系统保持同步更新。你需要执行的步骤如下：
 - en: 'Install the extra packages for the **Enterprise Linux** (**EPEL**) repository
     from [https://fedoraproject.org/wiki/EPEL](https://fedoraproject.org/wiki/EPEL)
     via this command:'
+  id: totrans-61
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过以下命令从[https://fedoraproject.org/wiki/EPEL](https://fedoraproject.org/wiki/EPEL)安装**企业Linux**（**EPEL**）仓库的额外软件包：
 - en: '[PRE12]'
+  id: totrans-62
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Now, install Ansible using yum, as follows:'
+  id: totrans-63
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，通过yum安装Ansible，方法如下：
 - en: '[PRE13]'
+  id: totrans-64
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: There's more…
+  id: totrans-65
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: 'If you want to keep your Git clone up to date, remember that the sources tree
     also contains two subtrees. You''ll have to execute the following:'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想保持Git克隆的更新，记住源代码树中还包含两个子树。你必须执行以下操作：
 - en: '[PRE14]'
+  id: totrans-67
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: Configuring the Ansible inventory
+  id: totrans-68
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 配置Ansible清单
 - en: The Ansible inventory is the heart of the product as it provides a lot of variables
     about your environment to the deployment mechanism. These variables are known
     as `facts` and serve Ansible to make decisions, template text-based files, and
     so on.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible清单是该产品的核心，因为它提供了关于环境的大量变量给部署机制。这些变量被称为`facts`，为Ansible做决策、生成基于文本的文件等提供支持。
 - en: How to do it…
+  id: totrans-70
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: There are several ways of adding information about your environment to your
     inventory.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 有几种方法可以将环境信息添加到清单中。
 - en: The static inventory file
+  id: totrans-72
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 静态清单文件
 - en: 'The static inventory is basically a mini-formatted file containing the definitions
     for hosts and groups. Here''s what you need to do:'
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 静态清单基本上是一个小型格式化文件，包含主机和组的定义。你需要做的是：
 - en: 'Create `/etc/ansible/hosts` with the following contents:'
+  id: totrans-74
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建`/etc/ansible/hosts`，并填入以下内容：
 - en: '[PRE15]'
+  id: totrans-75
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: The dynamic inventory file
+  id: totrans-76
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 动态清单文件
 - en: 'The dynamic inventory file has to be an executable file, generating a JSON
     string containing information about your hosts and groups. Follow these steps::'
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 动态清单文件必须是一个可执行文件，生成一个包含主机和组信息的JSON字符串。按以下步骤操作：
 - en: 'Create an `~/inventory.py` script with the following contents:'
+  id: totrans-78
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个`~/inventory.py`脚本，内容如下：
 - en: '[PRE16]'
+  id: totrans-79
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'Now, make the script executable, as follows:'
+  id: totrans-80
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，使脚本可执行，方法如下：
 - en: '[PRE17]'
+  id: totrans-81
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: host_vars files
+  id: totrans-82
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: host_vars文件
 - en: 'A `host_vars` file is a `yml`-formatted one containing extra facts, which will
     only be applied to the host with the same name as the file. Simply do the following:'
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: '`host_vars`文件是一个`yml`格式的文件，包含额外的事实信息，这些信息只会应用于与文件名相同的主机。只需执行以下操作：'
 - en: 'Create a `host_vars` file for `srv1.domain.tld` through this command:'
+  id: totrans-84
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过以下命令为`srv1.domain.tld`创建`host_vars`文件：
 - en: '[PRE18]'
+  id: totrans-85
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: group_vars files
+  id: totrans-86
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: group_vars文件
 - en: 'Like `host_vars`, `group_vars` files are `yml`-formatted ones containing extra
     facts. These will be applied to the group with the same name as the file. Perform
     the following:'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 像`host_vars`一样，`group_vars`文件也是`yml`格式的文件，包含额外的事实信息。这些信息将应用于与文件名相同的组。执行以下操作：
 - en: 'Create a `group_vars` file for mail via the following command:'
+  id: totrans-88
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过以下命令为邮件创建`group_vars`文件：
 - en: '[PRE19]'
+  id: totrans-89
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: How it works…
+  id: totrans-90
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: The inventory file location is set in the Ansible configuration file—look for
     the line starting with `hostfile` within the `defaults` section. This file is
     either a static file, or a script returning a JSON-formatted list of hosts and
     groups, as shown in the preceding recipe. Ansible automatically detects whether
     a file is a script and treats it this way to import information.
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 清单文件的位置在Ansible配置文件中设置—在`defaults`部分寻找以`hostfile`开头的行。此文件可以是静态文件，也可以是返回JSON格式的主机和组信息的脚本，正如前面示例中所展示的。Ansible会自动检测文件是否是脚本，并按此方式处理以导入信息。
 - en: 'There is one caveat, however: the script needs to show the JSON-formatted information
     by specifying `--list`.'
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，有一个警告：脚本需要通过指定`--list`来显示JSON格式的信息。
 - en: 'Ansible can automatically combine the inventory with the `host_vars` and `group_vars`
     files if the latter two directories are in the same directory as the inventory
     file / script. Take a look at the following:'
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果 `host_vars` 和 `group_vars` 目录与清单文件/脚本位于同一目录下，Ansible 可以自动将清单与这两个目录中的文件结合起来。看看以下内容：
 - en: '[PRE20]'
+  id: totrans-94
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: The same can be achieved by putting the `host_vars` and `group_vars` directories
     in the same directory as the playbook you are executing.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样可以通过将 `host_vars` 和 `group_vars` 目录放在与你执行的 playbook 相同的目录下实现。
 - en: Tip
+  id: totrans-96
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: The facts in `host_vars` and `group_vars` take priority over the variables returned
     through the inventory.
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: '`host_vars` 和 `group_vars` 中的事实优先于通过清单返回的变量。'
 - en: There's more…
+  id: totrans-98
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: 'Ansible already seeds the inventory with the facts that it retrieves from the
     host itself. You can easily find out which facts Ansible prepares for your use
     by executing the following command:'
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible 已经通过从主机本身获取的事实为清单提供了种子数据。你可以通过执行以下命令轻松查看 Ansible 为你准备了哪些事实：
 - en: '[PRE21]'
+  id: totrans-100
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: This will produce a lengthy JSON-formatted output with all the facts Ansible
     knows about your destination host.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将产生一长串 JSON 格式的输出，包含 Ansible 所知道的有关目标主机的所有事实。
 - en: If you want even more information, on RHEL systems, you can install `redhat-lsb-core`
     to have access to LSB-specific facts.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想要更多信息，在 RHEL 系统上，你可以安装 `redhat-lsb-core` 以访问 LSB 特定的事实。
 - en: Enterprises tend to have databases containing information regarding all their
     systems for change management. This is an excellent source for the inventory script
     to get its information.
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 企业往往有包含其所有系统信息的数据库，用于变更管理。这是一个非常好的来源，可以供清单脚本获取其信息。
 - en: See also
+  id: totrans-104
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: If you want more detailed information about the Ansible inventory, go to [http://docs.ansible.com/ansible/intro_inventory.html](http://docs.ansible.com/ansible/intro_inventory.html).
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想获取有关 Ansible 清单的更详细信息，可以访问 [http://docs.ansible.com/ansible/intro_inventory.html](http://docs.ansible.com/ansible/intro_inventory.html)。
 - en: Shameless self-promotion for a personal project and a tool to automate the inventory
     calls for a mention of [https://github.com/bushvin/inventoryd/](https://github.com/bushvin/inventoryd/).
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是对个人项目和一个自动化清单调用工具的无耻自我宣传，提及 [https://github.com/bushvin/inventoryd/](https://github.com/bushvin/inventoryd/)。
 - en: Creating a template for a kickstart file
+  id: totrans-107
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建一个 kickstart 文件的模板
 - en: A `template` is one of the core modules of Ansible. It is used to easily generate
     files (for example, configuration files) based on a common set of facts. It uses
     the Jinja2 template engine to interpret template files.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: '`template` 是 Ansible 的核心模块之一。它用于根据一组共同的事实轻松生成文件（例如配置文件）。它使用 Jinja2 模板引擎来解释模板文件。'
 - en: For this recipe, we'll use a simple `kickstart` script that is generic enough
     to deploy any host. Refer to [Chapter 2](part0025_split_000.html#NQU21-501a83dd54944cb1bf060a2ce9fab11f
     "Chapter 2. Deploying RHEL "En Masse""), *Deploying RHEL "En Masse"*, to find
     out about `kickstart` files.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于这个示例，我们将使用一个简单的 `kickstart` 脚本，它足够通用，可以部署任何主机。参考[第2章](part0025_split_000.html#NQU21-501a83dd54944cb1bf060a2ce9fab11f
+    "第2章 部署RHEL")，*大规模部署RHEL*，了解更多关于 `kickstart` 文件的信息。
 - en: Getting ready
+  id: totrans-110
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 做好准备
 - en: The facts that we need for this host are `repo_url`, `root_password_hash`, `ntp_servers`,
     `timezone`, `ipv4_address`, `ipv4_netmask`, `ipv4_gateway`, and `dns_servers`.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们需要的事实包括 `repo_url`、`root_password_hash`、`ntp_servers`、`timezone`、`ipv4_address`、`ipv4_netmask`、`ipv4_gateway`
+    和 `dns_servers`。
 - en: How to do it…
+  id: totrans-112
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Create the `kickstart` file in your playbook''s template folder (`~/playbooks/templates/kickstart/rhel7.ks`)
     with the following content:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 在你的 playbook 模板文件夹中创建 `kickstart` 文件（`~/playbooks/templates/kickstart/rhel7.ks`），并使用以下内容：
 - en: '[PRE22]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: How it works…
+  id: totrans-115
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: The Jinja2 engine replaces all the variables enclosed by `{{ }}` with whichever
     facts are available for the specified host in the inventory, resulting in a correct
     `kickstart` file, assuming all variables have been correctly set.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: Jinja2 引擎会将所有被 `{{ }}` 包围的变量替换为清单中指定主机的可用事实，从而生成正确的 `kickstart` 文件，前提是所有变量都已正确设置。
 - en: There's more…
+  id: totrans-117
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: Jinja2 can do more than just replace variables with whatever is in the inventory.
     It was originally developed as a rich templating language for web pages and supports
     major features such as conditions, loops, and so on.
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: Jinja2 不仅仅是用来将变量替换为清单中的内容。它最初是作为一个功能丰富的网页模板语言开发的，支持条件、循环等主要特性。
 - en: 'Using Jinja, you can easily loop over a list or array within the inventory
     and use the resultant variable or even dictionaries and objects. For example,
     consider that your host has the following fact:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 Jinja，你可以轻松地循环遍历清单中的列表或数组，并使用结果变量，甚至是字典和对象。例如，假设你的主机具有以下事实：
 - en: '[PRE23]'
+  id: totrans-120
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'This would allow you to replace the network portion of your `kickstart` script
     with the following:'
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将允许你用以下内容替换 `kickstart` 脚本中的网络部分：
 - en: '[PRE24]'
+  id: totrans-122
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'There is one consideration with provisioning new systems such as this and the
     inventory: you can only use the facts that you have introduced yourself, not those
     that Ansible gets from the system. This is because firstly, they don''t exist
     yet, and secondly, the task is executed on a different host.'
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用这种方式配置新系统时，有一个需要考虑的问题：你只能使用自己引入的事实，而不能使用 Ansible 从系统中获取的事实。因为首先，它们还不存在，其次，任务是在不同的主机上执行的。
 - en: See also
+  id: totrans-124
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: For more information about templating with Ansible, read the Jinja2 Template
     Designer documentation at [http://jinja.pocoo.org/docs/dev/templates/](http://jinja.pocoo.org/docs/dev/templates/).
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关使用 Ansible 模板的更多信息，请阅读 Jinja2 模板设计器文档：[http://jinja.pocoo.org/docs/dev/templates/](http://jinja.pocoo.org/docs/dev/templates/)。
 - en: For more information on the Ansible template module, go to [http://docs.ansible.com/ansible/template_module.html](http://docs.ansible.com/ansible/template_module.html).
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关 Ansible 模板模块的更多信息，请访问：[http://docs.ansible.com/ansible/template_module.html](http://docs.ansible.com/ansible/template_module.html)。
 - en: Creating a playbook to deploy a new VM with kickstart
+  id: totrans-127
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建一个 playbook 以使用 kickstart 部署新的虚拟机
 - en: Creating playbooks for Ansible is a relatively easy task as most considerations
     are handled by the modules. All modules are made as "idempotently" as possible,
     meaning that a module first checks what it is supposed to do with what has been
     done on the system and only then applies the changes if they are different.
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 为 Ansible 创建 playbooks 是一项相对简单的任务，因为大多数考虑因素都由模块处理。所有模块都尽可能做到“幂等”，这意味着模块首先检查它应该做什么，与系统上已经做过的操作进行比较，只有在有差异时才应用更改。
 - en: Getting ready
+  id: totrans-129
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: We don't need any additional facts for this recipe.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于这个食谱，我们不需要任何额外的事实。
 - en: For this to work, we need to have a web server and a location to store the `kickstart`
     files, which will be served by the web server.
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了使其工作，我们需要有一个 web 服务器和一个存储 `kickstart` 文件的位置，这些文件将由 web 服务器提供服务。
 - en: For the sake of convenience, our web server is called `web.domain.tld`, the
     location on this web server is `/var/www/html/kickstart`, and this directory can
     be accessed through `http://web.domain.tld/kickstart`.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了方便起见，我们的 web 服务器名为 `web.domain.tld`，该 web 服务器上的位置为 `/var/www/html/kickstart`，并且可以通过
+    `http://web.domain.tld/kickstart` 访问该目录。
 - en: We also need a KVM host (refer to [Chapter 1](part0015_split_000.html#E9OE1-501a83dd54944cb1bf060a2ce9fab11f
     "Chapter 1. Working with KVM Guests"), *Working with KVM Guests*, on how to set
     up a KVM server). In this case, we'll call our KVM server `kvm.domain.tld`.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还需要一个 KVM 主机（请参阅[第 1 章](part0015_split_000.html#E9OE1-501a83dd54944cb1bf060a2ce9fab11f
+    "第 1 章：与 KVM 客户机合作")，*与 KVM 客户机合作*，了解如何设置 KVM 服务器）。在此情况下，我们将我们的 KVM 服务器称为 `kvm.domain.tld`。
 - en: How to do it…
+  id: totrans-134
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Let''s create the playbook that will provision new systems via the following
     steps:'
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们通过以下步骤来创建一个为新系统配置的 playbook：
 - en: 'Create a `~/playbooks/provisioning.yml` playbook with the following contents:'
+  id: totrans-136
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个 `~/playbooks/provisioning.yml` playbook，内容如下：
 - en: '[PRE25]'
+  id: totrans-137
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'You''ll also need to create the template for the `~/templates/isolinux/isolinux.cfg.el7`
     file; you can do this by executing the following:'
+  id: totrans-138
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 你还需要为 `~/templates/isolinux/isolinux.cfg.el7` 文件创建模板；你可以通过执行以下命令来完成：
 - en: '[PRE26]'
+  id: totrans-139
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Now, use the following command to execute the playbook:'
+  id: totrans-140
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，使用以下命令执行 playbook：
 - en: '[PRE27]'
+  id: totrans-141
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: How it works…
+  id: totrans-142
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: The playbook starts off with a name describing the playbook, as does each task.
     Personally, I think naming your playbooks and tasks is a good idea as it will
     allow you to troubleshoot any issue at hand more easily.
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: playbook 开始时会有一个描述 playbook 的名称，每个任务也如此。就我个人而言，我认为为你的 playbook 和任务命名是个好主意，这将使你在排除任何问题时更加方便。
 - en: 'The `gather_facts: no` directive prevents the playbook from actually trying
     and connecting to the target host and gather information. As the host is yet to
     be built, this is of no use and will make the playbook fail.'
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: '`gather_facts: no` 指令防止 playbook 实际尝试连接目标主机并收集信息。由于主机尚未构建，这没有用处，反而会导致 playbook
+    执行失败。'
 - en: The first task uses a template (such as the one created in the previous recipe)
     to generate a new `kickstart` file. By default, tasks are executed on the host
     specified in the command line, but by specifying the `delegate_to` directive,
     this is executed on the web server with the facts of the selected host.
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个任务使用模板（如前面的教程中创建的模板）生成一个新的`kickstart`文件。默认情况下，任务在命令行指定的主机上执行，但通过指定`delegate_to`指令，可以在web服务器上执行，并带有所选主机的事实。
 - en: The same goes for the two last tasks; these execute a command using the local
     shell on `kvm.domain.tld` with the host's facts.
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样适用于最后两个任务；这些任务使用`kvm.domain.tld`上的本地shell执行命令，并带有选定主机的事实。
 - en: There's more…
+  id: totrans-147
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容…
 - en: As you can see, the playbook also makes use of Jinja, allowing us to create
     dynamic playbooks that can do different things based on the available facts.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 如你所见，playbook还利用了Jinja，使我们能够创建动态playbook，根据可用的事实执行不同的操作。
 - en: The more facts you have available in your inventory, the more dynamic you can
     go in your playbook. For instance, your source template could be OS-version specific
     and you can create all the virtual disks at once and specify the correct amount
     of CPUs and RAM upon system creation.
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 你在清单中拥有的事实越多，playbook就能变得越动态。例如，你的源模板可以特定于操作系统版本，你可以在系统创建时一次性创建所有虚拟磁盘，并指定正确数量的CPU和RAM。
 - en: See also
+  id: totrans-150
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: For more information on playbooks, go to [http://docs.ansible.com/ansible/playbooks.html](http://docs.ansible.com/ansible/playbooks.html).
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于playbooks的更多信息，请访问[http://docs.ansible.com/ansible/playbooks.html](http://docs.ansible.com/ansible/playbooks.html)。
 - en: For more information on Ansible templates, go to [http://docs.ansible.com/ansible/modules_by_category.html](http://docs.ansible.com/ansible/modules_by_category.html).
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于Ansible模板的更多信息，请访问[http://docs.ansible.com/ansible/modules_by_category.html](http://docs.ansible.com/ansible/modules_by_category.html)。
 - en: Creating a playbook to perform system configuration tasks
+  id: totrans-153
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建一个执行系统配置任务的playbook
 - en: Changing a system's configuration with Ansible isn't much more difficult than
     provisioning a new system.
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用Ansible更改系统配置并不比为新系统配置提供更复杂。
 - en: Getting ready
+  id: totrans-155
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'For this recipe, we will need the following facts for the new host:'
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于这个教程，我们需要以下新主机的事实：
 - en: '`ntp_servers`'
+  id: totrans-157
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ntp_servers`'
 - en: '`dns_servers`'
+  id: totrans-158
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dns_servers`'
 - en: '`dns_search`'
+  id: totrans-159
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`dns_search`'
 - en: 'We''ll also need to have a couple of templates to provision the following files:'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们还需要几个模板来配置以下文件：
 - en: '`/etc/logrotate.d/syslog`'
+  id: totrans-161
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`/etc/logrotate.d/syslog`'
 - en: '`/etc/ntp.conf`'
+  id: totrans-162
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`/etc/ntp.conf`'
 - en: '`/etc/ntp/step-tickers`'
+  id: totrans-163
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`/etc/ntp/step-tickers`'
 - en: '`/etc/resolv.conf`'
+  id: totrans-164
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`/etc/resolv.conf`'
 - en: How to do it…
+  id: totrans-165
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Now, we''ll create the playbook to configure the system. Perform the following
     steps:'
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们将创建playbook来配置系统。执行以下步骤：
 - en: 'Create a `~/playbooks/config.yml` playbook with the following content:'
+  id: totrans-167
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个`~/playbooks/config.yml`的playbook，内容如下：
 - en: '[PRE28]'
+  id: totrans-168
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'Create a `~/playbooks/networking.handlers.yml` file with the following content:'
+  id: totrans-169
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个`~/playbooks/networking.handlers.yml`文件，内容如下：
 - en: '[PRE29]'
+  id: totrans-170
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Now, create a `~/playbooks/ntp-client.handlers.yml` file with the following
     content:'
+  id: totrans-171
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，创建一个`~/playbooks/ntp-client.handlers.yml`文件，内容如下：
 - en: '[PRE30]'
+  id: totrans-172
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: 'Create a `~/playbooks/networking.tasks.yml` file with the following content:'
+  id: totrans-173
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个`~/playbooks/networking.tasks.yml`文件，内容如下：
 - en: '[PRE31]'
+  id: totrans-174
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'Next, create a `~/playbooks/ntp-client.tasks.yml` file with the following content:'
+  id: totrans-175
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，创建一个`~/playbooks/ntp-client.tasks.yml`文件，内容如下：
 - en: '[PRE32]'
+  id: totrans-176
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'Create a `~/playbooks/logrotate.tasks.yml` file with the following content:'
+  id: totrans-177
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个`~/playbooks/logrotate.tasks.yml`文件，内容如下：
 - en: '[PRE33]'
+  id: totrans-178
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'This is it for the playbook. Now we need to create the templates:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 就是这样，playbook部分完成了。接下来，我们需要创建模板：
 - en: 'First, create a `~/playbooks/templates/etc/sysctl.d/ipv6.conf.el7` file with
     the following content:'
+  id: totrans-180
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 首先，创建一个`~/playbooks/templates/etc/sysctl.d/ipv6.conf.el7`文件，内容如下：
 - en: '[PRE34]'
+  id: totrans-181
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'Then, create a `~/playbooks/templates/etc/resolv.conf.el7` file with the following
     content:'
+  id: totrans-182
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 然后，创建一个`~/playbooks/templates/etc/resolv.conf.el7`文件，内容如下：
 - en: '[PRE35]'
+  id: totrans-183
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'Create a `~/playbooks/templates/etc/ntp.conf.el7` file with the following content:'
+  id: totrans-184
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个`~/playbooks/templates/etc/ntp.conf.el7`文件，内容如下：
 - en: '[PRE36]'
+  id: totrans-185
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'Next, create a `~/playbooks/templates/etc/ntp/step-tickers.el7` file with the
     following content:'
+  id: totrans-186
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，创建一个`~/playbooks/templates/etc/ntp/step-tickers.el7`文件，内容如下：
 - en: '[PRE37]'
+  id: totrans-187
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'Create a `~/playbooks/templates/etc/logrotate.d/syslog.el7` file with the following
     content:'
+  id: totrans-188
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个`~/playbooks/templates/etc/logrotate.d/syslog.el7`文件，内容如下：
 - en: '[PRE38]'
+  id: totrans-189
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'Then, deploy the playbook to a newly created host by executing the following
     command:'
+  id: totrans-190
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 然后，执行以下命令将playbook部署到新创建的主机上：
 - en: '[PRE39]'
+  id: totrans-191
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: There's more…
+  id: totrans-192
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容…
 - en: The guys at Ansible are really smart people, and they have Ansible packed with
     lots of power tools. Two that are worth mentioning here and are lifesavers for
     debugging your playbooks are `--check` and `--diff`.
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible 的团队成员们是非常聪明的人，他们将 Ansible 打包了许多强大的工具。这里值得提及的两个工具，分别是 `--check` 和 `--diff`，它们对于调试你的
+    playbook 非常有帮助。
 - en: The `ansible-playbook --check` tool allows you to run your playbook on a system
     without actually changing anything. Why is this important, you ask? Well, the
     output of the playbook will list which actions of the playbook will actually change
     anything on the target system.
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ansible-playbook --check` 工具允许你在系统上运行 playbook，而不实际更改任何内容。你可能会问，为什么这很重要？答案是，playbook
+    的输出将列出哪些操作会在目标系统上实际更改内容。'
 - en: An important point to remember is that not all modules support this, but Ansible
     will tell you when it's not supported by a module.
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要记住的一个重要点是，并非所有模块都支持此功能，但 Ansible 会告诉你哪个模块不支持。
 - en: 'The `shell` module is one such module that doesn''t support the dry run, and
     it will not execute unless you specify the `always_run: yes` directive. Be careful
     with this directive as if the action would change anything, this directive will
     cause this change to be applied, even when specifying `--check`.'
+  id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: '`shell` 模块就是一个不支持干运行（dry run）的模块，它不会执行，除非你指定 `always_run: yes` 指令。使用这个指令时要小心，因为如果该操作会更改某些内容，即便指定了
+    `--check`，这个指令也会导致更改被应用。'
 - en: 'I added the `''Detect if ::1 is in /etc/hosts''` action to the `networking.tasks.yml`
     file with the `always_run: yes` directive. This specific action just checks whether
     the line is present. The `ergep` returns code `0` if it finds a match and `1`
     if it doesn''t. It registers the result of the shell action to a variable (`hosts_lo_ipv6`).'
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: '我将 `''Detect if ::1 is in /etc/hosts''` 操作添加到了 `networking.tasks.yml` 文件，并且使用了
+    `always_run: yes` 指令。这个操作的作用就是检查该行是否存在。如果找到匹配，`ergep` 会返回代码 `0`，如果没有则返回 `1`。它将
+    shell 操作的结果注册到一个变量 (`hosts_lo_ipv6`) 中。'
 - en: This variable contains everything about the result of the action; in this case,
     it contains the values for `stdout`, `stder,r`, and also (but not limited to)
     the result code, which we need for the next task in the playbook (`'Remove ::1
     from /etc/hosts'`) to decide on. This way, we can introduce a manual form of idempotency
     into the playbook for modules that cannot handle idempotency due to whatever restrictions.
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个变量包含了操作结果的所有信息；在本例中，它包含 `stdout`、`stderr` 的值，以及（但不限于）我们需要用于 playbook 中下一任务
+    (`'Remove ::1 from /etc/hosts'`) 决策的结果代码。通过这种方式，我们可以为那些由于某些限制无法处理幂等性的模块引入手动幂等性。
 - en: 'The `ansible-playbook --diff --check` tool does the exact same work as discussed
     here. However, it comes with an added bonus: it shows you what exactly will be
     changed in the form of a `diff -u` between what it actually is and what it''s
     supposed to be. Of course, once again, the module has to support it.'
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ansible-playbook --diff --check` 工具与这里讨论的功能完全相同。但它有一个额外的好处：它会显示哪些内容会发生变化，并以
+    `diff -u` 的形式展示实际内容与预期内容之间的差异。当然，模块必须支持此功能。'
 - en: As you can see in the recipe, Ansible allows us to create reusable code by creating
     separate task and handler yml files. This way, you could create other playbooks
     referring to these files, without having to reinvent the wheel.
+  id: totrans-200
   prefs: []
   type: TYPE_NORMAL
+  zh: 如你在示例中所看到，Ansible 允许我们通过创建单独的任务和处理器 yml 文件来创建可重用的代码。这样，你可以创建其他的 playbook 来引用这些文件，而无需重新发明轮子。
 - en: This becomes particularly practical once you start using roles to deploy your
     playbooks.
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦你开始使用角色来部署 playbook，这个功能就变得特别实用。
 - en: Roles allow you to group playbooks and have them deployed according to the needs
     (that is, roles) of your server.
+  id: totrans-202
   prefs: []
   type: TYPE_NORMAL
+  zh: 角色（Roles）允许你将 playbook 进行分组，并根据服务器的需求（即角色）进行部署。
 - en: 'For instance, a "lamp" role would deploy Linux, Apache, MariaDB, and PHP to
     a system using the playbooks included in the role. Roles can define dependencies.
     These dependencies are other roles, and thus, the "lamp" role could be broken
     down into three more roles that may be more useful as separate roles: Linux, Dbserver,
     and ApachePHP.'
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，一个 "lamp" 角色将使用该角色中的 playbooks 来部署 Linux、Apache、MariaDB 和 PHP。角色可以定义依赖关系。这些依赖关系是其他角色，因此，"lamp"
+    角色可以拆分成三个更有用的独立角色：Linux、Dbserver 和 ApachePHP。
 - en: 'This is a breakdown of the directory/file structure that you''ll need to use
     for certain roles:'
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是你在使用某些角色时需要的目录/文件结构分解：
 - en: '| File structure | Description |'
+  id: totrans-205
   prefs: []
   type: TYPE_TB
+  zh: '| 文件结构 | 描述 |'
 - en: '| --- | --- |'
+  id: totrans-206
   prefs: []
   type: TYPE_TB
+  zh: '| --- | --- |'
 - en: '| `roles/` | The container for all roles to be used by Ansible. |'
+  id: totrans-207
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/` | 存放 Ansible 所有角色的容器。 |'
 - en: '| `roles/<role>` | This is the container for your role. |'
+  id: totrans-208
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>` | 这是你的角色的容器。 |'
 - en: '| `roles/<role>/files` | This contains the files to be copied using the copy
     module to the target hosts. |'
+  id: totrans-209
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>/files` | 这包含要使用copy模块复制到目标主机的文件。 |'
 - en: '| `roles/<role>/templates` | This contains the template files to be deployed
     using the template module. |'
+  id: totrans-210
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>/templates` | 这包含要使用template模块部署的模板文件。 |'
 - en: '| `roles/<role>/tasks` | This is where the tasks go to perform all the necessary
     actions. |'
+  id: totrans-211
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>/tasks` | 这是放置执行所有必要操作任务的地方。 |'
 - en: '| `roles/<role>/tasks/main.yml` | This playbook is automatically added to the
     play when this role is applied to a system. |'
+  id: totrans-212
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>/tasks/main.yml` | 当这个角色应用到系统时，此playbook会自动添加到play中。 |'
 - en: '| `roles/<role>/handlers` | This is the location of your role handlers. |'
+  id: totrans-213
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>/handlers` | 这是你角色的处理程序所在的位置。 |'
 - en: '| `roles/<role>/handlers/main` | This set of handlers is automatically added
     to the play. |'
+  id: totrans-214
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>/handlers/main` | 这组处理程序会自动添加到play中。 |'
 - en: '| `roles/<role>/vars` | This location holds all the variables for your role.
     |'
+  id: totrans-215
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>/vars` | 该位置存放你角色的所有变量。 |'
 - en: '| `roles/<role>/vars/main.yml` | This set of variables is automatically applied
     to the play. |'
+  id: totrans-216
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>/vars/main.yml` | 这组变量会自动应用到play中。 |'
 - en: '| `roles/<role>/defaults` | This is the directory to hold the defaults for
     any fact you may need. The facts/variables defined in this way have the lowest
     priority, meaning that your inventory will win in the event that a fact is defined
     in both. |'
+  id: totrans-217
   prefs: []
   type: TYPE_TB
+  zh: '| `roles/<role>/defaults` | 这是存放任何你可能需要的事实默认值的目录。以这种方式定义的事实/变量优先级最低，这意味着如果一个事实在两个地方都有定义，清单中的定义会优先。
+    |'
 - en: '| `role/<role>/defaults/main.yml` | This set of defaults is automatically added
     to the play. |'
+  id: totrans-218
   prefs: []
   type: TYPE_TB
+  zh: '| `role/<role>/defaults/main.yml` | 这组默认值会自动添加到play中。 |'
 - en: '| `role/<role>/meta` | This directory holds all the role dependencies for this
     role. |'
+  id: totrans-219
   prefs: []
   type: TYPE_TB
+  zh: '| `role/<role>/meta` | 此目录包含该角色的所有依赖项。 |'
 - en: '| `role/<role>/meta/main.yml` | This set of dependencies is automatically added
     to the play. |'
+  id: totrans-220
   prefs: []
   type: TYPE_TB
+  zh: '| `role/<role>/meta/main.yml` | 这组依赖项会自动添加到play中。 |'
 - en: 'In order to address the roles created in this way, you just need to create
     a playbook containing the following:'
+  id: totrans-221
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了处理这样创建的角色，你只需要创建一个包含以下内容的playbook：
 - en: '[PRE40]'
+  id: totrans-222
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'Alternatively, you could create a role lamp that has Linux, DBserver, and ApachePHP
     as the dependencies in the `meta`/`main.yml` file by creating it with the following
     contents:'
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 或者，你可以通过在`meta`/`main.yml`文件中创建以下内容，来创建一个包含Linux、DBserver和ApachePHP作为依赖的角色：
 - en: '[PRE41]'
+  id: totrans-224
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: See also
+  id: totrans-225
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另请参见
 - en: For more information on Ansible Roles and Includes, go to [http://docs.ansible.com/ansible/playbooks_roles.html](http://docs.ansible.com/ansible/playbooks_roles.html).
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关Ansible角色和包含的更多信息，请访问 [http://docs.ansible.com/ansible/playbooks_roles.html](http://docs.ansible.com/ansible/playbooks_roles.html)。
 - en: For more information on playbooks, go to [http://docs.ansible.com/ansible/playbooks.html](http://docs.ansible.com/ansible/playbooks.html).
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关playbooks的更多信息，请访问 [http://docs.ansible.com/ansible/playbooks.html](http://docs.ansible.com/ansible/playbooks.html)。
 - en: For more information on Ansible templates, go to [http://docs.ansible.com/ansible/modules_by_category.html](http://docs.ansible.com/ansible/modules_by_category.html).
+  id: totrans-228
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关Ansible模板的更多信息，请访问 [http://docs.ansible.com/ansible/modules_by_category.html](http://docs.ansible.com/ansible/modules_by_category.html)。
 - en: Troubleshooting Ansible
+  id: totrans-229
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 故障排除Ansible
 - en: 'I''ve written it before, and I''ll do it again: the people at Ansible are really
     smart as they actually packed it with power tools.'
+  id: totrans-230
   prefs: []
   type: TYPE_NORMAL
+  zh: 我之前写过，今天再说一遍：Ansible团队真的是非常聪明，他们实际上将强大的工具都集成了进去。
 - en: One of my favorite troubleshooting tools is `--verbose` or `-v`. As you'll find
     out in this recipe, it's more than just verbose logging when deploying a playbook.
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 我最喜欢的故障排除工具之一是`--verbose`或`-v`。正如你在这个教程中会发现的，使用它不仅仅是为了在部署playbook时进行详细的日志记录。
 - en: Getting ready
+  id: totrans-232
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: 'Let''s see what happens with a `~/playbooks/hello_world.yml` playbook with
     the following contents when specifying up to 4 `-v` tools:'
+  id: totrans-233
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看当指定最多4个`-v`工具时，`~/playbooks/hello_world.yml` playbook会发生什么：
 - en: '[PRE42]'
+  id: totrans-234
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: How to do it…
+  id: totrans-235
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Ansible has various verbosity levels, all adding another layer of information.
     It''s important to understand which layer adds what. Perform the following steps:'
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible有多个详细程度级别，每个级别都会添加一层信息。理解每一层所添加的信息是很重要的。请按以下步骤操作：
 - en: 'First, execute the playbook without `–v`, as follows:'
+  id: totrans-237
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 首先，执行没有`–v`的playbook，如下所示：
 - en: '[PRE43]'
+  id: totrans-238
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Execute the playbook with one `–v`, as follows:'
+  id: totrans-239
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用一个`–v`执行playbook，如下所示：
 - en: '[PRE44]'
+  id: totrans-240
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: 'Now, execute the playbook with two `–v` tools; run the following:'
+  id: totrans-241
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，使用两个`–v`工具执行playbook；运行以下命令：
 - en: '[PRE45]'
+  id: totrans-242
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: 'Next, execute the playbook with three `–v` tools via this command:'
+  id: totrans-243
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，通过以下命令使用三个`–v`工具执行playbook：
 - en: '[PRE46]'
+  id: totrans-244
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: How it works…
+  id: totrans-245
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: 'This table depicts what information is shown:'
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 此表展示了显示哪些信息：
 - en: '| # of –v | Information shown |'
+  id: totrans-247
   prefs: []
   type: TYPE_TB
+  zh: '| # of –v | 显示的信息 |'
 - en: '| --- | --- |'
+  id: totrans-248
   prefs: []
   type: TYPE_TB
+  zh: '| --- | --- |'
 - en: '| `0` | We obtained information about the play, facts gathered (if not disabled),
     and tasks executed, along with an overview of which and how many tasks are executed
     per server. |'
+  id: totrans-249
   prefs: []
   type: TYPE_TB
+  zh: '| `0` | 我们获得了关于剧本的信息，收集的事实（如果未禁用）以及执行的任务，还概览了每台服务器上执行的任务及其数量。 |'
 - en: '| `1` | Additionally, in this case, each task shows all the values related
     to the module used. |'
+  id: totrans-250
   prefs: []
   type: TYPE_TB
+  zh: '| `1` | 此外，在这种情况下，每个任务都会显示与所使用模块相关的所有值。 |'
 - en: '| `2` | This shows some extra usage information additionally. There''s not
     much now, but this will be expanded in the future. |'
+  id: totrans-251
   prefs: []
   type: TYPE_TB
+  zh: '| `2` | 这会额外显示一些使用信息。目前没有太多内容，但未来会有所扩展。 |'
 - en: '| `3` | Additionally, this shows information about and the result for SSH operations.
     |'
+  id: totrans-252
   prefs: []
   type: TYPE_TB
+  zh: '| `3` | 此外，这里显示了关于 SSH 操作的信息及其结果。 |'
 - en: There's more…
+  id: totrans-253
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多…
 - en: When using the three `v` tools, you get to see what Ansible does to execute
     a certain task, and the SSH options will already get you started by debugging
     issues with communication to a certain host. As you can see, a lot of options
     are passed along the SSH command(s) that may not be a part of the standard SSH
     configuration of your control server. A mere SSH command to confirm connectivity
     problems is not the same as what Ansible throws at the target.
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用三个 `v` 工具时，你可以看到 Ansible 执行某个任务的过程，并且 SSH 选项将帮助你通过调试与某个主机的通信问题来入手。正如你所见，许多选项会随着
+    SSH 命令一起传递，而这些选项可能并非你的控制服务器的标准 SSH 配置的一部分。仅仅使用 SSH 命令来确认连接问题，并不等同于 Ansible 传递给目标主机的命令。
 - en: A lot of SSH issues occur due to a faulty profile at the other end, so besides
     testing your SSH connection, it may be a good idea to make sure that your `.bashrc`
     and `.bash_profile` files are correct.
+  id: totrans-255
   prefs: []
   type: TYPE_NORMAL
+  zh: 许多 SSH 问题是由于对端的配置文件有问题，因此，除了测试你的 SSH 连接，确保你的 `.bashrc` 和 `.bash_profile` 文件正确也是一个好主意。
 - en: 'Ansible has a module called debug, which allows you to show the values for
     a certain fact/variable or collection of facts. Take a look at the following code:'
+  id: totrans-256
   prefs: []
   type: TYPE_NORMAL
+  zh: Ansible 有一个名为 debug 的模块，它允许你显示某个事实/变量或一组事实的值。看看以下代码：
 - en: '[PRE47]'
+  id: totrans-257
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'This shows you all the facts related to the target host, while the following
     will only show you the value for the `inventory_hostname` fact:'
+  id: totrans-258
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将显示与目标主机相关的所有事实，而以下内容仅显示 `inventory_hostname` 事实的值：
 - en: '[PRE48]'
+  id: totrans-259
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'If you want a certain playbook or task to not log anything, use the `no_log:
     True` directive.'
+  id: totrans-260
   prefs: []
   type: TYPE_NORMAL
+  zh: '如果你希望某个剧本或任务不记录任何信息，使用 `no_log: True` 指令。'
 - en: 'On the play level, consider the following:'
+  id: totrans-261
   prefs: []
   type: TYPE_NORMAL
+  zh: 在剧本层面，考虑以下内容：
 - en: '[PRE49]'
+  id: totrans-262
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'Then, on the task level, consider the following:'
+  id: totrans-263
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，在任务层面，考虑以下内容：
 - en: '[PRE50]'
+  id: totrans-264
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
