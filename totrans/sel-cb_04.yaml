@@ -1,311 +1,447 @@
 - en: Chapter 4. Creating a Desktop Application Policy
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第4章 创建桌面应用程序策略
 - en: 'In this chapter, we will cover the following topics:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将涵盖以下主题：
 - en: Researching the application's logical design
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 研究应用程序的逻辑设计
 - en: Creating a skeleton policy
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建骨架策略
 - en: Setting context definitions
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 设置上下文定义
 - en: Defining application role interfaces
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 定义应用程序角色接口
 - en: Testing and enhancing the policy
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 测试和增强策略
 - en: Ignoring permissions we don't need
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 忽略不需要的权限
 - en: Creating application resource interfaces
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建应用程序资源接口
 - en: Adding conditional policy rules
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 添加条件策略规则
 - en: Adding build-time policy decisions
+  id: totrans-10
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 添加构建时策略决策
 - en: Introduction
+  id: totrans-11
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 引言
 - en: Up until now, we've modified and enhanced existing policies and interacted with
     the SELinux subsystem through the available administrative commands. But, in order
     to truly benefit from the protection measures that SELinux provides, we need to
     create our own policies for applications that would otherwise run with either
     too many privileges, or not run at all.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们已经修改并增强了现有的策略，并通过可用的管理命令与SELinux子系统进行交互。但是，为了真正从SELinux提供的保护措施中受益，我们需要为那些本来会运行时拥有过多权限或根本无法运行的应用程序创建我们自己的策略。
 - en: Desktop applications are a good example. The end user domains (`unconfined_t`
     for policies which support unconfined domains, and `user_t`, `staff_t`, and the
     like for the other policies) have many privileges assigned to them to allow generic
     applications to be executed while remaining in the user domain.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 桌面应用程序是一个很好的例子。终端用户域（`unconfined_t`用于支持未受限域的策略，`user_t`、`staff_t`等用于其他策略）已分配了许多权限，以允许通用应用程序在保持在用户域中的同时执行。
 - en: 'This has a huge downside: vulnerabilities within desktop applications or malfunctioning
     applications can create havoc with the users'' files and resources, potentially
     exposing information to malicious users. If all end user applications run within
     the same domain, then we cannot talk about a least privilege environment. After
     all, this single user domain then has to have the sum of all privileges needed
     by various applications.'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 这有一个巨大的缺点：桌面应用程序中的漏洞或故障应用程序可能会对用户的文件和资源造成混乱，甚至可能暴露信息给恶意用户。如果所有的终端用户应用程序都在同一个域中运行，那么我们就无法谈论最小权限环境。毕竟，这个单一的用户域必须拥有各种应用程序所需的所有权限的总和。
 - en: In this chapter, we will create a desktop application policy for Microsoft Skype™,
     a popular text messaging, voice, and video call application, which also runs on
     Linux systems, but is proprietary and thus its code cannot be reviewed to find
     what it might do. Confining this application ensures that the application can
     only perform the actions we allow it to do.
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将为微软Skype™创建一个桌面应用程序策略。Skype是一款流行的文本消息、语音和视频通话应用程序，也可以在Linux系统上运行，但由于它是专有的，因此无法审查其代码以确定它可能做什么。限制此应用程序确保它只能执行我们允许它执行的操作。
 - en: Researching the application's logical design
+  id: totrans-16
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 研究应用程序的逻辑设计
 - en: Before embarking on a policy development spree, we need to look at the application's
     behavior and logical design. We will get to know the application and its interactions
     as we begin to model this into the SELinux policy.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 在开始策略开发之前，我们需要查看应用程序的行为和逻辑设计。当我们开始将其建模到SELinux策略中时，我们将了解应用程序及其交互。
 - en: How to do it…
+  id: totrans-18
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做……
 - en: 'To prepare an SELinux policy for the application, let''s first look at how
     the application behaves:'
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了为应用程序准备SELinux策略，我们首先需要了解应用程序的行为：
 - en: Look into the files and directories that the application will interact with
     and write down the privileges that the application needs. Try to structure access
     based on the functionalities of the application.
+  id: totrans-20
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查看应用程序将要交互的文件和目录，并记录下应用程序所需的权限。尝试根据应用程序的功能来结构化访问。
 - en: Figure out which network resources are required by the application, which ports
     does the application bind (listen) to (if any), and which ports does it need to
     connect to.
+  id: totrans-21
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 弄清楚应用程序所需的网络资源，应用程序绑定（监听）的端口（如果有的话），以及它需要连接到哪些端口。
 - en: If the application needs to interact with other SELinux domains (processes),
     how does this interaction look (or what is it for)?
+  id: totrans-22
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果应用程序需要与其他SELinux域（进程）进行交互，这种交互是什么样的（或它的目的是什么）？
 - en: Does the application require specific hardware access or other kernel-provided
     resources?
+  id: totrans-23
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 应用程序是否需要特定的硬件访问或其他内核提供的资源？
 - en: How it works…
+  id: totrans-24
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: 'Gathering information on at least these four resources (files, network, applications,
     and hardware/kernel) helps us to start with a skeleton policy file. In the end,
     we might have a schematic representation of these resources, as shown in the following
     diagram:'
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 收集至少以下四种资源的信息（文件、网络、应用程序和硬件/内核）有助于我们开始编写一个骨架策略文件。最终，我们可能会有这些资源的示意图，如下所示：
 - en: '![How it works…](img/9669OS_04_01.jpg)'
+  id: totrans-26
   prefs: []
   type: TYPE_IMG
+  zh: '![它是如何工作的…](img/9669OS_04_01.jpg)'
 - en: Let's look at how this works out for our example.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看一下这个示例是如何实现的。
 - en: Files and directories
+  id: totrans-28
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 文件和目录
 - en: There are three main file accesses needed for the Skype™ application.
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: Skype™ 应用程序需要访问三种主要的文件。
 - en: The first is its own, user-specific configuration, which is stored at `~/.Skype/`.
     This will contain all settings for the application, including contact list, chat
     history, and more. In SELinux, user-specific configuration entries are labeled
     as `*_home_t` and marked as user home content, allowing the end user to still
     manage these resources.
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个是其特定于用户的配置，存储在 `~/.Skype/` 中。这将包含应用程序的所有设置，包括联系人列表、聊天记录等。在 SELinux 中，特定于用户的配置条目标记为
+    `*_home_t`，并标记为用户的主目录内容，允许最终用户仍然管理这些资源。
 - en: The second consists of the generic user files, which our application needs access
     to in order to upload or download files. This can be any end user file, although
     some distributions create specific support for this (such as through a `~/Downloads/`
     location).
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 第二种是通用的用户文件，应用程序需要访问这些文件来上传或下载文件。这可以是任何最终用户文件，尽管一些发行版为此创建了特定的支持（例如通过 `~/Downloads/`
+    位置）。
 - en: The third consists of the general resources of the Unix system that are available
     for the application. This access is needed for the application to load the necessary
     libraries. During application policy development, this is often not mentioned,
     as it is a default access provided to all applications.
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 第三种包括应用程序可以访问的 Unix 系统的一般资源。这种访问是应用程序加载必要库所必需的。在应用程序策略开发过程中，这通常没有被提及，因为它是默认提供给所有应用程序的访问。
 - en: Network resources
+  id: totrans-33
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 网络资源
 - en: The application needs to interact with network resources through its messaging,
     voice, and video chat functionality.
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 应用程序需要通过其消息、语音和视频聊天功能与网络资源进行交互。
 - en: In general, we know that the application needs to connect to the central Skype™
     infrastructure for all centrally managed services, such as authentication, directory
     searches, and more. This connection will be through TCP.
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 一般来说，我们知道应用程序需要连接到中央 Skype™ 基础设施，以支持所有集中管理的服务，如身份验证、目录搜索等。这个连接将通过 TCP 进行。
 - en: Next to the central infrastructure, the application will also connect to the
     Skype™ instances of other users for direct communication. This connection will
     be through both TCP and UDP (as UDP is more common for video and voice).
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了中央基础设施外，应用程序还将连接到其他用户的 Skype™ 实例，以进行直接通信。这个连接将通过 TCP 和 UDP（因为 UDP 更常用于视频和语音）进行。
 - en: Processes
+  id: totrans-37
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 进程
 - en: As the application is a graphical application, we know that it needs to interact
     with the X11 server running on the workstation. As we will see in the recipes
     in this chapter, this automatically requires a set of types and permissions to
     be assigned to the application.
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于该应用程序是图形应用程序，我们知道它需要与工作站上运行的 X11 服务器交互。正如我们在本章的方案中将看到的那样，这自动需要为应用程序分配一组类型和权限。
 - en: Other than that, there are no specific interactions with other domains.
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 除此之外，没有与其他领域的特定交互。
 - en: Hardware and kernel resources
+  id: totrans-40
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 硬件和内核资源
 - en: Finally, on the hardware level, the application will need access to the video
     and sound devices (for the webcam and voice call functionality, respectively).
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，在硬件层面，应用程序将需要访问视频和声音设备（分别用于摄像头和语音通话功能）。
 - en: The application will also need to use the user terminals in case of errors (so
     that the error message can be displayed).
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 在出现错误时，应用程序还需要使用用户终端（以便显示错误信息）。
 - en: Creating a skeleton policy
+  id: totrans-43
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建骨架策略
 - en: With the logical setup now in place, we can draft a skeleton policy. This policy
     will be a translation from the logical setup we encountered to SELinux policy
     rules.
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在逻辑设置已经到位，我们可以起草一个骨架策略。这个策略将是我们遇到的逻辑设置到 SELinux 策略规则的转换。
 - en: The entire policy is written in a `myskype.te` file. The final result of this
     set of recipes is also available through the download pack of this book as a reference.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 整个策略都写在一个 `myskype.te` 文件中。这一系列方案的最终结果也可以通过本书的下载包作为参考。
 - en: How to do it…
+  id: totrans-46
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'We start with a base skeleton that we can enhance later. This skeleton is developed
     as follows:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们从一个基本的骨架开始，之后可以进行增强。这个骨架的开发如下：
 - en: 'We start with the declaration of the various types. From the design, we can
     deduce four types:'
+  id: totrans-48
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们从各种类型的声明开始。从设计中，我们可以推导出四种类型：
 - en: '`skype_t` as the main process domain'
+  id: totrans-49
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`skype_t` 用作主进程域'
 - en: '`skype_exec_t` as the label for the Skype executable(s)'
+  id: totrans-50
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`skype_exec_t` 用作 Skype 可执行文件的标签'
 - en: '`skype_home_t` for the user configuration files and directories of the `skype_t`
     domain'
+  id: totrans-51
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`skype_home_t` 用于 `skype_t` 域的用户配置文件和目录'
 - en: '`skype_tmpfs_t` is needed for shared memory and the X11 interaction'
+  id: totrans-52
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`skype_tmpfs_t` 用于共享内存和 X11 交互'
 - en: 'The code to deduce these four types is as follows:'
+  id: totrans-53
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 推导这四种类型的代码如下：
 - en: '[PRE0]'
+  id: totrans-54
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Next, we write up the policy rules for accessing the various types, starting
     with the manage rights on `~/.Skype/`:'
+  id: totrans-55
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，我们编写访问各种类型的策略规则，从管理 `~/.Skype/` 上的权限开始：
 - en: '[PRE1]'
+  id: totrans-56
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'We enable the `X11` access and shared memory. This is a common set of privileges
     that need to be assigned to X11-enabled applications:'
+  id: totrans-57
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 我们启用 `X11` 访问和共享内存。这是一组常见的权限，需要分配给启用了 X11 的应用程序：
 - en: '[PRE2]'
+  id: totrans-58
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Next, we write down the network access rules, as follows:'
+  id: totrans-59
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，我们编写网络访问规则，如下所示：
 - en: '[PRE3]'
+  id: totrans-60
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'Finally, we have the device accesses:'
+  id: totrans-61
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 最后，我们处理设备访问：
 - en: '[PRE4]'
+  id: totrans-62
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: How it works…
+  id: totrans-63
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: In the skeleton policy, we start with the SELinux policy rules that we know
     will be necessary. If we are somewhat uncertain about one or more rules, it is
     perfectly fine to comment them out for starters and enable those as we move on
     to the testing phase in the *Testing and enhancing the policy* recipe later.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 在骨架策略中，我们从我们知道必需的 SELinux 策略规则开始。如果我们对一个或多个规则有些不确定，完全可以先将其注释掉，然后在后续的*测试和增强策略*阶段启用这些规则。
 - en: The skeleton starts off with the type declarations, which focus on the resources
     of the application. We then enhance the application domain with the proper privileges
     towards these resources. After the resource access, we look at the X11 privileges
     and finish with the network interaction of the application.
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 骨架从类型声明开始，重点是应用程序的资源。然后，我们为这些资源增强应用程序域的适当权限。资源访问之后，我们查看 X11 权限，最后处理应用程序的网络交互。
 - en: Type declarations
+  id: totrans-66
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 类型声明
 - en: 'The first part of any policy is the declaration of types and roles. We first
     create a role attribute called `skype_roles` to which the `skype_t` SELinux domain
     is granted. This role attribute will then be assigned to the users who are allowed
@@ -313,18 +449,28 @@
     will provide and also give those types a specific meaning. For instance, the `skype_t`
     and `skype_exec_t` types are given the proper meaning through the `userdom_user_application_domain`
     template. This template looks like the following:'
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 任何策略的第一部分都是类型和角色的声明。我们首先创建一个名为 `skype_roles` 的角色属性，并将其授予 `skype_t` SELinux 域。然后将此角色属性分配给允许调用该应用程序的用户。接下来，我们列出策略将提供的各种
+    SELinux 类型，并为这些类型赋予特定的含义。例如，`skype_t` 和 `skype_exec_t` 类型通过 `userdom_user_application_domain`
+    模板赋予适当的含义。该模板如下所示：
 - en: '[PRE5]'
+  id: totrans-68
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'The `application_domain` template, which is called from within `userdom_user_application_domain`,
     has the following definition:'
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: '`application_domain` 模板，从 `userdom_user_application_domain` 内部调用，具有以下定义：'
 - en: '[PRE6]'
+  id: totrans-70
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: This results in the `skype_t` domain to be marked as an application type (a
     true domain), whereas `skype_exec_t` is an executable file, which can be used
     as an entry point to the `skype_t` domain. Finally, `skype_t` is marked as `ubac_constrained`,
@@ -334,18 +480,27 @@
     would somehow be able to access the processes of another SELinux user (`userY_u`),
     then the `skype_t` domain will not be reachable as the UBAC constraints would
     come in action, preventing any interaction between the two.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 这导致 `skype_t` 域被标记为应用程序类型（真正的域），而 `skype_exec_t` 是一个可执行文件，可以作为进入 `skype_t` 域的入口点。最后，`skype_t`
+    被标记为 `ubac_constrained`，这用于**基于用户的访问控制**（**UBAC**），其中资源访问不仅通过类型及其访问向量来控制，还通过 SELinux
+    用户来控制。换句话说，如果 SELinux 用户 `userX_u` 以某种方式能够访问另一个 SELinux 用户（`userY_u`）的进程，那么 `skype_t`
+    域将无法访问，因为 UBAC 限制将发挥作用，阻止两者之间的任何交互。
 - en: All `userdom_user_*` templates mark the associated resources as UBAC constrained,
     together with the true file type association, so `userdom_user_tmpfs_file` marks
     the file not only as a `tmpfs_t` file (the type used for shared memory), but also
     makes it UBAC constrained.
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有`userdom_user_*`模板都将相关资源标记为UBAC受限，以及真实文件类型关联，因此`userdom_user_tmpfs_file`不仅将文件标记为`tmpfs_t`文件（用于共享内存的类型），还使其受到UBAC约束。
 - en: Managing files and directories
+  id: totrans-73
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 管理文件和目录
 - en: Next, we provide the access rights to files and resources. In the example, we
     limit access to `~/.Skype/` only and automatically mark `~/.Skype/` as `skype_home_t`
     when it is created inside a user home directory (through `userdom_user_home_dir_filetrans`),
@@ -354,24 +509,35 @@
     to have full access to all user resources or would we rather limit the access?
     And inversely, do we want other applications that can access user content to access
     Skype™ user (configuration) data?
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们提供对文件和资源的访问权限。在示例中，我们仅限制对`~/.Skype/`的访问，并在它在用户主目录中创建时自动将其标记为`skype_home_t`（通过`userdom_user_home_dir_filetrans`），尽管我们确定需要管理用户内容文件。这是因为我们需要在这里做出策略设计决策
+    —— 我们是否希望应用程序完全访问所有用户资源，还是更愿意限制访问？反之，我们是否希望其他可以访问用户内容的应用程序访问Skype™用户（配置）数据？
 - en: 'If we do not want the application to access any user content, then we do not
     need to add any rules: the policy will only allow search rights through the user
     home directory (in order to locate `~/.Skype/`) and deny everything else.'
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们不希望应用程序访问任何用户内容，那么我们不需要添加任何规则：策略将仅允许通过用户主目录进行搜索权限（以定位`~/.Skype/`），并拒绝其他所有内容。
 - en: 'If we would like to grant the application access to the user content, we can
     add in the following calls:'
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们希望授予应用程序对用户内容的访问权限，可以添加以下调用：
 - en: '[PRE7]'
+  id: totrans-77
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: This will grant full manage rights on user files and directories to the `skype_t`
     domain.
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将授予`skype_t`域对用户文件和目录的完全管理权限。
 - en: In the Gentoo Linux policy, additional types have been made available to provide
     a finer-grained access control to user files. These types map to the **XDG Base
     Directory Specification** (**XDGBDS**) as provided by the Free Desktop community,
@@ -379,38 +545,52 @@
     as `xdg_downloads_home_t` and allow applications to have selective access to user
     files, without risking that these applications have access to the more private
     files of that user.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Gentoo Linux策略中，已提供额外的类型，以提供对用户文件更精细的访问控制。这些类型映射到由Free Desktop社区提供的**XDG基本目录规范**（XDGBDS），包括`xdg_downloads_home_t`类型。最终用户可以将文件和目录标记为`xdg_downloads_home_t`，允许应用程序有选择地访问用户文件，而不会冒险使这些应用程序能够访问该用户更私密的文件。
 - en: 'In Gentoo, this means that the following call can be added to the policy:'
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 在Gentoo中，这意味着可以将以下调用添加到策略中：
 - en: '[PRE8]'
+  id: totrans-81
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: X11 and shared memory
+  id: totrans-82
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: X11和共享内存
 - en: When an application needs to interact with the X11 server (as a client application),
     much of this interaction is done through shared memory. In Linux, shared memory
     can be interpreted as files on a tmpfs mount (think `/dev/shm/`) although other
     shared memory constructions are still possible without tmpfs.
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 当应用程序需要与X11服务器交互（作为客户端应用程序），大部分交互通过共享内存完成。在Linux中，共享内存可以被解释为tmpfs挂载上的文件（例如`/dev/shm/`），尽管还可以通过其他共享内存结构进行。
 - en: In SELinux, policy developers want to make sure that this shared memory is labeled
     specifically for the domain. For this, they create a type with `_tmpfs_t` as the
     suffix. In our example, this is `skype_tmpfs_t`. Of course, we need to grant manage
     rights on the shared memory (for all classes that will be used) to the `skype_t`
     domain. In case of X11 interaction, these are files, symbolic links, FIFOs, and
     sockets.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 在SELinux中，策略开发人员希望确保此共享内存专门为该域标记。因此，他们创建了一个以`_tmpfs_t`作为后缀的类型。在我们的示例中，这是`skype_tmpfs_t`。当然，我们需要授予对共享内存的管理权限（对将使用的所有类别）给`skype_t`域。在X11交互的情况下，这些是文件、符号链接、FIFO和套接字。
 - en: 'Next to the manage rights, we also include a file transition: whenever `skype_t`
     creates a file, symbolic link, FIFO, or socket in a `tmpfs_t` labeled location,
     then this resource should be automatically labeled `skype_tmpfs_t`. This is done
     through the `fs_tmpfs_filetrans` call.'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了管理权限之外，我们还包括文件转换：每当`skype_t`在`tmpfs_t`标记的位置创建文件、符号链接、FIFO或套接字时，这些资源应自动标记为`skype_tmpfs_t`。这通过`fs_tmpfs_filetrans`调用完成。
 - en: Finally, we use `xserver_user_x_domain_template` that contains all the SELinux
     privileges necessary for both the X11 client as well as X11 server to interact
     with each other. This template uses a prefix argument (the first argument, which
@@ -418,117 +598,171 @@
     `skype_input_xevent_t`. Similar to what we've seen for web servers (where an `apache_content_template`
     call was used), this template gives an easy approach to automatically build additional
     types and enable the X11 support.
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们使用`xserver_user_x_domain_template`，它包含了 X11 客户端和 X11 服务器之间交互所需的所有 SELinux
+    权限。此模板使用一个前缀参数（第一个参数，我们提供为`skype`），该参数将用于创建一个名为`skype_input_xevent_t`的 X11 资源类型。类似于我们在
+    Web 服务器中看到的（使用了`apache_content_template`调用），此模板提供了一种简单的方法，自动构建其他类型并启用 X11 支持。
 - en: Next to the prefix, the domain itself is passed (`skype_t`) and the label used
     for the shared memory (`skype_tmpfs_t`) are passed on as those are needed for
     the X11 server support.
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了前缀外，域本身（`skype_t`）和用于共享内存的标签（`skype_tmpfs_t`）也会传递，因为这些对于 X11 服务器的支持是必需的。
 - en: The network access
+  id: totrans-88
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 网络访问
 - en: For the network access, we start by providing the `skype_t` domain with bind
     privileges on a TCP socket and its IP address (which is represented by `node_t`).
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于网络访问，我们首先为`skype_t`域提供 TCP 套接字和其 IP 地址（由`node_t`表示）的绑定权限。
 - en: Next, we allow the `skype_t` domain to connect to the central Skype™ services,
     which are available on HTTPS port `443` (authentication) and various seemingly
     random high TCP ports (network nodes). The HTTP target port is identified as an
     `http_port_t` type, the others are for the unreserved ports.
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们允许`skype_t`域连接到中央 Skype™ 服务，该服务通过 HTTPS 端口`443`（身份验证）以及多个看似随机的高 TCP 端口（网络节点）提供服务。HTTP
+    目标端口被识别为`http_port_t`类型，其他端口用于未保留端口。
 - en: Finally, we allow the `skype_t` domain to listen for incoming communications.
     By default, this is on a high TCP port for messages and state information, while
     for voice and video chat, this is through UDP.
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们允许`skype_t`域监听传入的通信。默认情况下，这通过高 TCP 端口用于消息和状态信息，而语音和视频聊天则通过 UDP 进行。
 - en: 'A simple way to identify the necessary types is to look at the `netstat` output,
     as it shows us what ports a process is listening on, the protocol family (TCP
     or UDP), as well as which ports it is connecting to:'
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 识别所需类型的一个简单方法是查看`netstat`输出，因为它向我们显示了进程监听的端口、协议族（TCP 或 UDP）以及它连接的端口：
 - en: '[PRE9]'
+  id: totrans-93
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: There's more...
+  id: totrans-94
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容……
 - en: The access to the sound and video devices is trivial, but during the design,
     it is very well possible that many more accesses are already identified (as ours
     is just an example). As we continue developing policies, writing a skeleton policy
     will become more trivial.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 对音频和视频设备的访问是简单的，但在设计过程中，很可能已经识别出了更多的访问（因为我们的只是一个示例）。随着策略的不断开发，编写骨架策略将变得更加简单。
 - en: A great source for learning more about the policies is to look for an existing
     policy of a similar application, or an application that has certain functionalities
     that resemble the functionalities offered by the application we're writing a policy
     for. For Skype™, we could look at the policy of Gift (a peer-to-peer file sharing
     application), which is an end user, graphical application with peer-to-peer communication
     flows, supporting uploading and downloading files.
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 学习更多关于策略的一个很好的来源是查找与我们正在编写策略的应用程序相似的现有策略，或者是具有与我们应用程序相似功能的应用程序。例如，对于 Skype™，我们可以查看
+    Gift（一个点对点文件共享应用程序）的策略，它是一个面向终端用户的图形应用程序，具有点对点通信流，支持上传和下载文件。
 - en: After all, SELinux policies are a write-down of what the expected behavior is
     of a domain. If another application has the same or similar behavior, then its
     policy will be very similar too.
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 毕竟，SELinux 策略是域预期行为的书面记录。如果另一个应用程序具有相同或相似的行为，那么它的策略也会非常相似。
 - en: In the previous example, we grouped the permissions together based on the functional
     need. However, the coding style for SELinux policy files, as mentioned by the
     reference policy, uses a different grouping, so make sure that if the policy would
     be sent upstream, this coding style is followed instead.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的示例中，我们根据功能需求将权限进行了分组。然而，正如参考策略中提到的，SELinux 策略文件的编码风格使用了不同的分组方式，因此如果该策略要上报到上游，确保遵循这种编码风格。
 - en: See also
+  id: totrans-99
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: For more information about the XDGBDS, see [http://standards.freedesktop.org/basedir-spec/latest/](http://standards.freedesktop.org/basedir-spec/latest/)
+  id: totrans-100
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 有关XDGBDS的更多信息，请参见 [http://standards.freedesktop.org/basedir-spec/latest/](http://standards.freedesktop.org/basedir-spec/latest/)
 - en: Setting context definitions
+  id: totrans-101
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 设置上下文定义
 - en: The next step in the policy development is to mark its resources with the proper
     file contexts. This will label the files of the application correctly, making
     sure that the SELinux policy makes the right decisions.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 政策开发的下一步是使用正确的文件上下文标记其资源。这将正确标记应用程序的文件，确保SELinux政策做出正确的决策。
 - en: How to do it…
+  id: totrans-103
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'To update the file context definitions, follow the next set of steps:'
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 要更新文件上下文定义，请按照以下步骤操作：
 - en: 'Create the `myskype.fc` file and add in the definition for `~/.Skype/`:'
+  id: totrans-105
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建`myskype.fc`文件，并在其中添加`~/.Skype/`的定义：
 - en: '[PRE10]'
+  id: totrans-106
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Next, add in the definitions for the `skype` binaries:'
+  id: totrans-107
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，添加`skype`二进制文件的定义：
 - en: '[PRE11]'
+  id: totrans-108
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: How it works…
+  id: totrans-109
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: The definitions for the binaries are standard, path-based context declarations.
     The one for the user home directory, however, is special.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 二进制文件的定义是标准的基于路径的上下文声明。然而，用户主目录的定义是特别的。
 - en: As can be seen from the example, the path starts with `HOME_DIR`. This is a
     special variable used by SELinux libraries, which automatically maps to all Linux
     users' home directories. Rather than creating a `/home/[^/]*/\.Skype(/.*)?` context
@@ -537,21 +771,29 @@
     the home directories of all real users (with a user ID starting at `500`, although
     this is configurable) and for each different home root directory (`/home/` is
     the most commonly used one), it will generate the proper contexts.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 从示例中可以看到，路径以`HOME_DIR`开始。这是SELinux库使用的特殊变量，它会自动映射到所有Linux用户的主目录。与其直接创建一个`/home/[^/]*/\.Skype(/.*)?`上下文，这样会有设计问题，因为其他位置的主目录（例如`/export/home/user/`）将无法匹配，SELinux库会检查所有真实用户的主目录（用户ID从`500`开始，尽管这是可以配置的），并且对于每个不同的主目录根目录（`/home/`是最常用的），它会生成适当的上下文。
 - en: The result of this operation is stored as the `file_contexts.homedirs` file
     inside `/etc/selinux/mcs/contexts/files/` and is automatically created during
     policy build (through the `genhomedircon` command).
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 该操作的结果存储在`/etc/selinux/mcs/contexts/files/`目录中的`file_contexts.homedirs`文件中，并在策略构建期间自动创建（通过`genhomedircon`命令）。
 - en: Next to `HOME_DIR`, other supported variables are `HOME_ROOT` (which represents
     the home root path) and `ROLE` (which is the first role associated with a user).
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了`HOME_DIR`之外，其他支持的变量包括`HOME_ROOT`（表示主目录根路径）和`ROLE`（表示与用户关联的第一个角色）。
 - en: Defining application role interfaces
+  id: totrans-114
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 定义应用程序角色接口
 - en: Finally, before testing the policy, we need to create a role interface and assign
     it to the user domain that will be used to test (and run) the application. If
     we don't create a role interface and assign it to a user domain, then the user
@@ -559,65 +801,91 @@
     application will run with the user context rather than the newly defined `skype_t`
     domain. If the user domain isn't unconfined, then chances are that the application
     will fail.
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，在测试政策之前，我们需要创建一个角色接口，并将其分配给将用于测试（和运行）应用程序的用户域。如果我们没有创建角色接口并将其分配给用户域，则用户域要么根本没有权限执行该应用程序，要么应用程序将以用户上下文而不是新定义的`skype_t`域运行。如果用户域没有被解除限制，那么应用程序很可能会失败。
 - en: How to do it…
+  id: totrans-116
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: Role interfaces are the gateways of a policy. They ensure that domains and SELinux
     users can interact with the application and that the set of privileges for a particular
     application are coherent.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 角色接口是政策的门户。它们确保域和SELinux用户能够与应用程序交互，并确保特定应用程序的权限集是一致的。
 - en: 'We create such an interface in the `.if` file and then assign this interface
     to a user domain in order to test the interface:'
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们在`.if`文件中创建这样的接口，然后将这个接口分配给一个用户域，以便测试这个接口：
 - en: 'Create the `myskype.if` file with the following interface in it:'
+  id: totrans-119
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建`myskype.if`文件，并在其中加入以下接口：
 - en: '[PRE12]'
+  id: totrans-120
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Create a policy for the user domain (for instance, `myunprivuser.te`) that
     grants regular users access to the `skype_t` domain, by assigning the user domain
     the `skype_role` call:'
+  id: totrans-121
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 为用户域创建一个策略（例如，`myunprivuser.te`），通过将`skype_role`调用分配给用户域，从而授予普通用户访问`skype_t`域的权限：
 - en: '[PRE13]'
+  id: totrans-122
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'Build both policies and load them. Then, relabel the `skype` binary files (and
     possibly preexisting `~/.Skype/` locations):'
+  id: totrans-123
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 构建这两个政策并加载它们。然后，重新标记`skype`二进制文件（以及可能已存在的`~/.Skype/`位置）：
 - en: '[PRE14]'
+  id: totrans-124
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: How it works…
+  id: totrans-125
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: Although we have defined all the rules for the `skype_t` domain that we think
     are needed (in the next recipe, the policy will be extended until it really works),
     we have not defined the rules yet to allow a user domain to actually execute the
     `skype_exec_t` binaries and have the process run in the `skype_t` domain.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然我们已经定义了认为需要的所有规则（在下一个示例中，策略将扩展直到真正起作用），但我们尚未定义允许用户域实际执行`skype_exec_t`二进制文件并使进程在`skype_t`域中运行的规则。
 - en: To accomplish that, we need to ensure that a domain transition occurs to the
     `skype_t` domain when the user executes `skype_exec_t`. This is handled by the
     `domtrans_pattern` call. But before we allow the domain transition, we first need
     to allow the `skype_t` domain for the user role, which is done through the `roleattribute`
     call.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了实现这一点，我们需要确保在用户执行`skype_exec_t`时，发生域过渡到`skype_t`域。这是通过`domtrans_pattern`调用来处理的。但在允许域过渡之前，我们首先需要允许用户角色使用`skype_t`域，这通过`roleattribute`调用来完成。
 - en: Until now, we focused primarily on type enforcement rules (that is, granting
     privileges to SELinux domains based on the label of the target resource). In order
     to allow certain users to run an application, the application domain itself needs
@@ -627,34 +895,46 @@
     (`user_r`, in our example). Other roles, such as DBA roles (`dbadm_r`) might have
     no need for running the Skype™ application, so they will not be granted access
     to the `skype_t` domain.
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 直到现在，我们主要关注的是类型强制规则（也就是说，根据目标资源的标签授予SELinux域特权）。为了允许某些用户运行应用程序，应用程序域本身需要被授予给用户角色。这是通过SELinux的**基于角色的访问控制**（**RBAC**）模型来支持的。该RBAC模型确保某个域（在我们的示例中是`skype_t`）只能由我们为其配置的角色使用（在我们的示例中是`user_r`）。其他角色，如DBA角色（`dbadm_r`），可能不需要运行Skype™应用程序，因此不会被授予访问`skype_t`域的权限。
 - en: Note
+  id: totrans-129
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'Not granting a domain does not necessarily prevent the application from executing
     within the user domain itself. To accomplish that, we need to make sure that the
     executable file type cannot be executed by other roles. Instead of using `userdom_user_application_domain`
     for the `skype_t` and `skype_exec_t` types (which would assign a generic executable
     attribute to the `skype_exec_t` type), we would use something similar to the following:'
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 不授予一个域并不一定会阻止应用程序在用户域内执行。为了实现这一点，我们需要确保其他角色无法执行该可执行文件类型。我们不会使用`userdom_user_application_domain`为`skype_t`和`skype_exec_t`类型分配一个通用的可执行属性，而是会使用类似以下的方式：
 - en: '[PRE15]'
+  id: totrans-131
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: As the user domain, which needs to be able to execute Skype™, also needs to
     manage the `skype_home_t` files (in case, manual intervention in `~/.Skype/` is
     needed or to make backups), we grant it both manage privileges as well as relabel
     privileges. The relabel privileges are needed when, for instance, a backup is
     restored.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于用户域需要能够执行Skype™，还需要管理`skype_home_t`文件（例如，在需要手动干预`~/.Skype/`或进行备份时），因此我们授予它管理权限以及重新标记权限。当例如恢复备份时，重新标记权限是必需的。
 - en: For the user domain, we then call the `skype_role` interface we just created.
     In the example, we used the `optional_policy` statement. This allows policy modules
     to be loaded even when one of the calls cannot be resolved or is not supported.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于用户域，我们将调用刚刚创建的`skype_role`接口。在这个示例中，我们使用了`optional_policy`语句。这允许即使某些调用无法解决或不被支持时，策略模块仍然能够被加载。
 - en: Suppose we need to unload the `myskype` module. Without the `optional_policy`
     statement, the `myunprivuser` module would need to be unloaded as well, even though
     this policy module might contain other rules that are important for the user domain
@@ -663,108 +943,150 @@
     we don't unload the module and no `optional_policy` statements are used, then
     SELinux will warn the administrator about unresolved dependencies between the
     modules.
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 假设我们需要卸载`myskype`模块。如果没有`optional_policy`语句，则`myunprivuser`模块也需要被卸载，即使这个策略模块可能包含其他对用户域正常工作至关重要的规则（在示例中，我们只调用了`skype_role`接口，但过一段时间后，模块可能会调用许多其他接口）。如果我们不卸载该模块并且没有使用`optional_policy`语句，SELinux将会警告管理员模块之间未解决的依赖关系。
 - en: With the `optional_policy` statement, the SELinux tools know that the call might
     become unresolvable, in which case, the entire block (everything inside the `optional_policy`
     block) will be ignored while the module remains loaded.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用`optional_policy`语句，SELinux工具知道该调用可能无法解决，在这种情况下，整个块（`optional_policy`块中的所有内容）将被忽略，同时模块仍然保持加载状态。
 - en: There's more...
+  id: totrans-136
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: At the beginning of the recipe, we mentioned that unconfined user domains will
     be able to execute the application without a domain transition. This is to be
     expected, as the entire idea behind unconfined domains is that they are, well,
     unconfined.
+  id: totrans-137
   prefs: []
   type: TYPE_NORMAL
+  zh: 在配方开始时，我们提到过非受限用户域能够在没有域转换的情况下执行应用程序。这是可以预期的，因为非受限域的整个理念就是它们没有被限制。
 - en: It is considered a bad practice to, in general, create domain transitions from
     an unconfined domain to confined domains. Only in very specific circumstances
     do domain transitions from an unconfined domain to confined domains make sense
     (such as when the target domain is used to confine potentially vulnerable applications,
     such as a sandbox domain).
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，将域转换从非受限域到受限域被认为是不好的做法。只有在非常特殊的情况下，从非受限域到受限域的域转换才有意义（例如，当目标域用于限制潜在易受攻击的应用程序时，例如沙箱域）。
 - en: From a security perspective, it makes more sense to confine users immediately
     and use the proper domain transitions between (confined) user domains and the
     application domains.
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 从安全的角度来看，立即限制用户并在（受限）用户域和应用程序域之间使用适当的域转换更有意义。
 - en: Testing and enhancing the policy
+  id: totrans-140
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 测试和增强策略
 - en: With the policy ready and loaded, it is time to start testing the application
     from a user's perspective, while keeping an eye on the audit logs (for denials)
     and application output.
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 策略准备就绪并加载后，开始从用户的角度测试应用程序，同时密切关注审计日志（以查找拒绝）和应用程序输出。
 - en: Testing the application is an important phase of policy development and will
     also be the most time consuming task. During testing, several functional features
     of the application will be tried and the resulting permissions (SELinux-wise)
     will need to be added to the policy.
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: 测试应用程序是策略开发中的一个重要阶段，也是最耗时的任务。在测试过程中，将尝试应用程序的几个功能特性，结果的权限（就SELinux而言）需要添加到策略中。
 - en: In previous recipes, such as *Creating a skeleton policy*, we enabled a set
     of permissions based on other policies and common sense. However, these permissions
     have not been validated and tested yet. In this recipe, we will assert that the
     permissions are truly needed, as we do not want to create a policy with too many
     rights associated with it.
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 在之前的配方中，如*创建骨架策略*，我们根据其他策略和常识启用了一个权限集。然而，这些权限还没有被验证和测试过。在这个配方中，我们将断言这些权限确实是需要的，因为我们不想创建一个与其关联权限过多的策略。
 - en: How to do it…
+  id: totrans-144
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Testing policies is a repetitive task. Every try-out means that the AVC denials
     leading up to the start need to be discarded (as we do not want to include privileges
     not related to the test) after which the application is tested and the results
     are documented. Depending on how the application acts, new policy rules are added
     to the policy:'
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 测试策略是一个重复的任务。每次尝试意味着需要丢弃启动之前的AVC拒绝（因为我们不想包含与测试无关的权限），然后对应用程序进行测试，并记录结果。根据应用程序的表现，新的策略规则将被添加到策略中：
 - en: 'Write down the current timestamp or create a reference point inside the audit
     logs (for instance, by reloading the SELinux policy), so we know from which point
     in the audit logs we need to look at the audit events:'
+  id: totrans-146
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 写下当前时间戳或在审计日志中创建一个参考点（例如，通过重新加载SELinux策略），以便我们知道从审计日志的哪个点开始查看审计事件：
 - en: '[PRE16]'
+  id: totrans-147
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: As an end user, start the application (from a terminal window) and watch what
     happens.
+  id: totrans-148
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 作为最终用户，从终端窗口启动应用程序并观察发生的情况。
 - en: 'Write down the error that is displayed (if any):'
+  id: totrans-149
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 写下显示的错误（如果有）：
 - en: '[PRE17]'
+  id: totrans-150
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'Look into the denials as displayed in the audit logs:'
+  id: totrans-151
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查看在审计日志中显示的拒绝信息：
 - en: '[PRE18]'
+  id: totrans-152
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: For each first denial or denial related to the error shown earlier, try to enhance
     the policy with the proper call and try again.
+  id: totrans-153
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 对于每个第一次拒绝或与之前显示的错误相关的拒绝，尝试使用适当的调用来增强策略并再次尝试。
 - en: How it works…
+  id: totrans-154
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: In this phase, we are enhancing the policy step by step. Some policy developers
     like to run the application in permissive mode (either by running the entire system
     in permissive mode or by marking this particular domain as a permissive domain),
@@ -772,379 +1094,555 @@
     policy based on that information. Although this might give a faster working policy,
     these developers will also risk that they add too many privileges to a policy,
     something that is very difficult to challenge and change later.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个阶段，我们正在一步步地增强策略。一些策略开发者喜欢在宽松模式下运行应用程序（要么是将整个系统运行在宽松模式下，要么是将某个特定领域标记为宽松领域），记录所有执行的访问（通过
+    AVC 拒绝）并根据这些信息增强策略。虽然这可能会使策略更快速地生效，但这些开发者也面临着将过多权限添加到策略中的风险，而这种情况后来很难被挑战或更改。
 - en: Instead, we let SELinux prevent accesses and look at how the application reacts.
     Based on the error logging of the application or the behavior of the application
     and the AVC denial(s) seen through the logs, we can have a good picture of what
     privileges are really needed.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 相反，我们让 SELinux 阻止访问，并观察应用程序如何反应。根据应用程序的错误日志或应用程序的行为以及通过日志看到的 AVC 拒绝，我们可以很好地了解真正需要哪些权限。
 - en: 'For instance, simultaneously with the error presented in the example, the following
     denial occurred:'
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，在示例中出现的错误的同时，还发生了以下拒绝：
 - en: '[PRE19]'
+  id: totrans-158
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: It is important that we focus on the first set of denials that occur and not
     on all denials shown. It is very likely that denials shown after the first set
     of denials are from error handling routines, either by the application or the
     system in general, which would never be triggered in the first place if the proper
     permissions are granted to the domain. Trying to grant those privileges as well
     would result in a too broadly defined set of permissions.
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们需要集中注意力在第一次出现的拒绝上，而不是所有显示的拒绝。很可能在第一次拒绝之后显示的拒绝是由错误处理程序引发的，不管是由应用程序还是系统引发的，如果为该领域授予适当权限，这些拒绝本来是不会被触发的。尝试授予这些权限会导致权限集定义过于宽泛。
 - en: 'The preceding denial shown would result in the following addition to the policy:'
+  id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述拒绝将导致策略中添加以下内容：
 - en: '[PRE20]'
+  id: totrans-161
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: Ignoring permissions we don't need
+  id: totrans-162
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 忽略我们不需要的权限
 - en: After repeated testing, we will have a policy that works, even though denials
     might still show up in the audit logs. In order not to alarm any administrator,
     we might want to disable auditing of those specific denials (while, of course,
     ensuring that critical access vectors are still logged by the audit daemon).
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 经过反复测试，我们将获得一个可行的策略，即使审计日志中可能仍然会显示拒绝。为了避免让管理员产生警觉，我们可能希望禁用对这些特定拒绝的审计（同时，当然，确保关键访问向量仍由审计守护进程记录）。
 - en: How to do it…
+  id: totrans-164
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'In order to disable logging of certain denials that do not influence an application''s
     behavior, trigger the denial and then register the `dontaudit` statements as explained
     in the following steps:'
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了禁用不影响应用程序行为的某些拒绝的日志记录，触发拒绝，然后按以下步骤注册 `dontaudit` 语句：
 - en: 'For each denial shown in the audit logs, we need to find the corresponding
     `dontaudit` rule set. Consider the following instance:'
+  id: totrans-166
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 对于审计日志中显示的每个拒绝，我们需要找到相应的 `dontaudit` 规则集。考虑以下实例：
 - en: '[PRE21]'
+  id: totrans-167
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'Search through the SELinux policies for `dontaudit` statements on this matter:'
+  id: totrans-168
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在 SELinux 策略中查找与此问题相关的 `dontaudit` 语句：
 - en: '[PRE22]'
+  id: totrans-169
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: Add in the interface call to the policy, rebuild the policy, and then reload
     it. Repeat until all cosmetic denials are no longer visible.
+  id: totrans-170
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将接口调用添加到策略中，重建策略，然后重新加载。重复此过程，直到所有外观上的拒绝不再显示。
 - en: How it works…
+  id: totrans-171
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: Many operations performed by applications can be seen as cosmetic—although in
     the example, the application really performs the searches through the user files,
     they are not needed for the application to function correctly. For instance, it
     might be searching through the entire directory until it finds its own files,
     which it does have access to.
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 应用程序执行的许多操作可以视为外观性操作——虽然在示例中，应用程序确实通过用户文件执行搜索，但它们对于应用程序的正常运行并不是必需的。例如，它可能会搜索整个目录，直到找到自己的文件，而这些文件它是有权限访问的。
 - en: By adding the `dontaudit` statements for these operations, we ensure that the
     audit logs stay clean.
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过为这些操作添加 `dontaudit` 语句，我们确保审计日志保持干净。
 - en: 'In case of problems, the administrator can still disable the `dontaudit` statements
     in the policy, revealing every denial that SELinux has triggered (even those that
     are explicitly marked as `dontaudit`):'
+  id: totrans-174
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果出现问题，管理员仍然可以禁用策略中的`dontaudit`语句，显示所有SELinux触发的拒绝（即使是那些明确标记为`dontaudit`的拒绝）：
 - en: '[PRE23]'
+  id: totrans-175
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'To re-enable the `dontaudit` statements, rebuild and reload the policy:'
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 要重新启用`dontaudit`语句，重新构建并重新加载策略：
 - en: '[PRE24]'
+  id: totrans-177
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: In certain situations, there might not be an interface related to `dontaudit`
     available. In that case, create a new interface (as part of an SELinux policy
     module) with the `dontaudit` rules defined in it. For instance, for a `dontaudit`
     rule set to ignore getting the attributes of `mozilla_home_t` content, we would
     create a `mymozilla` policy module with the `mozilla_dontaudit_getattr_home` interface
     declared in it.
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 在某些情况下，可能没有与`dontaudit`相关的接口可用。在这种情况下，可以创建一个新的接口（作为SELinux策略模块的一部分），并在其中定义`dontaudit`规则。例如，对于一个设置为忽略获取`mozilla_home_t`内容属性的`dontaudit`规则，我们将创建一个名为`mymozilla`的策略模块，并在其中声明`mozilla_dontaudit_getattr_home`接口。
 - en: Creating application resource interfaces
+  id: totrans-179
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建应用程序资源接口
 - en: Our application policy is almost ready for deployment. However, it currently
     is mainly end user focused, and there are no ways of interacting with the `skype_t`
     domain (or other resources managed by the `skype` module) except through the `skype_role`
     interface.
+  id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的应用程序策略几乎准备好部署了。然而，它目前主要面向最终用户，并且除了通过`skype_role`接口之外，没有任何与`skype_t`域（或`skype`模块管理的其他资源）交互的方式。
 - en: In this recipe, we'll add an interface for reading `skype_home_t`.
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个过程中，我们将为读取`skype_home_t`添加一个接口。
 - en: How to do it…
+  id: totrans-182
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何执行……
 - en: 'Alongside the `skype_role` interface that we created in the *Defining application
     role interfaces* recipe, we need to create additional resource interfaces so that
     other domains can easily interact with the newly created policy:'
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了我们在*定义应用程序角色接口*过程中创建的`skype_role`接口之外，我们还需要创建额外的资源接口，以便其他域能够轻松地与新创建的策略交互：
 - en: 'Open the `myskype.if` file and add in the following content:'
+  id: totrans-184
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 打开`myskype.if`文件，并添加以下内容：
 - en: '[PRE25]'
+  id: totrans-185
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: How it works…
+  id: totrans-186
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: The recipe itself is simple—for each interaction with resources managed by the
     `skype` module, we need to create an interface that can be called by other modules.
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个过程本身很简单——对于每次与`skype`模块管理的资源的交互，我们需要创建一个可以被其他模块调用的接口。
 - en: Each interface should be complete. For instance, in order to read the `skype_home_t`
     content, a domain will first need to be able to search through the user's home
     directory (`user_home_dir_t`, which is not the same as `user_home_t` as the former
     is the type for the home directory while the latter is for its contents); hence,
     the call to `userdom_search_user_home_dirs`.
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个接口应是完整的。例如，为了读取`skype_home_t`内容，域首先需要能够搜索用户的主目录（`user_home_dir_t`，这与`user_home_t`不同，前者是主目录的类型，而后者是其内容的类型）；因此，需要调用`userdom_search_user_home_dirs`。
 - en: Then, the necessary privileges are assigned to the domain. As we do not provide
     any class identifier in the interface name, the interface will grant read access
     to all (significant) classes related to the `skype_home_t` type.
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，将必要的权限分配给域。由于我们在接口名称中没有提供任何类标识符，接口将授予对所有与`skype_home_t`类型相关的（重要的）类的读取访问权限。
 - en: If we only want to grant read access to files (and not to the `directory` class),
     then the interface would be called `skype_read_home_files`.
+  id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们只想授予对文件的读取访问权限（而不包括`directory`类），则接口将命名为`skype_read_home_files`。
 - en: Adding conditional policy rules
+  id: totrans-191
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 添加条件策略规则
 - en: We can further fine-tune our policy with conditionals. Some of the access vectors
     identified earlier might not be necessary in all circumstances, so it makes sense
     to make them optional and configurable through SELinux Booleans.
+  id: totrans-192
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以通过条件进一步微调我们的策略。之前识别的一些访问向量在所有情况下可能并不需要，因此通过SELinux布尔值将其设为可选并可配置是有意义的。
 - en: 'Two of the identified access vectors that are candidates for configurable policies
     are as follows:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是两个可配置策略候选的访问向量：
 - en: Accessing the video and sound devices (in order to reduce the risk of malware
     or vulnerabilities in the application to access the webcam or sound device and
     spy on the unsuspecting users)
+  id: totrans-194
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 访问视频和音频设备（为了减少恶意软件或漏洞使应用程序能够访问摄像头或音频设备并监视无防备用户的风险）
 - en: Accessing all user content (instead of only the `skype_home_t` content)
+  id: totrans-195
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 访问所有用户内容（而不仅仅是`skype_home_t`内容）
 - en: How to do it…
+  id: totrans-196
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何执行……
 - en: The following set of steps allows us to make the policy more flexible for the
     administrators to handle by introducing Booleans. These Booleans modify the behavior
     of the policy and are added to a policy.
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下步骤集通过引入布尔值使策略对管理员更加灵活。这些布尔值修改策略的行为，并被添加到策略中。
 - en: 'Inside `myskype.te`, create the definitions for both Booleans. This is usually
     done before the type declarations:'
+  id: totrans-198
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在 `myskype.te` 内，创建两个布尔值的定义。通常在类型声明之前完成此操作。
 - en: '[PRE26]'
+  id: totrans-199
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Inside the policy, group the statements that we want to trigger through the
     Booleans:'
+  id: totrans-200
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在策略内部，将我们希望通过布尔值触发的语句进行分组：
 - en: '[PRE27]'
+  id: totrans-201
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: How it works…
+  id: totrans-202
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: The `gen_tunable` declarations will generate Booleans that administrators can
     toggle on the system. The first argument of each declaration is the name of the
     Boolean to be created, while the second argument sets the default value of the
     Boolean.
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: '`gen_tunable` 声明将生成管理员可以在系统上切换的布尔值。每个声明的第一个参数是要创建的布尔值的名称，第二个参数设置布尔值的默认值。'
 - en: Once Booleans are defined, the `tunable_policy` statements allow for grouping
     the statement calls that need to be made configurable.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦定义了布尔值，`tunable_policy` 语句允许将需要配置的语句调用进行分组。
 - en: 'It is possible to have rules enabled when a Boolean is disabled as well. For
     instance, for the `skype_manage_user_content` one, the following code can be used:'
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 即使布尔值被禁用，也有可能启用某些规则。例如，对于 `skype_manage_user_content`，可以使用以下代码：
 - en: '[PRE28]'
+  id: totrans-206
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'Booleans can also be combined, as shown in the following code:'
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 布尔值也可以组合，如以下代码所示：
 - en: '[PRE29]'
+  id: totrans-208
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: In such situations, the policy group rules will only take effect if both the
     Booleans are enabled.
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，策略组规则仅在两个布尔值都启用时才会生效。
 - en: 'It is also possible to only enable rules if a Boolean is not set, as shown
     in the next line of code:'
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: 也可以仅在布尔值未设置时启用规则，如以下代码行所示：
 - en: '[PRE30]'
+  id: totrans-211
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: There's more...
+  id: totrans-212
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'Tunable policies are a powerful extension to SELinux. However, there are some
     caveats to this:'
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 可调策略是 SELinux 的一个强大扩展。然而，这也有一些注意事项：
 - en: It is not simple to make the description of SELinux Booleans available to the
     administrator. The descriptions are defined through in-policy comments, but this
     is not used for custom modules—a full policy build needs to be made in order to
     generate the `policy.xml` file that contains all descriptions.
+  id: totrans-214
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 将 SELinux 布尔值的描述提供给管理员并不简单。描述是通过策略中的注释来定义的，但这对于自定义模块不起作用——需要完整的策略构建才能生成包含所有描述的
+    `policy.xml` 文件。
 - en: It is not possible to assign attributes within a `tunable_policy` group. Instead,
     policy developers will need to make the permissions related to the attribute configurable
     (if possible) or not assign the attribute at all.
+  id: totrans-215
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在 `tunable_policy` 组内无法分配属性。相反，策略开发人员需要使与属性相关的权限可配置（如果可能的话），或者根本不分配该属性。
 - en: It is not possible to use named file transitions within a `tunable_policy` group.
     In general, that doesn't matter that much—there are a few situations where a named
     file transition would depend on a Boolean, but these situations do occur.
+  id: totrans-216
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在 `tunable_policy` 组内无法使用命名文件转换。通常情况下，这没什么大不了的——有一些情况下，命名文件转换会依赖于布尔值，但这些情况确实会发生。
 - en: It is not possible to have the `optional_policy` statements within a `tunable_policy`
     group. Instead, wrap the `tunable_policy` call with an `optional_policy` statement
     first. It might be needed to create multiple blocks if a single Boolean would
     trigger multiple policy calls that warrant the use of an `optional_policy` block.
+  id: totrans-217
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在 `tunable_policy` 组内无法使用 `optional_policy` 语句。相反，首先用 `optional_policy` 语句包裹
+    `tunable_policy` 调用。如果一个布尔值会触发多个需要使用 `optional_policy` 块的策略调用，则可能需要创建多个块。
 - en: Efforts are being made to remove these shortcomings from the SELinux subsystem
     though.
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，目前正在努力从 SELinux 子系统中去除这些缺点。
 - en: Adding build-time policy decisions
+  id: totrans-219
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 添加构建时策略决策
 - en: The last enhancement we might want to look at is build-time policy decisions.
     Unlike SELinux Booleans, these are policy blocks that are enabled (or disabled)
     based on build parameters. We have encountered a few of these in the past already,
     namely `enable_mcs`, `enable_mls` as well as distribution selection parameters,
     such as `distro_gentoo` or `distro_redhat`.
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可能想要关注的最后一个增强功能是构建时策略决策。与 SELinux 布尔值不同，这些是基于构建参数启用（或禁用）的策略块。我们过去已经遇到过其中一些，比如
+    `enable_mcs`、`enable_mls` 以及分发选择参数，如 `distro_gentoo` 或 `distro_redhat`。
 - en: In this recipe, we will enable the `xdg_manage_downloads_home` call but only
     when the policy is built for a Gentoo system.
+  id: totrans-221
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个方案中，我们将启用`xdg_manage_downloads_home`调用，但仅在为Gentoo系统构建策略时启用。
 - en: How to do it…
+  id: totrans-222
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何执行…
 - en: 'Build-time decisions are added to the policy using the `ifdef` statements,
     as can be seen through the next set of steps:'
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 构建时决策通过`ifdef`语句添加到策略中，正如下一个步骤所展示的：
 - en: 'Open `myskype.te` and add in the following block of code:'
+  id: totrans-224
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 打开`myskype.te`并添加以下代码块：
 - en: '[PRE31]'
+  id: totrans-225
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'Rebuild the policy. On a Gentoo system, we can confirm that the access is now
     granted through `sesearch`, whereas other distributions probably don''t even know
     the `xdg_downloads_home_t` type:'
+  id: totrans-226
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重新构建策略。在Gentoo系统中，我们可以通过`sesearch`确认现在已授予访问权限，而其他发行版可能根本不知道`xdg_downloads_home_t`类型：
 - en: '[PRE32]'
+  id: totrans-227
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: How it works…
+  id: totrans-228
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: The reference policy build system automatically defines a couple of parameters
     that can be used by the `ifdef` macros. The build system uses definitions inside
     the `build.conf` file available at `/usr/share/selinux/mcs/include/` or `/usr/share/selinux/devel/include/`
     to generate such parameters.
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: 参考策略构建系统自动定义了一些可以被`ifdef`宏使用的参数。构建系统使用`/usr/share/selinux/mcs/include/`或`/usr/share/selinux/devel/include/`中的`build.conf`文件内的定义来生成这些参数。
 - en: 'For instance, the distribution parameter in `build.conf` is set as follows:'
+  id: totrans-230
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，`build.conf`中的发行版参数设置如下：
 - en: '[PRE33]'
+  id: totrans-231
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'Inside `Makefile`, this is converted into an `M4PARAM` setting:'
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`Makefile`中，这会转换为一个`M4PARAM`设置：
 - en: '[PRE34]'
+  id: totrans-233
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: Through these `M4` parameters, we can then use the `ifdef` statements to query
     the existence of these parameters and make build-time decisions.
+  id: totrans-234
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过这些`M4`参数，我们可以使用`ifdef`语句来查询这些参数的存在并做出构建时的决策。
 - en: There's more...
+  id: totrans-235
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多内容...
 - en: It is possible to add our own set of parameters. For this, we set the `M4PARAM`
     environment variable before we call the `make` command (used while building the
     policy modules).
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以添加自己的一组参数。为此，我们在调用`make`命令（用于构建策略模块）之前设置`M4PARAM`环境变量。
 - en: 'For instance, to support the `debug` statements, we could set the following
     in the policy:'
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，为了支持`debug`语句，我们可以在策略中设置如下：
 - en: '[PRE35]'
+  id: totrans-238
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: 'During policy build, we can enable these statements as follows:'
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: 在策略构建过程中，我们可以按如下方式启用这些语句：
 - en: '[PRE36]'
+  id: totrans-240
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
