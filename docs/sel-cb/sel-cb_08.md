@@ -1,4 +1,4 @@
-# 第八章 SELinux 调试
+# 第八章：SELinux 调试
 
 在本章中，我们将通过以下方法来查看 SELinux 调试：
 

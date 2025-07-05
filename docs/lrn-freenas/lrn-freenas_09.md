@@ -1,4 +1,4 @@
-# 第十章 FreeBSD 与命令行工具
+# 第十章：FreeBSD 与命令行工具
 
 FreeBSD 是 FreeNAS 服务器的基石。在本章中，我们将介绍一些简单的 FreeBSD 命令以及一些基础的 FreeBSD 管理任务，包括停止和启动不同的服务，以及从命令行控制 RAID。
 

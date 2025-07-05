@@ -1,4 +1,4 @@
-# 第四章 VMware Workstation 背后的秘密
+# 第四章：VMware Workstation 背后的秘密
 
 在前几章中，你已经学习了如何安装和使用 VMware Workstation。在本章中，你将深入了解 VMware 主机计算机发生了什么，虚拟机创建期间都做了哪些操作。你将查看已创建的配置文件以及相关的磁盘文件。你还将学习在将 VMware 磁盘文件移动到其他计算机时需要做什么。此外，我们还将讨论在 VMware Workstation 环境中可以使用的不同存储类型。
 

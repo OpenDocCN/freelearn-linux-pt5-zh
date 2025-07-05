@@ -1,4 +1,4 @@
-# 第八章 Nginx – 部署一个以性能为中心的 Web 服务器
+# 第八章：Nginx – 部署一个以性能为中心的 Web 服务器
 
 在谈到 web 服务器时，似乎 Apache 总是占据着所有的关注点，你可能会被引导认为几乎没有竞争对手；因此让我来向你介绍一下 Nginx。我们已经看过很多实现**Linux Apache MySQL 和 PHP**（**LAMP**）技术的文章。我们将在此稍作调整，看看**Linux Nginx MySQL 和 PHP**（**LEMP**）；LEMP 中的 E 来自于该 web 服务器的发音版本 *engine-x*，这个发音让我们得以为这个首字母缩写加上一个必要的元音字母。该 web 服务器首次推出是在 2004 年，Nginx 开始逐步进入企业级 web 空间，并且在提供 web 内容的速度上超过了相同的 Apache 服务器。
 

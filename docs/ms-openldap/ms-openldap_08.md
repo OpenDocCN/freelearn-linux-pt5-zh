@@ -1,4 +1,4 @@
-# 第八章 LDAP 与 Web
+# 第八章：LDAP 与 Web
 
 到目前为止，本书的重点是 LDAP 服务本身。在这一章中，我们将探讨如何将 LDAP 与其他服务集成。本章的重点将是将 OpenLDAP 与支持 LDAP 的 Web 服务集成。目标不仅是提供一些具体的 Web 服务示例，还要给出关于支持 LDAP 的应用程序常见特征的一般了解。我们主要将使用 Apache Web 服务器和 phpLDAPadmin 工具。本章将涉及以下主题：
 

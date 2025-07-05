@@ -1136,7 +1136,7 @@ WebGL 在 Tizen 上的演示
 
 +   Khronos Group 的演示仓库包含了多种不同的 WebGL 应用程序列表。可以随意在 Tizen 上尝试这些应用，访问链接：[`www.khronos.org/webgl/wiki/Demo_Repository`](http://www.khronos.org/webgl/wiki/Demo_Repository)。
 
-# 第四章 存储数据
+# 第四章：存储数据
 
 本章将涵盖：
 
@@ -2249,7 +2249,7 @@ IndexedDB 存储对象。本配方中的代码片段插入、删除并读取代�
 
 +   浏览 W3C 规范，了解更多关于 IndexedDB 完整功能的信息，网址：[`www.w3.org/TR/IndexedDB/`](http://www.w3.org/TR/IndexedDB/)。
 
-# 第五章 创建多媒体应用
+# 第五章：创建多媒体应用
 
 本章将介绍以下食谱：
 
@@ -4866,7 +4866,7 @@ calendar.update(event);
 
 +   要查看 `CalendarAlarm` 接口的完整规格，请查看 [`developer.tizen.org/dev-guide/2.2.1/org.tizen.web.device.apireference/tizen/calendar.html#::Calendar::CalendarAlarm`](https://developer.tizen.org/dev-guide/2.2.1/org.tizen.web.device.apireference/tizen/calendar.html#::Calendar::CalendarAlarm)。
 
-# 第八章 通信
+# 第八章：通信
 
 在本章中，我们将涵盖以下食谱：
 

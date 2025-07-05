@@ -1,4 +1,4 @@
-# 第十章 Kubernetes 介绍
+# 第十章：Kubernetes 介绍
 
 在本章中，我们将简要介绍 Google Kubernetes，它在多个主机上管理容器化应用程序。由于 Kubernetes 是一个非常庞大的项目，本章将仅概述其主要概念和一些用例，包括以下内容：
 

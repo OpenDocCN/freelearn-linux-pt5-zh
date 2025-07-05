@@ -4,7 +4,7 @@
 
 *Tizen 生态系统介绍*
 
-# 第一章 Tizen SDK
+# 第一章：Tizen SDK
 
 本章将覆盖以下食谱：
 

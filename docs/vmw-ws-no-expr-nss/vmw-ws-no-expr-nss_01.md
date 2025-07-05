@@ -1,4 +1,4 @@
-# 第一章 安装 VMware Workstation
+# 第一章：安装 VMware Workstation
 
 在本章中，你将学习如何安装 VMware Workstation。本章不仅仅是通过点击“下一步”、“下一步”和“完成”来执行一个向导，你还将学习如何明智地配置运行 VMware Workstation 的计算机，并在 Windows 或 Linux 上进行高级安装。
 

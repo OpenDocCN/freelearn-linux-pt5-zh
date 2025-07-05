@@ -1,4 +1,4 @@
-# 第九章 Puppet – 现在您是 Puppet Master
+# 第九章：Puppet – 现在您是 Puppet Master
 
 Puppet 来自 Puppet Labs，允许集中管理您的 Linux 设备。中央 Puppet 服务器被称为 Puppet master，延续了木偶戏的类比。这个主设备当然可以让您通过单一设备控制服务器和桌面（在 Puppet 术语中称为节点），尽管不需要用线操控木偶。Puppet master 向每个节点指定所需状态，每隔 30 分钟，节点会连接到 Puppet master 并发送关于其资源的事实；如果不符合所需状态，节点将自行修复以达成目标。在本章过程中，我们将研究 Puppet 配置，包括：
 

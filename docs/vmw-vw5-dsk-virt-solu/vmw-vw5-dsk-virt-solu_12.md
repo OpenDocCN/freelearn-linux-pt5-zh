@@ -1,4 +1,4 @@
-# 第十二章 VMware View 5.1
+# 第十二章：VMware View 5.1
 
 在本书发布时，VMware View 5.0 正在被 VMware View 5.1 版本取代，尽管是一个.1 版本，但 VMware View 团队添加了大量功能，改善了 VMware View 的性能、可扩展性和用户体验。
 
