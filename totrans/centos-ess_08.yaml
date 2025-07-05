@@ -1,295 +1,447 @@
 - en: Chapter 8. Introducing CoreUpdate and Container/Enterprise Registry
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第8章：介绍 CoreUpdate 和容器/企业注册中心
 - en: In the previous chapter, we saw how to set up a production cluster and deploy
     our code, how to set up staging using Docker builder, and private Docker registry
     machines to production servers.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上一章中，我们了解了如何设置生产集群并部署代码，如何使用 Docker 构建器设置暂存环境，以及如何将私有 Docker 注册中心机器部署到生产服务器。
 - en: In this chapter, we will overview the CoreOS update strategies, paid CoreUpdate
     services, and Docker image hosting at the Container Registry and the Enterprise
     Registry.
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将概述 CoreOS 更新策略、付费的 CoreUpdate 服务以及在容器注册中心和企业注册中心托管的 Docker 镜像。
 - en: 'In this chapter we will cover the following topics:'
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将涵盖以下主题：
 - en: Update strategies
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 更新策略
 - en: CoreUpdate
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: CoreUpdate
 - en: Container Registry
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 容器注册中心
 - en: Enterprise Registry
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 企业注册中心
 - en: Update strategies
+  id: totrans-8
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 更新策略
 - en: Before we look at the paid CoreUpdate services from CoreOS, let's overview automatic
     update strategies that come out-of-the-box.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们了解 CoreOS 的付费 CoreUpdate 服务之前，先概述一下开箱即用的自动更新策略。
 - en: Automatic updates
+  id: totrans-10
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 自动更新
 - en: CoreOS comes with automatic updates enabled by default.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: CoreOS 默认启用自动更新。
 - en: As we have mentioned earlier, as updates are released by the CoreOS team, the
     host will stage them down to a temporary location and install to the passive `usr`
     partition. After rebooting, active and passive partitions get swapped.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们之前提到的，当 CoreOS 团队发布更新时，主机将其暂存到临时位置并安装到被动的 `usr` 分区。重启后，活动分区和被动分区将交换。
 - en: 'At the time of writing this book, there are four update strategies, as follows:'
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 在写这本书时，共有四种更新策略，如下所示：
 - en: '![Automatic updates](img/image00171.jpeg)'
+  id: totrans-14
   prefs: []
   type: TYPE_IMG
+  zh: '![自动更新](img/image00171.jpeg)'
 - en: 'Which update strategy should be used is defined in the `update` part of `cloud-config`:'
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 应该使用哪种更新策略在 `cloud-config` 的 `update` 部分中定义：
 - en: '[PRE0]'
+  id: totrans-16
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Let''s take a look at what these update strategies are:'
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们来看一下这些更新策略：
 - en: '`best-effort`: This is the default one and works in such a way that it checks
     whether the machine is part of the cluster. Then it uses `etcd-lock`; otherwise
     it uses the `reboot` strategy.'
+  id: totrans-18
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`best-effort`：这是默认策略，其工作方式是检查机器是否为集群的一部分。如果是，它会使用 `etcd-lock`；否则，它会使用 `reboot`
+    策略。'
 - en: '`etcd-lock`: This allows us to boot only one machine at a time by putting a
     `reboot` lock on each machine and rebooting them one by one.'
+  id: totrans-19
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`etcd-lock`：这使我们能够通过在每台机器上放置一个 `reboot` 锁来一次只启动一台机器，并逐一重启它们。'
 - en: '`reboot`: This reboots the machine as soon as the update gets installed on
     the passive partition.'
+  id: totrans-20
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`reboot`：一旦更新安装到被动分区，它将立即重启机器。'
 - en: '`off`: The machine will not be rebooted after a successful update install onto
     the passive partition.'
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`off`：在成功更新安装到被动分区后，机器不会被重启。'
 - en: Uses of update strategies
+  id: totrans-22
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 更新策略的使用
 - en: 'Here are some examples of what `update` strategies can be used for:'
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是一些 `update` 策略的应用示例：
 - en: '`best-effort`: This is recommended to be used in production clusters'
+  id: totrans-24
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`best-effort`：建议在生产集群中使用此策略'
 - en: '`reboot`: This can be used for machines that can only be rebooted at a certain
     time of the day—for example, for automatic updates in a maintenance window'
+  id: totrans-25
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`reboot`：这可以用于只能在一天中的特定时间重启的机器，例如用于在维护窗口中进行自动更新。'
 - en: '`off`: This can be used for a local development environment where the control
     of reboots is in the user''s hands'
+  id: totrans-26
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`off`：适用于本地开发环境，其中重启控制权由用户掌握'
 - en: If you want to learn more about update strategies, take a look at the CoreOS
     website at [https://coreos.com/docs/cluster-management/setup/update-strategies/](https://coreos.com/docs/cluster-management/setup/update-strategies/).
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你想了解更多更新策略，请访问 CoreOS 官网：[https://coreos.com/docs/cluster-management/setup/update-strategies/](https://coreos.com/docs/cluster-management/setup/update-strategies/)。
 - en: CoreUpdate
+  id: totrans-28
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: CoreUpdate
 - en: CoreUpdate is a part of the managed Linux plans ([https://coreos.com/products/](https://coreos.com/products/)).
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: CoreUpdate 是受管 Linux 计划的一部分（[https://coreos.com/products/](https://coreos.com/products/)）。
 - en: 'It is a tool in the commercial offerings of CoreOS. It provides users with
     their own supported Omaha server and is analogous to tools such as Red Hat Satellite
     Server and Canonical Landscape:'
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是 CoreOS 商业版中的一个工具。它为用户提供了自己的支持 Omaha 服务器，类似于 Red Hat Satellite Server 和 Canonical
+    Landscape 等工具：
 - en: The standard plan is managed and hosted by CoreOS
+  id: totrans-31
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 标准计划由 CoreOS 管理和托管
 - en: The premium plan can be run behind the firewall, which can be on-premise or
     on the cloud
+  id: totrans-32
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 高级计划可以在防火墙后运行，可以是本地部署或云端部署
 - en: 'CoreUpdate uses exactly the same strategies as the aforementioned `update`
     strategies, except for a few differences in the `update` portion of the `cloud-config`
     file:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: CoreUpdate使用与前面提到的`update`策略完全相同的策略，除了在`cloud-config`文件中的`update`部分有一些区别：
 - en: '[PRE1]'
+  id: totrans-34
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Here:'
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 这里：
 - en: '`group` is what you have set at your CoreUpdate dashboard'
+  id: totrans-36
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`group`是你在CoreUpdate仪表板上设置的内容'
 - en: '`server` is the link generated for you after signing in for the managed Linux
     plan'
+  id: totrans-37
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`server`是你在为托管Linux计划注册后生成的链接。'
 - en: In our current example, as per `cloud-config`, the servers belong to `https://customer.update.core-os.net/v1/update`
     and `group` is `production`.
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们当前的示例中，根据`cloud-config`，服务器属于`https://customer.update.core-os.net/v1/update`，而`group`为`production`。
 - en: 'We change via the CoreUpdate UI, as shown in the following screenshot:'
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们通过CoreUpdate UI进行更改，如下图所示：
 - en: '![CoreUpdate](img/image00172.jpeg)'
+  id: totrans-40
   prefs: []
   type: TYPE_IMG
+  zh: '![CoreUpdate](img/image00172.jpeg)'
 - en: 'The following features are present:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下功能是可用的：
 - en: Release channel; in our case, it is the stable one
+  id: totrans-42
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 发布通道；在我们的案例中，它是稳定的。
 - en: Enable/disable automatic updates
+  id: totrans-43
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 启用/禁用自动更新
 - en: Time window between machines updates; in our case, it is 90 minutes
+  id: totrans-44
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 机器更新之间的时间窗口；在我们的案例中，它是90分钟。
 - en: The CoreUpdate UI allows you to very easily control your cluster update groups,
     without any need to perform `ssh` via the terminal to your servers and change
     there on each server individually update settings.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: CoreUpdate的UI允许你非常轻松地控制集群更新组，无需通过终端对每台服务器执行`ssh`并单独修改每台服务器的更新设置。
 - en: Note
+  id: totrans-46
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'You can read more about CoreUpdate at the following pages:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以在以下页面阅读更多关于CoreUpdate的信息：
 - en: '[https://coreos.com/docs/coreupdate/coreos/coreupdate-configure-machines](https://coreos.com/docs/coreupdate/coreos/coreupdate-configure-machines)'
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://coreos.com/docs/coreupdate/coreos/coreupdate-configure-machines](https://coreos.com/docs/coreupdate/coreos/coreupdate-configure-machines)'
 - en: '[https://coreos.com/docs/coreupdate/coreos/coreupdate-getting-started](https://coreos.com/docs/coreupdate/coreos/coreupdate-getting-started)'
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: '[https://coreos.com/docs/coreupdate/coreos/coreupdate-getting-started](https://coreos.com/docs/coreupdate/coreos/coreupdate-getting-started)'
 - en: Container Registry
+  id: totrans-50
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 容器注册表
 - en: 'The Container Registry is a hosted CoreOS service for application containers
     at [https://quay.io](https://quay.io). There, you can host your Docker images
     if you don''t want to run Private Docker Registry yourself:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 容器注册表是CoreOS为应用容器提供的托管服务，网址是[https://quay.io](https://quay.io)。在那里，如果你不想自己运行私有Docker注册表，可以托管你的Docker镜像：
 - en: It offers free, unlimited storage and repositories for public container repositories
+  id: totrans-52
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 它为公共容器仓库提供免费、无限的存储和仓库。
 - en: If you want private repositories, it offers a plenty of plans to choose from
+  id: totrans-53
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果你需要私有仓库，它提供了多种计划供你选择。
 - en: Quay.io overview
+  id: totrans-54
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: Quay.io概览
 - en: 'Let''s go through an overview of what they have there: a nice and easy-to-use
     UI.'
+  id: totrans-55
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看一下它们提供的概览：一个友好且易于使用的UI。
 - en: '![Quay.io overview](img/image00173.jpeg)'
+  id: totrans-56
   prefs: []
   type: TYPE_IMG
+  zh: '![Quay.io概览](img/image00173.jpeg)'
 - en: 'In the following screenshot we see postgres containers image in more details:'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下面的截图中，我们更详细地查看了postgres容器镜像：
 - en: '![Quay.io overview](img/image00174.jpeg)'
+  id: totrans-58
   prefs: []
   type: TYPE_IMG
+  zh: '![Quay.io概览](img/image00174.jpeg)'
 - en: As you see from the preceding screenshot, the UI is very easy to use and it's
     easy to understand the features.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 从前面的截图中可以看出，UI非常易于使用，功能也很容易理解。
 - en: 'Let''s see how the Create Repository feature looks:'
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们看看创建仓库功能是怎样的：
 - en: '![Quay.io overview](img/image00175.jpeg)'
+  id: totrans-61
   prefs: []
   type: TYPE_IMG
+  zh: '![Quay.io概览](img/image00175.jpeg)'
 - en: 'When you create a new repository, you can do the following:'
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 当你创建一个新仓库时，你可以进行以下操作：
 - en: Make the repository public or private.
+  id: totrans-63
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 将仓库设置为公开或私有。
 - en: Empty it if you want to build containers yourself and push them to the Registry.
+  id: totrans-64
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果你想自己构建容器并将它们推送到注册表中，可以将其清空。
 - en: Provide (upload) a `Docker` file.
+  id: totrans-65
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 提供（上传）一个`Docker`文件。
 - en: Link to the GitHub repository. This is the preferred choice as it allows you
     to automate container building when you push changes to your GitHub Repository.
+  id: totrans-66
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 链接到GitHub仓库。这是首选选项，因为它允许你在向GitHub仓库推送更改时自动构建容器。
 - en: Enterprise Registry
+  id: totrans-67
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 企业注册表
 - en: Enterprise Registry is basically the same as Container Registry, but is hosted
     on your premises or cloud servers behind your firewall.
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 企业注册表与容器注册表基本相同，但托管在你的本地或云服务器上，位于你的防火墙后面。
 - en: It has different plan options and can be found at [https://coreos.com/products/enterprise-registry/](https://coreos.com/products/enterprise-registry/).
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 它有不同的计划选项，可以在[https://coreos.com/products/enterprise-registry/](https://coreos.com/products/enterprise-registry/)找到。
 - en: It allows you to manage container builds, permissions of your teams and users,
     and so on.
+  id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 它允许你管理容器构建、团队和用户的权限等。
 - en: If your company's requirement is a setup that is very secured and fully controlled
     by you, then using the Container Registry and Enterprise Registry is the way to
     go.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果贵公司的需求是一个非常安全且完全由您控制的设置，那么使用容器注册表和企业注册表是最佳选择。
 - en: Summary
+  id: totrans-72
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: In this chapter, we overviewed the CoreOS update strategies, CoreUpdate services,
     the hosted free/paid Container Registry at [https://quay.io](https://quay.io),
     and the self-hosted Enterprise Registry services.
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们概述了CoreOS更新策略、CoreUpdate服务、托管的免费/付费容器注册表[https://quay.io](https://quay.io)以及自托管的企业注册表服务。
 - en: In the next chapter, you will be introduced to the CoreOS rkt—App Container
     runtime that can be used instead of Docker containers.
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章中，您将了解CoreOS的rkt——可以替代Docker容器使用的应用容器运行时。
