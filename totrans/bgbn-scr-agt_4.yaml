@@ -823,6 +823,7 @@
   id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: TPM 1.2 规范总共有700多页。我们将关注TPM的一个独特特性，这个特性使得它的许多安全功能成为可能：**平台控制寄存器** (**PCRs**)。PCRs是TPM寄存器，始终可以读取，但只能通过**扩展操作**写入。扩展操作获取当前的20字节PCR值，与一个20字节的输入值组合，并将新的PCR值设置为这个组合的SHA-1结果。关键点在于一旦PCR被设置，就无法逆转。它只能在未来的扩展操作中继续组合。
 - en: At first, it may not be obvious how this feature helps. Let's consider an example.
     On boot, your computer's BIOS, prior to loading the bootloader, first sends a
     SHA-1 hash of the bootloader to the TPM to extend one of the PCRs. It then loads
@@ -833,6 +834,7 @@
   id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 起初，这个功能可能不明显有何帮助。让我们考虑一个例子。在启动时，您的计算机的BIOS在加载引导加载程序之前，首先将引导加载程序的SHA-1哈希发送到TPM以扩展一个PCR。然后加载引导加载程序。引导加载程序在您的内核上执行相同的操作。然后内核在各种启动系统上执行相同的操作，最后允许正常用户操作。在这个过程结束时，PCRs将填充一系列哈希值。
 - en: The values of these registers represent a trusted measurement of your system.
     Now, say malware has infected your computer and has modified the boot process.
     On next boot, at least one of the PCRs will have a drastically different value
@@ -841,6 +843,7 @@
   id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些寄存器的值代表您系统的可信度量。现在，假设恶意软件已经感染了您的计算机并修改了启动过程。在下次启动时，至少一个PCR的值与之前记录的值有显著不同。PCRs使得可以对启动过程进行测量，从而提供关于启动过程的断言。
 - en: There are several terms relating to the TPM-protected boot process. Secure boot
     will halt the boot processes if the PCR values do not match a known configuration.
     Authenticated boot simply measures the boot process and allows remote parties
@@ -849,11 +852,13 @@
   id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 有几个与TPM保护启动过程相关的术语。如果PCR值与已知配置不匹配，安全启动将停止启动过程。经过认证的启动只是测量启动过程，并允许远程方对启动过程的来源进行断言。受信启动指的是同时使用经过认证和安全启动的系统。
 - en: Encrypting data to a PCR state
   id: totrans-103
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 加密数据到一个PCR状态
 - en: The TPM supports another feature that builds on the state of the PCRs. As previously
     mentioned, the TPM can perform RSA encryption. However, the TPM can also combine
     the state of the PCRs to the encryption in a process known as **sealing**. Once
@@ -862,6 +867,7 @@
   id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: TPM支持另一个建立在PCR状态之上的功能。如前所述，TPM可以执行RSA加密。然而，TPM还可以将PCR状态与加密结合在一起，这个过程称为**封存**。一旦数据被封存到PCR值，只有当PCR与加密时相同的值匹配时，才能解密数据。
 - en: How is this going to help us protect our GPG key? We will encrypt the GPG key
     to a known PCR state. We'll use the numeric code entered from the keypad connected
     to the CryptoCape as input into this PCR state. When the TPM decrypts the GPG
@@ -873,6 +879,7 @@
   id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将如何帮助我们保护GPG密钥？我们将GPG密钥加密到已知的PCR状态。我们将使用从连接到CryptoCape的键盘输入的数字代码作为这个PCR状态的输入。当TPM解密GPG私钥时，它将像通常一样可供GPG使用。虽然GPG私钥已经受到密码短语的保护，但TPM在静止时提供额外的密钥保护。密码短语仍然可能被键盘记录器捕获，但在BBB启动并连接CryptoCape并直接输入代码之前，我们的密钥将不可用。
 - en: This system also helps in preventing offline attacks on the numeric code. The
     PCR value, once extended with the correct code, will allow unsealing of the data.
     But, if the wrong code is entered, the PCR value will be incorrect and the only
@@ -880,11 +887,13 @@
   id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 该系统还有助于防止对数字代码的离线攻击。一旦使用正确的代码扩展了PCR值，就可以解锁数据。但是，如果输入错误的代码，PCR值将不正确，若该PCR是*不可重置*的PCR之一，唯一的重置方法是重启。
 - en: Adding the keypad
   id: totrans-107
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 添加键盘
 - en: 'We''re going to need a way to enter this code into the BBB. This code is used
     to populate one of the TPM''s PCRs that will be used to seal the GPG key. This
     keypad will be connected to the ATmega328p on the CryptoCape. While the BBB is
@@ -897,36 +906,44 @@
   id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们需要一种方法将此代码输入到BBB中。此代码用于填充TPM的PCR之一，该PCR将用于密封GPG密钥。这个键盘将连接到CryptoCape上的ATmega328p。虽然BBB完全能够处理键盘的I/O，但通过使用ATmega328p，我们可以充分利用代码重用。对于SparkFun目录中的大多数硬件产品，至少有一个非官方的Arduino库。如果这些组件在SparkFun上没有，你应该能够从产品描述中找到类似的部件。就键盘而言，有一个官方库。该项目的硬件列在下表中：
 - en: '| Device | SparkFun number |'
   id: totrans-109
   prefs: []
   type: TYPE_TB
+  zh: '| 设备 | SparkFun编号 |'
 - en: '| --- | --- |'
   id: totrans-110
   prefs: []
   type: TYPE_TB
+  zh: '| --- | --- |'
 - en: '| CryptoCape | DEV-12773 |'
   id: totrans-111
   prefs: []
   type: TYPE_TB
+  zh: '| CryptoCape | DEV-12773 |'
 - en: '| Keypad | COM-08653 |'
   id: totrans-112
   prefs: []
   type: TYPE_TB
+  zh: '| 键盘 | COM-08653 |'
 - en: '| F/F jumper wires | PRT-08430 |'
   id: totrans-113
   prefs: []
   type: TYPE_TB
+  zh: '| F/F跳线 | PRT-08430 |'
 - en: '| Male breakaway headers | PRT-00116 |'
   id: totrans-114
   prefs: []
   type: TYPE_TB
+  zh: '| 公头断开连接器 | PRT-00116 |'
 - en: 'To build this Arduino library, you''ll first need to install the `Keypad` library
     from the Arduino playground site: [http://playground.arduino.cc/code/Keypad](http://playground.arduino.cc/code/Keypad).
     Then clone the following repository from GitHub:'
   id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 要构建这个Arduino库，你首先需要从Arduino Playground网站安装`Keypad`库：[http://playground.arduino.cc/code/Keypad](http://playground.arduino.cc/code/Keypad)。然后从GitHub克隆以下仓库：
 - en: '[PRE8]'
   id: totrans-116
   prefs: []
@@ -940,6 +957,8 @@
   id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`ch4`代码文件夹中，你会找到`keypad.ino`源代码和已编译好的hex文件，准备加载到328p中。从[第3章](part0031_split_000.html#page
+    "第3章：通过CryptoCape添加硬件安全")，*通过CryptoCape添加硬件安全*，记住可以通过以下命令将编译好的草图上传到ATmega328p，只要确保安装了程序跳线：
 - en: '[PRE9]'
   id: totrans-118
   prefs: []
@@ -954,6 +973,8 @@
   id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 该程序将328p连接到I2C总线的十六进制地址0x42。它会等待从I2C主设备——BBB接收数据，然后从键盘收集五位数字代码。你有十秒钟的时间输入五位数字代码，计时器一旦CryptoCape
+    LED亮起就开始。每按下一次键，LED会瞬间闪烁。收集完五个字符后，LED会熄灭。
 - en: 'To connect the keypad to the CryptoCape, you first need to solder 0.1" male
     pins to the keypad. Also, you''ll need to solder the 0.1" male header pins to
     the CryptoCape ATmega328p pads. Once the pins are installed, now you need to connect
@@ -963,61 +984,75 @@
   id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 要将键盘连接到CryptoCape，你首先需要将0.1"的公头引脚焊接到键盘上。同时，你还需要将0.1"的公头引脚焊接到CryptoCape ATmega328p的焊盘上。安装好引脚后，你需要使用跳线将键盘连接到CryptoCape。请注意，键盘有九个引脚，但只有七个会用到。将第一个引脚（最靠近`*`字符的引脚）视为*引脚0*。按以下表格连接跳线：
 - en: '| Keypad pin | Arduino digital pin |'
   id: totrans-121
   prefs: []
   type: TYPE_TB
+  zh: '| 键盘引脚 | Arduino数字引脚 |'
 - en: '| --- | --- |'
   id: totrans-122
   prefs: []
   type: TYPE_TB
+  zh: '| --- | --- |'
 - en: '| 3 | D2 |'
   id: totrans-123
   prefs: []
   type: TYPE_TB
+  zh: '| 3 | D2 |'
 - en: '| 1 | D3 |'
   id: totrans-124
   prefs: []
   type: TYPE_TB
+  zh: '| 1 | D3 |'
 - en: '| 5 | D4 |'
   id: totrans-125
   prefs: []
   type: TYPE_TB
+  zh: '| 5 | D4 |'
 - en: '| 2 | D5 |'
   id: totrans-126
   prefs: []
   type: TYPE_TB
+  zh: '| 2 | D5 |'
 - en: '| 7 | D6 |'
   id: totrans-127
   prefs: []
   type: TYPE_TB
+  zh: '| 7 | D6 |'
 - en: '| 6 | D7 |'
   id: totrans-128
   prefs: []
   type: TYPE_TB
+  zh: '| 6 | D7 |'
 - en: '| 4 | D8 |'
   id: totrans-129
   prefs: []
   type: TYPE_TB
+  zh: '| 4 | D8 |'
 - en: 'The keypad, when attached to the CryptoCape, should look like the following
     image:'
   id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 将键盘连接到CryptoCape后，应该看起来如下图所示：
 - en: '![Adding the keypad](img/00018.jpeg)'
   id: totrans-131
   prefs: []
   type: TYPE_IMG
+  zh: '![添加键盘](img/00018.jpeg)'
 - en: Note
   id: totrans-132
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'The case shown in the image is logic supply''s plated steel chassis. It is
     available on their website: [http://www.logicsupply.com/components/beaglebone/boards-cases-kits/bb100-orange/](http://www.logicsupply.com/components/beaglebone/boards-cases-kits/bb100-orange/).'
   id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 图像中显示的情况是逻辑供应的镀钢机箱。您可以在他们的网站上找到这些信息：[http://www.logicsupply.com/components/beaglebone/boards-cases-kits/bb100-orange/](http://www.logicsupply.com/components/beaglebone/boards-cases-kits/bb100-orange/)。
 - en: 'Now, we need some software that will initiate the code collection process on
     the ATmega328p. Remember that the software needs to collect the code and then
     extend the PCR. In the previously listed repository is a file, `keypad.c`, which
@@ -1026,6 +1061,7 @@
   id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们需要一些软件，它将启动ATmega328p上的代码收集过程。请记住，软件需要收集代码，然后扩展PCR。在前面列出的存储库中有一个文件，`keypad.c`，它正是这样做的。要构建此程序，您需要开源TCG软件堆栈的开发包：
 - en: '[PRE10]'
   id: totrans-135
   prefs: []
@@ -1035,6 +1071,7 @@
   id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，您应该能够使用以下命令编译程序：
 - en: '[PRE11]'
   id: totrans-137
   prefs: []
@@ -1045,6 +1082,7 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 拥有TPM的所有权
 - en: 'Before we use the TPM, we must first take ownership of it. Taking ownership
     establishes an owner password for maintenance operations and a password for one
     of the root keys inside the TPM, the **Storage Root Key** (**SRK**) (pronounced
@@ -1056,6 +1094,7 @@
   id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: 在使用TPM之前，我们必须首先拥有它。拥有TPM会为维护操作建立一个所有者密码和一个TPM内部的根密钥之一，即**存储根密钥**（**SRK**）（发音为*shark*）。您可以将管理员密码设置为任何密码，但是为了与传统软件一起使用，您会想将SRK设置为二十个零的*众所周知的密码*。如果您想要设置一个唯一的SRK密码，但是用于控制TPM的TrouSerS软件包括一个命令行参数，用于将密码设置为其众所周知的值。首先安装`tpm-tools`：
 - en: '[PRE12]'
   id: totrans-140
   prefs: []
@@ -1067,6 +1106,7 @@
   id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，您应该重新启动带有CryptoCape连接的BBB。这将确保TPM内核驱动程序和相关软件正确加载。要检查一切是否正常工作，请发出以下命令：
 - en: '[PRE13]'
   id: totrans-142
   prefs: []
@@ -1076,6 +1116,7 @@
   id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: 应返回：
 - en: '[PRE14]'
   id: totrans-144
   prefs: []
@@ -1085,6 +1126,7 @@
   id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，通过发出以下命令检查守护程序：
 - en: '[PRE15]'
   id: totrans-146
   prefs: []
@@ -1094,6 +1136,7 @@
   id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 此命令应返回类似于以下内容：
 - en: '[PRE16]'
   id: totrans-148
   prefs: []
@@ -1103,6 +1146,7 @@
   id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，您可以按以下方式拥有TPM：
 - en: '[PRE17]'
   id: totrans-150
   prefs: []
@@ -1113,6 +1157,7 @@
   id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: 您将被提示输入所有者密码。 `-z` 选项将SRK设置为众所周知的密码短语。回应应为：
 - en: '[PRE18]'
   id: totrans-152
   prefs: []
@@ -1122,11 +1167,13 @@
   id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在您已经准备好使用TPM。
 - en: Note
   id: totrans-154
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: If you have the CryptoCape v02, then you will need to perform some additional
     steps. The version number is found on the bottom layer of the board, above the
     P8 header, near the open source hardware logo, which looks like a gear. The TPMs
@@ -1137,16 +1184,19 @@
   id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您有CryptoCape v02，则需要执行一些额外步骤。版本号位于板的底层，在P8标头上方，靠近开源硬件标志的图标上方，看起来像一个齿轮。此修订版上的TPM以合规模式发货，这意味着加载在其上的密钥是测试密钥。这有助于在制造过程中测试TPM，但需要最终用户更改密钥。有关详细信息，请参阅页面[http://cryptotronix.com/cryptocape-tpm/](http://cryptotronix.com/cryptocape-tpm/)。
 - en: Extending a PCR
   id: totrans-156
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 扩展PCR
 - en: 'We''ll need to extend a PCR so that we can encrypt our GPG key. We''ll arbitrarily
     choose PCR number 9\. First let''s view the PCR status to be sure that it is blank:'
   id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们需要扩展一个PCR以便加密我们的GPG密钥。我们将随意选择PCR号码9。首先让我们查看PCR状态，以确保它是空白的：
 - en: '[PRE19]'
   id: totrans-158
   prefs: []
@@ -1157,6 +1207,7 @@
   id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 这应返回PCR的当前状态，在不使用安全启动的情况下是：
 - en: '[PRE20]'
   id: totrans-160
   prefs: []
@@ -1171,6 +1222,8 @@
   id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，从以下部分运行`getgpgpin`程序。你应该会看到CryptoCape上的LED灯变为绿色，并且你有10秒钟的时间输入一个五位数字的PIN码。每次按下一个键时，LED灯应该会闪烁，当输入完五个数字时，LED灯会熄灭。10秒钟后，`getgpgpin`程序将悄无声息地退出。如果你在编译程序时启用了`#define
+    DEBUG`并设置为`1`，你应该会看到如下信息：
 - en: '[PRE21]'
   id: totrans-162
   prefs: []
@@ -1180,6 +1233,7 @@
   id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，再次检查你的PCR状态：
 - en: '[PRE22]'
   id: totrans-164
   prefs: []
@@ -1189,6 +1243,7 @@
   id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 你现在应该有一个填充的PCR9：
 - en: '[PRE23]'
   id: totrans-166
   prefs: []
@@ -1200,6 +1255,7 @@
   id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 你只能输入代码一次。如果你再次尝试，程序将使用现在错误的PCR状态作为输入，再次扩展PCR9。现在，让我们封存我们的GPG秘密密钥环：
 - en: '[PRE24]'
   id: totrans-168
   prefs: []
@@ -1210,6 +1266,7 @@
   id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你愿意，可以删除`-l debug`，命令将悄无声息地完成。现在让我们测试解密：
 - en: '[PRE25]'
   id: totrans-170
   prefs: []
@@ -1223,6 +1280,7 @@
   id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果成功，它应该悄无声息地完成。你现在可以删除临时文件`deleteme`和原始的`secring.gpg`。你做了加密备份对吧？你可能想要以更安全的方式删除这个文件。安全删除工具`srm`可以做到这一点，它会在删除之前多次覆盖文件。要安装它，可以使用以下命令：
 - en: '[PRE26]'
   id: totrans-172
   prefs: []
@@ -1232,11 +1290,13 @@
   id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后像使用`rm`一样使用它。
 - en: Note
   id: totrans-174
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Bunnie Huang and Sean Cross (also known as *xobs*) presented a talk at the **30th
     Chaos Communication Congress** (**30C3**) on hacking SD cards. Your SD or eMMC
     includes a small microcontroller that manages the attached flash memory. This
@@ -1248,11 +1308,13 @@
   id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: Bunnie Huang 和 Sean Cross（也被称为 *xobs*）在**第30届混沌通信大会**（**30C3**）上展示了一场关于破解SD卡的讲座。你的SD卡或eMMC包含一个小型微控制器，用于管理附加的闪存。这款微控制器非常适合充当中间人攻击者，并操控你存储在设备上的数据。例如，这个微控制器可能会保存你数据的备份，因为它向你的计算机报告的存储容量是8GB，但实际上它包含的是16GB的闪存芯片。更多信息可以在Bunnie的博客上找到，[http://www.bunniestudios.com/blog/?p=3554](http://www.bunniestudios.com/blog/?p=3554)。
 - en: Unlocking your key at startup
   id: totrans-176
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 启动时解锁你的密钥
 - en: Finally, we need to automate this process. When the BBB boots, we want it to
     collect the code, extend the PCR, and unwrap the GPG keys so that they are ready
     to use. We'll make an `init.d` script that will handle this, but we still need
@@ -1262,10 +1324,12 @@
   id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们需要自动化这个过程。当BBB启动时，我们希望它收集代码，扩展PCR，并解锁GPG密钥，以便它们可以准备使用。我们将制作一个`init.d`脚本来处理这个过程，但我们仍然需要处理GPG密钥。我们不希望解锁的GPG密钥留在磁盘上，即使它已通过密码保护。相反，我们将把GPG密钥保存在一个`ramfs`中，它永远不会触及持久存储。
 - en: 'To create the `ramfs`, add the following to `/etc/fstab`:'
   id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 要创建`ramfs`，请将以下内容添加到`/etc/fstab`：
 - en: '[PRE27]'
   id: totrans-179
   prefs: []
@@ -1278,6 +1342,7 @@
   id: totrans-180
   prefs: []
   type: TYPE_NORMAL
+  zh: 确保将你的uid和gid替换为适合你用户的值。你可以通过运行`id`命令来获取这些值。可以选择重启或运行`mount -a`来重新加载`fstab`。由于GPG期望`secring.gpg`文件位于`~/.gnupg/secring.gpg`，我们将创建一个从该位置到ramdisk的链接。创建以下符号链接：
 - en: '[PRE28]'
   id: totrans-181
   prefs: []
@@ -1290,6 +1355,7 @@
   id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们需要一个在启动时运行的脚本。在`beagle-bone-for-secret-agents/ch4`仓库中，有一个名为`tpm_gpg`的脚本，您可以将其复制到`/etc/init.d/`。此脚本期望`getgpgpin`位于`/usr/local/bin`，并且您的`secring.gpg`文件应该放在正常的位置。根据需要进行编辑。要注册此脚本，请以root身份运行：
 - en: '[PRE29]'
   id: totrans-183
   prefs: []
@@ -1305,11 +1371,13 @@
   id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 在脚本已经就绪、虚拟磁盘设置为启动时挂载、ATmega已编程以收集代码且硬件已连接的情况下，再次重启设备。注意观察CryptoCape LED灯是否亮起，输入您的PIN码，然后重新登录到BBB。如果您的GPG密钥位于`/mnt/ramdisk`，恭喜您，您刚刚使用TPM来保护您的GPG密钥！由于符号链接的存在，所有与GPG相关的程序将像往常一样使用这些密钥。如果没有，请重新编译`keypad.c`，将调试模式设置为`1`，确保一切正常运行。
 - en: Note
   id: totrans-185
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: While the ramfs is meant to ensure that the GPG key, which is still protected
     by a password, is destroyed without power, researchers have recovered keys from
     RAM in the past. Refer to the URL [https://citp.princeton.edu/research/memory/](https://citp.princeton.edu/research/memory/)
@@ -1317,11 +1385,13 @@
   id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然ramfs旨在确保仍然通过密码保护的GPG密钥在断电后被销毁，但过去有研究人员从RAM中恢复了密钥。请参考[https://citp.princeton.edu/research/memory/](https://citp.princeton.edu/research/memory/)上的冷启动攻击。
 - en: Iterating on the threat model
   id: totrans-187
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 威胁模型的迭代
 - en: Threat modeling and system design is an iterative process. The system we built
     in this chapter is a good start, but it can be improved. We identified a problem
     at the beginning of the chapter in that we still had to enter the GPG passphrase
@@ -1334,6 +1404,7 @@
   id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 威胁建模和系统设计是一个迭代过程。本章中我们构建的系统是一个良好的起点，但它仍然可以改进。我们在本章开始时识别出一个问题，那就是我们仍然需要在可能已被攻破的计算机上输入GPG密码。键盘上的代码输入目前仅在BBB关闭电源时保护GPG密钥。如果一个不知情的攻击者启动BBB，它也可以保护密钥，因为在10秒的时间窗口后，PCR将不再具有正确的值。为了防止密钥记录攻击，我们希望能够直接在BBB上输入密码短语。
 - en: There is a piece of software called **gpg-agent**, which manages your passphrase
     per login session. It can support different types of *pin entry* programs. For
     example, one pin entry program is X-Windows-based and another supports a command-line
@@ -1346,6 +1417,7 @@
   id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 有一款名为**gpg-agent**的软件，它管理每个登录会话的密码短语。它可以支持不同类型的*PIN码输入*程序。例如，一个PIN码输入程序是基于X-Windows的，另一个则支持命令行接口。您当然可以创建一个支持自定义硬件的PIN码输入程序。然而，当您创建这个自定义PIN码输入程序时，您需要考虑密码短语的强度问题，如果仅由数字组成，可能会导致GPG密钥的安全性降低。这展示了随着新特性的加入，我们需要重新评估威胁模型，以确保最初的假设仍然有效。
 - en: 'Also, you might want to consider adding an enclosure for your project. Your
     local hackerspace will be able to help you make a professionally looking enclosure.
     If you want something on the cheap, find a small translucent container and cut
@@ -1353,15 +1425,18 @@
   id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，您可能还想考虑为您的项目添加一个外壳。您所在的黑客空间可以帮助您制作一个专业外观的外壳。如果您想要便宜一点的选择，可以找到一个小型半透明容器，并按以下图示切割出键盘和连接器的空间：
 - en: '![Iterating on the threat model](img/00019.jpeg)'
   id: totrans-191
   prefs: []
   type: TYPE_IMG
+  zh: '![威胁模型的迭代](img/00019.jpeg)'
 - en: Summary
   id: totrans-192
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: In this chapter, you learned how GPG can protect e-mail confidentiality. We
     created a threat model for our system and showed how this analysis can help us
     understand the capabilities and limitations of our design. At the end, we successfully
@@ -1370,6 +1445,8 @@
   id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，你学习了如何通过 GPG 来保护电子邮件的机密性。我们为我们的系统创建了一个威胁模型，并展示了如何通过这个分析帮助我们理解设计的能力和局限性。最后，我们成功构建了一个
+    BBB GPG 协处理器，使用 TPM 来帮助保护静态的 GPG 密钥，并获得了更多将微控制器与嵌入式 Linux 平台结合的实践。
 - en: In the next chapter, we will investigate another major privacy enhancing technology
     that is used to protect real-time chat. You'll learn about the unique cryptographic
     properties of **Off-the-Record** (**OTR**) and how to use OTR over an Internet
@@ -1377,3 +1454,5 @@
   id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章中，我们将研究另一种用于保护实时聊天的主要隐私增强技术。你将了解 **Off-the-Record** (**OTR**) 的独特加密特性，以及如何在你的
+    BBB 主机上托管的 Internet Relay Chat 网关上使用 OTR。
