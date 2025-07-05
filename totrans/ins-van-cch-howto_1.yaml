@@ -1,763 +1,1102 @@
 - en: Chapter 1. Instant Varnish Cache How-to
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第1章 快速Varnish Cache操作指南
 - en: Welcome to *Instant Varnish Cache How-to*. In this book, we will cover the basics
     of setting up a Varnish Cache server instance in front of your website, how to
     identify cacheable portions of it, and how to get the best performance from your
     cache mechanism and policies.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 欢迎来到*快速Varnish Cache操作指南*。在本书中，我们将介绍如何在你的网站前端设置Varnish Cache服务器实例，如何识别可缓存的部分，以及如何从缓存机制和策略中获得最佳性能。
 - en: Varnish Cache is a caching reverse proxy—often referred to as an HTTP accelerator,
     which sits between your application server and the client's requests. Its main
     goal is to avoid unnecessary duplicated work when the generated response is known
     to be the same, and with its flexible framework, it allows you to manipulate requests
     and also stitches together the **Edge Side Includes** (**ESI**) parts.
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: Varnish Cache是一个缓存反向代理——通常被称为HTTP加速器，它位于你的应用服务器和客户端请求之间。它的主要目标是避免在已知生成响应相同的情况下，进行不必要的重复工作。凭借其灵活的框架，它允许你操作请求，并将**边缘端包含**（**ESI**）部分拼接在一起。
 - en: Most of the sample codes found in this book were written for a specific use-case
     and should be applied with caution. Hopefully, these examples will inspire you
     to write your own solutions for your scenario, and deploy a fast and reliable
     Varnish Cache inside your infrastructure.
+  id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 本书中大多数示例代码是为特定应用场景编写的，应谨慎使用。希望这些示例能激发你为你的场景编写自己的解决方案，并在你的基础架构中部署一个快速且可靠的Varnish
+    Cache。
 - en: This book targets system administrators and web developers with previous knowledge
     of the HTTP protocol. I've made a few assumptions throughout the book regarding
     the HTTP protocol and if you ever find yourself in need of an extended explanation,
     you can always refer to the HTTP Version 1.1 documentation at [http://www.w3.org/Protocols/rfc2616/rfc2616.html](http://www.w3.org/Protocols/rfc2616/rfc2616.html)
     or the Varnish Cache 3.0 documentation at [https://www.varnish-cache.org/docs/3.0/](https://www.varnish-cache.org/docs/3.0/).
+  id: totrans-4
   prefs: []
   type: TYPE_NORMAL
+  zh: 本书面向具有HTTP协议基础知识的系统管理员和Web开发者。在本书中，我假设你已经了解HTTP协议。如果你需要更详细的解释，可以随时参考HTTP版本1.1的文档，[http://www.w3.org/Protocols/rfc2616/rfc2616.html](http://www.w3.org/Protocols/rfc2616/rfc2616.html)或Varnish
+    Cache 3.0的文档，[https://www.varnish-cache.org/docs/3.0/](https://www.varnish-cache.org/docs/3.0/)。
 - en: Installing Varnish Cache (Must know)
+  id: totrans-5
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 安装Varnish Cache（必备知识）
 - en: The Varnish Cache binaries are very likely to be provided by your Linux distribution
     package repository, but the version you get from that repository might not be
     as up-to-date as it should be.
+  id: totrans-6
   prefs: []
   type: TYPE_NORMAL
+  zh: Varnish Cache二进制文件很可能已经被你的Linux发行版的软件包仓库提供，但是从仓库获得的版本可能没有最新。
 - en: The Varnish Cache official repository provides versions for Red Hat- or Debian-based
     distributions, FreeBSD, and there's also the possibility to install it manually
     from a tarball file.
+  id: totrans-7
   prefs: []
   type: TYPE_NORMAL
+  zh: Varnish Cache官方仓库提供适用于Red Hat或Debian系列发行版、FreeBSD的版本，也可以通过tar包手动安装。
 - en: In the following recipe, we will install Varnish Cache on a Linux CentOS box
     using the `varnish-cache.org` repository and the **yum** package manager.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 在以下的教程中，我们将通过使用`varnish-cache.org`仓库和**yum**包管理器，在Linux CentOS系统上安装Varnish Cache。
 - en: Getting ready
+  id: totrans-9
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: The following example will use both Varnish Cache 3.0.3 and 64-bit Linux CentOS
     6.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下示例将同时使用Varnish Cache 3.0.3和64位Linux CentOS 6。
 - en: It's recommended to try it out first on a virtual machine, since your caching
     policy will need to be adjusted and debugged before you go live.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 建议首先在虚拟机上尝试，因为在正式上线之前，你的缓存策略需要进行调整和调试。
 - en: If you don't have virtualization software yet, I recommend the Oracle VirtualBox
     at [https://www.virtualbox.org/](https://www.virtualbox.org/) for its easy-to-use
     interface.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你还没有虚拟化软件，我推荐使用Oracle VirtualBox，[https://www.virtualbox.org/](https://www.virtualbox.org/)因为它的界面易于使用。
 - en: For other Linux distributions, you can find the correct `varnish-cache.org`
     repository at [https://www.varnish-cache.org/releases/](https://www.varnish-cache.org/releases/).
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于其他Linux发行版，你可以在[https://www.varnish-cache.org/releases/](https://www.varnish-cache.org/releases/)找到正确的`varnish-cache.org`仓库。
 - en: How to do it...
+  id: totrans-14
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'Add the `varnish-cache.org` repository to your CentOS box by typing the following
     command:'
+  id: totrans-15
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过输入以下命令，将`varnish-cache.org`仓库添加到你的CentOS系统：
 - en: '[PRE0]'
+  id: totrans-16
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Install Varnish Cache by typing the following command:'
+  id: totrans-17
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过输入以下命令安装Varnish Cache：
 - en: '[PRE1]'
+  id: totrans-18
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Start the Varnish Cache daemon by typing the following command:'
+  id: totrans-19
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过输入以下命令启动Varnish Cache守护进程：
 - en: '[PRE2]'
+  id: totrans-20
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: How it works...
+  id: totrans-21
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: Adding the `varnish-cache.org` repository allows us to keep our varnish server
     up-to-date and running with stable versions only.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 添加`varnish-cache.org`仓库可以让我们保持Varnish服务器的最新状态，并且仅使用稳定版本。
 - en: If there's no `varnish-cache.org` repository for your Linux distribution, or
     in case you decide to compile it by hand, you'll need to download a tarball file
     from [http://repo.varnish-cache.org/source/](http://repo.varnish-cache.org/source/
     ) and resolve the dependencies before you use the GNU `make` and `make install`
     commands.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您的Linux发行版没有`varnish-cache.org`仓库，或者您决定手动编译，您需要从[http://repo.varnish-cache.org/source/](http://repo.varnish-cache.org/source/)下载一个tarball文件，并在使用GNU
+    `make`和`make install`命令之前解决依赖关系。
 - en: There's more...
+  id: totrans-24
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: 'Always check if the startup script service was correctly added to the runlevels
     list by typing the following command:'
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 始终检查启动脚本服务是否正确添加到运行级别列表中，您可以输入以下命令：
 - en: '[PRE3]'
+  id: totrans-26
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'You should see runlevels 2, 3, 4, and 5 marked as `on`, as follows:'
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 您应该看到运行级别2、3、4和5标记为`开启`，如下所示：
 - en: '[PRE4]'
+  id: totrans-28
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'In case the service is turned `off` in any of these runlevels, turn them `on`
     by using the following command:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果在任何一个运行级别中该服务被`关闭`，请使用以下命令将其`打开`：
 - en: '[PRE5]'
+  id: totrans-30
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: This will ensure that in case of a power outage or accidental server restart,
     our Varnish Cache instance will be up and running as soon as possible.
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 这样可以确保在停电或意外服务器重启的情况下，我们的Varnish缓存实例能够尽快恢复运行。
 - en: 'Startup scripts (also known as initialization script), are scripts that are
     typically run at system boot time. Most of them start services and set initial
     system parameters. For more information, visit [https://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_Linux/6/html/Installation_Guide/s2-boot-init-shutdown-init.html](https://access.redhat.com/knowledge/docs/en-US/     Red_Hat_Enterprise_Linux/6/html/Installation_Guide/s2-boot-init-shutdown-init.html).'
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 启动脚本（也称为初始化脚本）是通常在系统启动时运行的脚本。它们中的大多数用于启动服务并设置初始系统参数。有关更多信息，请访问[https://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_Linux/6/html/Installation_Guide/s2-boot-init-shutdown-init.html](https://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_Linux/6/html/Installation_Guide/s2-boot-init-shutdown-init.html)。
 - en: The runlevels list determines which programs are executed at system startup.
     More information about how runlevels works can be found at [https://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_Linux/6/html/Installation_Guide/s1-boot-init-shutdown-sysv.html](https://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_Linux/6/html/Installation_Guide/s1-boot-init-shutdown-sysv.html).
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 运行级别列表决定了哪些程序在系统启动时执行。有关运行级别工作原理的更多信息，请访问[https://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_Linux/6/html/Installation_Guide/s1-boot-init-shutdown-sysv.html](https://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_Linux/6/html/Installation_Guide/s1-boot-init-shutdown-sysv.html)。
 - en: Varnish Cache server daemon options (Must know)
+  id: totrans-34
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: Varnish缓存服务器守护进程选项（必须了解）
 - en: Now that we have installed the Varnish Cache service and it's running, we need
     to take a moment to make sure that our startup parameters are correct.
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经安装了Varnish Cache服务并且它正在运行，我们需要花一些时间确认启动参数是否正确。
 - en: The default post-installation storage method declared in the startup script
     is file, and we will change that to a memory-based storage in order to maximize
     our performance boost.
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 启动脚本中声明的默认后安装存储方法是文件存储，我们将其更改为基于内存的存储，以最大化性能提升。
 - en: Note
+  id: totrans-37
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Bear in mind that our entire data is supposed to fit into memory. In case it
     doesn't, stick with the default storage type (file).
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 请记住，我们的所有数据应该能适应内存。如果无法适应，请使用默认存储类型（文件）。
 - en: Some parameters such as the number of open files, the location of the configuration
     file, and others do not require adjusting to server specifications and should
     work as provided.
+  id: totrans-39
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些参数，如打开文件的数量、配置文件的位置等，不需要根据服务器规格进行调整，应该按照默认配置正常工作。
 - en: The daemon options go from setting the amount of space for storage and the type
     of storage used up, to thread pooling and hashing algorithms.
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 守护进程选项包括设置存储空间大小和存储类型，直到线程池和哈希算法等配置。
 - en: Getting ready
+  id: totrans-41
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: The `varnish` file at `/etc/sysconfig` is where all daemon options are conveniently
     located and also the resource for the startup script. You can also start the daemon
     manually and set the configuration parameters by passing arguments to it, but
     there's no need to do it since everything is already packed and ready. Every change
     to the `varnish` file at `/etc/sysconfig` is only valid after a full restart of
     the Varnish Cache service.
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: '`/etc/sysconfig`中的`varnish`文件是所有守护进程选项的位置，也是启动脚本的资源。你也可以手动启动守护进程并通过传递参数来设置配置参数，但无需这样做，因为一切都已打包并准备就绪。对`/etc/sysconfig`中的`varnish`文件的任何更改只有在完全重启Varnish
+    Cache服务后才有效。'
 - en: 'To restart the Varnish Cache, use the following provided script:'
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 若要重启Varnish Cache，请使用以下提供的脚本：
 - en: '[PRE6]'
+  id: totrans-44
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: Tip
+  id: totrans-45
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: When you perform a full restart, the cache is completely wiped. Be careful.
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 当你执行完全重启时，缓存会被完全清除。请小心。
 - en: How to do it...
+  id: totrans-47
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做...
 - en: 'Open the `varnish` file from `/etc/sysconfig` using your favorite text editor
     (I''m using vim) by typing the following command:'
+  id: totrans-48
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用你喜欢的文本编辑器（我使用vim）打开`/etc/sysconfig`中的`varnish`文件，输入以下命令：
 - en: '[PRE7]'
+  id: totrans-49
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: Take your time and read all the comments so that you can understand every bit
     of this file, since it's loaded by the startup script (`/etc/init.d/varnish`).
+  id: totrans-50
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 慢慢阅读并查看所有评论，这样你就能理解该文件的每一部分，因为它是由启动脚本（`/etc/init.d/varnish`）加载的。
 - en: Find the `VARNISH_STORAGE` parameter and change the default value to `malloc
     ,${VARNISH_STORAGE_SIZE}`.
+  id: totrans-51
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 找到`VARNISH_STORAGE`参数，并将默认值更改为`malloc ,${VARNISH_STORAGE_SIZE}`。
 - en: '[PRE8]'
+  id: totrans-52
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: Set the `VARNISH_STORAGE_SIZE` parameter to about 85 percent of your available
     ram.
+  id: totrans-53
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将`VARNISH_STORAGE_SIZE`参数设置为可用内存的约85%。
 - en: 'On a 16-GB RAM system, we can allocate 14-GB for storage and leave the remaining
     2-GB for OS usage by using the following command:'
+  id: totrans-54
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在16GB RAM的系统上，我们可以通过以下命令分配14GB用于存储，并将剩余的2GB留给操作系统使用：
 - en: '[PRE9]'
+  id: totrans-55
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: How it works...
+  id: totrans-56
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: Both methods of storage—file and malloc—make use of file and memory resources
     but in a slightly different manner.
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件存储和`malloc`存储这两种方法都使用文件和内存资源，但方式略有不同。
 - en: While the file storage type will allocate the entire cache size on a file, and
     tell the OS to map that file to memory (if possible) in order to gain speed, the
     malloc will request the storage size to the OS, and let it decide about how to
     divide and swap to file, what it can't fit into memory.
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件存储类型会为文件分配整个缓存大小，并告知操作系统将该文件映射到内存（如果可能）以提高速度，而`malloc`会向操作系统请求存储大小，并让操作系统决定如何划分和交换文件，无法放入内存的部分会被交换出去。
 - en: Tip
+  id: totrans-59
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Don''t get fooled by the name**'
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: '**不要被名字欺骗**'
 - en: The file storage does not keep data in file when you restart your Varnish Cache
     server.
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 文件存储在重启Varnish Cache服务器时不会将数据保存在文件中。
 - en: There's more...
+  id: totrans-62
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: A new and still experimental storage type called persistent will work in a similar
     fashion for the file storage, but not every object will persist, since it can't
     handle situations where there's no more space left on the disk. The main benefit
     of this new storage type would be having a warmed up cache when recovering from
     an outage, since the objects are still available on disk.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 一种新的、仍处于实验阶段的存储类型——持久化存储，将以类似于文件存储的方式工作，但并非每个对象都会持久化，因为它无法处理磁盘空间不足的情况。这种新存储类型的主要优点是在恢复系统故障后能够使用预热缓存，因为对象仍然保存在磁盘上。
 - en: The warm-up phase can also be performed with a tool called `varnishreplay`,
     but it requires much more time, since you will need an access logfile to replay
     it to Varnish Cache.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 预热阶段也可以使用名为`varnishreplay`的工具执行，但它需要更多时间，因为你需要一个访问日志文件并将其重放到Varnish Cache。
 - en: You can find more information about the persistent storage type on [https://www.varnish-cache.org/trac/wiki/ArchitecturePersistentStorage](https://www.varnish-cache.org/trac/wiki/ArchitecturePersistentStorage).
+  id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 你可以在[https://www.varnish-cache.org/trac/wiki/ArchitecturePersistentStorage](https://www.varnish-cache.org/trac/wiki/ArchitecturePersistentStorage)上找到更多关于持久化存储类型的信息。
 - en: Connecting to backend servers (Should know)
+  id: totrans-66
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 连接到后端服务器（应知）
 - en: A backend server can be defined as any HTTP server from which Varnish Cache
     can request and fetch data. In this recipe, we will define our backend servers,
     probe those servers for their health status, and direct our clients' requests
     to the correct backend servers.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 后端服务器可以定义为Varnish Cache可以请求和获取数据的任何HTTP服务器。在本教程中，我们将定义我们的后端服务器，检查这些服务器的健康状态，并将客户端的请求导向正确的后端服务器。
 - en: Getting ready
+  id: totrans-68
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: If you have a server architecture diagram, that's a good place to start listing
     all the required servers and grouping them, but you'll also need some technical
     data about those servers. You may find this information in a server monitoring
     diagram, where you will find the IP addresses, ports, and luckily a probing URL
     for health checks.
+  id: totrans-69
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果您有服务器架构图，那是列出所有所需服务器并将它们分组的好地方，但您还需要一些关于这些服务器的技术数据。您可以在服务器监控图中找到这些信息，其中会显示
+    IP 地址、端口，幸运的话，还会提供健康检查的探测 URL。
 - en: '![Getting ready](img/0403OS_03_1.jpg)'
+  id: totrans-70
   prefs: []
   type: TYPE_IMG
+  zh: '![准备就绪](img/0403OS_03_1.jpg)'
 - en: In our case, the main VCL configuration file `default.vcl` is located at `/etc/varnish`
     and defines the configuration that the Varnish Cache will use during the life
     cycle of the request, including the backend servers list.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的例子中，主要的 VCL 配置文件 `default.vcl` 位于 `/etc/varnish`，并定义了 Varnish Cache 在请求生命周期中使用的配置，包括后端服务器列表。
 - en: How to do it...
+  id: totrans-72
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'Open the `default vcl` file by using the following command:'
+  id: totrans-73
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用以下命令打开 `default vcl` 文件：
 - en: '[PRE10]'
+  id: totrans-74
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'A simple backend declaration would be:'
+  id: totrans-75
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 一个简单的后端声明如下：
 - en: '[PRE11]'
+  id: totrans-76
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: This small block of code indicates the name of the backend (`server01`), and
     also the hostname or IP, and which port to connect to.
+  id: totrans-77
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这段小代码指示了后端的名称（`server01`），还包括了主机名或 IP 地址，以及连接的端口。
 - en: 'Save the file and reload the configuration using the following command:'
+  id: totrans-78
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 保存文件并使用以下命令重新加载配置：
 - en: '[PRE12]'
+  id: totrans-79
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: At this point, Varnish will proxy every request to the first declared backend
     using its default VCL file. Give it a try and access a known URL (like the index
     of your website) through the Varnish Cache and make sure that the content is delivered
     as it would be without Varnish.
+  id: totrans-80
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 此时，Varnish 将使用其默认的 VCL 文件将每个请求代理到第一个声明的后端。尝试访问一个已知的 URL（如您的网站首页），通过 Varnish
+    Cache 确保内容的交付与没有 Varnish 时一样。
 - en: For testing purposes, this is an okay backend declaration, but we need to make
     sure that our backend servers are up and waiting for requests before we really
     start to direct web traffic to them.
+  id: totrans-81
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 出于测试目的，这是一个可以接受的后端声明，但我们需要确保我们的后端服务器已经启动并准备好接收请求，然后才真正开始将 Web 流量引导到它们。
 - en: 'Let''s include a probing request to our backend:'
+  id: totrans-82
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 让我们为后端添加一个探测请求：
 - en: '[PRE13]'
+  id: totrans-83
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: Varnish will now probe the backend server using the provided URL with a timeout
     of 60 ms, every couple of seconds.
+  id: totrans-84
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: Varnish 现在将使用提供的 URL 每隔几秒钟探测后端服务器，超时时间为 60 毫秒。
 - en: To determine if a backend is healthy, it will analyze the last five probes.
     If three of them result in `200 – OK`, the backend is marked as Healthy and the
     requests are forwarded to this backend; if not, the backend is marked as Sick
     and will not receive any incoming requests until it's Healthy again.
+  id: totrans-85
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 为了确定后端是否健康，它将分析最后五次探测结果。如果其中三次返回 `200 – OK`，则该后端被标记为健康，请求将转发到此后端；否则，该后端将被标记为生病，直到恢复健康才会接收任何传入请求。
 - en: 'Probe the backend servers that require additional information:'
+  id: totrans-86
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 探测需要额外信息的后端服务器：
 - en: 'In case your backend server requires extra headers or has an HTTP basic authentication,
     you can change the probing from `URL` to `Request` and specify a raw HTTP request.
     When using the `Request` probe, you''ll always need to provide a `Connection:
     close` header or it will not work. This is shown in the following code snippet:'
+  id: totrans-87
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: '如果您的后端服务器需要额外的头部或具有 HTTP 基本认证，您可以将探测从 `URL` 更改为 `Request` 并指定一个原始的 HTTP 请求。使用
+    `Request` 探测时，您始终需要提供一个 `Connection: close` 头部，否则它将无法工作。如下代码片段所示：'
 - en: '[PRE14]'
+  id: totrans-88
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'Choose a backend server based on incoming data:'
+  id: totrans-89
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 根据传入数据选择后端服务器：
 - en: 'After declaring your backend servers, you can start directing the clients''
     requests. The most common way to choose which backend server will respond to a
     request is according to the incoming URL, as shown in the following code snippet:'
+  id: totrans-90
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在声明了后端服务器后，您可以开始指引客户端的请求。选择哪个后端服务器响应请求的最常见方式是根据传入的 URL，如下代码片段所示：
 - en: '[PRE15]'
+  id: totrans-91
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: Based on the preceding configuration, all requests that contain `/api/` (`www.yourdomain.com/api/`)
     in the URL will be sent to the backend named `api` and the others will reach the
     backend named `website`.
+  id: totrans-92
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 基于上述配置，所有包含 `/api/`（`www.yourdomain.com/api/`）的请求将被发送到名为 `api` 的后端，其他请求则会到达名为
+    `website` 的后端。
 - en: You can also pick the correct backend server, based on User-agent header, Client
     IP (geo-based), and pretty much every information that comes with the request.
+  id: totrans-93
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 您还可以根据 User-agent 头部、客户端 IP（基于地理位置）以及请求中附带的几乎所有信息来选择正确的后端服务器。
 - en: How it works...
+  id: totrans-94
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: By probing your backend servers, you can automate the removal of a sick backend
     from your cluster, and by doing so, you avoid delivering a broken page to your
     customer. As soon as your backend starts to behave normally, Varnish will add
     it back to the cluster pool.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过探测后台服务器，你可以自动移除出现故障的后台服务器，从而避免将坏页面提供给客户。一旦后台服务器恢复正常，Varnish 会将其重新加入到集群池中。
 - en: Directing requests to the appropriate backend server is a great way to make
     sure that every request reaches its destination, and gives you the flexibility
     to provide content based on the incoming data, such as a mobile device or an API
     request.
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 将请求导向合适的后台服务器是确保每个请求都能到达目的地的好方法，同时也提供了根据传入数据（如移动设备或 API 请求）提供内容的灵活性。
 - en: There's more...
+  id: totrans-97
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: If you have lots of servers to be declared as backend, you can declare probes
     as a separated configuration block and make reference to that block later at the
     backend specifications, avoiding repetition and improving the code's readability.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你有很多服务器需要声明为后台服务器，可以将探测器声明为一个单独的配置块，并在后台服务器规格中引用该块，从而避免重复并提高代码可读性。
 - en: '[PRE16]'
+  id: totrans-99
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: The `server01` server will use the probe named `favicon`, and the `server02`
     server will use the probe named `robots`.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: '`server01` 服务器将使用名为 `favicon` 的探测器，而 `server02` 服务器将使用名为 `robots` 的探测器。'
 - en: Load balance requests (Should know)
+  id: totrans-101
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 负载均衡请求（应该了解）
 - en: Balancing requests is a great way to share workload across the cluster pool
     and avoid overloading a single server instance, keeping the overall health of
     the system. There's also the possibility to direct VIP customers to a dedicated
     cluster pool, guaranteeing them the best user experience.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 请求负载均衡是分担集群池工作负载的好方法，可以避免单个服务器实例过载，从而保持系统的整体健康。还有可能将 VIP 客户导向专用集群池，保证他们获得最佳的用户体验。
 - en: By using a director group, Varnish will manage and spread the incoming requests
     to those servers included in it. Having the servers constantly checked, Varnish
     can take care of the sick servers and maintain everything as if there was no problem
     at all.
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过使用指令器组，Varnish 将管理并分发传入的请求到包含其中的服务器。由于服务器会不断检查，Varnish 可以处理出现问题的服务器，并且确保系统的运行就像没有任何问题一样。
 - en: Getting ready
+  id: totrans-104
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: 'There are six types of director groups to be configured: random, client, hash,
     round-robin, DNS, and fallback. While the random director is self-explanatory
     (randomly distributes requests), a DNS director can be used to spread to an entire
     network of servers. The hash director will always choose a backend based on the
     hash of the incoming URL and the fallback director can be used in emergency cases
     when servers behave oddly.'
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 有六种类型的指令器组需要配置：random（随机）、client（客户端）、hash（哈希）、round-robin（轮询）、DNS（域名系统）和fallback（回退）。虽然
+    random 指令器的功能很直观（随机分发请求），但 DNS 指令器可以用于将请求分发到一个完整的服务器网络。hash 指令器会基于传入 URL 的哈希值来选择一个后台服务器，而
+    fallback 指令器则可在服务器行为异常时用作紧急备用。
 - en: The two most common directors are the round-robin and client directors.
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 两个最常见的指令器是轮询（round-robin）指令器和客户端（client）指令器。
 - en: The round-robin can be used to spread requests one by one to the entire cluster
     of servers no matter what is requested, and the client director can be used to
     create a sticky-session based on unique information provided by the client, such
     as an IP address.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 轮询（round-robin）可以用于将请求逐一分发到整个服务器集群，不管请求的内容是什么，而客户端指令器（client director）可以用于根据客户端提供的唯一信息（如
+    IP 地址）创建粘性会话（sticky-session）。
 - en: In this recipe we will create both the client and round-robin balancers to spread
     requests across application servers.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本教程中，我们将创建客户端指令器和轮询负载均衡器，将请求分发到应用服务器。
 - en: How to do it...
+  id: totrans-109
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何实现...
 - en: 'Group the backend servers to load balance requests by using the following code
     snippet:'
+  id: totrans-110
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用以下代码片段将后台服务器分组以进行请求的负载均衡：
 - en: '[PRE17]'
+  id: totrans-111
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: In the preceding example, we have declared that our director named `dr1` is
     a `round-robin` director, and inside this director there are four backend servers
     to be balanced. Backend servers `server01` to `server04` have already been configured
     earlier and this declaration is only referring to them.
+  id: totrans-112
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在前面的示例中，我们声明了名为`dr1`的指令器是一个`round-robin`指令器，并且在该指令器内有四个后台服务器需要进行负载均衡。后台服务器`server01`到`server04`已经在之前配置过了，这里的声明仅仅是引用它们。
 - en: 'Create a sticky-session pool of servers by using the following code snippet:'
+  id: totrans-113
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用以下代码片段创建一个粘性会话服务器池：
 - en: '[PRE18]'
+  id: totrans-114
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: At first, there's absolutely no difference from the `round-robin` declaration
     to the `client` one, but inside your `vcl_recv` subroutine, you'll need to specify
     what identifies a unique client. Varnish will use, as default, the client IP address,
     but if you have other services in front of your Varnish Cache (such as a firewall),
     you'll need to rewrite the value of the `client.identity` variable. In the following
     example, we'll use the `X-Forwarded-For` header to get the clients' real IP address.
+  id: totrans-115
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 一开始，`round-robin`声明与`client`声明之间没有任何区别，但在你的`vcl_recv`子例程中，你需要指定什么标识了一个独特的客户端。Varnish默认使用客户端的IP地址，但如果你在Varnish
+    Cache前有其他服务（如防火墙），你需要重写`client.identity`变量的值。在以下示例中，我们将使用`X-Forwarded-For`头部来获取客户端的真实IP地址。
 - en: Note
+  id: totrans-116
   prefs:
   - PREF_IND
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: The `X-Forwarded-For` header is used to maintain information lost in the proxying
     process. For more information visit [http://tools.ietf.org/html/draft-ietf-appsawg-http-forwarded-10](http://tools.ietf.org/html/draft-ietf-appsawg-http-forwarded-10).
+  id: totrans-117
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: '`X-Forwarded-For`头部用于在代理过程中过滤掉的信息。更多信息请访问[http://tools.ietf.org/html/draft-ietf-appsawg-http-forwarded-10](http://tools.ietf.org/html/draft-ietf-appsawg-http-forwarded-10)。'
 - en: '[PRE19]'
+  id: totrans-118
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: A sticky-session pool is necessary to direct clients to specific parts of your
     website that requires an HTTP session or authorization, such as shopping cart/checkout
     and login/logout pages, without breaking their session. Those parts of your website
     may be critical to your business, and having a sticky-session dedicated cluster
     can prioritize paying customers while the others are still browsing the products
     and will not interfere with the checkout process performance.
+  id: totrans-119
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 一个粘性会话池是必需的，用于将客户端引导到需要HTTP会话或授权的特定网站部分，例如购物车/结账和登录/登出页面，而不会中断他们的会话。这些网站部分可能对你的业务至关重要，拥有一个专门的粘性会话集群可以在其他客户浏览商品时优先处理付费客户，并且不会影响结账过程的性能。
 - en: How it works...
+  id: totrans-120
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: By using directors to load balance the requests, we can obtain greater service
     availability and provide paying customers with an improved user experience.
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过使用调度器来进行请求的负载均衡，我们可以获得更大的服务可用性，并为付费客户提供更好的用户体验。
 - en: There's more...
+  id: totrans-122
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 更多内容...
 - en: Sometimes it's not possible for all the servers to be identical inside a cluster.
     Some servers may have more available ram or more processors than others, and to
     balance requests based on the weakest server in the cluster is not the best way
     to solve this problem, since the higher end servers would be underused.
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时，集群中的所有服务器并不可能完全相同。有些服务器可能具有更多的可用内存或更多的处理器，基于集群中最弱的服务器来平衡请求并不是解决这个问题的最佳方式，因为高端服务器将被闲置使用。
 - en: 'Weight-based load balancing improves the balance of the system by taking into
     account a pre-assigned weight for each server as shown in the following code snippet:'
+  id: totrans-124
   prefs: []
   type: TYPE_NORMAL
+  zh: 基于权重的负载均衡通过考虑为每个服务器分配的预先设定权重来改善系统的平衡，如以下代码片段所示：
 - en: '[PRE20]'
+  id: totrans-125
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: Tip
+  id: totrans-126
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: Weighting the servers is only possible in the random or client directors.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 对服务器进行加权只有在随机或客户端调度器中才可行。
 - en: The Varnish Configuration Language (Should know)
+  id: totrans-128
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: Varnish 配置语言（应当了解）
 - en: The **Varnish Configuration Language** (**VCL**) is a domain-specific language
     used to define the caching policy. It might seem a bit confusing at first to learn
     another DSL instead of using an already known language, but in the next recipe
     you will find out how easy it is to define how your cache should behave using
     the VCL.
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: '**Varnish 配置语言**（**VCL**）是一种特定领域语言，用于定义缓存策略。刚开始学习另一个DSL可能会让人感到有些困惑，而不是使用一个已经熟悉的语言，但在接下来的例子中，你将发现使用VCL定义缓存行为是多么简单。'
 - en: Every written VCL code will be compiled to binary code when you start your Varnish
     Cache. So if you forget a semi-colon, for example, the code will not compile and
     the daemon will continue using the last compiled version of your configuration
     file, as long as you use the reload function from the startup script and don't
     restart your server.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 每一段编写的VCL代码在你启动Varnish Cache时都会被编译成二进制代码。因此，如果你忘记了一个分号等错误，代码将无法编译，守护进程会继续使用你配置文件的上次编译版本，只要你从启动脚本中使用重新加载功能，而不重新启动服务器。
 - en: Getting ready
+  id: totrans-131
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: The main configuration file `default.vcl` used to define the caching policy
     is entirely written in VCL and is located at `/etc/varnish/`.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 用于定义缓存策略的主要配置文件`default.vcl`完全用VCL编写，位于`/etc/varnish/`。
 - en: Most of the configuration is written into subroutines and follows a pre-defined
     flow during the request and response phase.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: 大多数配置都写入子例程，并在请求和响应阶段遵循预定义的流程。
 - en: '![Getting ready](img/0403OS_05_1.jpg)'
+  id: totrans-134
   prefs: []
   type: TYPE_IMG
+  zh: '![准备就绪](img/0403OS_05_1.jpg)'
 - en: How to do it...
+  id: totrans-135
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何实现...
 - en: 'Creating comments in the code:'
+  id: totrans-136
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在代码中创建注释：
 - en: 'You can use `//`, `#`,or `/* your comment inside */`for creating a comment
     in your code:'
+  id: totrans-137
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你可以使用 `//`、`#` 或 `/* 你的注释内容 */` 来在代码中创建注释：
 - en: '[PRE21]'
+  id: totrans-138
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'Assignment and logical operators:'
+  id: totrans-139
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 赋值和逻辑运算符：
 - en: Assignments can be done with a single equals sign `=`.
+  id: totrans-140
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 赋值可以使用单个等号 `=`。
 - en: '[PRE22]'
+  id: totrans-141
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: Comparisons can be done with `==` for matching conditions or `!=`for not matching
     conditions.
+  id: totrans-142
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 比较操作可以使用 `==` 来匹配条件，或使用 `!=` 来表示不匹配条件。
 - en: '[PRE23]'
+  id: totrans-143
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: Logical operations can be done with `&&` for AND operations, and || for OR operations.
+  id: totrans-144
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 逻辑操作可以使用 `&&` 进行与操作，使用 `||` 进行或操作。
 - en: '[PRE24]'
+  id: totrans-145
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'Regular expressions:'
+  id: totrans-146
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 正则表达式：
 - en: Varnish uses the **Perl-compatible regular expressions** (**PCRE Regex**).
+  id: totrans-147
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: Varnish 使用 **Perl 兼容的正则表达式**（**PCRE 正则表达式**）。
 - en: The contains operator for validating regex is `~` (tilde) and the does not contain
     operator is `!~`.
+  id: totrans-148
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 验证正则表达式的包含操作符是 `~`（波浪线），而不包含操作符是 `!~`。
 - en: '[PRE25]'
+  id: totrans-149
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'VCL functions:'
+  id: totrans-150
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: VCL 函数：
 - en: '`regsub()` and `regsuball()`: They work by changing a provided string whenever
     it matches a regex expression. The difference between the two functions is that
     the `regsub()`function replaces only the first match and the `regsuball()`function
     replaces all matching occurrences.'
+  id: totrans-151
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`regsub()` 和 `regsuball()`：它们通过在提供的字符串与正则表达式匹配时进行替换来工作。这两个函数的区别在于，`regsub()`
+    只替换第一个匹配项，而 `regsuball()` 则替换所有匹配项。'
 - en: 'Both functions expect a `original_string`, regex, `substitute_stringformat`
     as input:'
+  id: totrans-152
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这两个函数都期望 `original_string`、正则表达式和 `substitute_stringformat` 作为输入：
 - en: '[PRE26]'
+  id: totrans-153
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: This expression will remove any character located after a `?`sign (including
     the question mark itself). Removing the parameters from the requested URL during
     the `vcl_hash` phase will help you avoid storing duplicated content (be careful
     not to end up serving the wrong content).
+  id: totrans-154
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这个表达式会删除位于 `?` 符号之后的任何字符（包括问号本身）。在 `vcl_hash` 阶段移除请求 URL 中的参数将有助于避免存储重复的内容（小心不要最终提供错误的内容）。
 - en: '`purge`: It is used to invalidate stale content, keeping the cache fresh. A
     good rule of thumb is to send an HTTP `PURGE` request to Varnish Cache whenever
     your backend receives an HTTP `POST` or `DELETE`.'
+  id: totrans-155
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`purge`：它用于使过时的内容失效，保持缓存的新鲜度。一个好的经验法则是，每当你的后台接收到 HTTP `POST` 或 `DELETE` 请求时，向
+    Varnish 缓存发送 HTTP `PURGE` 请求。'
 - en: '`ban()` and `ban_url()`: They create a filter, instructing if a cached object
     is supposed to be delivered or not. Adding a new filter to the ban list will not
     remove the content that is already cached—what it really does is exclude the matching
     cached objects from any subsequent requests, forcing a cache miss.'
+  id: totrans-156
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`ban()` 和 `ban_url()`：它们创建一个过滤器，指示是否应该交付一个缓存的对象。向禁用列表添加一个新的过滤器不会删除已经缓存的内容——它真正做的是排除匹配的缓存对象，使其无法响应随后的请求，强制触发缓存未命中。'
 - en: '[PRE27]'
+  id: totrans-157
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: Note
+  id: totrans-158
   prefs:
   - PREF_IND
   - PREF_IND
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Too many entries in the ban list will consume extra CPU space.
+  id: totrans-159
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 禁用列表中条目过多会消耗额外的 CPU 空间。
 - en: '`return(`: It determines to which subroutine the request should proceed to.
     By calling `return(lookup)` method, we''re instructing Varnish to stop executing
     the current subroutine and proceed to the `lookup` subroutine.'
+  id: totrans-160
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`return(`：它决定请求应该继续到哪个子程序。通过调用 `return(lookup)` 方法，我们指示 Varnish 停止执行当前的子程序并继续执行
+    `lookup` 子程序。'
 - en: '[PRE28]'
+  id: totrans-161
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: '`hash_data(`: It is responsible for setting the hash key used to store an object
     and it is only available inside the `vcl_hash` subroutine. The default value for
     the `hash_data` variable is `req.url` (requested URL), but it may not suit your
@@ -765,993 +1104,1443 @@
     `hash_data` for the homepage would be `/` in all domains. Concatenating the value
     of the `req.http.Host` variable would add the domain name to the hash key, making
     it unique.'
+  id: totrans-162
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`hash_data(`：它负责设置用于存储对象的哈希键，并且仅在 `vcl_hash` 子程序内可用。`hash_data` 变量的默认值是 `req.url`（请求的
+    URL），但这可能不适合你的需求。在多域名网站中，可能会发生哈希键冲突，因为首页的默认 `hash_data` 在所有域名下都是 `/`。通过将 `req.http.Host`
+    变量的值连接到哈希键中，可以将域名添加到哈希键中，使其唯一。'
 - en: '`error`: It is used to interrupt a request or response whenever an error arises
     and an error page needs to be displayed. The first argument is the HTTP error
     code and the second is a string with the error code message.'
+  id: totrans-163
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`error`：它用于在请求或响应出现错误时中断请求，并显示错误页面。第一个参数是 HTTP 错误代码，第二个参数是包含错误代码信息的字符串。'
 - en: '[PRE29]'
+  id: totrans-164
   prefs:
   - PREF_IND
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: How it works...
+  id: totrans-165
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何实现...
 - en: 'All the VCL written code is translated to C language and compiled into a shared
     object, which will be linked to the server process when it is reloaded. Any coding
     mistake found during this phase, such as a missing semi-colon at the end of a
     line, will generate the following compiler error indicating the line and what
     the compiler was expecting:'
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有编写的 VCL 代码都会被翻译成 C 语言，并编译成一个共享对象，当服务器进程重新加载时将与其链接。在此阶段发现的任何编码错误，例如缺少行末分号，都会生成如下编译器错误，指示错误的行以及编译器的预期内容：
 - en: '[PRE30]'
+  id: totrans-167
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: In the preceding example, the VCC compiler informs that it was expecting a `;`(semi-colon)
     on line `93` and found a `}` (curly bracket) instead.
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的示例中，VCC 编译器指出它期望在第`93`行看到一个 `;`（分号），但却发现了一个 `}`（大括号）。
 - en: There's more...
+  id: totrans-169
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多...
 - en: To find out how Varnish is translating your VCL code to C language, run the
     daemon with the `-C` argument that will instruct the daemon to compile and print
     the C language code to the console.
+  id: totrans-170
   prefs: []
   type: TYPE_NORMAL
+  zh: 若要了解 Varnish 如何将 VCL 代码翻译成 C 语言，可以运行守护进程并添加`-C`参数，这将指示守护进程编译并将 C 语言代码打印到控制台。
 - en: '[PRE31]'
+  id: totrans-171
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: If you decide to insert an inline C code inside your VCL, analyzing the generated
     code will help you to debug it.
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你决定在 VCL 中插入内联 C 代码，分析生成的代码将帮助你调试它。
 - en: You will also find out that inside the generated C code the default VCL configuration
     is still present, even if you have deleted it. This is a self-defense mechanism
     which makes sure that a request always has a valid `return()` statement.
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 你还会发现，即使你删除了它，在生成的 C 代码中，默认的 VCL 配置依然存在。这是一个自我保护机制，确保每个请求始终有一个有效的`return()`语句。
 - en: Handling HTTP request vcl_recv (Should know)
+  id: totrans-174
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理 HTTP 请求 vcl_recv（应了解）
 - en: The `vcl_recv` routine is the first subroutine to be executed when a request
     comes in. At this point, you can normalize URL, add or subtract HTTP headers,
     strip or delete cookies, define which backend or director will respond to the
     request, control access, and much more.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vcl_recv` 例程是请求到达时执行的第一个子程序。在这一点，你可以规范化 URL、添加或删除 HTTP 头、去除或删除 cookies、定义哪个后端或代理将响应请求、控制访问等等。'
 - en: First, we will take a look at the default `vcl_recv` subroutine and increment
     its behavior to suit our needs.
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们将查看默认的 `vcl_recv` 子程序，并增加其行为以满足我们的需求。
 - en: Getting ready
+  id: totrans-177
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: Open the `default.vcl` file at `/etc/varnish` and find the `vcl_recv` routine
     (`sub vcl_recv`).
+  id: totrans-178
   prefs: []
   type: TYPE_NORMAL
+  zh: 打开位于`/etc/varnish`的`default.vcl`文件，找到`vcl_recv`例程（`sub vcl_recv`）。
 - en: The following block of codes are presented as an explanation of the default
     behavior and in the *How to do it...* section, we will modify them.
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下代码块作为默认行为的解释展示，在*如何做...*部分，我们将对其进行修改。
 - en: '[PRE32]'
+  id: totrans-180
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: The `req.restarts` object is an internal counter that indicates how many times
     the request was restarted (the prefix `req` indicates that this variable is of
     the type request). Restarting is commonly done when a backend server is not responding
     or an expected error arises, and by doing so, you can choose another backend server,
     rewrite the URL, or take other actions to prevent an error page.
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: '`req.restarts` 对象是一个内部计数器，表示请求已重启了多少次（前缀 `req` 表示该变量属于请求类型）。重启通常发生在后端服务器没有响应或出现预期错误时，通过这种方式，你可以选择另一个后端服务器、重写
+    URL 或采取其他措施以避免错误页面。'
 - en: This specific block of code is executed only when the request is not restarted,
     and it will append the client IP to an `X-Forwarded-For` header, if present. If
     not, Varnish will create the `X-Forwarded-For` header and assign the client IP
     to it.
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 这段特定的代码仅在请求未被重启时执行，它会将客户端 IP 附加到`X-Forwarded-For`头部（如果存在）。如果没有，Varnish 会创建`X-Forwarded-For`头并将客户端
+    IP 分配给它。
 - en: '[PRE33]'
+  id: totrans-183
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: If the incoming request is not a known HTTP method, Varnish will pipe it to
     the backend and let it handle the request.
+  id: totrans-184
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果传入请求不是已知的 HTTP 方法，Varnish 会将其传递到后端并让后端处理该请求。
 - en: '[PRE34]'
+  id: totrans-185
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: Since delivering cached content can only be done in `GET` and `HEAD` HTTP methods,
     we need to pass the request that do not match to the backend servers.
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于仅在 `GET` 和 `HEAD` HTTP 方法中可以交付缓存内容，我们需要将不匹配的请求传递到后端服务器。
 - en: '[PRE35]'
+  id: totrans-187
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: If the request contains an authorization or cookies header, we should not try
     to look up for it in cache, since the content of this request is specific to the
     client.
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果请求包含授权或 cookies 头部，我们不应尝试在缓存中查找它，因为此请求的内容是特定于客户端的。
 - en: '[PRE36]'
+  id: totrans-189
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: The final statement inside the `vcl_recv` subroutine instructs Varnish to look
     up the requested URL in cache. When the request does not match any of the previous
     conditions, which instructs Varnish not to look up for the content (like cookies,
     authorization, HTTP `POST`, and others), it will deliver a cached version of the
     requested content.
+  id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vcl_recv`子程序中的最终语句指示Varnish在缓存中查找请求的URL。当请求不匹配任何之前的条件时，这些条件指示Varnish不去查找内容（如cookies、授权、HTTP
+    `POST`等），它将提供请求内容的缓存版本。'
 - en: How to do it...
+  id: totrans-191
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: After understanding the default `vcl_recv` subroutine, we should identify the
     sections of our website that can be cached and the ones that cannot be cached.
     For some sections of the website, you still may want to deliver a cached version
     even if a user sends a cookie, for example, static content such as CSS, XML, and
     JPEG files.
+  id: totrans-192
   prefs: []
   type: TYPE_NORMAL
+  zh: 在理解了默认的`vcl_recv`子程序后，我们应该识别出我们网站上哪些部分可以被缓存，哪些部分不能缓存。对于网站的某些部分，即使用户发送了cookie，你仍然可能希望提供缓存版本，例如静态内容，如CSS、XML和JPEG文件。
 - en: 'Stripping cookies from requests:'
+  id: totrans-193
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 从请求中去除cookie：
 - en: '[PRE37]'
+  id: totrans-194
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: If the requested URL ends in any of the extensions (`.png`, `.jpeg`, `.ico`,
     and so on) listed in the condition, the cookies will be removed before the request
     continues through the VCL. The same behavior will happen for anything under the
     `static` and `images` directory.
+  id: totrans-195
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果请求的URL以条件中列出的任何扩展名（`.png`、`.jpeg`、`.ico`等）结尾，那么在请求继续通过VCL时，cookie将被移除。对于`static`和`images`目录下的任何内容，也会发生相同的行为。
 - en: Remember that Varnish will execute the code in a sequential way, so the first
     return statement that matches will be executed, and all the code after that will
     not be processed.
+  id: totrans-196
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 请记住，Varnish将按顺序执行代码，因此第一个匹配的返回语句将被执行，而之后的所有代码将不会被处理。
 - en: 'Define which backend or director will receive the request:'
+  id: totrans-197
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 定义哪个后端或目录将接收请求：
 - en: '[PRE38]'
+  id: totrans-198
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: Every request that contains a `/java/` URL will hit the `java` director and
     everything else will hit the `php` director. This is a really basic example, and
     in reality you will probably use a regular expression to match sections of the
     requested URL.
+  id: totrans-199
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 每个包含`/java/` URL的请求将命中`java`目录，而其他所有请求将命中`php`目录。这是一个非常基础的示例，实际上你可能会使用正则表达式来匹配请求的URL中的部分内容。
 - en: 'Create security barriers to avoid unauthorized access:'
+  id: totrans-200
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建安全屏障以防止未经授权的访问：
 - en: '[PRE39]'
+  id: totrans-201
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: If you want to, you can pass the request directly to the error subroutine `vcl_error`
     (with an HTTP error code and message), instead of using a return statement.
+  id: totrans-202
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果你希望，你可以直接将请求传递给错误子程序`vcl_error`（带有HTTP错误代码和信息），而不是使用返回语句。
 - en: How it works...
+  id: totrans-203
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: Getting your subroutines right is one of the most important steps to get a good
     hit ratio, since the `vcl_recv` and `vcl_fetch` subroutines are probably where
     you will write 80 percent of your VCL code.
+  id: totrans-204
   prefs: []
   type: TYPE_NORMAL
+  zh: 正确编写子程序是获得良好命中率的最重要步骤之一，因为`vcl_recv`和`vcl_fetch`子程序可能是你编写VCL代码的80%的地方。
 - en: By stripping cookies of known static content, we get rid of requests that would
     always hit the backend for the same content like a header or footer, since the
     default behavior is to pass requests that contain cookies. Be extremely careful
     when stripping cookies, otherwise users may be locked outside your website if
     you remove sensitive data.
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过从已知的静态内容中去除cookie，我们可以避免那些每次请求相同内容（如页眉或页脚）时总是命中后端的请求，因为默认行为是通过包含cookie的请求。删除cookie时要非常小心，否则如果删除了敏感数据，用户可能会被锁定在网站外。
 - en: The `vcl_recv` subroutine is also the one where you control how balanced your
     cluster/directors will be, whenever a request passes through Varnish.
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vcl_recv`子程序还是你控制集群/目录如何平衡的地方，每当请求通过Varnish时都会经过这里。'
 - en: Handling HTTP request vcl_hash (Should know)
+  id: totrans-207
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理HTTP请求`vcl_hash`（需要了解）
 - en: The `vcl_hash` subroutine is the subroutine that is executed after the `vcl_recv`
     subroutine. Its responsibility is to generate a hash that will become the key
     in the memory map of stored objects and play an important role in achieving a
     high hit ratio.
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vcl_hash`子程序是`vcl_recv`子程序执行后调用的子程序。它的责任是生成一个哈希值，该哈希值将作为存储对象内存映射的键，并在实现高命中率方面起到重要作用。'
 - en: The default value for an object's key is its URL and it probably suits most
     of the cases. If you have too many SEO friendly URLs, and purging becomes a problem
     since those URLs are dynamically generated, using the `vcl_hash` subroutine to
     normalize these keys will help you remove stale content from cache.
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: 对象的键的默认值是其 URL，这通常适用于大多数情况。如果你有太多 SEO 友好的 URL，并且因为这些 URL 是动态生成的，清除缓存成为一个问题，使用
+    `vcl_hash` 子例程来规范化这些键可以帮助你从缓存中移除过时的内容。
 - en: Getting ready
+  id: totrans-210
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: This is the default action for the `vcl_hash` subroutine and the object's key
     will be of the `URL + host` format, in case an HTTP `host` header is present,
     or of the `URL + server ip` format, when it is not.
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是 `vcl_hash` 子例程的默认操作，当 HTTP `host` 头存在时，对象的键将是 `URL + host` 格式，或者当没有时，将是 `URL
+    + 服务器 IP` 格式。
 - en: '[PRE40]'
+  id: totrans-212
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: Whenever the `hash_data()` function is called, the provided value is appended
     to the current key.
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 每次调用 `hash_data()` 函数时，提供的值会附加到当前键值上。
 - en: How to do it...
+  id: totrans-214
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'Avoiding double caching for `www.youdomain.com` and `yourdomain.com`:'
+  id: totrans-215
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 避免 `www.youdomain.com` 和 `yourdomain.com` 的重复缓存：
 - en: '[PRE41]'
+  id: totrans-216
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: Adding the HTTP host normalization step before it is appended to the `hash_data()`
     function will prevent your cache from generating different keys for `www.yourdomain.com`
     and `www.yourdomain.com`, when the content is the same.
+  id: totrans-217
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在将 HTTP 主机规范化步骤添加到 `hash_data()` 函数之前，这可以防止当内容相同时，缓存为 `www.yourdomain.com` 和
+    `www.yourdomain.com` 生成不同的键值。
 - en: 'Removing domain name (host) from static files of multi-language websites:'
+  id: totrans-218
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 从多语言网站的静态文件中移除域名（主机名）：
 - en: '[PRE42]'
+  id: totrans-219
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: Removing a domain name from the object's key can help you achieve a higher hit
     ratio by serving the same image for all web pages that speak the same language
     but have different domain names.
+  id: totrans-220
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 从对象的键中移除域名，可以通过为所有使用相同语言但域名不同的网页提供相同的图片，帮助你获得更高的命中率。
 - en: Creating a temporary header `http X-HASH` to rewrite and modify everything you
     need before passing to the `hash_data()` function can make your code more readable.
     By removing the domain name, the generated object's keys for `http://www.youdomain.com/images/example.png`
     and `http://www.youdomain.co.uk/images/example.png` will be the same.
+  id: totrans-221
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 创建一个临时头 `http X-HASH` 来重写并修改你需要的内容，然后再传递给 `hash_data()` 函数，这可以让你的代码更具可读性。通过移除域名，生成的对象键将会相同，例如
+    `http://www.youdomain.com/images/example.png` 和 `http://www.youdomain.co.uk/images/example.png`。
 - en: 'Normalizing SEO URLs for easier purging:'
+  id: totrans-222
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 规范化 SEO URL 以便更容易清除缓存：
 - en: '[PRE43]'
+  id: totrans-223
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: Taking `http://yourdomain.com/a-long-seo-friendly-url-that-can-make-your-life-harder__3458.html`
     as an example of a SEO-friendly URL, removing this object from cache can become
     harder if the generated SEO URL is based on an updated field (as you will lose
     reference to the old key value), or if you have an asynchronous process that purges
     content, based on the timestamp of objects.
+  id: totrans-224
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 以 `http://yourdomain.com/a-long-seo-friendly-url-that-can-make-your-life-harder__3458.html`
+    为例，作为 SEO 友好的 URL，如果生成的 SEO URL 是基于更新的字段（因为你将失去对旧键值的引用），或者如果你有一个基于对象时间戳的异步清除过程，那么从缓存中移除这个对象将变得更加困难。
 - en: How it works...
+  id: totrans-225
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: Normalizing the object's key can make your life easier whenever you need to
     purge a content that is shared across multiple domains, or whenever you have a
     SEO friendly website in which it is necessary to update content as soon as it
     becomes stale.
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 规范化对象的键可以让你在需要清除跨多个域共享的内容时，或者在你有一个 SEO 友好的网站，需要在内容过时时立即更新时，事半功倍。
 - en: Avoiding duplicated content will save extra memory space and provide you with
     a higher hit ratio, improving the overall performance of your website.
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 避免重复的内容可以节省额外的内存空间，并为你提供更高的命中率，从而提高网站的整体性能。
 - en: Take some time to familiarize yourself with your website contents, in order
     to identify files and sections that can benefit from a normalized key.
+  id: totrans-228
   prefs: []
   type: TYPE_NORMAL
+  zh: 花点时间熟悉你的网站内容，以便识别哪些文件和部分可以从规范化键中受益。
 - en: Handling HTTP request vcl_pipe and vcl_pass (Should know)
+  id: totrans-229
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理 HTTP 请求的 `vcl_pipe` 和 `vcl_pass`（应该了解）
 - en: The main difference between these two subroutines is that the `vcl_pipe` subroutine
     will transmit the bytes back and forth after a pipe instruction is executed at
     the `vcl_recv` subroutine (and the subsequent VCL code will not be processed),
     no matter what is in it, while the `vcl_pass` subroutine will transmit the request
     to the backend without caching the generated response.
+  id: totrans-230
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两个子例程之间的主要区别在于，`vcl_pipe` 子例程会在执行 `vcl_recv` 子例程的管道指令后，来回传输字节（随后将不再处理 VCL 代码），无论其中是什么，而
+    `vcl_pass` 子例程会将请求传递到后台，并且不会缓存生成的响应。
 - en: Both subroutines respect a `keep-alive` header. As long as the connection is
     still open, the `vcl_pipe` subroutine will keep transmitting bytes back and forth
     without analyzing any of the subsequent requests, preventing cached content from
     being delivered since the pipe is still active.
+  id: totrans-231
   prefs: []
   type: TYPE_NORMAL
+  zh: 两个子例程都尊重`keep-alive`头。只要连接仍然保持打开状态，`vcl_pipe`子例程将继续来回传输字节，而不分析任何后续请求，从而阻止缓存内容的传递，因为管道仍然处于活动状态。
 - en: Piping or passing a request can be useful when users reach a protected section
     of the website.
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: 在用户访问网站的受保护部分时，管道或传递请求可能会非常有用。
 - en: Getting ready
+  id: totrans-233
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'The following is the default `vcl_pipe` subroutine:'
+  id: totrans-234
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是默认的`vcl_pipe`子例程：
 - en: '[PRE44]'
+  id: totrans-235
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: The default behavior is that if you do not set the HTTP `connection` header
     as `close`, a client might be piped once, and then all other subsequent requests
     made with a keep-alive header will use the same pipe, overloading your backend
     servers.
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认行为是，如果你没有将HTTP `connection`头设置为`close`，客户端可能会在第一次请求时建立管道连接，然后所有其他带有keep-alive头的后续请求将使用同一个管道，这样会导致你的后台服务器过载。
 - en: 'This is the default `vcl_pass` subroutine:'
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是默认的`vcl_pass`子例程：
 - en: '[PRE45]'
+  id: totrans-238
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: The default `vcl_pass` behavior is pretty much self-explanatory. The request
     will be passed to the backend and the generated response will not be cached.
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认的`vcl_pass`行为几乎不需要解释。请求会被传递到后台，生成的响应将不会被缓存。
 - en: How to do it...
+  id: totrans-240
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何实现...
 - en: 'Add a connection header to piped requests:'
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 为管道请求添加连接头：
 - en: '[PRE46]'
+  id: totrans-242
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: Every piped request will be closed after it is processed.
+  id: totrans-243
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个管道请求处理完后都会关闭。
 - en: How it works...
+  id: totrans-244
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: By piping requests, you can stream large objects, but you need to be careful
     or all other subsequent requests for that same client will also be piped.
+  id: totrans-245
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过管道传递请求，你可以流式传输大对象，但你需要小心，否则所有该客户端的后续请求也会被管道化。
 - en: Passing requests is the default action for protected or personalized sections
     of your website and requires no extra work.
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于你网站上的受保护或个性化部分，传递请求是默认的操作，不需要额外的工作。
 - en: Handling HTTP response vcl_fetch (Should know)
+  id: totrans-247
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理HTTP响应的`vcl_fetch`（需要了解）
 - en: The `vcl_fetch` subroutine is the first subroutine to deal with the response
     phase and it plays an important role on caching policies and **Edge-side Include**
     (**ESI**). When dealing with a legacy system that does not provide a `cache-control`
     header, you can hardcode a time to live (ttl) value to the content that should
     be cached.
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vcl_fetch`子例程是处理响应阶段的第一个子例程，它在缓存策略和**边缘侧包含**（**ESI**）中扮演着重要角色。对于不提供`cache-control`头部的遗留系统，你可以硬编码一个生存时间（ttl）值给应该被缓存的内容。'
 - en: While you can manipulate requests based on client-provided data using the `req.*`
     variable in the `vcl_recv` subroutine, you can do the same data manipulation in
     the `vcl_fetch` subroutine, but with data provided by a backend server using the
     `beresp.*` variable (`beresp` = backend response).
+  id: totrans-249
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然你可以使用`vcl_recv`子例程中的`req.*`变量基于客户端提供的数据来操作请求，但你也可以在`vcl_fetch`子例程中执行相同的数据操作，不过数据是由后台服务器提供的，使用`beresp.*`变量（`beresp`
+    = 后台响应）。
 - en: Tip
+  id: totrans-250
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: For more information about edge-side include visit [http://www.w3.org/TR/esi-lang](http://www.w3.org/TR/esi-lang).
+  id: totrans-251
   prefs: []
   type: TYPE_NORMAL
+  zh: 有关边缘侧包含的更多信息，请访问[http://www.w3.org/TR/esi-lang](http://www.w3.org/TR/esi-lang)。
 - en: Getting ready
+  id: totrans-252
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'First we will take a look at the default `vcl_fetch` subroutine:'
+  id: totrans-253
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们将查看默认的`vcl_fetch`子例程：
 - en: '[PRE47]'
+  id: totrans-254
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: The default `vcl_fetch` behavior will not cache the response if your backend
     server provides a zero or negative ttl value, a `Set-cookie` header, or a `Vary`
     header. Instead, Varnish will cache a dummy object that instructs the next requests
     for this URL to be passed for the next two minutes. This is called hit-for-pass.
+  id: totrans-255
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的后台服务器提供零值或负值的ttl值、`Set-cookie`头部或`Vary`头部，默认的`vcl_fetch`行为将不会缓存响应。相反，Varnish会缓存一个虚拟对象，指示后续请求在接下来的两分钟内传递给后台。这被称为“hit-for-pass”。
 - en: How to do it...
+  id: totrans-256
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何实现...
 - en: 'Overriding the default time to live of a cached object:'
+  id: totrans-257
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 覆盖缓存对象的默认生存时间：
 - en: '[PRE48]'
+  id: totrans-258
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: Using the `set beresp.ttl = 1d` instruction, our static files will be stored
     in cache for one day. If our backend server provides an HTTP `cache-control` or
     `expires` header with a different time frame, we will override it with the set
     command.
+  id: totrans-259
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 使用`set beresp.ttl = 1d`指令后，我们的静态文件将会在缓存中存储一天。如果我们的后台服务器提供了一个不同时间范围的HTTP `cache-control`或`expires`头部，我们将用设置的指令覆盖它。
 - en: 'Stripping cookies for static content:'
+  id: totrans-260
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 为静态内容剥离Cookies：
 - en: '[PRE49]'
+  id: totrans-261
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: Removing the HTTP `set-cookie` header from the response allows us to sanitize
     the object before inserting it into memory.
+  id: totrans-262
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 从响应中移除HTTP `set-cookie`头部可以让我们在将对象插入内存之前进行清理。
 - en: 'Restart requests that failed:'
+  id: totrans-263
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重启失败的请求：
 - en: '[PRE50]'
+  id: totrans-264
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: In case the backend server returns a 500+ HTTP error code (server-side error)
     and the original request was not an HTTP `POST`, we will restart it and try a
     different backend. Restarting will take the request back to the `vcl_recv` subroutine.
+  id: totrans-265
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果后端服务器返回500以上的HTTP错误代码（服务器端错误），且原始请求不是HTTP `POST`，我们将重新启动请求并尝试不同的后端。重新启动会将请求带回到`vcl_recv`子程序。
 - en: To do so, we also need to tweak the `vcl_recv` subroutine so that the restarted
     request can pick another backend instead of our original failed server.
+  id: totrans-266
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 为此，我们还需要调整`vcl_recv`子程序，以便重新启动的请求可以选择另一个后端，而不是我们原本失败的服务器。
 - en: '[PRE51]'
+  id: totrans-267
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'Inspecting why the response was not cached:'
+  id: totrans-268
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 检查为什么响应没有被缓存：
 - en: Sending a debug header alongside the response can help you understand the behavior
     of the cache and why a specific content was not cached.
+  id: totrans-269
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在响应中发送调试头部可以帮助你理解缓存的行为，以及为什么某个特定内容没有被缓存。
 - en: '[PRE52]'
+  id: totrans-270
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: The preceding code will check for the presence of an expired time to live, cookies,
     or if the `Cache-control` header instructed that the content is private.
+  id: totrans-271
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 上述代码将检查是否存在过期的生存时间、cookies，或`Cache-control`头部是否指示内容是私有的。
 - en: How it works...
+  id: totrans-272
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: Stripping cookies from a response will help you clean up data that should not
     be stored along with the object in cache, but it may be risky to do so, since
     cookies are used to authenticate users or track user steps. Be extra sure that
     the user experience will not be affected.
+  id: totrans-273
   prefs: []
   type: TYPE_NORMAL
+  zh: 从响应中去除cookies可以帮助你清理那些不应与对象一起存储在缓存中的数据，但这么做可能有风险，因为cookies用于用户认证或跟踪用户操作。请确保用户体验不会受到影响。
 - en: It is also possible to restart a request that would otherwise end up in an error
     inside the `vcl_error` subroutine, but there's no need to take that extra step
     if you can restart it as soon as the backend server throws an error. This is not
     a bulletproof method, but it can most certainly help you when a bad deploy happens
     in one of the cluster servers.
+  id: totrans-274
   prefs: []
   type: TYPE_NORMAL
+  zh: 也可以重新启动一个本会在`vcl_error`子程序中出错的请求，但如果你能在后端服务器抛出错误时立即重新启动请求，就没有必要执行这个额外的步骤。这不是一个万无一失的方法，但当集群服务器中的某个服务器出现问题时，它无疑能帮助你。
 - en: Handling HTTP response vcl_deliver (Should know)
+  id: totrans-275
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理HTTP响应vcl_deliver（应该知道的内容）
 - en: The `vcl_deliver` subroutine is the last step before a response returns to the
     client and can be used for server obfuscation, adding debug headers, and a last
     overall headers' clean up.
+  id: totrans-276
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vcl_deliver`子程序是响应返回给客户端之前的最后一步，可以用于服务器混淆、添加调试头部，以及最后的整体头部清理。'
 - en: Because the `vcl_deliver` subroutine is executed after the object is placed
     into cache, all manipulation that happens inside the `vcl_deliver` subroutine
     will not be persisted.
+  id: totrans-277
   prefs: []
   type: TYPE_NORMAL
+  zh: 因为`vcl_deliver`子程序是在对象放入缓存之后执行的，所以在`vcl_deliver`子程序中进行的所有操作都不会被持久化。
 - en: Getting ready
+  id: totrans-278
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: 'This is the default `vcl_deliver` behavior:'
+  id: totrans-279
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是默认的`vcl_deliver`行为：
 - en: '[PRE53]'
+  id: totrans-280
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: As you can see, the default `vcl_deliver` subroutine is very straightforward
     and in fact it does not modify anything.
+  id: totrans-281
   prefs: []
   type: TYPE_NORMAL
+  zh: 如你所见，默认的`vcl_deliver`子程序非常简单，实际上它并不会修改任何内容。
 - en: How to do it...
+  id: totrans-282
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做到...
 - en: 'Remove the server name for obfuscating purposes:'
+  id: totrans-283
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 移除服务器名称以进行混淆：
 - en: '[PRE54]'
+  id: totrans-284
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: Obfuscating the HTTP `Server` header is a good way to avoid exposing what type
     of server and version you are using behind your Varnish Cache.
+  id: totrans-285
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 混淆HTTP `Server`头部是一种很好的方法，可以避免暴露你在Varnish缓存后面使用的服务器类型和版本。
 - en: 'Removing extra headers added by Varnish:'
+  id: totrans-286
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 移除Varnish添加的额外头部：
 - en: '[PRE55]'
+  id: totrans-287
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'The HTTP `Age` header provides information about how long this object has been
     cached, while the HTTP `Via` header informs who delivered the response. The `X-Varnish`
     header returns two values: the first one is the request ID that originated the
     cached object, and the second one is the present request ID.'
+  id: totrans-288
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: HTTP `Age`头部提供了该对象被缓存的时间，而HTTP `Via`头部则告知响应由谁提供。`X-Varnish`头部返回两个值：第一个是发起缓存对象请求的请求ID，第二个是当前请求ID。
 - en: There is absolutely no need to remove those headers, but it is a good way to
     not give away unnecessary information.
+  id: totrans-289
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 完全不需要移除这些头部，但这是一个避免泄露不必要信息的好方法。
 - en: 'Add cache `hit` or `miss` debug headers:'
+  id: totrans-290
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 添加缓存`hit`或`miss`调试头部：
 - en: '[PRE56]'
+  id: totrans-291
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: Inside the `vcl_deliver` subroutine, you can read the object's `hit` counter
     variable to determine if the object is being served from cache or by the backend.
+  id: totrans-292
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在`vcl_deliver`子程序内部，你可以读取对象的`hit`计数器变量来判断对象是从缓存中提供的还是由后端提供的。
 - en: Adding a debug header in order to know if the content was served from cache
     helps you to identify objects that should be served from cache, but are not.
+  id: totrans-293
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 添加调试头部可以帮助你知道内容是否是从缓存中提供的，这有助于你识别那些应该从缓存中提供但没有的对象。
 - en: Handling HTTP response vcl_error (Should know)
+  id: totrans-294
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 处理 HTTP 响应 vcl_error（应当了解）
 - en: The `vcl_error` subroutine handles odd behaviors from backend servers, and can
     also be used when you want to deny access to a request or redirect requests to
     a new location.
+  id: totrans-295
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vcl_error` 子程序处理来自后端服务器的异常行为，也可以在你想拒绝访问请求或将请求重定向到新位置时使用。'
 - en: Another good use of the `vcl_error` subroutine is to deliver a maintenance page
     while you are working on the backstage, rolling out patches, or deploying a new
     version of your website (in case you cannot have multiple versions deployed at
     the same time).
+  id: totrans-296
   prefs: []
   type: TYPE_NORMAL
+  zh: '`vcl_error` 子程序的另一个好用场景是在后台工作时，交付一页维护页面，或者在你推出补丁或部署新版本的网站时（如果你无法同时部署多个版本）。'
 - en: Getting ready
+  id: totrans-297
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: 'We will take a look at the default `vcl_error` subroutine:'
+  id: totrans-298
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们来看一下默认的 `vcl_error` 子程序：
 - en: '[PRE57]'
+  id: totrans-299
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: The default `vcl_error` subroutine will generate a simple HTML page informing
     the status of the response and the ID of the request.
+  id: totrans-300
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认的 `vcl_error` 子程序将生成一个简单的 HTML 页面，告知响应的状态和请求的 ID。
 - en: Custom error pages can be declared inside the synthetic block.
+  id: totrans-301
   prefs: []
   type: TYPE_NORMAL
+  zh: 自定义错误页面可以在合成块中声明。
 - en: How to do it...
+  id: totrans-302
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Maintenance page:'
+  id: totrans-303
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 维护页面：
 - en: Whenever you need to take the entire website offline (as a last resort), you
     can redirect users straight from the request phase (`vcl_recv`) to the `vcl_error`
     subroutine and deliver a static page that warns the users about the scheduled
     maintenance.
+  id: totrans-304
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 每当你需要将整个网站下线（作为最后手段）时，可以直接从请求阶段（`vcl_recv`）将用户重定向到 `vcl_error` 子程序，并提供一张告知用户计划维护的静态页面。
 - en: '[PRE58]'
+  id: totrans-305
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: 'Redirecting users:'
+  id: totrans-306
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 重定向用户：
 - en: Inside the `vcl_error` subroutine you can read and write to requests, objects,
     and responses variables. In case of an unexpected failure, you can redirect customers
     to an **Oops! We're sorry** friendly page or even to the website home page.
+  id: totrans-307
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在 `vcl_error` 子程序中，你可以读取和写入请求、对象和响应变量。如果发生意外故障，你可以将客户重定向到**哎呀！我们很抱歉**的友好页面，甚至直接重定向到网站的首页。
 - en: '[PRE59]'
+  id: totrans-308
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: Keep in mind that the `301` HTTP code means Moved Permanently, so dealing with
     redirections based on a system failure cannot be assigned as a `301` status. A
     `302` HTTP code informs that the resource was temporarily moved.
+  id: totrans-309
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 请记住，`301` HTTP 状态码表示永久移动，因此处理因系统故障而产生的重定向时，不能将其分配为 `301` 状态码。`302` HTTP 状态码表示资源被临时移动。
 - en: How it works...
+  id: totrans-310
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: Redirecting customers to a friendly error page is a good way to avoid users
     from having a bad experience, therefore favoring a competitor's website.
+  id: totrans-311
   prefs: []
   type: TYPE_NORMAL
+  zh: 将客户重定向到友好的错误页面是一种避免用户产生不良体验的好方法，从而减少他们转向竞争对手网站的可能性。
 - en: Caching static content (Should know)
+  id: totrans-312
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 缓存静态内容（应当了解）
 - en: A static web page can be defined as a page that is pre-built and delivered exactly
     the same way every time it is loaded. Even if the content of a page is updated
     from time to time (let's say every 10 to 15 minutes) with the latest news or products,
     you can still cache that page for a smaller period and benefit from not having
     to process that same response for every customer inside that time frame.
+  id: totrans-313
   prefs: []
   type: TYPE_NORMAL
+  zh: 静态网页可以定义为一种预构建的页面，每次加载时都以完全相同的方式呈现。即使页面的内容不时更新（比如每 10 到 15 分钟更新一次最新的新闻或产品），你仍然可以将该页面缓存较短的时间，从而避免在该时间段内为每个客户处理相同的响应。
 - en: Other cacheable static contents that can make your website faster are the CSS,
     JavaScript, and image files which will probably be cached for a longer period
     of time than your HTML pages.
+  id: totrans-314
   prefs: []
   type: TYPE_NORMAL
+  zh: 其他可以加速你网站的缓存静态内容包括 CSS、JavaScript 和图片文件，这些文件的缓存时间通常会比你的 HTML 页面长。
 - en: Getting ready
+  id: totrans-315
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: First, you need to identify your static files or sections and define a time
     to live based on how long you expect a specific type of file to change its content.
+  id: totrans-316
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，你需要识别出你的静态文件或部分，并根据你预期某种类型文件更改内容的时间，定义其存活时间。
 - en: 'Creating a list of files and sections helps you grouping them under a single
     VCL condition (rule) based on their expected ttl:'
+  id: totrans-317
   prefs: []
   type: TYPE_NORMAL
+  zh: 创建文件和部分列表可以帮助你根据预期的 ttl，将它们归类在一个 VCL 条件（规则）下：
 - en: '| File type | Time period |'
+  id: totrans-318
   prefs: []
   type: TYPE_TB
+  zh: '| 文件类型 | 时间段 |'
 - en: '| --- | --- |'
+  id: totrans-319
   prefs: []
   type: TYPE_TB
+  zh: '| --- | --- |'
 - en: '| Image files (JPG, PNG, GIF) | 1 week |'
+  id: totrans-320
   prefs: []
   type: TYPE_TB
+  zh: '| 图片文件（JPG、PNG、GIF） | 1周 |'
 - en: '| JavaScript | 1 hour |'
+  id: totrans-321
   prefs: []
   type: TYPE_TB
+  zh: '| JavaScript | 1小时 |'
 - en: '| CSS | 1 hour |'
+  id: totrans-322
   prefs: []
   type: TYPE_TB
+  zh: '| CSS | 1小时 |'
 - en: The best place to define your ttl caching policies is inside the `vcl_fetch`
     subroutine because it is the last step before an object is inserted to cache.
+  id: totrans-323
   prefs: []
   type: TYPE_NORMAL
+  zh: 定义 ttl 缓存策略的最佳位置是在 `vcl_fetch` 子程序中，因为这是在对象插入缓存前的最后一步。
 - en: How to do it...
+  id: totrans-324
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Define a time to live based on file type:'
+  id: totrans-325
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 根据文件类型定义存活时间：
 - en: '[PRE60]'
+  id: totrans-326
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: 'As you have probably already noticed, Varnish takes a numeric argument followed
     by a single letter, which identifies a scale of time:'
+  id: totrans-327
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 正如您可能已经注意到的，Varnish 接受一个数字参数，后跟一个字母，表示时间的度量单位：
 - en: S = seconds
+  id: totrans-328
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: S = 秒
 - en: H = hours
+  id: totrans-329
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: H = 小时
 - en: D = days
+  id: totrans-330
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: D = 天
 - en: W = weeks
+  id: totrans-331
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: W = 周
 - en: 'Disabling cache:'
+  id: totrans-332
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 禁用缓存：
 - en: '[PRE61]'
+  id: totrans-333
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: Setting the ttl to zero seconds will create an already expired object, forcing
     it not to be cached.
+  id: totrans-334
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 将 ttl 设置为零秒将创建一个已过期的对象，强制它不被缓存。
 - en: How it works...
+  id: totrans-335
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: Avoiding duplicated workload is the first step to a faster website, and achieving
     a higher hit ratio for your static content is where you have to primarily focus
     before moving to more complex caching policies.
+  id: totrans-336
   prefs: []
   type: TYPE_NORMAL
+  zh: 避免重复工作负载是加速网站的第一步，实现静态内容的更高命中率是您在转向更复杂的缓存策略之前必须重点关注的。
 - en: Make sure your backend is not already defining a caching policy with `cache-control`
     or `expire` headers, as you probably will be better off obeying those policies.
+  id: totrans-337
   prefs: []
   type: TYPE_NORMAL
+  zh: 确保您的后端没有已经定义 `cache-control` 或 `expire` 头的缓存策略，因为遵守这些策略通常会更好。
 - en: Un-setting cookies before the object is placed into memory is mandatory or else
     you will end up caching unnecessary and sensitive information.
+  id: totrans-338
   prefs: []
   type: TYPE_NORMAL
+  zh: 在将对象放入内存之前，必须取消设置 cookies，否则你将缓存不必要且敏感的信息。
 - en: Cookies, sessions, and authorization (Become an expert)
+  id: totrans-339
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: Cookies、会话和授权（成为专家）
 - en: 'There are many ways to identify unique users in our website. In this recipe,
     we will cover the three most used ones: cookies, sessions, and authorization.
     Whenever one of them occurs, you must be extremely careful with the request and
     generated response since they contain user-specific data and cannot be delivered
     to a different user.'
+  id: totrans-340
   prefs: []
   type: TYPE_NORMAL
+  zh: 有多种方法可以识别网站上的唯一用户。在本教程中，我们将介绍三种最常用的方法：cookies、会话和授权。每当发生其中之一时，您必须特别小心请求和生成的响应，因为它们包含用户特定的数据，不能交付给其他用户。
 - en: Caching user-specific content requires an extra step, since only the same user
     will be able to access that cached object. Delivering user-specific content to
     someone else can lead to session hijacking, user's private information leakage,
     and many other security problems.
+  id: totrans-341
   prefs: []
   type: TYPE_NORMAL
+  zh: 缓存用户特定内容需要额外的步骤，因为只有相同的用户才能访问该缓存对象。将用户特定的内容提供给其他人可能会导致会话劫持、用户的私人信息泄漏以及其他许多安全问题。
 - en: Getting ready
+  id: totrans-342
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: An HTTP cookie, also referred to as browser cookie, is the result of a `set-cookie`
     response header and it is used to store small pieces of data on the client side
     (browser) for later usage on subsequent requests. The top reason for using cookies
     is to identify a unique user and use the stored information to generate personalized
     content or to track its steps.
+  id: totrans-343
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP cookie，也称为浏览器 cookie，是 `set-cookie` 响应头的结果，它用于在客户端（浏览器）上存储少量数据，以便在后续请求中使用。使用
+    cookie 的主要原因是识别唯一用户，并使用存储的信息生成个性化内容或跟踪其步骤。
 - en: HTTP session is generated on the server side and only the ID of that interaction
     is sent to the client in the form of a cookie. A session is used to keep all the
     information on the server side, and the user only handles the session ID (token),
     unlike what happens with a regular cookie. Session tokens are often specific to
     programming languages.
+  id: totrans-344
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP 会话在服务器端生成，只有该交互的 ID 会以 cookie 的形式发送到客户端。会话用于将所有信息保存在服务器端，用户仅处理会话 ID（令牌），不同于常规
+    cookie 的处理方式。会话令牌通常特定于编程语言。
 - en: HTTP authorization is the most basic kind of HTTP security that can be implemented
     in a website (often called HTTP Basic Auth), and it is executed via an `authorization`
     header. HTTP authorization will often encrypt the username and password in a base
     64 fashion.
+  id: totrans-345
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP 授权是可以在网站中实现的最基本的 HTTP 安全性（通常称为 HTTP Basic Auth），它通过 `authorization` 头进行执行。HTTP
+    授权通常会以 base64 的方式加密用户名和密码。
 - en: How to do it...
+  id: totrans-346
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'Avoiding cache for user-specific requests:'
+  id: totrans-347
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 避免缓存用户特定请求：
 - en: '[PRE62]'
+  id: totrans-348
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: Since sessions are stored inside cookies, you will only need to check for the
     presence of a session as a URL parameter, like the `JSESSIONID` (for Java systems).
+  id: totrans-349
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 由于会话存储在 cookie 中，您只需要检查 URL 参数中是否存在会话，例如 `JSESSIONID`（适用于 Java 系统）。
 - en: 'Caching user specific information:'
+  id: totrans-350
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 缓存用户特定信息：
 - en: If you need to create a per-user cache, the following example of code will set
     the cookie along with the original `hash_data`. Caching responses with cookies
     will often lead to more problems than solutions.
+  id: totrans-351
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 如果您需要为每个用户创建缓存，以下代码示例将在设置 cookie 的同时设置原始 `hash_data`。使用 cookies 缓存响应通常会带来更多的问题而不是解决方案。
 - en: '[PRE63]'
+  id: totrans-352
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: This is actually a basic example on how to deal with requests that contain cookies
     and need to be cached. You should write your own regex (using the `regsub` function)
     to extract only the value of the cookie that you will use to append to the default
     object's key.
+  id: totrans-353
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这是一个处理包含 cookie 且需要缓存的请求的基本示例。你应该编写自己的正则表达式（使用 `regsub` 函数）来提取仅用于附加到默认对象键的 cookie
+    值。
 - en: How it works...
+  id: totrans-354
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: Storing user-specific content in cache can be helpful to deliver a faster response,
     but it is not recommended since the non-authenticated users represent the biggest
     portion of the requests, therefore, the authenticated users will not have trouble
     if they do not hit the cache at all.
+  id: totrans-355
   prefs: []
   type: TYPE_NORMAL
+  zh: 将用户特定的内容存储在缓存中有助于提供更快的响应，但不推荐这样做，因为未认证的用户占据了请求的大部分，因此认证用户即使完全没有命中缓存也不会遇到问题。
 - en: Unless you have a website that requires all users (or at least half of them)
     to be logged in, it is better to let the requests pass to backend servers and
     avoid the trouble of leaking private information and other security concerns.
+  id: totrans-356
   prefs: []
   type: TYPE_NORMAL
+  zh: 除非你的网站要求所有用户（或至少其中一半的用户）都登录，否则最好让请求直接传递到后端服务器，避免泄露私人信息及其他安全问题。
 - en: HTTP cache headers (Should know)
+  id: totrans-357
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: HTTP 缓存头（应了解）
 - en: The HTTP is a long-established protocol for exchanging information between clients
     and servers, and the headers are an important part of that communication. HTTP
     headers define what the client is requesting and how they expect it to be responded
     to by the server.
+  id: totrans-358
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP 是一个长期建立的信息交换协议，用于客户端和服务器之间的通信，而头部是这种通信的重要组成部分。HTTP 头定义了客户端请求的内容以及客户端期望服务器如何响应。
 - en: Along with a request, you will probably find a handful of headers such as accept,
     accept-encoding, keep-alive, host, and many others. In a `GET` method, the request
     will ask for information about a specific resource and attach headers to allow
     the server to know how the response should be formed.
+  id: totrans-359
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了请求外，你可能会看到一些头部信息，比如 accept、accept-encoding、keep-alive、host 等等。在 `GET` 方法中，请求将请求关于特定资源的信息，并附加头部以告知服务器响应应该如何形成。
 - en: On the response phase of the communication, the server will also attach server-specific
     headers to let the client know how it should treat the response and, if instructed,
     store it (browser cache).
+  id: totrans-360
   prefs: []
   type: TYPE_NORMAL
+  zh: 在通信的响应阶段，服务器还会附加特定于服务器的头部，告知客户端如何处理响应，并在指示的情况下将其存储（浏览器缓存）。
 - en: Getting ready
+  id: totrans-361
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备开始
 - en: In this section, we will focus primarily on the HTTP header called cache-control
     which is covered in the section 13 of the Hypertext Transfer Protocol Version
     1.1 ([http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html](http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html)).
+  id: totrans-362
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们将主要关注 HTTP 头中的 `cache-control`，该内容在《超文本传输协议 1.1 版本》（[http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html](http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html)）的第
+    13 节中有详细介绍。
 - en: How to do it...
+  id: totrans-363
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: The HTTP protocol Version 1.1 introduced the `cache-control` response header
     as an alternative to the `expires` header implemented in HTTP 1.0\. The main difference
     between them is that `expires` takes a date value and the `cache-control` can
     receive an age value.
+  id: totrans-364
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP 协议 1.1 引入了 `cache-control` 响应头，作为 HTTP 1.0 中实现的 `expires` 头的替代。它们之间的主要区别在于
+    `expires` 使用日期值，而 `cache-control` 可以接受年龄值。
 - en: '[PRE64]'
+  id: totrans-365
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: 'The `cache-control` header can also indicate what level of cache should be
     done for that response. This type of control is passed as a directive and can
     assume the following values:'
+  id: totrans-366
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`cache-control` 头还可以指示应该对该响应进行什么级别的缓存。这种控制方式是通过指令传递的，可以具有以下值：'
 - en: '`public`: Any type of cache mechanism (server, proxy, or browser) can cache
     the content of that response.'
+  id: totrans-367
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`public`：任何类型的缓存机制（服务器、代理或浏览器）都可以缓存该响应的内容。'
 - en: '`private`: Indicates that the response (or part of it) is specific to a single
     client and should not be cached by a "shared" cache mechanism.'
+  id: totrans-368
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`private`：表示响应（或其中的一部分）是特定于单个客户端的，且不应被“共享”缓存机制缓存。'
 - en: '`no-cache`: Forces a validation request to the origin server before delivering
     the cached copy to the user. It is primarily used for authentication when a cached
     copy of the response cannot be delivered to an unauthorized client.'
+  id: totrans-369
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`no-cache`：强制在将缓存副本传递给用户之前向源服务器发起验证请求。它主要用于认证，当缓存的响应副本不能传递给未经授权的客户端时使用。'
 - en: '`no-store`: The response cannot be cached at all.'
+  id: totrans-370
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`no-store`：响应不能被缓存。'
 - en: 'The expiration attributes (ttl) of the `cache-control` header are:'
+  id: totrans-371
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`cache-control` 头的过期属性（ttl）包括：'
 - en: '`max-age`: Defines for what period of time the response will be cached.'
+  id: totrans-372
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`max-age`：定义响应将被缓存的时间段。'
 - en: '`s-maxage`: Exactly the same as max-age, but it only applies to proxy caches.'
+  id: totrans-373
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`s-maxage`：与 max-age 完全相同，但它仅适用于代理缓存。'
 - en: Opposite to the `cache-control` header, the `expires` header receives an HTTP-date
     (RFC 1123) as value that indicates until when the content of the response is considered
     valid. After it expires, a new representation will be requested from the origin
     server.
+  id: totrans-374
   prefs: []
   type: TYPE_NORMAL
+  zh: 与 `cache-control` 头相反，`expires` 头接受一个 HTTP-date（RFC 1123）作为值，指示响应内容有效的截止时间。过期后，将从源服务器请求新的表示形式。
 - en: Tip
+  id: totrans-375
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: The HTTP-date specification can be found at section 3.3.1 of the HTTP protocol
     ([http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html](http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html)).
+  id: totrans-376
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP-date 规范可以在 HTTP 协议的第 3.3.1 节找到（[http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html](http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html)）。
 - en: How it works...
+  id: totrans-377
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: The HTTP protocol is the foundation in which Varnish relies and includes a number
     of elements to make caching policies easier. The best approach to setting different
     times for cached objects (when using a proxy-cache) is to code the time to live
@@ -1759,381 +2548,547 @@
     with the response and thus avoiding to hardcode the ttl inside the VCL code. In
     case you are dealing with a legacy system that is no longer maintained, you will
     probably need to hardcode the ttl to create a cache object.
+  id: totrans-378
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP 协议是 Varnish 所依赖的基础，并包括了多个元素来简化缓存策略的设置。为缓存对象设置不同时间（当使用代理缓存时）的最佳方法是将生存时间策略编码在应用服务器中，通过在响应中发送
+    `cache-control` 头，从而避免将 ttl 硬编码在 VCL 代码中。如果你处理的是一个已经不再维护的遗留系统，可能需要将 ttl 硬编码以创建缓存对象。
 - en: Varnish will respect the cache headers values unless it is told not to. So whenever
     a content should be cached and it is not, check the response headers for any indication
     of a `no-store`, `no-cache`, or maybe an already expired time value.
+  id: totrans-379
   prefs: []
   type: TYPE_NORMAL
+  zh: Varnish 会遵守缓存头部的值，除非另行指示。因此，每当内容应该被缓存但没有被缓存时，检查响应头部，看看是否有 `no-store`、`no-cache`
+    或者已经过期的时间值的指示。
 - en: Invalidating cached content (Should know)
+  id: totrans-380
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使缓存内容失效（应当了解）
 - en: Up until now, we have only seen ways of caching contents of your website, but
     delivering stale data to clients is undesirable when an updated version of that
     content has already been deployed—this is actually worst than not having a cache
     at all.
+  id: totrans-381
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们只看到了缓存网站内容的方法，但当更新版的内容已经部署时，向客户端提供过期数据是不可取的——这实际上比没有缓存更糟糕。
 - en: A simple example of bad content (stale) is the representation of a product that
     is on sale, and after the discount expires, the server keeps showing its discounted
     value. Since you would not cache a sensitive portion of your website, like the
     shopping cart, the user would see a discount price at the product detail page
     and a higher price at the shopping cart.
+  id: totrans-382
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个简单的坏内容（过期内容）示例是展示一个正在促销的产品，而当折扣过期后，服务器仍然显示折扣后的价格。由于你不会缓存网站的敏感部分，如购物车，用户在产品详情页看到的是折扣价格，而在购物车中看到的是更高的价格。
 - en: Getting ready
+  id: totrans-383
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: There are actually two ways of invalidating cached contents, and it is very
     important that you understand the difference between them.
+  id: totrans-384
   prefs: []
   type: TYPE_NORMAL
+  zh: 实际上，有两种方法可以使缓存内容失效，理解它们之间的区别非常重要。
 - en: '**Purge**: It is used to remove a single object from cache and must be implemented
     inside both the `vcl_hit` and `vcl_miss` subroutines. A single object can contain
     multiple cached versions if the content is delivered with a `vary` header, and
     the purge method will remove all existing variations.'
+  id: totrans-385
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**Purge**：用于从缓存中移除单个对象，必须在 `vcl_hit` 和 `vcl_miss` 子程序中实现。如果内容带有 `vary` 头，一个对象可能包含多个缓存版本，而
+    purge 方法将删除所有现有的变体。'
 - en: '**Ban**: It is useful for removing large amounts of contents at the same time
     by using regular expressions as match. In case you need to ban all JPEGs (`.jpg`)
     or any other regex match, the ban method is faster than the purge method because
     the latter will invalidate them one by one, thus taking a lot longer to process.'
+  id: totrans-386
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**Ban**：通过使用正则表达式匹配，它在同时删除大量内容时非常有用。如果你需要禁止所有 JPEG 文件（`.jpg`）或任何其他正则匹配，ban
+    方法比 purge 方法更快，因为 purge 方法会逐个使它们失效，从而处理时间更长。'
 - en: Be aware that while the purge will remove the content from cache, the ban method
     does not remove it right away—what it actually does is create a ban list that
     is checked every time a request comes, trying to find out if the content should
     be delivered from cache or if a newer version should be fetched from the backend
     server. At this point, you must probably have concluded that this will generate
     extra workload and a big ban list filter may increase the load on your server.
+  id: totrans-387
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，尽管 purge 会从缓存中删除内容，但 ban 方法并不会立即删除它——它实际做的是创建一个禁用列表，每次请求到来时都会检查该列表，试图找出内容是否应从缓存中提供，或者是否应从后端服务器获取更新的版本。在这一点上，你应该已经得出结论，这会生成额外的工作负载，并且一个大的禁用列表过滤器可能会增加服务器的负担。
 - en: How to do it...
+  id: totrans-388
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'Purge:'
+  id: totrans-389
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 清除：
 - en: When using any method of invalidation, it is always a good idea to have an **Access
     Control List** (**ACL**) with the authorized hosts.
+  id: totrans-390
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 使用任何失效方法时，拥有一个授权主机的 **访问控制列表** (**ACL**) 总是一个好主意。
 - en: '[PRE65]'
+  id: totrans-391
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: In the preceding example, we are adding `localhost` and all hosts from the `10.1.0.0`
     and `172.16.11.0` networks to an ACL called `purge` (you can name the ACL any
     way you want).
+  id: totrans-392
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在前面的示例中，我们将 `localhost` 和来自 `10.1.0.0` 与 `172.16.11.0` 网络的所有主机添加到一个名为 `purge`
+    的 ACL 中（你可以根据需要命名该 ACL）。
 - en: '[PRE66]'
+  id: totrans-393
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: Even though the `PURGE` method is not present in the HTTP protocol, it is actually
     a `GET` method with a different name that is used to direct requests to the purge
     method inside the VCL.
+  id: totrans-394
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 尽管 `PURGE` 方法在 HTTP 协议中并不存在，但它实际上是一个具有不同名称的 `GET` 方法，用于将请求引导到 VCL 内部的 purge
+    方法。
 - en: The exact requested object might not generate a hit and a variant of that object
     might be in cache, so using the purge method inside the `vcl_miss` subroutine
     is necessary to remove all variants.
+  id: totrans-395
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 请求的确切对象可能不会产生命中，而该对象的某个变体可能已经缓存，因此在 `vcl_miss` 子例程中使用 purge 方法是必要的，以清除所有变体。
 - en: 'Ban:'
+  id: totrans-396
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 禁用：
 - en: 'Ban can be done through VCL code:'
+  id: totrans-397
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 禁用可以通过 VCL 代码完成：
 - en: '[PRE67]'
+  id: totrans-398
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: 'But, it can also can be done through the varnish CLI:'
+  id: totrans-399
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 但它也可以通过 varnish CLI 完成：
 - en: '[PRE68]'
+  id: totrans-400
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: How it works...
+  id: totrans-401
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 工作原理...
 - en: While you may increase the ttl of cached objects in hope that it will improve
     the chances of a cache hit, serving stale content is bad and should be avoided
     at any cost. Implementing a cache invalidation policy is as important as getting
     objects into cache and should be treated as a top priority.
+  id: totrans-402
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管你可能会增加缓存对象的 ttl，希望它能提高缓存命中的概率，但提供过时的内容是错误的，应该尽量避免。实施缓存失效策略和将对象加入缓存同样重要，应当视为优先任务。
 - en: You should always purge content whenever your application server receives an
     update to its own entities. Since this behavior is not always present in legacy
     systems, you may need to remove stale data using the varnish CLI.
+  id: totrans-403
   prefs: []
   type: TYPE_NORMAL
+  zh: 每当你的应用服务器接收到自己实体的更新时，应该始终清除内容。由于这一行为在遗留系统中并不总是存在，你可能需要使用 varnish CLI 删除过时的数据。
 - en: Compressing the response (Become an expert)
+  id: totrans-404
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 压缩响应（成为专家）
 - en: HTTP compression can be described as a way to reduce the transferred data between
     servers and client. Reducing the amount of transmitted data will result in a faster
     loading website, and in the new cloud datacenter era, it may even reduce your
     network usage costs.
+  id: totrans-405
   prefs: []
   type: TYPE_NORMAL
+  zh: HTTP 压缩可以被描述为一种减少服务器与客户端之间传输数据的方法。减少传输的数据量将导致网站加载更快，在新的云数据中心时代，它甚至可能降低你的网络使用成本。
 - en: Compression can be performed mainly on text content such as HTML, CSS, JS, XML
     files, but it does not mean that other type of files cannot be compressed. A common
     mistake is to compress files that are already natively compressed, such as a PNG
     image file. This odd behavior will only reduce performance as the compression
     and decompression processes will actually consume more time and will not result
     in a smaller file.
+  id: totrans-406
   prefs: []
   type: TYPE_NORMAL
+  zh: 压缩主要可以应用于 HTML、CSS、JS、XML 等文本内容，但这并不意味着其他类型的文件不能被压缩。一个常见的错误是压缩已经本地压缩的文件，比如 PNG
+    图像文件。这种行为只会降低性能，因为压缩和解压缩过程实际上会消耗更多的时间，并且不会导致更小的文件。
 - en: Getting ready
+  id: totrans-407
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: Only after Version 3.0 of the Varnish Cache, the gzip compression method is
     possible and is definitely encouraged.
+  id: totrans-408
   prefs: []
   type: TYPE_NORMAL
+  zh: 只有在 Varnish Cache 3.0 版本之后，gzip 压缩方法才可用，并且强烈建议使用该方法。
 - en: Varnish default behavior is to compress the response before delivering it to
     the client, searching for the presence of the `accept-encoding` header in the
     request. You can change this behavior by setting the `http_gzip_support` parameter
     in the Varnish daemon.
+  id: totrans-409
   prefs: []
   type: TYPE_NORMAL
+  zh: Varnish 的默认行为是先压缩响应，然后再将其传递给客户端，检查请求中是否存在 `accept-encoding` 头部。你可以通过在 Varnish
+    守护进程中设置 `http_gzip_support` 参数来更改这一行为。
 - en: Even if the `accept-encoding` header is present in the request, this does not
     guarantee that the cached object will be stored as a compressed representation.
     In the following section, we will compress objects before inserting them into
     cache.
+  id: totrans-410
   prefs: []
   type: TYPE_NORMAL
+  zh: 即使请求中包含了`accept-encoding`头，也并不能保证缓存的对象会以压缩的形式存储。在接下来的部分中，我们将在将对象插入缓存之前进行压缩。
 - en: How to do it...
+  id: totrans-411
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: 'Compressing before storing:'
+  id: totrans-412
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 压缩前存储：
 - en: Setting the `do_gzip` variable to `true` inside the `vcl_fetch` subroutine will
     enable the gzip compression before the content is stored.
+  id: totrans-413
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 将`do_gzip`变量设置为`true`，并将其放置在`vcl_fetch`子例程中，可以在内容存储之前启用gzip压缩。
 - en: '[PRE69]'
+  id: totrans-414
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: 'Compressing specific content:'
+  id: totrans-415
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 压缩特定内容：
 - en: '[PRE70]'
+  id: totrans-416
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE70]'
 - en: You should not try to compress files that are already natively compressed such
     as JPEGs, MP3s, and so on, avoiding unnecessary workload.
+  id: totrans-417
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 不应尝试压缩已经原生压缩的文件，如JPEG、MP3等，以避免不必要的工作负载。
 - en: How it works...
+  id: totrans-418
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: Compressing the response will result in a smaller network footprint, a faster
     loading time of pages, and in reduced costs if your datacenter charges you for
     network bandwidth usage.
+  id: totrans-419
   prefs: []
   type: TYPE_NORMAL
+  zh: 压缩响应将导致更小的网络占用、更快的页面加载时间，并且如果数据中心根据网络带宽使用量收费，也能减少成本。
 - en: Since most of the search engines will add relevance to faster websites, consider
     this tool as one of the most important implementation inside your VCL code.
+  id: totrans-420
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于大多数搜索引擎会为加载更快的网站增加相关性，考虑将此工具作为你VCL代码中最重要的实现之一。
 - en: Monitoring the hit ratio (Become an expert)
+  id: totrans-421
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 监控命中率（成为专家）
 - en: Varnish default installation comes with many secondary tools that can make the
     debugging and analysis tasks easier and faster, including `varnishlog` (to access
     the shared memory log), `varnishncsa` (to generate an access log in the apache
     common format), `varnishhist` (to create a histogram with hit-miss along with
     time), `varnishadm` (for administrative interface), and the `varnishstat` that
     we will cover in this recipe.
+  id: totrans-422
   prefs: []
   type: TYPE_NORMAL
+  zh: Varnish的默认安装包括许多辅助工具，可以使调试和分析任务更加简便和高效，包括`varnishlog`（用于访问共享内存日志）、`varnishncsa`（用于生成Apache常用格式的访问日志）、`varnishhist`（用于创建包含命中和未命中情况的直方图）、`varnishadm`（用于管理界面）以及我们将在本节中讲解的`varnishstat`。
 - en: Analyzing the HTTP headers contained inside the requests and responses will
     solve most of the problems you may encounter while debugging. An HTTP header viewer
     such as the Firefox add-on **Live HTTP Headers** will be very helpful to sort
     out why a response is not being cached, but some other type of bugs will take
     extra investigation.
+  id: totrans-423
   prefs: []
   type: TYPE_NORMAL
+  zh: 分析请求和响应中的HTTP头将解决你在调试过程中可能遇到的大多数问题。像Firefox插件**Live HTTP Headers**这样的HTTP头查看工具将非常有助于解决为什么响应没有被缓存的问题，但某些其他类型的错误将需要额外的调查。
 - en: Getting ready
+  id: totrans-424
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备开始
 - en: Before trying to improve your cache by reducing the number of repeated objects
     in memory and refactoring your VCL code to make it slimmer, take a minute to see
     how well you cache is performing live.
+  id: totrans-425
   prefs: []
   type: TYPE_NORMAL
+  zh: 在通过减少内存中重复对象的数量和重构VCL代码来使其更加精简来改进缓存之前，先花一分钟时间查看一下你的缓存实际表现如何。
 - en: If you Varnish instance has a low hit ratio percentage, you may need to implement
     more aggressive caching policies by forcing to cache static content that is not
     being stored due to a misconfigured header.
+  id: totrans-426
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你的Varnish实例的命中率较低，可能需要通过强制缓存由于头配置错误而未被缓存的静态内容来实现更为激进的缓存策略。
 - en: How to do it...
+  id: totrans-427
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作...
 - en: Open the `varnishstat` monitoring tool.
+  id: totrans-428
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 打开`varnishstat`监控工具。
 - en: '[PRE71]'
+  id: totrans-429
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE71]'
 - en: Type in your server console screen the preceding command to execute the Varnish
     statistics tool.
+  id: totrans-430
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在你的服务器控制台屏幕中输入前面的命令来执行Varnish统计工具。
 - en: You will be presented with a screen full of statistics and we will go through
     the most important ones here is this section.
+  id: totrans-431
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你将看到一个充满统计数据的屏幕，我们将在本节中讨论其中最重要的部分。
 - en: '![How to do it...](img/0403_17_01.jpg)'
+  id: totrans-432
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![它是如何工作的...](img/0403_17_01.jpg)'
 - en: The upper left part of the `varnishstat` shows the uptime of the server (Days+Hours:Minutes:Seconds).
+  id: totrans-433
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: '`varnishstat`的左上角显示了服务器的正常运行时间（天+小时:分钟:秒）。'
 - en: The **Hitrate ratio** indicates the time frame, in seconds, of the collected
     data.
+  id: totrans-434
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: '**Hitrate ratio**指示的是收集数据的时间框架（以秒为单位）。'
 - en: The **Hitrate avg** numbers show the percentage of hits (multiply by 100) according
     to the time frame right above them.
+  id: totrans-435
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: '**Hitrate avg**数字显示了根据上方时间框架计算的命中百分比（乘以100）。'
 - en: In this example, the hit ratio average was 77 percent for the last 10 seconds,
     as it also was in the remaining time frames.
+  id: totrans-436
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在此示例中，过去10秒钟的命中率平均为77%，在其余时间框架中也是如此。
 - en: 'The following data is formatted as:'
+  id: totrans-437
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 以下数据的格式为：
 - en: Raw data / realtime (per second) / since boot (per second)
+  id: totrans-438
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 原始数据 / 实时（每秒）/ 自启动以来（每秒）
 - en: '![How to do it...](img/0403_17_02.jpg)'
+  id: totrans-439
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![如何操作...](img/0403_17_02.jpg)'
 - en: 8.99 connections accepted per second.
+  id: totrans-440
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 每秒接受8.99个连接。
 - en: 199.71 requests being made.
+  id: totrans-441
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 每秒发起199.71个请求。
 - en: The preceding lines show the client connections and requests. The client connections
     are expected to be lower than the requests, since `KeepAlive` headers were sent
     with the connections.
+  id: totrans-442
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 前面的行显示了客户端连接和请求。由于发送了`KeepAlive`头，客户端连接数应该低于请求数。
 - en: '![How to do it...](img/0403_17_03.jpg)'
+  id: totrans-443
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![如何操作...](img/0403_17_03.jpg)'
 - en: 162.76 cache hits per second.
+  id: totrans-444
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 每秒162.76次缓存命中。
 - en: 33.95 cache misses per second.
+  id: totrans-445
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 每秒33.95次缓存未命中。
 - en: A high cache miss counter is the first sign of a bad caching policy that needs
     revision. There is not a magic number when it comes to hit ratio average, but
     if your cache is not effective, there is no point in caching.
+  id: totrans-446
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 高缓存未命中计数是缓存策略存在问题的首个迹象，表明需要修订。关于命中率的平均值并没有固定的“魔法数字”，但如果你的缓存不有效，那么缓存就没有意义。
 - en: '![How to do it...](img/0403_17_04.jpg)'
+  id: totrans-447
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![如何操作...](img/0403_17_04.jpg)'
 - en: 0.00 connections to the backend.
+  id: totrans-448
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 每秒0.00个连接到后端。
 - en: 37.94 connections reused to the backend.
+  id: totrans-449
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 每秒37.94个连接被重用到后端。
 - en: Do not be scared if you find out that in the last second no connections were
     made to the backend servers. This is a good sign of connections being reused,
     which avoid unnecessary handshake between servers. We are aiming for a high backend
     reuse.
+  id: totrans-450
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果你发现上一秒没有与后端服务器建立连接，不必担心。这是连接重用的好迹象，避免了服务器之间不必要的握手。我们希望达到高效的后端连接重用。
 - en: There are many other counters to retrieve information from the statistics about
     the health of your Varnish instance and whether there is a problem with it or
     not. You should pay close attention to the hit ratio and how well Varnish is connecting
     to the backend servers.
+  id: totrans-451
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 还有许多其他计数器可以从统计信息中获取关于Varnish实例健康状态的资料，帮助你判断它是否存在问题。你应该密切关注命中率，以及Varnish与后端服务器的连接状况。
 - en: Tip
+  id: totrans-452
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: To quit the `varnishstat` interface just hit *Ctrl* + *C*.
+  id: totrans-453
   prefs: []
   type: TYPE_NORMAL
+  zh: 要退出`varnishstat`界面，只需按*Ctrl* + *C*。
 - en: How it works...
+  id: totrans-454
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的...
 - en: Monitoring the hit ratio average, the backend connections and other information
     after a new VCL has been deployed is the key to identifying early problems before
     it crashes and a server restart is required.
+  id: totrans-455
   prefs: []
   type: TYPE_NORMAL
+  zh: 在部署新的VCL后，监控命中率平均值、后端连接和其他信息是发现问题的关键，这样可以在崩溃前及时发现问题，避免需要重新启动服务器。
 - en: The smallest mistake while coding a personalized hash key or misplacing a return
     statement can ruin your cache and make your backend servers go down with the increased
     and unexpected load.
+  id: totrans-456
   prefs: []
   type: TYPE_NORMAL
+  zh: 在编写个性化哈希键时，哪怕是一个小小的错误，或者错误地放置返回语句，都可能破坏缓存并使后端服务器因突如其来的负载增加而崩溃。
