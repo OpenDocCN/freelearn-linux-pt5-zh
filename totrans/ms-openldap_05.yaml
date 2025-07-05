@@ -1,108 +1,152 @@
 - en: Chapter 5. Advanced Configuration
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第五章：高级配置
 - en: 'In the last chapter, we looked at securing our OpenLDAP server with SSL/TLS,
     simple and SASL authentication, and ACL-based authorization rules. All of these
     measures were implemented through configuration files for SLAPD. In this chapter,
     we will look at some other advanced features of SLAPD, including:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上一章中，我们讨论了如何通过SSL/TLS、简单认证和SASL认证以及基于ACL的授权规则来保护我们的OpenLDAP服务器。所有这些措施都通过SLAPD的配置文件实现。在本章中，我们将介绍SLAPD的一些其他高级功能，包括：
 - en: Configuring multiple database backends
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 配置多个数据库后端
 - en: Tuning directory performance
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 调整目录性能
 - en: Working with directory overlays
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用目录覆盖
 - en: Adding integrity checks
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 添加完整性检查
 - en: Adding uniqueness constraints
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 添加唯一性约束
 - en: Multiple Database Backends
+  id: totrans-7
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 多个数据库后端
 - en: As we have worked on OpenLDAP so far we have been using only one directory tree
     (`dc=example,dc=com`) and one backend database (an HDB database configured in
     `slapd.conf`). This works well for most of the small directory servers. It is
     simple to configure and all of the data is stored in the same place.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 迄今为止，在操作OpenLDAP时，我们一直使用一个目录树（`dc=example,dc=com`）和一个后端数据库（在`slapd.conf`中配置的HDB数据库）。这种配置适用于大多数小型目录服务器。它简单易配置，所有数据都存储在同一个地方。
 - en: 'But there are a number of more complex-use cases where it makes sense to have
     one directory server that handles multiple directory trees, where each tree is
     stored in its own backend database. Here are some situations in which this sort
     of configuration might make sense:'
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，在一些更复杂的使用场景中，拥有一个可以处理多个目录树的目录服务器是有意义的，每个目录树都存储在自己的后端数据库中。以下是一些可能需要这种配置的情况：
 - en: One directory server hosts the directory information trees for multiple organizations
+  id: totrans-10
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个目录服务器托管多个组织的目录信息树
 - en: One large directory server is broken up into multiple smaller trees and subtrees
     for performance and replication reasons
+  id: totrans-11
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个大型目录服务器被拆分成多个较小的树和子树，以提高性能和复制的效率。
 - en: Two or more previously existing directory information trees are being gradually
     consolidated (as in the case of a corporate merger)
+  id: totrans-12
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 两个或更多先前存在的目录信息树正在逐步合并（如企业并购的情况）。
 - en: Of course, there are other scenarios that might require an LDAP server with
     multiple backends. These are just a few examples of common situations.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 当然，还有其他可能需要使用多个后端的LDAP服务器的场景。这些只是一些常见情况的示例。
 - en: How does a SLAPD with multiple backends works? Let's examine a simple example.
     Say we have two directory information trees, the `dc=example,dc=com` tree that
     we have used in previous chapters, and `dc=demo,dc=net`.
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个带有多个后端的SLAPD是如何工作的？让我们通过一个简单的例子来理解。假设我们有两个目录信息树，一个是我们在之前章节中使用过的`dc=example,dc=com`树，另一个是`dc=demo,dc=net`。
 - en: We want to host both of these on the same SLAPD server. But we don't want the
     data for `dc=example,dc=com` to be stored in the same database files as `dc=demo,dc=net`
     (that could present problems later on if we ever had to split up the databases).
     And, of course, we don't want searches for records in one directory tree to return
     entries from the other.
+  id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们希望在同一个SLAPD服务器上托管这两个目录树。但我们不希望`dc=example,dc=com`的数据与`dc=demo,dc=net`存储在相同的数据库文件中（如果以后需要拆分数据库，这可能会带来问题）。当然，我们也不希望一个目录树中的记录查询返回另一个目录树中的条目。
 - en: Configuring a new database is primarily a matter of defining the new database
     in `slapd.conf`. After that is done we just need to create some data and load
     it into the new database.
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置一个新的数据库主要是通过在`slapd.conf`中定义新的数据库来完成的。完成这一步之后，我们只需要创建一些数据并将其加载到新数据库中。
 - en: The slapd.conf File
+  id: totrans-17
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: slapd.conf 文件
 - en: We created the `slapd.conf` file in Chapter 2\. In previous chapters we have
     modified small sections of `slapd.conf`, but now we are going to step back and
     take a look at the overall structure of the `slapd.conf` file.
+  id: totrans-18
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们在第二章中创建了`slapd.conf`文件。在之前的章节中，我们修改了`slapd.conf`的一小部分，但现在我们将回顾一下`slapd.conf`文件的整体结构。
 - en: 'As mentioned in Chapter 2, the `slapd.conf` file can be broken into component
     pieces. Initially we created three sections, which we called *Basics*, *Database*,
     and*ACLs*. In the last chapter we looked extensively at ACLs, as well as the security
     directives which (for the most part) are defined in the first, *Basics* section.
     Let''s see how the structure of our `slapd.conf` file looks:'
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 如第二章所述，`slapd.conf`文件可以分为几个组成部分。最初，我们创建了三个部分，分别叫做*Basics*、*Database*和*ACLs*。在上一章中，我们详细讨论了ACLs以及大多数情况下在第一个*Basics*部分中定义的安全指令。让我们来看看我们`slapd.conf`文件的结构：
 - en: '![The slapd.conf File](img/1021_05_01.jpg)'
+  id: totrans-20
   prefs: []
   type: TYPE_IMG
+  zh: '![slapd.conf 文件](img/1021_05_01.jpg)'
 - en: Now it is time to refine the model a little bit. The *Basics* section contains
     global configuration parameters. That is, the parameters defined there are effective
     for the entire SLAPD server, regardless of how many database backends it has.
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在是时候稍微完善一下模型了。*基础*部分包含全局配置参数。也就是说，在那里定义的参数对整个SLAPD服务器有效，无论它有多少个数据库后端。
 - en: The *Database* section contains directives that pertain to a specific database
     backend, where each backend often hosts only one directory information tree. Parameters
     in this section define which backend (such as BDB, HDB, LDIF, SQL) is used, what
@@ -110,23 +154,31 @@
     manager for that database, and so on. There can be multiple *Database* sections
     in one `slapd.conf` file. In fact, configuring multiple database sections is how
     we accomplish hosting multiple database backends on one SLAPD server.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: '*数据库*部分包含与特定数据库后端相关的指令，每个后端通常只托管一个目录信息树。此部分中的参数定义了使用哪个后端（例如BDB、HDB、LDIF、SQL）、该后端的具体参数和叠加层、哪个DN将是该数据库的管理员，等等。一个`slapd.conf`文件中可以有多个*数据库*部分。实际上，配置多个数据库部分是我们在一个SLAPD服务器上托管多个数据库后端的方式。'
 - en: 'Finally, the *ACL* section is really a subsection of the *Database* section
     (though, as we saw in the last chapter, ACLs can be used at the global level,
     as well). Each database can have its own set of access controls. So a more accurate
     picture of the `slapd.conf` file would look more like this:'
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，*ACL*部分实际上是*数据库*部分的一个子部分（虽然正如我们在上一章所看到的，ACL也可以在全局级别使用）。每个数据库可以有自己的访问控制集。所以，`slapd.conf`文件的一个更准确的表现应该是这样的：
 - en: '![The slapd.conf File](img/1021_05_02.jpg)'
+  id: totrans-24
   prefs: []
   type: TYPE_IMG
+  zh: '![slapd.conf 文件](img/1021_05_02.jpg)'
 - en: This figure is more representative of how the `slapd.conf` file is composed.
     The previous example shows two separate databases (though the number of databases
     is certainly not limited to two), each of which has its own directives, and its
     own ACLs.
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个图更能代表`slapd.conf`文件的组成。前面的例子展示了两个独立的数据库（虽然数据库的数量当然不限于两个），每个数据库都有自己的指令和访问控制列表（ACL）。
 - en: While global ACLs are mentioned in the *Basic* *Configuration* section, they
     are not visually separated into their own section in part because their role there
     is not as significant as the use of ACLs in the context of a backend. Global ACLs
@@ -134,320 +186,466 @@
     portions of the tree (see [Appendix C](apc.html "Appendix C. Useful LDAP Commands")),
     but not much more. Most ACLs should be placed in the appropriate *Database* *Configuration*
     section.
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然全局ACL在*基础* *配置*部分中提到，但它们没有被单独分成一个部分，部分原因是它们在这里的作用不像在后端上下文中使用ACL那样重要。全局ACL主要用于保护根DSE、`cn=Config`和`cn=Subschema`树的部分（请参阅[附录C](apc.html
+    "附录C.有用的LDAP命令")），但不止于此。大多数ACL应放置在适当的*数据库* *配置*部分中。
 - en: Now we are ready to turn to the configuration file itself and see how the previous
     diagram is put into practice.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们准备转向配置文件本身，看看前面的图示是如何付诸实践的。
 - en: 'A basic multiple database setup can be done easily by adding just over a dozen
     lines to our `slapd.conf` file. We will begin with the existing backend configuration
     that we created in Chapter 2 and add a new database backend beneath it:'
+  id: totrans-28
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个基本的多数据库设置可以通过在我们的`slapd.conf`文件中增加十几行轻松完成。我们将从第二章创建的现有后端配置开始，并在其下方添加一个新的数据库后端：
 - en: '[PRE0]'
+  id: totrans-29
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'We have just configured two databases:'
+  id: totrans-30
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们刚刚配置了两个数据库：
 - en: The `Example.Com` directory is handled by the first database
+  id: totrans-31
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Example.Com`目录由第一个数据库处理。'
 - en: The `Demo.Net` directory is handled by the second database
+  id: totrans-32
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`Demo.Net`目录由第二个数据库处理。'
 - en: 'There are a few important things to note about this configuration:'
+  id: totrans-33
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于此配置，有几点需要注意：
 - en: Each directory has a separate manager account. This is useful when each directory
     is managed by a different individual or group.
+  id: totrans-34
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 每个目录都有一个单独的管理员帐户。这在每个目录由不同的个人或小组管理时非常有用。
 - en: The directory for the second database is different than that of the first. Remember
     that the directory is the location where the database files are stored. Each backend
     must have its own storage directory.
+  id: totrans-35
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 第二个数据库的目录与第一个数据库的目录不同。请记住，目录是存储数据库文件的位置。每个后端必须有自己的存储目录。
 - en: As we discussed earlier, each database section can (and should) have its own
     ACLs and a different set of ACLs can be specified for each database defined in
     `slapd.conf`. The ACLs in the previous example are minimal.
+  id: totrans-36
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 正如我们之前讨论的，每个数据库部分可以（并且应该）有自己的ACL，并且可以为`slapd.conf`中定义的每个数据库指定不同的ACL。在之前的示例中，ACL是最小的。
 - en: Creating and Importing a Second Directory
+  id: totrans-37
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 创建和导入第二个目录
 - en: 'Before we can import data, we need to create the location where the data will
     be stored. In the `slapd.conf` file fragment, the `directory` directive points
     to `/var/lib/ldap/demo.net`. However, this directory does not yet exist. We need
     to create it:'
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们导入数据之前，需要创建存储数据的位置。在`slapd.conf`文件片段中，`directory`指令指向`/var/lib/ldap/demo.net`。然而，这个目录还不存在。我们需要创建它：
 - en: '[PRE1]'
+  id: totrans-39
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: Note
+  id: totrans-40
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'If SLAPD is run as a user other than `root`, make sure to change the ownership
     on the `demo.net/` directory. The SLAPD user ought to own the directory. For example,
     if the user `ldap` runs `slapd`, do this:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果SLAPD是以非`root`用户身份运行的，请确保更改`demo.net/`目录的所有权。SLAPD用户应该拥有该目录。例如，如果`ldap`用户运行`slapd`，可以执行以下操作：
 - en: '[PRE2]'
+  id: totrans-42
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Next, we need to create an LDIF file that contains the basic records for our
     new directory. In Chapter 3, we created an LDIF file with the main tree structures
     for the `dc=example,dc=com` directory information tree. Here we will create just
     a minimal directory structure in a file called `demo.net.ldif`:'
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们需要创建一个包含新目录基本记录的LDIF文件。在第3章中，我们为`dc=example,dc=com`目录信息树创建了一个LDIF文件，其中包含主要的树结构。在这里，我们将创建一个最小的目录结构，并将其保存在一个名为`demo.net.ldif`的文件中：
 - en: '[PRE3]'
+  id: totrans-44
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: This file creates the top-level entry—a single subtree branch (for users) and
     a single user.
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个文件创建了顶级条目——一个单一的子树分支（用于用户）和一个单一的用户。
 - en: 'Now that we have an LDIF file, we can import it with `slapadd`. If you have
     not already done so, stop SLAPD while running `slapadd`. We run the following
     command to import:'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经有了一个LDIF文件，我们可以通过`slapadd`导入它。如果你还没有这样做，请在运行`slapadd`时停止SLAPD。我们运行以下命令进行导入：
 - en: '[PRE4]'
+  id: totrans-47
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: By default, `slapadd` tries to import the data into the first directory specified
     in `slapd.conf`. However, in our case we want the data to be stored in the second
     directory. Thus, in the previous example, we used the `-b` flag to specify the
     base DN of the second directory. Instead of doing `-b` `'dc=demo,dc=net'`, we
     could have done `-n` `2`, which instructs `slapadd` to put the records in database
     two.
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，`slapadd`会尝试将数据导入到`slapd.conf`中指定的第一个目录。然而，在我们的案例中，我们希望将数据存储在第二个目录中。因此，在之前的示例中，我们使用了`-b`标志来指定第二个目录的基准DN。我们本可以使用`-n`
+    `2`，这样就指示`slapadd`将记录放入第二个数据库中，而不是使用`-b` `'dc=demo,dc=net'`。
 - en: 'Now we have a second database with a handful of entries. We can start up the
     server and test it with `ldapsearch`:'
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们有了一个包含少量条目的第二个数据库。我们可以启动服务器并使用`ldapsearch`进行测试：
 - en: '[PRE5]'
+  id: totrans-50
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'This is what we will get:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是我们将得到的结果：
 - en: '[PRE6]'
+  id: totrans-52
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: Binding to the `dc=demo,dc=net` directory tree as the manager of that directory,
     we can verify that the three records we added exist. Note that only the description
     attribute is to be returned. That is why only `dn` and `description` are displayed.
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 作为该目录的管理员绑定到`dc=demo,dc=net`目录树，我们可以验证我们添加的三个记录是否存在。请注意，只有`description`属性会被返回。这就是为什么只显示`dn`和`description`的原因。
 - en: 'No ACLs are in place in the `demo.net` portion of `slapd.conf` that would prevent
     users of the `example.com` database from seeing information in the `demo.net`
     directory. For example, the user `uid=matt,ou=users,dc=example,dc=com` can retrieve
     information from the `demo.net` directory:'
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`slapd.conf`中的`demo.net`部分没有设置ACL来阻止`example.com`数据库的用户查看`demo.net`目录中的信息。例如，用户`uid=matt,ou=users,dc=example,dc=com`可以从`demo.net`目录中检索信息：
 - en: '[PRE7]'
+  id: totrans-55
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'This is the output:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是输出：
 - en: '[PRE8]'
+  id: totrans-57
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'If we want to prevent this behavior, we can do so with ACLs. For example, we
     could replace the rule that reads `access` `to` `dn`.`sub="dc=demo,dc=net"` `by`
     `users` `read` to a rule that restricts reading to entries within the `dc=demo,dc=net`
     tree:'
+  id: totrans-58
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们想防止这种行为，可以通过ACL来实现。例如，我们可以将规则`access` `to` `dn`.`sub="dc=demo,dc=net"` `by`
+    `users` `read`替换为一个限制仅允许`dc=demo,dc=net`树内条目读取的规则：
 - en: '[PRE9]'
+  id: totrans-59
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: This would deny entries outside of the `dc=demo,dc=net` tree from accessing
     these records. A similar rule would have to be added to the ACLs in the `dc=example,dc=com`
     section to block access from users in the `dc=demo,dc=net` tree.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将拒绝`dc=demo,dc=net`树以外的条目访问这些记录。必须在`dc=example,dc=com`部分的ACL中添加类似的规则，以阻止`dc=demo,dc=net`树中的用户访问。
 - en: Now we have a directory with two different databases. In later parts of this
     book, we will examine other aspects of using multiple databases. For example,
     later in this chapter we will look at using the `glue` overlay to connect two
     databases together in one search. In Chapter 7 we will look at doing replication
     with multiple databases. But next we will look at some performance tuning options
     for SLAPD.
+  id: totrans-61
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们有一个包含两个不同数据库的目录。在本书的后续部分中，我们将研究使用多个数据库的其他方面。例如，在本章的后面，我们将看看如何使用 `glue` 叠加来连接两个数据库进行搜索。在第7章中，我们将研究在多个数据库上进行复制。但接下来，我们将看一些
+    SLAPD 的性能调优选项。
 - en: Performance Tuning
+  id: totrans-62
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 性能调优
 - en: In Chapter 2 we created a basic `slapd.conf` file. Our focus there, though,
     was on getting a basic server running. In the last chapter, we took a close look
     at the directives that had to do with security. While creating a second database
     backend just now, we took a higher-level look at the `slapd.conf` file.
+  id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 在第2章中，我们创建了一个基本的 `slapd.conf` 文件。我们在那里的重点是让基本服务器运行起来。在上一章中，我们详细查看了与安全相关的指令。刚刚创建第二个数据库后端时，我们更高层次地查看了
+    `slapd.conf` 文件。
 - en: In this part, we will continue working on `slapd.conf`, but here we will focus
     on parameters that help you tailor the server to the performance needs of your
     organization. Later in this part we will look at the `DB_CONFIG` file that the
     Berkeley DB backends (BDB and HDB) use. The optimizations made in that file can
     lead to significant performance improvements in OpenLDAP.
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这部分中，我们将继续在 `slapd.conf` 上工作，但这里我们将专注于帮助您根据组织的性能需求调整服务器的参数。稍后在这一部分，我们将看看 Berkeley
+    DB 后端（BDB 和 HDB）使用的 `DB_CONFIG` 文件。在该文件中进行的优化可以显著提升 OpenLDAP 的性能。
 - en: Tip
+  id: totrans-65
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Terminology: Databases and Backends**'
+  id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: '**术语：数据库和后端**'
 - en: The distinction between databases and backends is a fine-grained one, and often
     the terms are used interchangeably. Here is the difference.
+  id: totrans-67
   prefs: []
   type: TYPE_NORMAL
+  zh: 数据库和后端之间的区别非常微妙，通常这两个术语可以互换使用。这里是区别。
 - en: A **database** is a location (a file, a relational database, a network resource)
     where a directory information tree is stored.
+  id: totrans-68
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**数据库**是存储目录信息树的位置（文件、关系数据库、网络资源）。'
 - en: A **backend** is a particular mechanism that is used to store databases (or,
     in some cases, to direct SLAPD to a remote database). Backends are coded as modules,
     which means they can be loaded dynamically at startup.
+  id: totrans-69
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**后端**是用于存储数据库（或者在某些情况下，指导 SLAPD 连接到远程数据库）的特定机制。后端被编码为模块，这意味着它们可以在启动时动态加载。'
 - en: Performance Directives
+  id: totrans-70
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 性能指令
 - en: We have already created a `slapd.conf` file that SLAPD uses for managing the
     directory server. We will continue building on this configuration file as we look
     at the next batch of directives.
+  id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们已经创建了一个 SLAPD 使用的 `slapd.conf` 文件来管理目录服务器。随着我们查看下一批指令，我们将继续构建这个配置文件。
 - en: 'We will break the directives into two different classes:'
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将把指令分成两个不同的类：
 - en: Those that are global, and should be placed in the basic configuration section
     at the top of the `slapd.conf` file
+  id: totrans-73
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 那些属于全局的指令应该放在 `slapd.conf` 文件顶部的基本配置部分。
 - en: Those that apply only to individual database backends
+  id: totrans-74
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 仅适用于单个数据库后端的指令
 - en: Of those that apply to database backends, some are available to all backend
     types (such as BDB, SQL, Shell, LDIF, and so on), and there are some that apply
     only to a specific backend type. Since we are using an HDB backend (the default),
     we will focus on directives that can be used by that backend.
+  id: totrans-75
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于数据库后端适用的指令，一些适用于所有后端类型（如 BDB、SQL、Shell、LDIF 等），还有一些仅适用于特定后端类型。由于我们使用的是 HDB
+    后端（默认），我们将专注于可以由该后端使用的指令。
 - en: Global Directives
+  id: totrans-76
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 全局指令
 - en: The global directives must be placed at the top part of the `slapd.conf` file,
     before any database sections are defined. These directives apply to the entire
     SLAPD server, not just a particular directory information tree within that server.
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 全局指令必须放在 `slapd.conf` 文件的顶部部分，在定义任何数据库部分之前。这些指令适用于整个 SLAPD 服务器，而不仅仅是该服务器内的特定目录信息树。
 - en: The first three directives we will see are used to optimize the interaction
     between the client and the LDAP server. These directives are the `timelimit`,
     `sizelimit`, and `idletimeout` directives. After that, we will look at the `threads`
     directive, which is used to tune SLAPD's threading.
+  id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将首先看到的前三个指令用于优化客户端与 LDAP 服务器之间的交互。这些指令是 `timelimit`、`sizelimit` 和 `idletimeout`
+    指令。之后，我们将看看 `threads` 指令，该指令用于调整 SLAPD 的线程。
 - en: Note
+  id: totrans-79
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Fine-grained limits on size and time can be set per-database using the `limit`
     directive, discussed later in this section. For example, this directive can be
     used to set time and size limits based per user or group.
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以使用`limit`指令为每个数据库设置精细的大小和时间限制，稍后会讨论该指令。例如，可以使用此指令为每个用户或组设置时间和大小限制。
 - en: Time Limits
+  id: totrans-81
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 时间限制
 - en: The `timelimit` directive is used to specify the maximum amount of time SLAPD
     will work on a particular operation before stopping the operation and returning
     a message to the client.
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: '`timelimit`指令用于指定SLAPD在停止操作并返回消息给客户端之前，针对特定操作所能花费的最大时间。'
 - en: Some operations, like searching a large directory for an attribute that is not
     indexed, can take a long time. Other times, clients connecting over slow network
     links and requesting large amounts of data can also take up significant time.
     Such lengthy searches can slow the entire server down, and on a busy server it
     can also prevent other clients from connecting and getting timely responses. And,
     of course, not all client applications deal well with lengthy waiting periods.
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些操作，例如在一个没有索引的属性上搜索一个大目录，可能需要很长时间。其他时候，客户端通过慢速网络连接并请求大量数据也可能会占用大量时间。这类漫长的搜索会拖慢整个服务器的速度，在繁忙的服务器上，它还可能阻止其他客户端连接并获取及时的响应。当然，并非所有客户端应用程序都能很好地处理长时间的等待。
 - en: In order to avoid these problems, there is a `timelimit` directive, which gives
     you the ability to set the maximum amount of time the server will wait for an
     operation to complete before ending the operation and returning a message to the
     client.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了避免这些问题，存在一个`timelimit`指令，它允许你设置服务器在结束操作并返回消息给客户端之前，等待操作完成的最大时间。
 - en: 'The default time limit is 3600 seconds. In this example, we will lower it to
     only five minutes:'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认时间限制是3600秒。在这个例子中，我们将其降低到仅五分钟：
 - en: '[PRE10]'
+  id: totrans-86
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: Remember, this directive is a *global* directive, and must be placed in the
     configuration file before any `database` directives.
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 请记住，这个指令是一个*全局*指令，必须放在配置文件中的`database`指令之前。
 - en: 'Sometimes it is useful to eliminate all time limits. This does have the disadvantage
     of allowing a connection to occupy resources for an unspecified amount of time
     and, if too many connections did this, the result would be lengthy delays (and
     perhaps, in extreme cases, denial of service) for clients. But, in controlled
     environments, this might be a risk that can be taken. To turn off time limits
     use the keyword `unlimited`:'
+  id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时，取消所有时间限制是有用的。这样做的缺点是允许连接占用资源一段不确定的时间，如果有太多连接这样做，可能会导致客户端出现长时间延迟（在极端情况下，甚至是拒绝服务）。但是，在受控环境中，这可能是一个可以接受的风险。要关闭时间限制，请使用关键字`unlimited`：
 - en: '[PRE11]'
+  id: totrans-89
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: With this setting the server will not return a message to the client until the
     operation is complete.
+  id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用此设置，服务器在操作完成之前不会向客户端返回任何消息。
 - en: 'These examples represent the basic use of time limits, but sometimes a more
     sophisticated time limit configuration is desirable. The OpenLDAP developers created
     a more advanced form of the `timelimit` directive to handle such complex time
     limit settings. In this form, the `timelimit` directive can set two different
     sorts of time limits:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些例子展示了时间限制的基本用法，但有时需要更复杂的时间限制配置。OpenLDAP开发人员创建了一种更高级的`timelimit`指令形式来处理这种复杂的时间限制设置。在这种形式中，`timelimit`指令可以设置两种不同类型的时间限制：
 - en: '**Soft limit**: The soft limit is the default time limit that the server uses
     if the client does not include a desired time limit in its request.'
+  id: totrans-92
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**软限制**：软限制是默认的时间限制，服务器在客户端请求中没有包含所需时间限制时，会使用该限制。'
 - en: '**Hard limit**: The hard limit is the absolute longest time that the server
     will spend processing a request.'
+  id: totrans-93
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**硬限制**：硬限制是服务器处理请求时所能花费的最长时间。'
 - en: Understanding this difference will help to know how the client and the server
     handle timing issues.
+  id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 理解这一差异有助于了解客户端和服务器如何处理时间问题。
 - en: When a client connects to the directory and performs a search, it might send
     its own time limit request, which instructs the server to take no longer than
     that amount of time to do the search. For example, if a client sends a time limit
@@ -456,107 +654,152 @@
     the client, then the server will set the limit for that request to the client's
     requested time limit. However, if the server's hard limit is lower than the client's
     then it will use its own hard limit for that request.
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 当客户端连接到目录并执行搜索时，它可能会发送自己的时间限制请求，指示服务器在该时间限制内完成搜索。例如，如果客户端发送了30秒的时间限制，它将期望服务器在30秒内响应。如果服务器的硬时间限制高于客户端发送的时间限制，那么服务器将为该请求设置客户端请求的时间限制。然而，如果服务器的硬时间限制低于客户端的时间限制，它将使用自己的硬限制来处理该请求。
 - en: So, if the server's hard time limit is 60 seconds, and the client requests a
     30 second time limit, the server will use the 30 second limit. If, however, the
     server's hard time limit is 10 seconds and the client requests a 30 second limit,
     the server will use its hard 10-second limit, since it is lower.
+  id: totrans-96
   prefs: []
   type: TYPE_NORMAL
+  zh: 所以，如果服务器的硬时间限制是60秒，而客户端请求的是30秒时间限制，服务器将使用30秒的限制。然而，如果服务器的硬时间限制是10秒，而客户端请求的是30秒时间限制，服务器将使用其硬10秒限制，因为它较低。
 - en: Tip
+  id: totrans-97
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Setting the Client Time Limit**'
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: '**设置客户端时间限制**'
 - en: 'For OpenLDAP clients like `ldapsearch`, you can set the client time limit by
     editing `ldap.conf` (or your `.ldaprc` file) and adding the `TIMELIMIT` directive.
     In the `ldap.conf` file, `TIMELIMIT` takes only one parameter: time limit in seconds.
     For example, to set the time limit to 30 seconds: `TIMELIMIT` `30`.'
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于像`ldapsearch`这样的OpenLDAP客户端，可以通过编辑`ldap.conf`（或你的`.ldaprc`文件）并添加`TIMELIMIT`指令来设置客户端时间限制。在`ldap.conf`文件中，`TIMELIMIT`只有一个参数：以秒为单位的时间限制。例如，设置时间限制为30秒：`TIMELIMIT`
+    `30`。
 - en: Where does the soft limit come in? The client does not always supply a time
     limit and, in these cases, you may want to set a limit that is lower than the
     hard limit. That is, if the default hard limit is an hour, that may be a perfectly
     legitimate limit to set as a maximum limit, but a default of a minute or two is
     a better limit for those clients that don't need the longer limit.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 软时间限制在哪儿起作用？客户端并不总是提供时间限制，在这些情况下，你可能希望设置一个低于硬时间限制的限制。也就是说，如果默认的硬时间限制是一小时，这可能是一个完全合法的最大限制，但对于那些不需要更长时间限制的客户端来说，设置一分钟或两分钟的默认限制会更合适。
 - en: Note
+  id: totrans-101
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: If you set a soft limit higher than the hard limit, the hard limit will be used.
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你设置了一个高于硬限制的软限制，将使用硬限制。
 - en: 'Now we can look at the expanded form of the `timelimit` directive to see an
     example of setting the hard and soft limits. Typically, both are set in the same
     command (though you can set one without setting the other):'
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们可以查看`timelimit`指令的扩展形式，了解如何设置硬时间限制和软时间限制的示例。通常，两者是在同一命令中设置的（虽然你可以只设置一个，而不设置另一个）：
 - en: '[PRE12]'
+  id: totrans-104
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: In this example the soft time limit is 30 seconds, while the hard time limit
     is 300 seconds. This allows clients that request longer limits to get longer processing
     time, while setting a lower default for clients that do not provide time limits
     when making requests.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这个例子中，软时间限制是30秒，而硬时间限制是300秒。这允许请求更长时间限制的客户端获得更长的处理时间，同时为那些在请求时没有提供时间限制的客户端设置较低的默认时间限制。
 - en: What does the client get if the time limit is reached? The server will return
     as much of the processing as it could complete, but it will also include a warning
     that the time limit was exceeded.
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果时间限制到达，客户端会得到什么？服务器将返回它能够完成的最大处理量，但也会包含一个警告，说明时间限制已被超出。
 - en: Note that on a busy server a request may get queued, but not actually be executed
     until a thread becomes available to do the processing. In such cases, the time
     that the request waits for a thread is not counted against the time limit. The
     timer for the time limit begins when the worker thread begins processing the request,
     not when the server receives the request.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，在繁忙的服务器上，请求可能会被排队，但实际上可能直到线程可用时才会执行。在这种情况下，请求等待线程的时间不会算入时间限制。时间限制的计时器从工作线程开始处理请求时开始，而不是从服务器接收到请求时开始。
 - en: Note
+  id: totrans-108
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: The backend-specific limits directive discussed later in this chapter provides
     fine-grained time and size-limit support. For example, you can set time limits
     on particular users or group members.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章后面讨论的后端特定限制指令提供了更细粒度的时间和大小限制支持。例如，你可以为特定用户或组成员设置时间限制。
 - en: Idle Timeouts
+  id: totrans-110
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 空闲超时
 - en: Along with limiting the amount of time SLAPD spends processing a request you
     can also limit how long SLAPD should allow a client to remain connected, but idle.
     A connection is idle if it is connected to SLAPD but is not performing any operations.
     For example, a client may connect to SLAPD, perform a bind, and then keep the
     connection open, perhaps waiting for input from a user.
+  id: totrans-111
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了限制 SLAPD 处理请求所需的时间外，您还可以限制 SLAPD 允许客户端保持连接但空闲的时间。如果一个连接已连接到 SLAPD，但没有执行任何操作，则该连接为空闲状态。例如，客户端可能连接到
+    SLAPD，执行绑定操作，然后保持连接打开，可能是在等待用户输入。
 - en: In many cases, there is no harm in allowing clients to remain connected, but
     idle. Idle clients do not require attention by one of the server's threads, so
     they do not use up valuable resources. Because of this, the default behavior of
     the server is to simply allow idle connections to remain connected indefinitely.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 在许多情况下，允许客户端保持连接但处于空闲状态并不会造成危害。空闲的客户端不需要服务器线程的关注，因此不会消耗宝贵的资源。因此，服务器的默认行为是简单地允许空闲连接无限期地保持连接。
 - en: 'But on occasion (sometimes because of limitations in another part of the system),
     it is desirable to prevent clients from connecting and remaining idle. Use the
     `idletimeout` directive to set a timeout. Like the simple form of `timelimit`,
     `idletimeout` takes just one argument, the number of seconds a connection can
     be idle before SLAPD closes the connection:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 但有时（有时是由于系统其他部分的限制），希望防止客户端连接并保持空闲。使用 `idletimeout` 指令来设置超时时间。与 `timelimit`
+    的简单形式类似，`idletimeout` 只需要一个参数，即连接空闲前 SLAPD 关闭连接的秒数：
 - en: '[PRE13]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: Size Limits
+  id: totrans-115
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 大小限制
 - en: Along with setting limits on the amount of time that an operation can take,
     it is also possible to set limits on the number of records a search operation
     can return. Clients can easily perform broad searches that will return many records.
@@ -564,37 +807,55 @@
     if not restricted by ACLs, return every record in the search base. And if such
     a search was performed on a database that held millions of records, SLAPD would
     send all of those records back to the client.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了设置操作可以持续的时间限制外，还可以设置搜索操作返回记录的数量限制。客户端可以轻松执行广泛的搜索，这些搜索会返回大量记录。如果没有设置大小限制，使用过滤器
+    `(objectclass=*)` 的搜索（如果不受 ACL 限制）将返回搜索基准中的每一条记录。如果在包含数百万条记录的数据库上执行此类搜索，SLAPD
+    会将所有这些记录返回给客户端。
 - en: In most cases it makes sense to set an upper limit on the number of records
     that can be returned in any one search. By default, SLAPD will only return the
     first 500 records. But that number can be changed with the `sizelimit` directive.
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 在大多数情况下，为任何一次搜索设置记录返回数量的上限是有意义的。默认情况下，SLAPD 只会返回前 500 条记录。但这个数字可以通过 `sizelimit`
+    指令进行更改。
 - en: 'In its simple form the `sizelimit` directive takes only one parameter, the
     maximum number of records to return:'
+  id: totrans-118
   prefs: []
   type: TYPE_NORMAL
+  zh: 在其简单形式中，`sizelimit` 指令只需要一个参数，即返回的最大记录数：
 - en: '[PRE14]'
+  id: totrans-119
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: As with `timelimit` though, there is an expanded form of the `sizelimit` directive,
     and like `timelimit`, `sizelimit` has both soft and hard limits. The expanded
     `sizelimit` directive also has a third property that can be set, and this property
     is called `unchecked`.
+  id: totrans-120
   prefs: []
   type: TYPE_NORMAL
+  zh: 与 `timelimit` 类似，`sizelimit` 指令也有扩展形式，并且像 `timelimit` 一样，`sizelimit` 具有软限制和硬限制。扩展形式的
+    `sizelimit` 指令还可以设置第三个属性，这个属性称为 `unchecked`。
 - en: Hard and soft limits function similarly in `sizelimit` as they do in `timelimit`.
     The hard limit determines the maximum number of search results that will be returned
     in any search. Just as is the case with time limits, clients can also send information
     telling the server the maximum number of entries the client wants back. If no
     such information is set the value of the soft limit will be used.
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 `sizelimit` 中，硬限制和软限制的功能与 `timelimit` 中相似。硬限制决定了在任何搜索中返回的最大搜索结果数。就像时间限制一样，客户端也可以发送信息告诉服务器客户端希望返回的最大条目数。如果没有设置此类信息，则会使用软限制的值。
 - en: 'If the server finds more records than the `sizelimit` allows, it will return
     the maximum number of records as well as an error message: `Size limit exceeded`.'
+  id: totrans-122
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果服务器发现的记录超过了 `sizelimit` 允许的数量，它将返回最大数量的记录并附带错误信息：`Size limit exceeded`。
 - en: The `unchecked` condition is a little bit more complex. In cases where a search
     requests matches for an attribute that is not indexed, SLAPD may find a large
     number of records that it needs to test to see if they match the client's filter.
@@ -603,71 +864,98 @@
     as candidates for matching. This can prevent poorly-tuned databases from consuming
     lots of time and resources searching through huge potential records for those
     that match.
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: '`unchecked`条件稍微复杂一些。在搜索请求的属性未被索引时，SLAPD可能会找到大量记录，需要测试这些记录是否符合客户端的筛选条件。有时候候选记录的数量非常大。`unchecked`属性可以用来设置一个最大记录数限制，限制可以作为匹配候选项的记录数。这可以防止调优不良的数据库在搜索匹配的记录时消耗大量时间和资源。'
 - en: Note
+  id: totrans-124
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Indexing attributes that are commonly searched is the best way to avoid this
     situation. Indexing is discussed later in this chapter.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 对常用的搜索属性进行索引是避免这种情况的最佳方法。索引将在本章后面讨论。
 - en: If a client's request produces more candidates than allowed by the unchecked
     property, the server will return an error (`Administrative limit exceeded`) and
     will not do the search at all.
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果客户端的请求产生的候选项超过了`unchecked`属性允许的数量，服务器将返回错误（`行政限制超出`），并且不会执行搜索。
 - en: The `unchecked` property will keep the server from spending too much time on
     such tasks, but at the expense of the client's ability to run queries against
     the database. Perfectly legitimate searches can be blocked this way. For that
     reason, the `unchecked` property should be used with care. The default is to not
     limit the number of candidates. This is equivalent to specifying `size.unchecked=unlimited`.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: '`unchecked`属性将防止服务器在此类任务上花费过多时间，但代价是客户端无法对数据库运行查询。这样，完全合法的搜索也可能会被阻止。因此，`unchecked`属性应谨慎使用。默认情况下，未对候选记录数设置限制。这相当于指定`size.unchecked=unlimited`。'
 - en: 'Here''s an example of setting all three in one directive:'
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是一个在一个指令中设置所有三个限制的示例：
 - en: '[PRE15]'
+  id: totrans-129
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: In this example, the soft size limit is set to 500, while the hard limit is
     set to 1000, and the maximum number of unchecked records to be analyzed is 2000\.
     Note that the unchecked size limit should, as a matter of practice, be set to
     a value larger than the hard limit.
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 在此示例中，软大小限制设置为500，硬限制设置为1000，最大未检查记录数为2000。请注意，未检查的大小限制应当实际设置为比硬限制更大的值。
 - en: Threads
+  id: totrans-131
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 线程
 - en: The last few directives have dealt with setting limits on the server's performing
     requested operations. These can prove valuable ways of preventing resources from
     being wasted or misused. Now however, I want to turn to a directive that governs
     the server's ability to handle requests.
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后的几个指令涉及设置服务器执行请求操作的限制。这些限制可以有效地防止资源的浪费或误用。现在，我想转向一个指令，它控制服务器处理请求的能力。
 - en: SLAPD is a multi-threaded application. Unlike other servers, SLAPD does not
     start subprocesses to handle searching. Instead, the SLAPD server is a single
     process that has many different threads executing concurrently within that processes.
+  id: totrans-133
   prefs: []
   type: TYPE_NORMAL
+  zh: SLAPD是一个多线程应用程序。与其他服务器不同，SLAPD不会启动子进程来处理搜索。相反，SLAPD服务器是一个单一进程，在该进程内有多个不同的线程并发执行。
 - en: Each thread can perform its own task. So, if a server has sixteen threads (the
     default for OpenLDAP's SLAPD server), then it can perform sixteen different tasks
     at the same time. Roughly speaking, threads perform operations. A single client
     can make a single connection, and then request several different operations, each
     of which may be done by a different thread (although no more than half of the
     total threads will be dedicated to a single client).
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个线程可以执行自己的任务。因此，如果一个服务器有十六个线程（OpenLDAP的SLAPD服务器的默认配置），那么它可以同时执行十六个不同的任务。粗略地说，线程执行操作。一个客户端可以建立一个连接，然后请求多个不同的操作，每个操作可能由不同的线程执行（尽管不超过一半的线程会被分配给单个客户端）。
 - en: Sixteen threads, the default, is excessive. Recent performance testing has shown
     that running a busy server at eight threads performs better than running sixteen,
     even at high loads. Why? The answer, in a nutshell, is that more threads introduce
     more competition for the same resources. SLAPD is efficient enough that delegating
     work to a smaller thread pool is typically faster than using a large thread pool,
     and incurring thread scheduling overhead.
+  id: totrans-135
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认的 16 个线程是过多的。最近的性能测试表明，在负载较高的情况下，运行 8 个线程的繁忙服务器的表现要优于运行 16 个线程的服务器。为什么？简而言之，更多的线程会导致更多的资源竞争。SLAPD
+    足够高效，通常将工作委托给较小的线程池会比使用大型线程池更快，并且可以减少线程调度的开销。
 - en: Lowering the thread count has additional benefits. It is estimated that each
     thread costs at least 13MB (and perhaps quite a bit more, depending on the configuration
     of SLAPD and the hardware on the machine). Enterprise LDAP directories can certainly
@@ -675,372 +963,548 @@
     services, reducing the number of threads might boost the server's performance
     in other areas, and still perform at the same speeds (or better) as it would when
     running sixteen threads.
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 降低线程数还有其他好处。据估计，每个线程至少需要 13MB 的内存（根据 SLAPD 的配置和机器硬件，可能需要更多的内存）。企业级 LDAP 目录能够承受这种开销，但如果主机同时运行
+    LDAP 和其他许多服务，减少线程数可能会提升服务器在其他领域的性能，且仍然能保持与使用 16 个线程时相同（或更好的）性能。
 - en: Note
+  id: totrans-137
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: In future versions of OpenLDAP, the default thread count will very likely be
     reduced from sixteen to eight.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 在未来版本的 OpenLDAP 中，默认的线程数很可能会从 16 降低到 8。
 - en: 'The `threads` directive is used to set the maximum number of threads that SLAPD
     will create. It takes an integer:'
+  id: totrans-139
   prefs: []
   type: TYPE_NORMAL
+  zh: '`threads` 指令用于设置 SLAPD 创建的最大线程数。它需要一个整数值：'
 - en: '[PRE16]'
+  id: totrans-140
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: In typical OpenLDAP configurations, this setting is optimal, though small servers
     with little traffic may benefit by dropping the thread pool to as low as four.
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 在典型的 OpenLDAP 配置中，这个设置是最优的，尽管流量较小的服务器可能会通过将线程池减少到 4 来受益。
 - en: Tip
+  id: totrans-142
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Proxies and Threads**'
+  id: totrans-143
   prefs: []
   type: TYPE_NORMAL
+  zh: '**代理与线程**'
 - en: If you are running busy SLAPD proxy server (with a `proxy` or `ldap` backend,
     covered in Chapter 7) that queries remote directory servers, you may benefit by
     having much larger thread pools. Since the worker thread is occupied until the
     remote LDAP server responds, a thread can remain occupied for long periods of
     time. In order to keep clients from being denied service you may want to add threads.
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你正在运行一个忙碌的 SLAPD 代理服务器（使用 `proxy` 或 `ldap` 后端，在第 7 章中介绍），该服务器会查询远程目录服务器，你可能会通过拥有更大的线程池来提高性能。由于工作线程会一直占用，直到远程
+    LDAP 服务器响应，因此一个线程可能会长时间被占用。为了防止客户端被拒绝服务，你可能需要添加更多的线程。
 - en: Note that the lowest number of threads allowed is 2\. This is the minimum number
     of threads OpenLDAP needs to provide basic service.
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，允许的最低线程数是 2。这个线程数是 OpenLDAP 提供基本服务所需的最小线程数。
 - en: Directives in the Database Section
+  id: totrans-146
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 数据库部分中的指令
 - en: Some directives go in the database section instead of the main portion of the
     configuration file. And of these, some database directives are specific to the
     particular backend being used. Along with the backend-neutral directives, we will
     see a few directives that can be used in BDB/HDB backends.
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些指令应该放在数据库部分，而不是配置文件的主部分。并且其中有些数据库指令是特定于所使用的后端的。除了与后端无关的指令外，我们还会看到一些可以在 BDB/HDB
+    后端使用的指令。
 - en: Limits
+  id: totrans-148
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 限制
 - en: We looked at the `sizelimit` and `timelimit` directives, both of which are used
     in the global section. But in the Database section, there is another directive
     used for setting limits, and this directive provides finer-grained control over
     who is limited. You can, for example, set lower or higher limits for individual
     DNs, subtrees, or for members of a group. The directive for doing these things
     is the `limit` directive.
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们已经看过了 `sizelimit` 和 `timelimit` 指令，它们都用于全局部分。但在数据库部分，还有另一种用于设置限制的指令，这种指令提供了更精细的控制，可以限制特定用户。你可以例如为单独的
+    DN、子树或某个组的成员设置更低或更高的限制。用来做这些事情的指令是 `limit` 指令。
 - en: 'A `limit` directive is similar to an ACL. It has three parts: the directive
     itself, the who-phrase, and one or more limit-phrases. Here''s an example:'
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: '`limit` 指令类似于 ACL。它有三个部分：指令本身、who-phrase 和一个或多个 limit-phrase。下面是一个例子：'
 - en: '[PRE17]'
+  id: totrans-151
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'This directive sets a limit for all authenticated users (using the `users`
     keyword). Only twenty records will be returned before SLAPD will return the message:
     `Size limit exceeded`.'
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 此指令为所有经过身份验证的用户（使用`users`关键字）设置了限制。在SLAPD返回消息`Size limit exceeded`之前，只会返回二十条记录。
 - en: 'The `limit` directive supports two limit-phrases: `size` and `time`. As with
     the `sizelimit` directive discussed above, `size` can use the `soft`, `hard`,
     and `unchecked` styles. Similarly, `time` can use the `soft` and `hard` styles.
     Since more than one limit-phrase can be used, we can create a more robust set
     of limits. Here''s an example limiting the anonymous user to only short result
     sets, and only if the operation can be done quickly:'
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: '`limit`指令支持两种限制短语：`size`和`time`。与上面讨论的`sizelimit`指令一样，`size`可以使用`soft`、`hard`和`unchecked`样式。同样，`time`可以使用`soft`和`hard`样式。由于可以使用多个限制短语，我们可以创建更强大的限制集。以下是一个示例，将匿名用户限制为只返回短结果集，并且仅在操作可以迅速完成时才返回：'
 - en: '[PRE18]'
+  id: totrans-154
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: This sets all three size limits, as well as both time limits, for the anonymous
     user. This would keep the anonymous user from running lengthy searches.
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将为匿名用户设置所有三个大小限制，以及两个时间限制。这将防止匿名用户进行长时间的搜索。
 - en: As we have seen, the `anonymous` and `users` keywords can be used in the who-phrase.
     But just as in ACLs, the `dn` specifier, along with its modifiers (`exact`, `base`,
     `onelevel`, `subtree`, `children`, and `regex`) can also be used.
+  id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们所看到的，`anonymous`和`users`关键字可以用于who-phrase。但是，就像在ACLs中一样，`dn`说明符以及它的修饰符（`exact`、`base`、`onelevel`、`subtree`、`children`和`regex`）也可以使用。
 - en: Note
+  id: totrans-157
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: The `dn` field and its modifiers were covered in detail in the section on *Access
     Control Lists* in the previous chapter.
+  id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: '`dn`字段及其修饰符在上一章的*访问控制列表*部分中已详细介绍。'
 - en: 'Using the `dn` field we can create limits for particular DNs, DN patterns,
     or subtrees. For example, we can set a size limit for a particular user:'
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用`dn`字段，我们可以为特定的DN、DN模式或子树设置限制。例如，我们可以为特定用户设置大小限制：
 - en: '[PRE19]'
+  id: totrans-160
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: This will set the size limit to 50 for this particular user only. If this is
     the only limits statement, then SLAPD will apply the size limit set in `sizelimit`
     to all other DNs.
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将仅为该特定用户设置大小限制为50。如果这是唯一的限制声明，则SLAPD会将`sizelimit`中设置的大小限制应用于所有其他DN。
 - en: 'Similarly, we can set a size limit for all DNs in a subtree with a directive
     like this:'
+  id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样，我们可以使用类似的指令为子树中的所有DN设置大小限制：
 - en: '[PRE20]'
+  id: totrans-163
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: The above limit will apply to `uid=matt,ou=Users,dc=example,dc=com` as well
     as all other users in that same branch of the directory information tree.
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 上述限制将适用于`uid=matt,ou=Users,dc=example,dc=com`以及该目录信息树同一分支下的所有其他用户。
 - en: 'Finally, limits can also be set by group. In this case the limits will apply
     to any member of the group. As with ACLs, the limits directive''s who-phrase uses
     the `group` field to indicate that SLAPD should base restrictions on group membership:'
+  id: totrans-165
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，限制还可以通过组来设置。在这种情况下，限制将适用于该组的任何成员。与ACLs一样，限制指令的who-phrase使用`group`字段来指示SLAPD应该基于组成员身份进行限制：
 - en: '[PRE21]'
+  id: totrans-166
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: This directive sets the limit for members of the `Admins` group to `unlimited`,
     which means that no limiting will be enforced on these group members.
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 此指令为`Admins`组的成员设置了`unlimited`的限制，这意味着不会对这些组成员实施限制。
 - en: Just as with ACLs, only records with the object class `groupOfNames` are automatically
     considered to be groups. But other object classes function as groups, as well.
     For example, in Chapter 3 we created a group with the object class `groupOfUniqueNames`.
     That group's DN was `cn=LDAP` `Admins`, `ou=Groups,dc=example,dc=com`.
+  id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 与ACLs一样，只有具有对象类`groupOfNames`的记录才会自动被视为组。但是，其他对象类也可以作为组使用。例如，在第三章中，我们创建了一个对象类为`groupOfUniqueNames`的组。该组的DN是`cn=LDAP`
+    `Admins`，`ou=Groups,dc=example,dc=com`。
 - en: 'In order to use that record as a group we need to specify more information
     in the `limits` clause:'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了将该记录作为一个组使用，我们需要在`limits`子句中指定更多信息：
 - en: '[PRE22]'
+  id: totrans-170
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: When putting a directive, such as the given one into a `slapd.conf` file note
     that the entire group field (from `group` to the end of the DN) must be on one
     line.
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 当将指令（如给定的指令）放入`slapd.conf`文件时，请注意整个组字段（从`group`到DN的末尾）必须写在一行上。
 - en: This `limits` directive will allow search results of unlimited size for members
     of the group `cn=LDAP` `Admins`, `ou=Groups,dc=example,dc=com`. The group type
     explicitly indicates the object class of the record (`groupOfUniqueNames`) and
     the field that is to be treated as the membership field for that group (`uniqueMember`).
     Thus, when
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个`限制`指令将允许`cn=LDAP` `Admins`，`ou=Groups,dc=example,dc=com`组成员的搜索结果大小不限。该组类型明确指示了记录的对象类（`groupOfUniqueNames`）以及应视为该组成员字段的字段（`uniqueMember`）。因此，当
 - en: SLAPD checks limits, it will look at the `LDAP` `Admins` record, check to see
     if it has the `groupOfUniqueNames` object class, and then evaluate whether the
     user who connected is listed in one of the `uniqueMember` values in the record.
     If so, then that user's size limit will be set to `unlimited`.
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: SLAPD检查限制时，会查看`LDAP` `Admins`记录，检查是否具有`groupOfUniqueNames`对象类，然后评估连接的用户是否在记录中的某个`uniqueMember`值中。如果是，那么该用户的大小限制将设置为`unlimited`。
 - en: Read-only and Restrict Directives
+  id: totrans-174
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 只读和限制指令
 - en: One way to improve performance on a busy server is to limit what clients can
     do on the server. For example, if the information in a directory is static (that
     is, no users ought to be able to change data), then it may be best to put the
     directory server into a read-only mode. Or perhaps limiting just specific operations
     (such as adding new records or deleting records) is sufficient.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 提高繁忙服务器性能的一种方法是限制客户端在服务器上可以执行的操作。例如，如果目录中的信息是静态的（即没有用户应该能够更改数据），那么最好将目录服务器设置为只读模式。或者，也许仅限制特定的操作（例如添加新记录或删除记录）就足够了。
 - en: 'There are two directives that can be placed in the `slapd.conf` file for achieving
     these results: `readonly` and `restrict`.'
+  id: totrans-176
   prefs: []
   type: TYPE_NORMAL
+  zh: 有两个指令可以放在`slapd.conf`文件中以实现这些结果：`readonly`和`restrict`。
 - en: 'The `readonly` directive is simple. It is either `on` or `off`. By default
     it is `off`, so the directory allows writing operations (add, modify, delete,
     and so on). Here''s how it is used to configure SLAPD as a read-only directory
     server:'
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: '`readonly`指令很简单。它只有`on`或`off`两种状态。默认情况下是`off`，因此目录允许写入操作（添加、修改、删除等）。以下是将SLAPD配置为只读目录服务器的方式：'
 - en: '[PRE23]'
+  id: totrans-178
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'When this directive is set, a client that attempts to modify information in
     the directory information tree will get an error message from the server:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 当设置此指令时，尝试修改目录信息树中信息的客户端将从服务器收到错误信息：
 - en: '[PRE24]'
+  id: totrans-180
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: Note
+  id: totrans-181
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Not even the manager can perform modifications to the directory when `readonly`
     is turned on.
+  id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 当`readonly`开启时，甚至管理员也无法对目录进行修改。
 - en: Binding, searching, and other operations that do not involve changing directory
     information can continue to function as normal though.
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，绑定、搜索以及其他不涉及更改目录信息的操作仍然可以正常运行。
 - en: Note
+  id: totrans-184
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Extended operations, such as the **Password Modify extended operation**, are
     not affected by the `readonly` directive. For that reason the `ldappasswd` client,
     for example, will still change a password in the directory even if `readonly`
     is turned on.
+  id: totrans-185
   prefs: []
   type: TYPE_NORMAL
+  zh: 扩展操作，如**密码修改扩展操作**，不会受到`readonly`指令的影响。因此，`ldappasswd`客户端（例如）即使在`readonly`开启时仍然能够更改目录中的密码。
 - en: To prevent this, use the `restrict` operation to restrict one or all extensions.
     The Password Modify extended operation is defined in RFC 3062 ([http://www.ietf.org/rfc/rfc3062.txt](http://www.ietf.org/rfc/rfc3062.txt)).
+  id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了防止这种情况发生，可以使用`restrict`操作来限制一个或所有扩展操作。密码修改扩展操作在RFC 3062中定义（[http://www.ietf.org/rfc/rfc3062.txt](http://www.ietf.org/rfc/rfc3062.txt)）。
 - en: Sometimes setting the server to read-only mode is too stringent. It may be desirable
     to just prevent certain operations. This can be accomplished with the `restrict`
     directive.
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时候将服务器设置为只读模式过于严格。可能只需要阻止某些操作。这可以通过`restrict`指令来实现。
 - en: 'The `restrict` directive takes a list of one or more LDAP operations that should
     be disallowed. These are the operations that `restrict` understands:'
+  id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: '`restrict`指令接受一个或多个LDAP操作的列表，这些操作应该被禁止。`restrict`支持以下操作：'
 - en: '`add`'
+  id: totrans-189
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`添加`'
 - en: '`bind`'
+  id: totrans-190
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`绑定`'
 - en: '`compare`'
+  id: totrans-191
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`比较`'
 - en: '`delete`'
+  id: totrans-192
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`删除`'
 - en: '`modify`'
+  id: totrans-193
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`修改`'
 - en: '`rename`'
+  id: totrans-194
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`重命名`'
 - en: '`read` (a special pseudonym that prevents all reading operations like search,
     compare, and bind)'
+  id: totrans-195
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`读取`（一个特殊的伪名，防止所有读取操作，如搜索、比较和绑定）'
 - en: '`search`'
+  id: totrans-196
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`搜索`'
 - en: '`write` (a special pseudonym that prevents all writing operations and is equivalent
     to setting `readonly` `on`)'
+  id: totrans-197
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`写入`（一个特殊的伪名，防止所有写入操作，等同于将`readonly`设置为`on`）'
 - en: 'In addition to these nine, there is one special type for handling extension:
     `extended=<OID>`. In the extended type, `<OID>` should be replaced with the Object
     Identifier (OID) for the extended operation that you want to restrict.'
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 除了这九种类型外，还有一种特殊类型用于处理扩展操作：`extended=<OID>`。在扩展类型中，`<OID>`应替换为你想要限制的扩展操作的对象标识符（OID）。
 - en: 'For example, we can prevent users from adding, renaming, and deleting entire
     entries with the following directive:'
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，我们可以使用以下指令防止用户添加、重命名和删除整个条目：
 - en: '[PRE25]'
+  id: totrans-200
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'This will prevent a user from adding new entries, renaming existing entries
     (that is, changing the DN), or deleting entries. With the above configuration
     in the database section of `slapd.conf`, we cannot add or remove entries with
     the command-line tools:'
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将阻止用户添加新条目、重命名现有条目（即更改 DN）或删除条目。根据在 `slapd.conf` 数据库部分中的配置，我们不能使用命令行工具添加或删除条目：
 - en: '[PRE26]'
+  id: totrans-202
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Here is what we get:'
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是我们得到的结果：
 - en: '[PRE27]'
+  id: totrans-204
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'Notice that in both cases the server responded: `Server unwilling to perform`.
     However, modifying an attribute in the record is still allowed, as are searching,
     comparing, and binding.'
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，在这两种情况下，服务器的响应都是：`Server unwilling to perform`。然而，仍然允许修改记录中的属性，以及进行搜索、比较和绑定操作。
 - en: As we noted before, extended operations can be restricted using the `extended`
     type with the `restrict` directive. Unlike the other types though, `extended`
     takes a value—we can specify which extended operation we want to restrict. Unfortunately,
     the value must be in the unfriendly OID format. To find out the correct OID you
     can either check your server's Root DSE entry (see [Appendix C](apc.html "Appendix C. Useful
     LDAP Commands")), or you can read the RFC for the desired extended operation.
+  id: totrans-206
   prefs: []
   type: TYPE_NORMAL
+  zh: 如前所述，扩展操作可以通过 `restrict` 指令与 `extended` 类型进行限制。不过，与其他类型不同，`extended` 需要一个值——我们可以指定要限制的扩展操作。不幸的是，值必须使用不友好的
+    OID 格式。要找到正确的 OID，你可以检查服务器的 Root DSE 条目（参见 [附录 C](apc.html "附录 C. 有用的 LDAP 命令")），或者阅读所需扩展操作的
+    RFC。
 - en: 'Once you have the OID number it is easy to set a restriction. For example,
     to prevent clients from performing the *Password* *Modify* extended operation
     use the following:'
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦你获得了 OID 编号，就可以轻松设置限制。例如，为了防止客户端执行 *Password* *Modify* 扩展操作，使用以下内容：
 - en: '[PRE28]'
+  id: totrans-208
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'Attempting to use the `ldappasswd` client to modify a password will result
     in an error:'
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: 尝试使用 `ldappasswd` 客户端修改密码将会导致错误：
 - en: '[PRE29]'
+  id: totrans-210
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Here is the error:'
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是我们得到的错误：
 - en: '[PRE30]'
+  id: totrans-212
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: The `restrict` directive provides a convenient way of limiting what operations
     clients can perform.
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: '`restrict` 指令提供了一种方便的方式来限制客户端可以执行的操作。'
 - en: Index (BDB/HDB Backends Only)
+  id: totrans-214
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 索引（仅限 BDB/HDB 后端）
 - en: If you are running a SLAPD server with the BDB or HDB backends (the most commonly-used
     backends), then the `index` directive is the single most important performance-related
     directive.
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你运行的是带有 BDB 或 HDB 后端的 SLAPD 服务器（最常用的后端），那么 `index` 指令是最重要的性能相关指令。
 - en: The `index` directive, which is specified in the database section for each BDB
     or HDB database, indicates which fields SLAPD should build and maintain an index
     for. An index is a separate database file that is optimized for speedy access
     during LDAP read operations.
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: '`index` 指令在每个 BDB 或 HDB 数据库的数据库部分中指定，表示 SLAPD 应该为哪些字段构建并维护索引。索引是一个单独的数据库文件，优化用于在
+    LDAP 读取操作时进行快速访问。'
 - en: When a client uses a search filter with an attribute that is not indexed, SLAPD
     searches through every record in the directory for the desired attribute, then
     checks the value of that attribute against the attribute value or filter supplied
     by the client.
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 当客户端使用带有未索引属性的搜索过滤器时，SLAPD 会在目录中查找每一条记录，寻找所需的属性，然后将该属性的值与客户端提供的属性值或过滤器进行对比。
 - en: If the attribute is indexed on the other hand, the SLAPD server simply searches
     the appropriate attribute index for the value, and quickly returns a list of matching
     records.
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果该属性已经建立索引，那么 SLAPD 服务器会直接在相应的属性索引中查找该值，并迅速返回匹配记录的列表。
 - en: An index search is much faster than a full directory search and, the larger
     the directory, the more noticeable the difference.
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
+  zh: 索引搜索比全目录搜索要快，而且目录越大，差异越明显。
 - en: The task of determining which attributes must be indexed is left up to you,
     and the attributes that you ought to index should be determined by which object
     classes are used in your directory information tree, and which reading operations
@@ -1048,166 +1512,235 @@
     primarily oriented around information about people (using `person`, `organizationalPerson`,
     and `inetOrgPerson` object classes) should probably have indexes for commonly
     used attributes such as `cn`, `sn`, and `uid`.
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 确定需要索引的属性的任务由你来完成，你应该根据在目录信息树中使用的对象类以及针对你的目录服务器执行的读取操作（搜索、绑定、比较）来决定需要索引的属性。主要面向人员信息的目录（使用`person`、`organizationalPerson`和`inetOrgPerson`对象类）可能需要为常用属性如`cn`、`sn`和`uid`创建索引。
 - en: 'When we created our basic `slapd.conf` file in Chapter 2, we configured the
     following indexes:'
+  id: totrans-221
   prefs: []
   type: TYPE_NORMAL
+  zh: 在第2章创建基础的`slapd.conf`文件时，我们配置了以下索引：
 - en: '[PRE31]'
+  id: totrans-222
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'There are three indexes specified above: one for `objectClass`, one for `cn`,
     and one for `uid`.'
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 上面指定了三个索引：一个是针对`objectClass`的，一个是针对`cn`的，还有一个是针对`uid`的。
 - en: The first line creates an index for the `objectClass` attribute. The index is
     optimized for equality (`eq`) matches (that is, searches like `objectclass=person`,
     but not searches such as `objectclass=*son`). This index should always be included,
     as the vast majority of reading operations will use the `objectClass` attribute.
+  id: totrans-224
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一行创建了一个针对`objectClass`属性的索引。该索引针对相等（`eq`）匹配进行了优化（即像`objectclass=person`这样的搜索，但不是像`objectclass=*son`这样的搜索）。这个索引应该始终包含，因为绝大多数的读取操作都会使用`objectClass`属性。
 - en: 'The second line is the index for the `cn` attribute. Along with configuring
     this index to efficiently handle equality (`eq`) matches, it is also configured
     to efficiently perform substring (`sub`) and approximation (`approx`) matches,
     as well as doing quick tests to see if the attribute is present (`pres`). Here
     is a brief explanation of each of the index optimization types:'
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 第二行是针对`cn`属性的索引。除了配置此索引以有效处理相等（`eq`）匹配外，还配置了有效执行子字符串（`sub`）和近似（`approx`）匹配，并快速测试该属性是否存在（`pres`）。以下是每种索引优化类型的简要说明：
 - en: '`approx`: This optimizes searches for approximation matching. If a search operation
     is made request approximate matches (`cn~=mat`), this index may be used to speed
     up the approximation matching.'
+  id: totrans-226
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`approx`：这优化了近似匹配的搜索。如果搜索操作请求近似匹配（`cn~=mat`），则可以使用此索引加速近似匹配。'
 - en: '`eq`: This optimizes for equality matching. Filters that request an exact match,
     such as (`uid=matt`) or (`objectclass=person`) make use of the `eq` optimization.
     It is very important that the `objectclass` attribute have an index optimized
     for equality. When using directory replication or other overlays, you may also
     need to index other frequently used attributes.'
+  id: totrans-227
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`eq`：这优化了相等匹配。请求精确匹配的过滤器，如（`uid=matt`）或（`objectclass=person`），都会使用`eq`优化。确保`objectclass`属性有针对相等匹配优化的索引非常重要。当使用目录复制或其他覆盖时，可能还需要对其他常用属性进行索引。'
 - en: '`sub`: This optimizes substring matching. A substring search occurs when a
     search request sends a part of a string and asks that attribute value that contains
     that part be returned. For example, the filter (`uid=*ar*`) should match any UIDs
     that contain the string `ar`. Users `mark` and `karen` would both match this filter.'
+  id: totrans-228
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`sub`：这优化了子字符串匹配。当搜索请求发送一个字符串的部分，并请求返回包含该部分的属性值时，就会发生子字符串搜索。例如，过滤器（`uid=*ar*`）应该匹配任何包含字符串`ar`的UID。用户`mark`和`karen`都会匹配此过滤器。'
 - en: '`subinitial`: This is a special type of `sub` optimization that optimizes matching
     the first part of the string only. It is good for handling filters like (`uid=mar*`),
     but not filters like (`uid=*ark`).'
+  id: totrans-229
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`subinitial`：这是一种特殊的`sub`优化，仅优化匹配字符串的第一部分。它适用于处理像（`uid=mar*`）这样的过滤器，但不适用于像（`uid=*ark`）这样的过滤器。'
 - en: '`subfinal`: This is also a special type of `sub` optimization. This one optimizes
     matching the last part of the string, and performs well for filters like (`uid=*ark`).'
+  id: totrans-230
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`subfinal`：这也是一种特殊的`sub`优化。它优化了匹配字符串最后一部分，并且对于像（`uid=*ark`）这样的过滤器表现良好。'
 - en: '`pres`: The `pres` type optimizes the index for cases where a search merely
     needs to see if an attribute is present.'
+  id: totrans-231
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`pres`：`pres`类型优化了索引，用于仅需检查某个属性是否存在的情况。'
 - en: Not all attributes though, support all of the index options. For example, the
     `objectclass` attribute does not support `approx`, `sub`, or any of the `sub`
     variants, and does not benefit from having a `pres` index.
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，并不是所有属性都支持所有的索引选项。例如，`objectclass` 属性不支持 `approx`、`sub` 或任何 `sub` 的变体，也无法从
+    `pres` 索引中获益。
 - en: Tip
+  id: totrans-233
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Indexes and Schemas**'
+  id: totrans-234
   prefs: []
   type: TYPE_NORMAL
+  zh: '**索引与模式**'
 - en: An object class' schema defines what matching rules an attribute supports, and
     the type of matching rule determines whether or not it can support a particular
     type of index. See Chapter 6.
+  id: totrans-235
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个对象类的模式定义了一个属性支持的匹配规则，而匹配规则的类型决定了该属性是否能支持某种特定类型的索引。请参见第六章。
 - en: In general, adding indexes for commonly-used attributes is a good thing. It
     speeds up searching and other reading operations, and since the majority of LDAP
     operations are reading operations, this can be a boon to performance.
+  id: totrans-236
   prefs: []
   type: TYPE_NORMAL
+  zh: 一般来说，为常用属性添加索引是一个好主意。它加快了搜索和其他读取操作的速度，并且由于大多数LDAP操作是读取操作，这对性能来说是一个提升。
 - en: But maintaining indexes does slow down writing operations that involve indexed
     attributes, since those attributes have to be maintained not only in the main
     database, but also in the index database files. Also, each index requires additional
     cache space for efficiently searching, which means adding more indexes will consume
     more memory. For those reasons, it is best to index only the attributes that are
     frequently used in searching operations, rather than indexing everything.
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，维护索引会减慢涉及索引属性的写入操作，因为这些属性不仅需要在主数据库中维护，还需要在索引数据库文件中维护。此外，每个索引还需要额外的缓存空间来高效地进行搜索，这意味着添加更多索引将消耗更多的内存。基于这些原因，最好只对经常用于搜索操作的属性进行索引，而不是对所有属性都进行索引。
 - en: When an `index` directive is added or modified though, SLAPD does not automatically
     re-index all of the entries in the directory. You will need to do it by hand.
     For example, after looking at common searches on our system, we determine that
     it would be good to add indexes for the `sn` and `member` attributes. Other applications
     often run searches to find out what groups particular DNs are members of, and
     an index of this attribute would expedite those searches.
+  id: totrans-238
   prefs: []
   type: TYPE_NORMAL
+  zh: 当添加或修改 `index` 指令时，SLAPD 并不会自动重新索引目录中的所有条目。你需要手动执行。例如，在查看我们系统上的常见搜索后，我们确定为 `sn`
+    和 `member` 属性添加索引会是个不错的选择。其他应用程序经常进行搜索，以查找特定 DN 所在的组，索引该属性将加快这些搜索。
 - en: 'To service these needs we will add the following new `index` directives:'
+  id: totrans-239
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了满足这些需求，我们将添加以下新的 `index` 指令：
 - en: '[PRE32]'
+  id: totrans-240
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'But once we have added these to `slapd.conf`, we will need to stop SLAPD and
     run the `slapindex` program to rebuild the index files:'
+  id: totrans-241
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，一旦我们将这些添加到 `slapd.conf` 后，我们需要停止 SLAPD 并运行 `slapindex` 程序来重建索引文件：
 - en: '[PRE33]'
+  id: totrans-242
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: This will rebuild all of the indexes. The `-q` (quick) flag will greatly speed
     up the process, as it skips performing consistency checks of the database.
+  id: totrans-243
   prefs: []
   type: TYPE_NORMAL
+  zh: 这将重建所有的索引。`-q`（快速）标志将大大加速该过程，因为它跳过了数据库一致性检查。
 - en: Tip
+  id: totrans-244
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Avoid Rebuilding Indexes**'
+  id: totrans-245
   prefs: []
   type: TYPE_NORMAL
+  zh: '**避免重建索引**'
 - en: A `slapindex` procedure will rebuild all indexes. When adding an index to a
     large directory, you may want to avoid rebuilding all of the other indexes. One
     way to do this is to comment out the existing indexes in `slapd.conf` (leaving
     only the new index lines uncommented), run `slapdindex`, and then remove the comments
     from the existing indexes. The next version of OpenLDAP will support a more convenient
     way of adding indexes.
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: '`slapindex` 程序将重建所有索引。在向一个大型目录中添加索引时，你可能希望避免重建所有其他索引。一种方法是注释掉 `slapd.conf`
+    中现有的索引（只保留新的索引行未注释），然后运行 `slapindex`，再从现有的索引中删除注释。OpenLDAP 的下一个版本将支持一种更方便的添加索引的方式。'
 - en: The `slapindex` program will print error messages if any of the optimizing types
     are not allowed for an attribute (like if one tries to add substring indexing
     to `objectclass`). But when it runs successfully, it will quietly exit without
     printing any messages.
+  id: totrans-247
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果某些优化类型不允许某个属性使用（例如，如果尝试为 `objectclass` 添加子字符串索引），`slapindex` 程序将打印错误信息。但当运行成功时，它会悄悄退出，并且不会打印任何信息。
 - en: Once `slapindex` is finished, SLAPD can be restarted.
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦 `slapindex` 完成，SLAPD 就可以重新启动。
 - en: Controlling the Cache (BDB/HDB Only)
+  id: totrans-249
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 控制缓存（仅限 BDB/HDB）
 - en: 'With BDB and HDB backends, SLAPD stores frequently-accessed records in a cache
     so that it doesn''t have to read directory information from disk with every request.
     By default, SLAPD retains one-thousand records in the cache. But busy directory
     servers with a few thousand entries or more will benefit from having a larger
     cache. This can be done with the `cachesize` directive:'
+  id: totrans-250
   prefs: []
   type: TYPE_NORMAL
+  zh: 在BDB和HDB后端中，SLAPD将经常访问的记录存储在缓存中，这样它就不需要每次请求时都从磁盘读取目录信息。默认情况下，SLAPD在缓存中保留一千条记录。但是，对于拥有几千条或更多条目且繁忙的目录服务器来说，增加缓存大小会有所帮助。这可以通过`cachesize`指令来实现：
 - en: '[PRE34]'
+  id: totrans-251
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: The above directive doubles the default cache size, instructing SLAPD to keep
     2000 records in memory.
+  id: totrans-252
   prefs: []
   type: TYPE_NORMAL
+  zh: 上面的指令将默认缓存大小加倍，指示SLAPD将2000条记录保存在内存中。
 - en: What happens when the cache is full? By default, SLAPD simply drops the last
     item in the cache (leaving a cache of 2000 with 1999 full slots). On a busy server,
     emptying just one cache entry at a time can have slight negative impacts on performance,
@@ -1215,109 +1748,150 @@
     each one missing a cache hit, the last entry of the cache would be freed up and
     filled with every request. This scenario is more likely to happen with the cache
     is disproportionately small, when compared to the number of entries in the database.
+  id: totrans-253
   prefs: []
   type: TYPE_NORMAL
+  zh: 当缓存满了会发生什么呢？默认情况下，SLAPD会直接删除缓存中的最后一个项目（使缓存保持2000个条目，但只有1999个条目已满）。在繁忙的服务器上，每次只清空一个缓存项可能会对性能产生轻微的负面影响，因为如果多个搜索迅速连续执行，每个搜索都未命中缓存，缓存的最后一个条目将被清空，并在每个请求中填充。这种情况在缓存大小与数据库中的条目数量不成比例时更有可能发生。
 - en: 'The `cachefree` directive can be used to instruct SLAPD to drop more than one
     item from the cache when it fills:'
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: '`cachefree`指令可以用来指示SLAPD在缓存满时删除多个项目：'
 - en: '[PRE35]'
+  id: totrans-255
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: This example instructs SLAPD to drop the last five entries in the cache.
+  id: totrans-256
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个示例指示SLAPD从缓存中删除最后五个条目。
 - en: Ideally, the cache size should remain as close to the actual number of entries
     in the database as memory constraints will permit. At least, though, the cache
     should be large enough that frequently requested records can remain in memory.
     For example, if your directory server functions as an address book, then the cache
     should be large enough that the user records, as well as their ancestor records,
     can all be kept in cache at the same time.
+  id: totrans-257
   prefs: []
   type: TYPE_NORMAL
+  zh: 理想情况下，缓存大小应该尽量接近数据库中实际条目的数量，前提是内存限制允许。至少，缓存应该足够大，以便频繁请求的记录能够保持在内存中。例如，如果你的目录服务器作为通讯录使用，那么缓存应该足够大，以便用户记录及其祖先记录可以同时保存在缓存中。
 - en: Note
+  id: totrans-258
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: These caching directives are not the only ones of importance for SLAPD. See
     also the `set_cachesize` directive in the `DB_CONFIG` file section.
+  id: totrans-259
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些缓存指令并不是SLAPD中唯一重要的指令。请参阅`DB_CONFIG`文件部分中的`set_cachesize`指令。
 - en: 'The third cache directive is `idlcachesize`. The `idlcachesize` directive is
     used for caching the results of frequently performed searches, and a large cache
     here will make searches of often used searches much faster. With the HDB database,
     it is suggested that this be *three* *times* the `cachesize` value:'
+  id: totrans-260
   prefs: []
   type: TYPE_NORMAL
+  zh: 第三个缓存指令是`idlcachesize`。`idlcachesize`指令用于缓存经常执行的搜索结果，在这里，较大的缓存将使经常使用的搜索变得更快。对于HDB数据库，建议将此值设置为`cachesize`的*三倍*：
 - en: '[PRE36]'
+  id: totrans-261
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: We have now finished taking a look at the `slapd.conf` configuration options.
     Now we will turn to another configuration file that can be used to tailor the
     performance of SLAPD.
+  id: totrans-262
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们现在已经完成了对`slapd.conf`配置选项的查看。接下来，我们将转向另一个可以用来调整SLAPD性能的配置文件。
 - en: Reducing Disk I/O Latency (BDB/HDB Only)
+  id: totrans-263
   prefs:
   - PREF_H4
   type: TYPE_NORMAL
+  zh: 降低磁盘I/O延迟（仅适用于BDB/HDB）
 - en: When LDAP operations write new data to the directory and SLAPD is using the
     BDB or HDB backends the data is stored in memory first, and then flushed to the
     database files stored in the operating system.
+  id: totrans-264
   prefs: []
   type: TYPE_NORMAL
+  zh: 当LDAP操作将新数据写入目录，并且SLAPD使用BDB或HDB后端时，数据首先存储在内存中，然后刷新到操作系统中的数据库文件。
 - en: 'On a very busy directory server (or a server with really slow disk I/O), it
     is sometimes desirable to trade off data security for speed. There are two directives
     in particular that instruct SLAPD to make this trade off:'
+  id: totrans-265
   prefs: []
   type: TYPE_NORMAL
+  zh: 在非常繁忙的目录服务器（或磁盘I/O非常慢的服务器）上，有时会希望在速度和数据安全性之间进行权衡。特别有两个指令可以指示SLAPD进行这种权衡：
 - en: The first, and the less risky of the two, is the `dirtyread` directive which
     takes no parameters.
+  id: totrans-266
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 其中第一个，且风险较小的是`dirtyread`指令，它不接受任何参数。
 - en: Consider the case where one client performs a write operation to modify a record,
     and then another client performs a read operation on that same record before SLAPD
     has written the first client's changes to disk. Should the server return the unmodified
     data stored on disk, or the modified data that has not yet been committed? Usually
     it does the first, sending the *clean*, but soon-to-be out-of-date record to the
     client.
+  id: totrans-267
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 假设有一个客户端执行写操作来修改一个记录，然后另一个客户端在 SLAPD 将第一个客户端的更改写入磁盘之前，执行对该记录的读取操作。此时服务器应当返回未修改的磁盘数据，还是未提交的修改数据呢？通常，服务器会返回前者，将*干净*但即将过时的记录发送给客户端。
 - en: The term "dirty read" describes the second case, where the server sends the
     client information that has not been committed. While returning this data may
     be faster, it might possibly be inaccurate; the server may reject or abort the
     modification request of the first client even after having sent the modified data
     to the second client.
+  id: totrans-268
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: “脏读”一词描述了第二种情况，即服务器将尚未提交的信息发送给客户端。虽然返回这些数据可能更快，但它可能不准确；即使服务器已将修改后的数据发送给第二个客户端，也可能会拒绝或中止第一个客户端的修改请求。
 - en: The `dirtyread` directive only increases the risks that a client may get inaccurate
     data.
+  id: totrans-269
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: '`dirtyread` 指令只会增加客户端获取不准确数据的风险。'
 - en: The second directive, `dbnosync`, carries a higher risk.
+  id: totrans-270
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 第二个指令 `dbnosync` 风险更高。
 - en: Normally, when an operation changes directory information, the changes are written
     to disk as soon as possible. Data stored in memory is flushed to the files in
     the Berkeley DB subsystem. But performing disk I/O can slow the server. One way
     to speed this up is to instruct SLAPD to delay writing the information to the
     log file on the disk, and this is done with the `dbnosync` directive.
+  id: totrans-271
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 通常，当一个操作更改了目录信息时，修改会尽快写入磁盘。存储在内存中的数据会被刷新到 Berkeley DB 子系统中的文件中。但进行磁盘 I/O 操作可能会减慢服务器速度。加速此过程的一种方式是指示
+    SLAPD 延迟将信息写入磁盘上的日志文件，这可以通过 `dbnosync` 指令来实现。
 - en: The risk in running with `dbnosync` though, is that in the event that the server
     should die without a clean shutdown, modifications made to the directory, but
     not yet written to disk, will be lost. However, there is no greater risk of corrupting
     the database—the database will still be recoverable, though the most recent changes
     may be lost.
+  id: totrans-272
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 使用 `dbnosync` 运行的风险在于，如果服务器在没有正常关闭的情况下崩溃，对目录所做的修改但尚未写入磁盘的部分将会丢失。然而，这并不会导致数据库损坏的风险增加——数据库仍然可以恢复，尽管最近的更改可能会丢失。
 - en: 'You can reduce (though not eliminate) the risks of running with `dbnosync`
     by also using the `checkpoint` directive. Setting a checkpoint causes SLAPD to
     periodically write data to the disk. The `checkpoint` directive takes two parameters:
@@ -1325,78 +1899,113 @@
     the database anytime the amount of data written is greater than the maximum size
     or after the specified interval of time has passed. Here is an example of the
     `checkpoint` directive:'
+  id: totrans-273
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你可以通过同时使用 `checkpoint` 指令来降低（但不能消除）使用 `dbnosync` 运行的风险。设置检查点会使 SLAPD 定期将数据写入磁盘。`checkpoint`
+    指令有两个参数：最大大小（以千字节为单位）和时间限制（以分钟为单位）。当写入的数据量大于最大大小或经过指定时间间隔后，SLAPD 将执行数据库检查点。以下是
+    `checkpoint` 指令的示例：
 - en: '[PRE37]'
+  id: totrans-274
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: This instructs SLAPD to checkpoint the database (flushing any new data from
     memory to the file system) whenever more than one megabyte of data has been written
     to the database and every 30 minutes.
+  id: totrans-275
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这指示 SLAPD 在向数据库写入超过一兆字节的数据并且每隔 30 分钟时，执行数据库检查点（将所有新数据从内存刷新到文件系统）。
 - en: Due to the increased risks with these directives, it is generally better to
     try other means of improving performance (such as altering the cache or tuning
     the `DB_CONFIG` file) before implementing these directives.
+  id: totrans-276
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于这些指令增加了风险，通常最好先尝试其他提升性能的方法（例如调整缓存或调优 `DB_CONFIG` 文件），再实施这些指令。
 - en: The DB_CONFIG File
+  id: totrans-277
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: DB_CONFIG 文件
 - en: The `DB_CONFIG` file is technically not an OpenLDAP configuration file at all.
     It is a Berkeley DB configuration file, and is specific to the BDB and HDB backends
     only. It provides a series of settings for the Berkeley database engine.
+  id: totrans-278
   prefs: []
   type: TYPE_NORMAL
+  zh: '`DB_CONFIG` 文件在技术上根本不是一个 OpenLDAP 配置文件。它是一个 Berkeley DB 配置文件，仅针对 BDB 和 HDB
+    后端。它为 Berkeley 数据库引擎提供了一系列设置。'
 - en: Note
+  id: totrans-279
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'Berkeley DB is an Open Source embedded database, now maintained by Oracle.
     Because it is robust and reliable, actively maintained, and widely support, it
     is a popular product in both open source and proprietary applications. For more
     information about Berkeley DB, see Oracle''s website: [http://www.oracle.com/database/berkeley-db/index.html](http://www.oracle.com/database/berkeley-db/index.html)'
+  id: totrans-280
   prefs: []
   type: TYPE_NORMAL
+  zh: Berkeley DB 是一个开源的嵌入式数据库，目前由 Oracle 维护。由于它稳健可靠，且得到积极维护并广泛支持，因此它在开源和专有应用中都非常流行。如需了解有关
+    Berkeley DB 的更多信息，请访问 Oracle 的网站：[http://www.oracle.com/database/berkeley-db/index.html](http://www.oracle.com/database/berkeley-db/index.html)
 - en: Since the entire directory information tree, as well as the indexes, for a BDB/HDB
     backend is stored in a Berkeley DB database, a properly configured `DB_CONFIG`
     file is the most important facet of directory performance.
+  id: totrans-281
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于整个目录信息树以及索引都存储在 Berkeley DB 数据库中，因此正确配置的 `DB_CONFIG` 文件是影响目录性能的最重要因素。
 - en: When experimenting with the `DB_CONFIG` file and trying out new configurations,
     it is best to use a non-production server, and to use `slapcat` to make a full
     backup of the directory data before you make any changes.
+  id: totrans-282
   prefs: []
   type: TYPE_NORMAL
+  zh: 在实验 `DB_CONFIG` 文件并尝试新配置时，最好使用非生产服务器，并在做任何更改之前，使用 `slapcat` 做一次目录数据的完整备份。
 - en: 'The `DB_CONFIG` file is not stored with the OpenLDAP configuration files. Instead,
     it is stored alongside the database files at `/var/lib/ldap` (or `/usr/local/var/openldap-data`).
     Unlike the other configuration files, it is read only when the database is created
     or recovered. As of OpenLDAP 2.3, if SLAPD detects changes in `DB_CONFIG` when
     it is starting up, it will attempt to perform a database recovery in order to
     incorporate the changes, and you may see an entry like this in your log file:'
+  id: totrans-283
   prefs: []
   type: TYPE_NORMAL
+  zh: '`DB_CONFIG` 文件并没有与 OpenLDAP 配置文件一起存储。相反，它与数据库文件一起存储在 `/var/lib/ldap`（或 `/usr/local/var/openldap-data`）目录下。与其他配置文件不同，它只有在创建或恢复数据库时才会被读取。从
+    OpenLDAP 2.3 版本开始，如果 SLAPD 在启动时检测到 `DB_CONFIG` 的变化，它会尝试进行数据库恢复以融入这些变化，你可能会在日志文件中看到类似的条目：'
 - en: '[PRE38]'
+  id: totrans-284
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: Likewise, when you create a new directory, the Berkeley DB subsystem will read
     the `DB_CONFIG` file and create the databases according to the directives therein.
+  id: totrans-285
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样地，当你创建一个新的目录时，Berkeley DB 子系统会读取 `DB_CONFIG` 文件，并根据其中的指令创建数据库。
 - en: Tip
+  id: totrans-286
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: Make sure your database has a `DB_CONFIG` file. If your database directory does
     not have a `DB_CONFIG` file present, you will be using the factory defaults for
     Berkeley DB, which are very conservative. On anything but a small (<100 entries)
     directory server, the defaults will be insufficient, and result in poor performance.
+  id: totrans-287
   prefs: []
   type: TYPE_NORMAL
+  zh: 确保你的数据库中有一个 `DB_CONFIG` 文件。如果你的数据库目录中没有 `DB_CONFIG` 文件，系统将使用 Berkeley DB 的出厂默认设置，这些默认设置非常保守。在除了小型（<100条目）目录服务器外的任何情况下，这些默认设置都不足以提供足够的性能，并且会导致性能问题。
 - en: 'OpenLDAP distributions include a default `DB_CONFIG` file tuned for general
     use. It should be located at `/var/lib/ldap` already (though it is sometimes labeled
     `DB_CONFIG.example`, in which case you will need to rename it to just `DB_CONFIG`).
@@ -1404,117 +2013,171 @@
     We will start by using the version included with the OpenLDAP source distribution
     (which is configured for enterprise use). The default version looks something
     like this:'
+  id: totrans-288
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenLDAP 发行版包括一个默认的 `DB_CONFIG` 文件，已针对一般用途进行了调整。它应该已经位于 `/var/lib/ldap`（尽管有时会标记为
+    `DB_CONFIG.example`，此时你需要将其重命名为 `DB_CONFIG`）。在 Ubuntu Linux 中，一个针对 Ubuntu 定制的
+    `DB_CONFIG` 文件位于 `/usr/share/doc/slapd/examples/DB_CONFIG`。我们将从 OpenLDAP 源代码发行版中包含的版本开始使用（该版本已为企业使用配置）。默认版本大致如下：
 - en: '[PRE39]'
+  id: totrans-289
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: We have removed some of the comments from the header and footer of the file,
     but preserved all of the settings.
+  id: totrans-290
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们已经从文件的头部和尾部删除了一些注释，但保留了所有的设置。
 - en: For standard usage on a medium-sized directory, these settings are good. If
     your directory is performing sufficiently fast and your system is not strapped
     for resources, you need not feel compelled to change the default settings.
+  id: totrans-291
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于中型目录的标准使用，这些设置是合适的。如果你的目录性能足够快，且系统资源充足，那么无需强迫自己更改默认设置。
 - en: The `DB_CONFIG` file contains directives that directly pertain to the performance
     of the underlying Berkeley DB files. We will go through these six settings in
     order. The most important directive is the first.
+  id: totrans-292
   prefs: []
   type: TYPE_NORMAL
+  zh: '`DB_CONFIG` 文件包含与底层 Berkeley DB 文件性能直接相关的指令。我们将依次介绍这六个设置，最重要的指令是第一个。'
 - en: At the end of this section we will also look at three additional directives
     used for tuning Berkeley DB lock handling.
+  id: totrans-293
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节末我们还将查看三个额外的指令，用于调优 Berkeley DB 锁定处理。
 - en: Note
+  id: totrans-294
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Some of the directives we examined earlier are synonyms for `DB_CONFIG` directives.
     For example, `dbnosync` does the same thing as the `DB_CONFIG` directive `set_flags`
     `DB_TXN_NOSYNC`.
+  id: totrans-295
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们之前检查过的一些指令是 `DB_CONFIG` 指令的同义词。例如，`dbnosync` 的作用与 `DB_CONFIG` 指令 `set_flags`
+    `DB_TXN_NOSYNC` 相同。
 - en: Setting the Cache Size
+  id: totrans-296
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 设置缓存大小
 - en: The BDB/HDB backend attempts to keep as much of the directory as possible in
     memory in the form of a cache. This keeps directory reading quick since SLAPD
     does not have to read information from the disk.
+  id: totrans-297
   prefs: []
   type: TYPE_NORMAL
+  zh: BDB/HDB 后端会尽量将尽可能多的目录信息保存在内存中作为缓存。这使得目录读取更快速，因为 SLAPD 不必从磁盘读取信息。
 - en: While it might not be possible (on a system with other services, a good economic
     trade-off) to keep the entire directory in the cache, the server will run faster
     if at least the most frequently used entries are kept in the cache.
+  id: totrans-298
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管在具有其他服务的系统上（作为一种良好的经济权衡）可能无法将整个目录保存在缓存中，但如果至少将最常用的条目保存在缓存中，服务器的运行速度会更快。
 - en: 'The `set_cachesize` directive determines how much memory SLAPD will allocate
     for a directory cache. The directive takes three arguments:'
+  id: totrans-299
   prefs: []
   type: TYPE_NORMAL
+  zh: '`set_cachesize` 指令决定 SLAPD 为目录缓存分配多少内存。该指令接受三个参数：'
 - en: The number of gigabytes of space to allocate for the cache
+  id: totrans-300
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 分配给缓存的千兆字节数
 - en: The number of bytes of space to allocate for the cache
+  id: totrans-301
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 分配给缓存的字节数
 - en: The number of segments to use for the the cache
+  id: totrans-302
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 用于缓存的段数
 - en: The first and second are added together and should not, when combined, be larger
     than 4 GB. The third determines how many data segments the Berkeley DB backend
     will break the cache into. The values 1 and 0 both result in a single cache segment
     (which is usually desired).
+  id: totrans-303
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个和第二个值相加后，不应超过 4 GB。第三个值决定了 Berkeley DB 后端将缓存分割成多少个数据段。值 1 和 0 都会导致单个缓存段（通常是需要的）。
 - en: 'In the default OpenLDAP `DB_CONFIG` file, the `set_cachesize` directive looks
     like this:'
+  id: totrans-304
   prefs: []
   type: TYPE_NORMAL
+  zh: 在默认的 OpenLDAP `DB_CONFIG` 文件中，`set_cachesize` 指令如下所示：
 - en: '[PRE40]'
+  id: totrans-305
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: The total size of the cache is 256 megabytes (268435456/1024/1024), and the
     entire cache is stored in one segment. For our tiny directory, this is far more
     than we need. It is a safe setting, though the full 256 megabytes will not be
     allocated.
+  id: totrans-306
   prefs: []
   type: TYPE_NORMAL
+  zh: 缓存的总大小为 256 兆字节（268435456/1024/1024），整个缓存存储在一个段中。对于我们的小型目录来说，这远远超过了我们的需求。虽然完整的
+    256 兆字节不会被分配，但这是一个安全设置。
 - en: 'A good rule of thumb for estimating the minimum amount of cache you will need
     in a small or medium-sized directory is to allocate two megabytes of cache for
     every 100 megabytes of LDIF data, plus one megabyte of cache per index. Larger
     directories will definitely benefit though, from carefully-tuned caches. For a
     finer-grained calculation, see the OpenLDAP FAQ-O-Matic entry on setting cache
     sizes: [http://www.openldap.org/faq/data/cache/1075.html](http://www.openldap.org/faq/data/cache/1075.html).'
+  id: totrans-307
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于小型或中型目录，估算所需最小缓存量的一个经验法则是：每 100 兆字节的 LDIF 数据分配 2 兆字节的缓存，每个索引分配 1 兆字节的缓存。然而，较大的目录一定会从精心调整的缓存中受益。有关更精确的计算，参见
+    OpenLDAP FAQ-O-Matic 上关于设置缓存大小的条目：[http://www.openldap.org/faq/data/cache/1075.html](http://www.openldap.org/faq/data/cache/1075.html)。
 - en: Configuring the Data Directory
+  id: totrans-308
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 配置数据目录
 - en: The `set_data_dir` directive takes one parameter, which is the path to the directory
     that contains the database files. In the previous example this directive is commented
     out. Since the `DB_CONFIG` file is stored in the same directory as the BDB files
     themselves you should not need to set this directive. It only needs to be set
     when the `DB_CONFIG` file is loaded from a location outside of the database directory.
+  id: totrans-309
   prefs: []
   type: TYPE_NORMAL
+  zh: '`set_data_dir` 指令接受一个参数，即包含数据库文件的目录路径。在之前的示例中，这个指令被注释掉。由于 `DB_CONFIG` 文件与 BDB
+    文件本身存储在同一目录中，因此通常不需要设置此指令。仅当 `DB_CONFIG` 文件从数据库目录外的某个位置加载时，才需要设置此指令。'
 - en: Optimizing BDB/HDB Transaction Logging
+  id: totrans-310
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 优化 BDB/HDB 事务日志
 - en: 'The last three directives relate to transaction logging. As modifications are
     made to the Berkeley DB, the complete details of the transaction are written to
     log files, named `log.XXXXXXXXXX`, where the ten `X`''s are replaced by digits
     from 0-9\. The first log file is `log.0000000001`, and once it grows too large,
     a new log file is created by incrementing the number: `log.0000000002`.'
+  id: totrans-311
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后三个指令与事务日志相关。随着对Berkeley DB的修改，事务的完整细节会被写入日志文件，日志文件名为`log.XXXXXXXXXX`，其中十个`X`会被0-9之间的数字替换。第一个日志文件是`log.0000000001`，一旦它变得过大，一个新的日志文件会通过递增数字创建：`log.0000000002`。
 - en: The log files comprise a record of all that has happened in a database. In fact,
     they are so complete that they can be used to rebuild a corrupt database. The
     log file format is not plain text, and cannot be read using the usual tools (like
@@ -1522,39 +2185,54 @@
     (or `dbX.Y_printlog`, where `X.Y` is replaced by the major and minor version numbers
     of the database, such as `db4.2_printlog`). This will display a record for each
     transaction made to the databases.
+  id: totrans-312
   prefs: []
   type: TYPE_NORMAL
+  zh: 日志文件包含了数据库中所有发生过的记录。实际上，它们如此完整，以至于可以用来重建一个损坏的数据库。日志文件格式不是纯文本，不能通过常规工具（如`cat`、`more`或`less`）读取。要读取它，您需要使用`db_printlog`命令（或`dbX.Y_printlog`，其中`X.Y`是数据库的主版本号和次版本号，如`db4.2_printlog`）。这将显示每个事务的记录。
 - en: Tip
+  id: totrans-313
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**Recovering a Corrupt BDB/HDB Database**'
+  id: totrans-314
   prefs: []
   type: TYPE_NORMAL
+  zh: '**恢复损坏的BDB/HDB数据库**'
 - en: The log files written by the Berkeley DB subsystem can be used to recover a
     corrupt database. The Berkeley DB distribution includes a tool called `db_recover`
     (or `dbX.Y_recover`, where `X.Y` is the major and minor version number, such as
     `db4.3_recover`). The `db_recover` tool uses the log files to fix corrupted databases.
     For more information view the man page for `db_recover`.
+  id: totrans-315
   prefs: []
   type: TYPE_NORMAL
+  zh: Berkeley DB子系统写入的日志文件可以用来恢复损坏的数据库。Berkeley DB发行版包括一个名为`db_recover`的工具（或`dbX.Y_recover`，其中`X.Y`是主版本号和次版本号，如`db4.3_recover`）。`db_recover`工具使用日志文件来修复损坏的数据库。有关更多信息，请查看`db_recover`的手册页。
 - en: At startup SLAPD automatically performs a recovery on the BDB directory to ensure
     that the database is in a stable state. It is only in rare cases that a system
     administrator will have to manually work with the log files.
+  id: totrans-316
   prefs: []
   type: TYPE_NORMAL
+  zh: 启动时，SLAPD会自动对BDB目录执行恢复，以确保数据库处于稳定状态。只有在极少数情况下，系统管理员才需要手动处理日志文件。
 - en: Since these transaction log files play such an important role in the safety
     of SLAPD's data, it is good to ensure that the environment is properly tuned.
+  id: totrans-317
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于这些事务日志文件在SLAPD数据安全性中起着如此重要的作用，因此确保环境已正确调优是很有必要的。
 - en: 'The `set_lg_regionmax` directive controls the amount of memory allocated to
     storing the names of Berkeley DB files. It takes one argument: the amount of space
     to be allocated (in bytes). The file above allocates 256 KB for storing names,
     and this should be fine for almost all applications. Only in rare cases where
     there are many index files would it be necessary to raise this limit (I have never
     yet encountered such a situation).'
+  id: totrans-318
   prefs: []
   type: TYPE_NORMAL
+  zh: '`set_lg_regionmax`指令控制分配给存储Berkeley DB文件名称的内存量。它需要一个参数：要分配的空间量（以字节为单位）。上述文件为存储名称分配了256
+    KB的空间，这对几乎所有应用程序来说都足够了。只有在极少数有大量索引文件的情况下，才需要提高此限制（我至今从未遇到过这种情况）。'
 - en: 'The next directive, `set_lg_bsize`, is used to allocate the amount of memory
     used to buffer data before it is written to the transaction log. It too takes
     one argument: the amount of space (in bytes) to be used for a buffer. The setting
@@ -1562,25 +2240,35 @@
     BDB/HDB database, information about the modification is not written to the log
     until the transaction is complete. Until it is written it is temporarily stored
     in an in-memory buffer, whose size is no bigger than the value of `set_lg_bsize`.'
+  id: totrans-319
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一个指令，`set_lg_bsize`，用于分配用于缓冲数据的内存量，直到数据被写入事务日志。它也需要一个参数：用于缓冲区的空间量（以字节为单位）。我们文件中的设置分配了两兆字节的空间。当对BDB/HDB数据库进行修改时，关于该修改的信息不会写入日志，直到事务完成。在它被写入之前，它会暂时存储在一个内存缓冲区中，缓冲区的大小不超过`set_lg_bsize`的值。
 - en: Since most LDAP data is relatively short, two megabytes is usually sufficient.
     But if your particular directory frequently stores large chunks of data (such
     as image files), you may consider increasing the buffer size for the transaction
     log to accommodate the largest chunks of data. For example, if the directory stores
     images as large as ten megabytes, `set_lg_bsize` should be set at `10485760` (which
     is 10 * 1024 *1024).
+  id: totrans-320
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于大多数 LDAP 数据相对较短，通常两兆字节已经足够。但如果你的目录经常存储大量数据（如图像文件），你可以考虑增加事务日志的缓冲区大小，以适应最大的文件块。例如，如果目录存储的图像最大为十兆字节，`set_lg_bsize`
+    应该设置为 `10485760`（即 10 * 1024 * 1024）。
 - en: Howard Chu, one of the OpenLDAP developers, points out that when increasing
     the `set_lg_bsize` flag to a value this large, you will also have to raise the
     maximum size limit for the log file using the `set_lg_max` flag. The maximum size
     for the log file must be *at* *least* four times the value of `set_lg_bsize`.
+  id: totrans-321
   prefs: []
   type: TYPE_NORMAL
+  zh: OpenLDAP 开发者之一 Howard Chu 指出，当将 `set_lg_bsize` 标志的值增大到如此大的值时，你还必须通过 `set_lg_max`
+    标志提高日志文件的最大大小限制。日志文件的最大大小必须*至少*是 `set_lg_bsize` 值的四倍。
 - en: '[PRE41]'
+  id: totrans-322
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: 'Finally, the last directive, `set_lg_dir`, points to the log file for BDB.
     By default, these log files are stored in the same directory as the rest of the
     database files (`/var/lib/ldap/` or `/usr/local/var/openldap-data/` if you compiled
@@ -1589,164 +2277,238 @@
     For example, you might want to store the logs on a different hard disk than the
     database files. To do so, uncomment the `set_lg_dir` directive and set it to the
     absolute path of the desired destination directory:'
+  id: totrans-323
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后一条指令 `set_lg_dir` 指向 BDB 的日志文件。默认情况下，这些日志文件与其他数据库文件存储在同一目录下（如果你从源代码编译，则存储在
+    `/var/lib/ldap/` 或 `/usr/local/var/openldap-data/`）。然而，由于日志对于数据库恢复至关重要，最好将日志文件存储在与数据库文件不同的位置。例如，你可能希望将日志存储在与数据库文件不同的硬盘上。为此，可以取消注释
+    `set_lg_dir` 指令，并将其设置为目标目录的绝对路径：
 - en: '[PRE42]'
+  id: totrans-324
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: This directive will instruct the Berkeley DB subsystem to write the log files
     to `/usr/local/var/ldap` instead of the same directory that the BDB files are
     located.
+  id: totrans-325
   prefs: []
   type: TYPE_NORMAL
+  zh: 这条指令将指示 Berkeley DB 子系统将日志文件写入 `/usr/local/var/ldap`，而不是写入与 BDB 文件所在目录相同的位置。
 - en: Note
+  id: totrans-326
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Regularly backing up the Berkeley DB files (including the log files) is a good
     idea. A more portable way of backing up the data is to dump a copy of the directory
     using the `slapcat` tool. This will export the database into LDIF format, which
     can be easily imported into a SLAPD server, regardless of the backend format.
+  id: totrans-327
   prefs: []
   type: TYPE_NORMAL
+  zh: 定期备份 Berkeley DB 文件（包括日志文件）是一个好主意。备份数据的更便捷方式是使用 `slapcat` 工具导出目录的副本。这将会把数据库导出为
+    LDIF 格式，可以轻松导入到 SLAPD 服务器中，无论后端格式如何。
 - en: Tuning Lock Files
+  id: totrans-328
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 调整锁定文件
 - en: There are three additional parameters that should be included in the `DB_CONFIG`
     file. These are the three directives that tune the locking mechanisms in Berkeley
     DB.
+  id: totrans-329
   prefs: []
   type: TYPE_NORMAL
+  zh: '`DB_CONFIG` 文件中应该包括三个附加参数。这三条指令用于调整 Berkeley DB 中的锁机制。'
 - en: Certain operations on the database will require that the data be locked to prevent
     the introduction of data inconsistency. For example, it is not good to allow two
     different threads to modify the same record at the same time. Berkeley DB uses
     a locking mechanism to prevent this from happening.
+  id: totrans-330
   prefs: []
   type: TYPE_NORMAL
+  zh: 数据库上的某些操作需要锁定数据，以防止数据不一致的情况发生。例如，允许两个不同的线程同时修改同一条记录是不好的。Berkeley DB 使用锁定机制来防止这种情况发生。
 - en: 'There are three directives that are used to tune the locking subsystem. These
     are:'
+  id: totrans-331
   prefs: []
   type: TYPE_NORMAL
+  zh: 有三条指令用于调整锁定子系统。这些指令是：
 - en: '`set_lk_max_objects`: The maximum number of objects that can be locked at a
     given time'
+  id: totrans-332
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`set_lk_max_objects`：一次可以锁定的最大对象数'
 - en: '`set_lk_max_locks`: The maximum number of locks that can be requested at a
     time'
+  id: totrans-333
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`set_lk_max_locks`：一次可以请求的最大锁定数'
 - en: '`set_lk_max_lockers`: The maximum number of simultaneous lock requests'
+  id: totrans-334
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`set_lk_max_lockers`：最大同时锁定请求数'
 - en: 'In the default Ubuntu `DB_CONFIG` file these are all set to 5000, but lower
     values (between 1500 and 3000) may be more desirable:'
+  id: totrans-335
   prefs: []
   type: TYPE_NORMAL
+  zh: 在默认的 Ubuntu `DB_CONFIG` 文件中，这些值都设置为 5000，但较低的值（介于 1500 和 3000 之间）可能更为理想：
 - en: '[PRE43]'
+  id: totrans-336
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: Setting these values at a sufficiently high value will prevent the database
     from running out of locks, and thus denying database access.
+  id: totrans-337
   prefs: []
   type: TYPE_NORMAL
+  zh: 将这些值设置为足够大的值，可以防止数据库用尽锁定，从而拒绝数据库访问。
 - en: Note
+  id: totrans-338
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: 'To see if your Berkeley DB lock settings are adequate, you can use the following
     command, which prints detailed information about locks and lockers:'
+  id: totrans-339
   prefs: []
   type: TYPE_NORMAL
+  zh: 要查看您的 Berkeley DB 锁定设置是否足够，可以使用以下命令，该命令会打印关于锁和锁定器的详细信息：
 - en: '**db4.2_stat -c**'
+  id: totrans-340
   prefs: []
   type: TYPE_NORMAL
+  zh: '**db4.2_stat -c**'
 - en: More about Berkeley DB
+  id: totrans-341
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 更多关于 Berkeley DB 的信息
 - en: The directives we have covered in this section are those that get the most attention
     for OpenLDAP. However, there are other directives, and judicious use of such settings
     can also improve the performance and reliability of the BDB and HDB backends.
+  id: totrans-342
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们在本节中介绍的指令是 OpenLDAP 中最受关注的那些。然而，还有其他指令，合理使用这些设置也可以提高 BDB 和 HDB 后端的性能和可靠性。
 - en: 'Some information about these parameters can be found in OpenLDAP''s FAQ-O-Matic
     ([http://www.openldap.org/faq/data/cache/1072.html](http://www.openldap.org/faq/data/cache/1072.html)).
     For a thorough understanding, though the best resource is the *Berkeley* *DB*
     *Reference* *Guide.* The newest version can be found here: [http://www.oracle.com/technology/documentation/berkeley-db/db/ref/toc.html](http://www.oracle.com/technology/documentation/berkeley-db/db/ref/toc.html)'
+  id: totrans-343
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些参数的一些信息可以在 OpenLDAP 的 FAQ-O-Matic 中找到（[http://www.openldap.org/faq/data/cache/1072.html](http://www.openldap.org/faq/data/cache/1072.html)）。然而，要全面理解，最好的资源是*Berkeley*
+    *DB* *参考* *指南*。最新版本可以在这里找到：[http://www.oracle.com/technology/documentation/berkeley-db/db/ref/toc.html](http://www.oracle.com/technology/documentation/berkeley-db/db/ref/toc.html)
 - en: 'At this point we have looked at the `slapd.conf` and `DB_CONFIG` files, examining
     some of the ways that these files can be modified to improve the performance of
     SLAPD. Next, we will turn to a different topic: extending the functionality of
     SLAPD using directory overlays.'
+  id: totrans-344
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，我们已经查看了`slapd.conf`和`DB_CONFIG`文件，检查了这些文件可以通过哪些方式进行修改，以提高 SLAPD 的性能。接下来，我们将讨论一个不同的话题：使用目录覆盖扩展
+    SLAPD 的功能。
 - en: Directory Overlays
+  id: totrans-345
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 目录覆盖层
 - en: As the OpenLDAP project has grown, more and more features have been added. Initially,
     these features were added directly to the SLAPD server's code base. But as features
     were rolled into OpenLDAP, both the code and the configuration became increasingly
     complex.
+  id: totrans-346
   prefs: []
   type: TYPE_NORMAL
+  zh: 随着 OpenLDAP 项目的发展，越来越多的功能被添加进来。最初，这些功能直接被添加到 SLAPD 服务器的代码库中。但是随着功能的不断集成到 OpenLDAP
+    中，代码和配置变得越来越复杂。
 - en: To address this problem, OpenLDAP developers introduced a new concept in OpenLDAP
     2.2 that made it easier to introduce new features while reducing the complexity
     of the underlying code. The developers introduced a modular system called **overlays**.
     An overlay is a chunk of code that can modify the behavior of the SLAPD.
+  id: totrans-347
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了解决这个问题，OpenLDAP 开发者在 OpenLDAP 2.2 中引入了一个新概念，使得在减少底层代码复杂性的同时更容易引入新功能。开发者引入了一个名为**覆盖层**（overlays）的模块化系统。覆盖层是可以修改
+    SLAPD 行为的一段代码。
 - en: When SLAPD receives a request for a database configured to use an overlay, the
     overlay is given an opportunity to perform processing on the request before any
     information is retrieved from the underlying database. As a result overlays can
     be used to perform additional processing of requests.
+  id: totrans-348
   prefs: []
   type: TYPE_NORMAL
+  zh: 当 SLAPD 收到一个配置为使用覆盖层的数据库请求时，覆盖层会在从底层数据库检索任何信息之前有机会对请求进行处理。因此，覆盖层可以用于对请求进行额外的处理。
 - en: How is an overlay added to the directory server? It is through special directives
     in the `slapd.conf` file. The `overlay` directive is placed in the database configuration
     section, though an overlay sometimes intercepts operations that are not backend-specific.
+  id: totrans-349
   prefs: []
   type: TYPE_NORMAL
+  zh: 如何将覆盖层添加到目录服务器中？通过在 `slapd.conf` 文件中的特殊指令。`overlay` 指令放置在数据库配置部分，尽管某些覆盖层会拦截与后端无关的操作。
 - en: More than one overlay can be used in a database. When overlays are used this
     way, they are said to be **stacked**. As we will see later in this chapter the
     order of overlay directives is very important because SLAPD sequentially goes
     through the overlay stack, calling the overlays one at a time.
+  id: totrans-350
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个数据库中可以使用多个覆盖层。当覆盖层以这种方式使用时，它们被称为**堆叠**。正如我们在本章后面将看到的那样，覆盖层指令的顺序非常重要，因为 SLAPD
+    会依次遍历覆盖层堆栈，一次调用一个覆盖层。
 - en: A Brief Tour of the Official Overlays
+  id: totrans-351
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 官方覆盖的简要介绍
 - en: In OpenLDAP 2.3 there are sixteen *official* overlays included with the OpenLDAP
     distribution, and a handful of contributed and unofficial overlays. Almost all
     of the official overlays are described in the man pages. Here we have a brief
     description of each of the sixteen; we will also see a few useful overlays in
     more detail. In the later chapters we will also make use of overlays.
+  id: totrans-352
   prefs: []
   type: TYPE_NORMAL
+  zh: 在OpenLDAP 2.3中，包含了十六个*官方*覆盖层以及一些贡献的和非官方的覆盖层。几乎所有的官方覆盖层都在手册页中进行了描述。在这里，我们简要描述了这十六个覆盖层；我们还将更详细地讨论一些有用的覆盖层。在后续章节中，我们也会使用这些覆盖层。
 - en: 'The *official* overlays are as follows:'
+  id: totrans-353
   prefs: []
   type: TYPE_NORMAL
+  zh: '*官方*覆盖层如下：'
 - en: '`accesslog`: The access logging overlay is used to record information about
     directory access and utilization. Rather than recording the data in the file system,
     information is stored as records inside a special log directory. Logs can then
     be retrieved through LDAP clients, or by using a tool such as `slapcat` to dump
     the logs into a flat (LDIF) file. We will implement this overlay in the next chapter,
     and use it again in Chapter 7 to improve replication.'
+  id: totrans-354
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`accesslog`：访问日志覆盖层用于记录有关目录访问和利用的信息。信息不是记录在文件系统中，而是作为记录存储在一个特殊的日志目录中。然后，可以通过LDAP客户端检索日志，或者使用如`slapcat`之类的工具将日志导出到平面（LDIF）文件中。在下一章中，我们将实现此覆盖层，并在第七章中再次使用它来改进复制。'
 - en: '`auditlog`: The audit logging overlay records information on changes to the
     directory. Unlike the more powerful access logging overlay, audit log stores information
     in a file in the file system.'
+  id: totrans-355
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`auditlog`：审计日志覆盖层记录关于目录变更的信息。与功能更强大的访问日志覆盖层不同，审计日志将信息存储在文件系统中的文件中。'
 - en: '`chain`: In complex directory environments, one directory may have information
     that another directory does not have. That second directory may be configured
     to *refer* clients of the first directory. Typically, a referral involves sending
@@ -1754,26 +2516,34 @@
     to chase the referral. The chain overlay handles referral chasing on the server
     side; the server will follow the referral itself and return the complete information
     to the client.'
+  id: totrans-356
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`chain`：在复杂的目录环境中，一个目录可能包含另一个目录没有的信息。第二个目录可能被配置为*引用*第一个目录的客户端。通常，引用涉及发送客户端有关重定向查询的信息，然后客户端需要追踪该引用。`chain`覆盖层处理服务器端的引用追踪；服务器会自行跟踪引用并将完整信息返回给客户端。'
 - en: '`denyop`: The deny operation overlay performs the same sort of function as
     the restrict directive discussed earlier in this chapter. It disallows clients
     from performing certain LDAP operations. In the next section we will use this
     overlay.'
+  id: totrans-357
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`denyop`：拒绝操作覆盖层执行的功能与本章早些时候讨论的限制指令相同。它不允许客户端执行某些LDAP操作。在下一部分，我们将使用此覆盖层。'
 - en: '`dyngroup`: The `dyngroup` overlays provide ways of creating dynamic groups
     based on specific attributes in an object. This provides a powerful method of
     grouping records.'
+  id: totrans-358
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`dyngroup`：`dyngroup`覆盖层提供了一种基于对象中特定属性创建动态组的方法。这提供了一种强大的记录分组方法。'
 - en: '`dynlist`: It is similar to the `dyngroup` overlay.'
+  id: totrans-359
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`dynlist`：它类似于`dyngroup`覆盖层。'
 - en: '`glue`: The glue overlay, which is built-in and loaded by default, makes it
     possible to link two databases together so they appear as if they were one large
     directory information tree. For example, if one database contains `dc=example,dc=com`,
@@ -1781,487 +2551,710 @@
     it possible for searches of `dc=example, dc=com` to return entries from the `ou=Users,dc=example,dc=com`
     database. The `subordinate` directive must be used in the database section of
     `slapd.conf` to indicate which databases should be glued.'
+  id: totrans-360
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`glue`：`glue`覆盖层是内建的，并且默认加载，它使得将两个数据库连接起来成为可能，从而使它们看起来像是一个大的目录信息树。例如，如果一个数据库包含`dc=example,dc=com`，而另一个数据库包含`ou=Users,dc=example,dc=com`，`glue`覆盖层使得对`dc=example,
+    dc=com`的搜索可以返回来自`ou=Users,dc=example,dc=com`数据库的条目。必须在`slapd.conf`的数据库部分使用`subordinate`指令，来指示哪些数据库应该被连接。'
 - en: '`lastmod`: The last modification overlay creates a special record in the directory
     information tree that contains information about what the most recently modified
     record is and when it was modified.'
+  id: totrans-361
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`lastmod`：最后修改覆盖层在目录信息树中创建一个特殊的记录，包含有关最近修改的记录是什么以及何时修改的信息。'
 - en: '`pcache`: The proxy cache overlay caches the results of an LDAP search. This
     overlay is mainly used with the `ldap` backend. With this combination, SLAPD can
     be configured to use another LDAP server as its backend, but speed up client requests
     by keeping a cached copy of the data in a special database.'
+  id: totrans-362
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`pcache`：代理缓存覆盖层缓存LDAP搜索的结果。此覆盖层主要与`ldap`后端一起使用。通过这种组合，SLAPD可以配置为使用另一个LDAP服务器作为其后端，但通过在一个特殊的数据库中保持数据的缓存副本，从而加速客户端请求。'
 - en: '`ppolicy`: The password policy overlay allows you to enforce certain restrictions,
     such as password expiration dates and password length. The password policy overlay
     is described in the next chapter.'
+  id: totrans-363
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`ppolicy`：密码策略覆盖层允许您强制执行某些限制，如密码过期日期和密码长度。密码策略覆盖层将在下一章进行描述。'
 - en: '`refint`: The referential integrity overlay is used to keep directory entries
     consistent when records are deleted or DNs are modified. For example, if a DN
     is deleted from the directory and the `refint` overlay is used, SLAPD will search
     the directory for other references to this DN (such as group memberships) and
     remove those references as well. We will look at this later in the chapter.'
+  id: totrans-364
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`refint`：参照完整性覆盖层用于在记录删除或DN修改时保持目录条目的一致性。例如，如果从目录中删除一个DN，并且使用了`refint`覆盖层，SLAPD会在目录中搜索其他与该DN相关的引用（例如，组成员关系），并将这些引用也一并删除。我们将在本章稍后讨论此内容。'
 - en: '`retcode`: This overlay is designed to help LDAP client implementors test how
     their code responds to abnormal server responses.'
+  id: totrans-365
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`retcode`：此覆盖层旨在帮助LDAP客户端实现者测试他们的代码如何响应异常的服务器响应。'
 - en: '`rwm`: The rewriting and mapping overlay provides a facility for taking a client
     request and re-writing or mapping parts of the request to other values. This can
     be used in conjunction with a proxying LDAP server to re-write attribute names
     and DNs.'
+  id: totrans-366
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`rwm`：重写与映射覆盖层提供了一种机制，可以重新编写或映射客户端请求中的某些部分到其他值。可以与代理LDAP服务器配合使用，重写属性名称和DN。'
 - en: '`syncprov`: The synchronization provider overlay is used by SLAPD servers that
     act as providers from which other SLAPD servers replicate data. We will discuss
     this more in Chapter 7.'
+  id: totrans-367
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`syncprov`：同步提供者覆盖层用于作为提供者的SLAPD服务器，这些服务器向其他SLAPD服务器复制数据。我们将在第七章中详细讨论这个话题。'
 - en: '`translucent`: The `translucent` overlay is similar to the proxy overlay. When
     a client requests a record, it retrieves the record from a remote server. But,
     it can do more—it can store a local copy of the record that can override portions
     of the remote record.'
+  id: totrans-368
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`translucent`：`translucent`覆盖层类似于代理覆盖层。当客户端请求记录时，它会从远程服务器检索该记录。但它可以做更多的事情——它可以存储该记录的本地副本，并可以覆盖远程记录的部分内容。'
 - en: '`unique`: The `unique` overlay enforces attribute uniqueness. It is used to
     ensure that, for specified attributes, a given attribute value exists in only
     one record in the directory. This is useful to keep multiple users from having
     the same email address (`mail`) or user ID (`uid`) attribute values.'
+  id: totrans-369
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: '`unique`：`unique`覆盖层强制属性唯一性。它用于确保对于指定的属性，某个属性值在目录中仅存在于一个记录中。这对于避免多个用户具有相同的电子邮件地址（`mail`）或用户ID（`uid`）属性值非常有用。'
 - en: 'Each of the overlays documented here (except for `denyop`) has a corresponding
     man page that can be accessed using the command `man` `slapo-<name` `of` `overlay>`,
     where `<name` `of` `overlay>` is replaced with the abbreviated name of the overlay.
     For example, to get the man page for the `translucent` overlay, run the command:
     `man` `slapo-translucent`.'
+  id: totrans-370
   prefs: []
   type: TYPE_NORMAL
+  zh: 本文档中记录的每个覆盖层（`denyop`除外）都有相应的man页面，可以通过命令`man` `slapo-<overlay名称>`访问，其中`<overlay名称>`替换为覆盖层的简称。例如，要查看`translucent`覆盖层的man页面，可以运行命令：`man`
+    `slapo-translucent`。
 - en: In the remainder of this chapter we will cover a few simple overlays in detail.
     In the next few chapters we will cover several sophisticated overlays, using them
     to address common directory server needs.
+  id: totrans-371
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章的剩余部分，我们将详细介绍一些简单的覆盖层。在接下来的几章中，我们将介绍几个复杂的覆盖层，并使用它们来解决常见的目录服务器需求。
 - en: 'Configuring an Overlay: denyop'
+  id: totrans-372
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 配置覆盖层：denyop
 - en: Since we have covered the basic concepts behind the `denyop` overlay when we
     looked at the `restrict` directive, and since `denyop` is simple to implement,
     we will look at it as an example for how to use an overlay.
+  id: totrans-373
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于我们在查看`restrict`指令时已经涵盖了`denyop`覆盖层背后的基本概念，并且`denyop`实现起来较为简单，因此我们将以它作为如何使用覆盖层的示例进行探讨。
 - en: Note
+  id: totrans-374
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: The `restrict` directive is actually the preferred method of restricting operations.
     The `denyop` overlay was intended primarily as an example for other overlay authors.
+  id: totrans-375
   prefs: []
   type: TYPE_NORMAL
+  zh: '`restrict`指令实际上是限制操作的首选方法。`denyop`覆盖层主要是作为其他覆盖层作者的示例。'
 - en: 'Overlays are configured in the `slapd.conf` file. Typically there are three
     steps to configuring an overlay:'
+  id: totrans-376
   prefs: []
   type: TYPE_NORMAL
+  zh: 覆盖层在`slapd.conf`文件中进行配置。通常配置覆盖层有三个步骤：
 - en: Load the dynamic object with the moduleload directive
+  id: totrans-377
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`moduleload`指令加载动态对象。
 - en: Add the overlay to the *database* *section* with the `overlay` directive
+  id: totrans-378
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`overlay`指令将覆盖层添加到*数据库* *部分*。
 - en: Add any overlay-specific directives to the database section
+  id: totrans-379
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将任何特定于覆盖层的指令添加到数据库部分。
 - en: Let's look at each step in detail.
+  id: totrans-380
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们详细看看每个步骤。
 - en: Loading the module
+  id: totrans-381
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 加载模块
 - en: The first task is to load the module containing the overlay. This part is not
     always necessary. Some versions of OpenLDAP have all of the modules statically
     compiled in, which means they are loaded along with the server. More often though,
     SLAPD is compiled to dynamically load modules that are loaded when SLAPD starts,
     and almost all overlays are implemented as modules.
+  id: totrans-382
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个任务是加载包含覆盖层的模块。这部分并不总是必要的。某些版本的OpenLDAP已经将所有模块静态编译，这意味着它们与服务器一起加载。然而，更多情况下，SLAPD被编译为动态加载模块，这些模块在SLAPD启动时加载，几乎所有的覆盖层都作为模块实现。
 - en: Note
+  id: totrans-383
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: See [Appendix A](apa.html "Appendix A. Building OpenLDAP from Source") for a
     further discussion of the difference between these two ways of building OpenLDAP.
+  id: totrans-384
   prefs: []
   type: TYPE_NORMAL
+  zh: 参见[附录A](apa.html "附录A. 从源代码构建OpenLDAP")，进一步讨论这两种构建OpenLDAP方式的区别。
 - en: 'The `moduleload` directive should go near the top of the configuration file,
     before the first `database` directive. To load the `denyop` dynamic object we
     need to add the following highlighted line:'
+  id: totrans-385
   prefs: []
   type: TYPE_NORMAL
+  zh: '`moduleload`指令应放在配置文件的顶部，位于第一个`database`指令之前。要加载`denyop`动态对象，我们需要添加以下高亮显示的行：'
 - en: '[PRE44]'
+  id: totrans-386
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: When SLAPD starts it will search for the `denyop` object in its module path,
     and load it if it finds it.
+  id: totrans-387
   prefs: []
   type: TYPE_NORMAL
+  zh: 当SLAPD启动时，它将搜索模块路径中的`denyop`对象，并在找到时加载它。
 - en: Note
+  id: totrans-388
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: If you need to load a module not in the module path you can specify the full
     path to the module. For example `/usr/local/libexec/openldap/my_module`.
+  id: totrans-389
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你需要加载一个不在模块路径中的模块，可以指定模块的完整路径。例如`/usr/local/libexec/openldap/my_module`。
 - en: 'If SLAPD fails to find the module on startup it will fail to start, exiting
     with an error like this:'
+  id: totrans-390
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果SLAPD在启动时未能找到模块，它将无法启动，并且会显示类似这样的错误：
 - en: '[PRE45]'
+  id: totrans-391
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: This indicates that the module, `lastmod`, was not found in the given module
     path, which in this case was erroneously set to `/tmp`.
+  id: totrans-392
   prefs: []
   type: TYPE_NORMAL
+  zh: 这表明在给定的模块路径中没有找到模块`lastmod`，在此情况下路径错误地设置为`/tmp`。
 - en: Make sure that the module is in one of the directories listed in `modulepath`,
     or that the full path to the module is correct.
+  id: totrans-393
   prefs: []
   type: TYPE_NORMAL
+  zh: 确保模块位于`modulepath`列出的目录之一，或者模块的完整路径是正确的。
 - en: Adding the Overlay
+  id: totrans-394
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 添加覆盖层
 - en: The next step is to add the overlay to the overlay stack. Since there are no
     overlays already specified, this will be the first of three items on the stack.
     The `glue` overlay is automatically applied, though it does nothing unless a `subordinate`
     directive is present. The backend processing of the operation (the actual directory
     lookup) is always the last item on the stack.
+  id: totrans-395
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一步是将覆盖层添加到覆盖层堆栈中。由于尚未指定任何覆盖层，这将是堆栈中的第一个项。`glue`覆盖层会自动应用，但除非存在`subordinate`指令，否则它不会执行任何操作。操作的后端处理（实际的目录查找）始终是堆栈中的最后一项。
 - en: 'To add our overlay we need to put the directive in the appropriate database
     section of the `slapd.conf` file. In a situation where there are multiple backends,
     the same overlay directive can be repeated in each database section to load the
     overlay for each database. The new directive is highlighted in the following example:'
+  id: totrans-396
   prefs: []
   type: TYPE_NORMAL
+  zh: 要添加我们的覆盖层，我们需要将指令放在`slapd.conf`文件的相应数据库部分中。如果有多个后端，可以在每个数据库部分重复同样的覆盖层指令，以便为每个数据库加载覆盖层。以下示例中突出显示了新的指令：
 - en: '[PRE46]'
+  id: totrans-397
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: Now, we are ready for the third step.
+  id: totrans-398
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们准备进行第三步。
 - en: Adding Overlay-Specific Directives
+  id: totrans-399
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 添加特定于覆盖层的指令
 - en: An overlay may have its own special directives. These directives are usually
     documented in the man page for that overlay.
+  id: totrans-400
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个覆盖层可能有其特定的指令。这些指令通常在该覆盖层的手册页中有文档。
 - en: There is only one directive supported by the `denyop` overlay, and it is the
     eponymous `denyop` directive. Like the `restrict` directive that we looked at
     earlier, the `denyop` directive takes a list of operations. Clients will be disallowed
     from performing any operation in this list.
+  id: totrans-401
   prefs: []
   type: TYPE_NORMAL
+  zh: '`denyop`覆盖层仅支持一个指令，即同名的`denyop`指令。像我们之前看到的`restrict`指令一样，`denyop`指令接受一个操作列表。客户端将被禁止执行该列表中的任何操作。'
 - en: 'Earlier in this chapter we used the `restrict` directive to prevent clients
     from performing `add`, `delete`, and `rename` operations:'
+  id: totrans-402
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章前面，我们使用了`restrict`指令来防止客户端执行`add`、`delete`和`rename`操作：
 - en: '[PRE47]'
+  id: totrans-403
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'We can implement the same thing with the `denyop` directive:'
+  id: totrans-404
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以使用`denyop`指令实现相同的功能：
 - en: '[PRE48]'
+  id: totrans-405
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'There are a few minor differences between the two directives:'
+  id: totrans-406
   prefs: []
   type: TYPE_NORMAL
+  zh: 这两个指令之间有一些小的区别：
 - en: '`denyop` takes a comma-separated list of operations'
+  id: totrans-407
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`denyop`接受一个以逗号分隔的操作列表。'
 - en: '`denyop` uses the `modrdn` name instead of using the term `rename`'
+  id: totrans-408
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`denyop`使用`modrdn`作为名称，而不是使用`rename`一词。'
 - en: If a client attempts to perform one of the disallowed operations `denyop` will
     stop SLAPD from performing the operation, and the client will be returned an `Unwilling`
     `to` `perform` error.
+  id: totrans-409
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果客户端尝试执行其中一个不允许的操作，`denyop`将阻止SLAPD执行该操作，并且客户端将收到`Unwilling to perform`错误。
 - en: The `denyop` overlay is simple and, due to the restrict directive, not likely
     to enjoy much use in a production server. But the next overlay that we will look
     at provides useful features, though the accompanying directives are slightly more
     complex.
+  id: totrans-410
   prefs: []
   type: TYPE_NORMAL
+  zh: '`denyop`覆盖层是简单的，并且由于`restrict`指令的存在，在生产服务器中不太可能被广泛使用。但我们接下来将要查看的下一个覆盖层提供了有用的功能，尽管伴随的指令稍微复杂一些。'
 - en: Referential Integrity Overlay
+  id: totrans-411
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 参照完整性覆盖层
 - en: The second overlay we will examine is the RefInt (Referential Integrity) overlay.
     RefInt is designed to handle cases where the modification or deletion of a record
     may render attribute values in other records inaccurate.
+  id: totrans-412
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将要查看的第二个覆盖层是RefInt（参照完整性）覆盖层。RefInt旨在处理修改或删除记录时，可能导致其他记录中的属性值不准确的情况。
 - en: 'LDAP groups provide a good context for illustrating the problem that the RefInt
     overlay is designed to address. In Chapter 3 we created an LDAP group that looked
     like this:'
+  id: totrans-413
   prefs: []
   type: TYPE_NORMAL
+  zh: LDAP组为说明RefInt覆盖层旨在解决的问题提供了一个很好的示例。在第3章中，我们创建了一个看起来像这样的LDAP组：
 - en: '[PRE49]'
+  id: totrans-414
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'This group has two members, `uid=matt`, and `uid=david`. These two member attributes
     refer to other records (identified by their respective DNs) that are also located
     in the directory. For example, here is the record for `uid=david`:'
+  id: totrans-415
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个组有两个成员，`uid=matt`和`uid=david`。这两个成员属性分别引用其他记录（由它们各自的DN标识），这些记录也位于目录中。例如，这是`uid=david`的记录：
 - en: '[PRE50]'
+  id: totrans-416
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: What would happen to the `cn=Admins` group if we deleted this record for `uid=david`
     from the directory information tree? Nothing! The `cn=Admins` group would still
     contain a member attribute with the DN for `uid=david`. By default, SLAPD does
     not do any searching for references to a modified or removed DN. Why? The assumption
     has generally been that such tasks are the responsibility of the applications
     that access and modify the directory.
+  id: totrans-417
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果我们从目录信息树中删除了`uid=david`的记录，`cn=Admins`组会发生什么？什么也不会发生！`cn=Admins`组仍然会包含一个成员属性，指向`uid=david`的DN。默认情况下，SLAPD不会对修改或删除的DN进行任何引用搜索。为什么？通常的假设是，这类任务应该由访问和修改目录的应用程序负责。
 - en: But keeping a directory free of invalid references is not a job that everyone
     wants to leave to external applications. For that reason the OpenLDAP developers
     created the RefInt overlay, which makes the task of maintaining referential integrity
     the responsibility of SLAPD.
+  id: totrans-418
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，保持目录中没有无效引用并不是每个人都愿意交给外部应用程序的任务。因此，OpenLDAP开发人员创建了RefInt覆盖层，使得维护参照完整性的任务变成SLAPD的责任。
 - en: 'There are two cases when the RefInt overlay kicks into action:'
+  id: totrans-419
   prefs: []
   type: TYPE_NORMAL
+  zh: RefInt覆盖层会在两种情况下启动：
 - en: 'When a DN is modified (via a `modrdn` operation): The RefInt overlay does a
     search of the directory (searching only the values of the attributes specified
     in the configuration), and replacing any occurrences of the old DN with the newly
     modified DN'
+  id: totrans-420
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 当一个DN被修改（通过`modrdn`操作）时：RefInt覆盖层会搜索目录（仅搜索配置中指定的属性值），并将旧的DN替换为新的修改后的DN。
 - en: 'When a record is removed (with a `delete` operation): The RefInt overlay searches
     the directory (looking for the specified attributes only), and deletes any references
     to the DN that it finds'
+  id: totrans-421
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 当记录被删除（通过`delete`操作）时：RefInt覆盖层会搜索目录（仅查找指定的属性），并删除它找到的所有引用该DN的项。
 - en: We will look at examples of these, but first let's configure the overlay.
+  id: totrans-422
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们将查看这些例子的实际情况，但首先让我们配置覆盖。
 - en: Configuring the Overlay
+  id: totrans-423
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 配置覆盖
 - en: 'The first step to configuring the overlay is to make sure the module is loaded.
     This is done (as always) by adding a `moduleload` directive in the basic section
     of the `slapd.conf` file, before the first database section:'
+  id: totrans-424
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置覆盖的第一步是确保模块已加载。与往常一样，方法是在`slapd.conf`文件的基本部分中，在第一个数据库部分之前添加`moduleload`指令：
 - en: '[PRE51]'
+  id: totrans-425
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: This example builds on our earlier `moduleload` example. Only the highlighted
     line has been added.
+  id: totrans-426
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个例子基于我们之前的`moduleload`例子。只有高亮的那一行被添加了进来。
 - en: 'Next, we want to add the overlay to the stack, and configure it for operation.
     These configuration directives go in each database section for which we want to
     use the overlay:'
+  id: totrans-427
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们希望将覆盖添加到栈中，并为其配置操作。这些配置指令应该放在我们希望使用该覆盖的每个数据库部分中：
 - en: '[PRE52]'
+  id: totrans-428
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: The first line, the `overlay` directive, adds RefInt to the overlay stack. Remember,
     it's position relative to other `overlay` directives will determine its position
     on the overlay stack.
+  id: totrans-429
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一行的`overlay`指令将RefInt添加到覆盖栈中。记住，它相对于其他`overlay`指令的位置将决定它在覆盖栈中的位置。
 - en: On the next line is the `refint_attributes` directive. This directive takes
     a list of attributes (separated by whitespace characters) that will be searched
     whenever a `modrdn` or `delete` operation is performed. We want to include all
     of the attributes that we want SLAPD to maintain referential integrity for.
+  id: totrans-430
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一行是`refint_attributes`指令。此指令接受一个由空格分隔的属性列表，每当执行`modrdn`或`delete`操作时，这些属性将被搜索。我们希望包括所有希望SLAPD维护引用完整性的属性。
 - en: Since we have records that are `groupOfNames` and `groupOfUniqueNames` object
     classes, we want the RefInt overlay to check the `member` and `uniqueMember` attributes.
     The `seeAlso` attribute, which is an attribute allowed for `organization`, `organizationalUnit`,
     and `person` objects (all of which are used in our directory information tree),
     takes a DN for a value, so we want RefInt to check it as well.
+  id: totrans-431
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于我们有`groupOfNames`和`groupOfUniqueNames`对象类的记录，我们希望RefInt覆盖检查`member`和`uniqueMember`属性。`seeAlso`属性是一个允许用于`organization`、`organizationalUnit`和`person`对象的属性（这些对象都在我们的目录信息树中使用），它的值是一个DN，所以我们希望RefInt也检查它。
 - en: Tip
+  id: totrans-432
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: '**The seeAlso Attribute**'
+  id: totrans-433
   prefs: []
   type: TYPE_NORMAL
+  zh: '**seeAlso属性**'
 - en: The `seeAlso` attribute, which allows only values that are DNs, is used to indicate
     a connection between the record that contains the `seeAlso` attribute, and the
     record or records that the `seeAlso` attribute points to. There are other attributes,
     such as the `manager` attribute for `inetOrgPerson` objects, which also take DN
     values.
+  id: totrans-434
   prefs: []
   type: TYPE_NORMAL
+  zh: '`seeAlso`属性仅允许值为DN，用于表示包含`seeAlso`属性的记录与`seeAlso`属性指向的记录或多个记录之间的连接。还有其他属性，如`inetOrgPerson`对象的`manager`属性，也允许使用DN值。'
 - en: The last directive, `refint_nothing`, is used in special cases when RefInt is
     responding to a `delete` operation.
+  id: totrans-435
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后的指令`refint_nothing`用于特殊情况，当RefInt响应`delete`操作时。
 - en: Sometimes it is not possible for RefInt to delete an attribute value. This happens
     when a record must (according to the schema) have at least one such attribute
     value. For example, any `groupOfNames` object must have at least one `member`
     attribute value. The schema does not allow groups with no members.
+  id: totrans-436
   prefs: []
   type: TYPE_NORMAL
+  zh: 有时候，RefInt无法删除一个属性值。这发生在根据模式要求，记录必须至少拥有一个此类属性值的情况下。例如，任何`groupOfNames`对象必须至少有一个`member`属性值。模式不允许没有成员的组。
 - en: But what if deleting an entry would require RefInt to remove the only `member`
     attribute from a group? We wouldn't want RefInt to try to violate the server's
     schema constraints.
+  id: totrans-437
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，如果删除一个条目需要RefInt删除某个组的唯一`member`属性，该怎么办呢？我们不希望RefInt违反服务器的模式约束。
 - en: 'RefInt avoids the problem this way: RefInt adds the DN in `refint_nothing`
     as a value for that attribute, and then deletes the other attribute. Effectively,
     it replaces the deleted value with a known placeholder value.'
+  id: totrans-438
   prefs: []
   type: TYPE_NORMAL
+  zh: RefInt通过这种方式避免了问题：RefInt将`refint_nothing`中的DN作为该属性的值，然后删除其他属性。实际上，它用已知的占位符值替换了被删除的值。
 - en: In the previous example we have set the `refint_nothing` DN to be `cn=EMPTY`.
     There is no entry in our directory information tree named `cn=EMPTY` (though if
     there were, it would cause no problems).
+  id: totrans-439
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的例子中，我们将`refint_nothing` DN设置为`cn=EMPTY`。我们的目录信息树中没有名为`cn=EMPTY`的条目（虽然如果有，也不会引发任何问题）。
 - en: Modifying the Records
+  id: totrans-440
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 修改记录
 - en: 'Now, we will add two records to our directory:'
+  id: totrans-441
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们将向我们的目录中添加两条记录：
 - en: '[PRE53]'
+  id: totrans-442
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: The first record is for a new `inetOrgPerson` with the UID `marcus`. The second
     record defines the `cn=Public` `Relations` group which currently has one member,
     `uid=marcus`. What happens to the `member` attribute of `cn=Public` `Relations`
     if we delete the record for `uid=marcus` by using the following command?
+  id: totrans-443
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一条记录是一个新的 `inetOrgPerson`，UID 为 `marcus`。第二条记录定义了 `cn=Public` `Relations` 组，该组当前有一个成员
+    `uid=marcus`。如果我们使用以下命令删除 `uid=marcus` 的记录，那么 `cn=Public` `Relations` 的 `member`
+    属性会发生什么变化呢？
 - en: '[PRE54]'
+  id: totrans-444
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'Now, we search for the `cn=Public` `Relations` group:'
+  id: totrans-445
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们搜索 `cn=Public` `Relations` 组：
 - en: '[PRE55]'
+  id: totrans-446
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'The record looks like this:'
+  id: totrans-447
   prefs: []
   type: TYPE_NORMAL
+  zh: 该记录看起来像这样：
 - en: '[PRE56]'
+  id: totrans-448
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: As the last line of the code illustrates, there is still one member (the `groupOfNames`
     schema requires that there be one) but, thanks to the RefInt overlay, it no longer
     points to the deleted `uid=marcus` record. Instead it points to the DN we specified
     in `refint_nothing`.
+  id: totrans-449
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如代码的最后一行所示，仍然有一个成员（`groupOfNames` 模式要求至少有一个成员），但是得益于 RefInt 覆盖，它不再指向已删除的 `uid=marcus`
+    记录。相反，它指向我们在 `refint_nothing` 中指定的 DN。
 - en: 'Usually, though, the record will have more than one member attribute, like
     the `cn=Admins` example earlier. In such a case when one of those DNs is deleted,
     the attribute value is completely removed. Consider a modified version of our
     `cn=Public` `Relations` group:'
+  id: totrans-450
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常，记录将包含多个成员属性，像之前的 `cn=Admins` 示例一样。在这种情况下，当其中一个 DN 被删除时，属性值将被完全移除。考虑我们修改后的
+    `cn=Public` `Relations` 组：
 - en: '[PRE57]'
+  id: totrans-451
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: 'If the record for `uid=marcus` was deleted in this case, then the RefInt overlay
     would simply delete the second member attribute value, leaving the group looking
     like this:'
+  id: totrans-452
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果在这种情况下删除了 `uid=marcus` 的记录，那么 RefInt 覆盖将简单地删除第二个成员属性值，使得该组看起来像这样：
 - en: '[PRE58]'
+  id: totrans-453
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: The value of `refint_nothing` is used only when required.
+  id: totrans-454
   prefs: []
   type: TYPE_NORMAL
+  zh: '`refint_nothing` 的值仅在需要时使用。'
 - en: 'These last two examples have dealt with cases where the `delete` operation
     is used. But the RefInt overlay also handles changes to DNs made with the `modrdn`
     operation. For example, what if instead of deleting the record for `uid=marcus`
     we changed the DN? Using the previous example let''s begin with the same two records:'
+  id: totrans-455
   prefs: []
   type: TYPE_NORMAL
+  zh: 这最后两个示例涉及的是使用 `delete` 操作的情况。但是 RefInt 覆盖还处理使用 `modrdn` 操作更改 DN 的情况。例如，如果我们不是删除
+    `uid=marcus` 的记录，而是更改了 DN 会怎么样？使用之前的示例，让我们从相同的两条记录开始：
 - en: '[PRE59]'
+  id: totrans-456
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: 'Let''s change the DN of the first record to use Marcus Tullius''s better-known
     name:'
+  id: totrans-457
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们将第一条记录的 DN 改为 Marcus Tullius 更为人知的名字：
 - en: '[PRE60]'
+  id: totrans-458
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: 'In the previous example, we are changing the DN `uid=marcus,ou=users,dc=example,dc=com`,
     replacing the relative DN portion (`uid=marcus`) with a new relative DN: `uid=cicero`.
     Now the first record looks like this:'
+  id: totrans-459
   prefs: []
   type: TYPE_NORMAL
+  zh: 在之前的示例中，我们更改了 DN `uid=marcus,ou=users,dc=example,dc=com`，用一个新的相对 DN `uid=cicero`
+    替换了相对 DN 部分 (`uid=marcus`)。现在第一条记录看起来像这样：
 - en: '[PRE61]'
+  id: totrans-460
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: 'The `ldapmodrdn` client added a new `uid` attribute value (`cicero`), and then
     changed the DN of the entry from `uid=marcus,ou=users,dc=example,dc=com` to `uid=cicero,ou=users,dc=example,dc=com`.
     And what about the `cn=Public` `Relations` group? It now looks like this:'
+  id: totrans-461
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ldapmodrdn` 客户端添加了新的 `uid` 属性值 (`cicero`)，然后将条目的 DN 从 `uid=marcus,ou=users,dc=example,dc=com`
+    更改为 `uid=cicero,ou=users,dc=example,dc=com`。那么 `cn=Public` `Relations` 组呢？它现在看起来像这样：'
 - en: '[PRE62]'
+  id: totrans-462
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: The RefInt attribute changed the value of the `member` attribute to point to
     the newly modified DN. Remember, without the RefInt overlay, the `cn=Public` `Relations`
     group would point to the now non-existent DN `uid=marcus,ou=users,dc=example,dc=com`.
+  id: totrans-463
   prefs: []
   type: TYPE_NORMAL
+  zh: RefInt 属性将 `member` 属性的值更改为指向新修改的 DN。记住，如果没有 RefInt 覆盖，`cn=Public` `Relations`
+    组将指向现在已经不存在的 DN `uid=marcus,ou=users,dc=example,dc=com`。
 - en: Drawbacks
+  id: totrans-464
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 缺点
 - en: Are there any drawbacks of using the RefInt overlay? Performance is one issue.
     For every deletion or DN modification, the RefInt overlay will check all the values
     for all of the attributes listed in the `refint_attributes` directive. A large
     number of deletions or DN modifications can have an impact on system performance.
     But in most situations, large-scale `delete` and `modrdn` operations are not the
     norm (and the overlay can always be turned off when doing such operations).
+  id: totrans-465
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 RefInt 覆盖是否存在任何缺点？性能是一个问题。对于每次删除或 DN 修改，RefInt 覆盖将检查 `refint_attributes`
+    指令中列出的所有属性的所有值。大量的删除或 DN 修改可能会影响系统性能。但是在大多数情况下，大规模的 `delete` 和 `modrdn` 操作并不是常见的（而且在进行此类操作时，可以随时关闭该覆盖）。
 - en: There is one other drawback worthy of consideration. Some applications do handle
     their own reference checking. It is possible that a poorly-written client might
     try to delete attribute values that do not exist, generating spurious error messages
@@ -2269,39 +3262,55 @@
     information tree, but it might alarm the user. However, the vast majority of clients,
     including many that perform their own integrity checking, should not be hampered
     by the RefInt overlay.
+  id: totrans-466
   prefs: []
   type: TYPE_NORMAL
+  zh: 还有一个值得考虑的缺点。一些应用程序确实会自行处理引用检查。可能存在一个写得不好的客户端试图删除不存在的属性值，从而生成虚假的错误消息。当然，这不会对目录信息树产生负面影响，但可能会引起用户的警觉。然而，绝大多数客户端，包括许多执行自身完整性检查的客户端，都不应该受到RefInt覆盖层的影响。
 - en: A Useful Note
+  id: totrans-467
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 有用的备注
 - en: 'When starting up SLAPD after installing a new overlay, it is not uncommon to
     get the following warning message:'
+  id: totrans-468
   prefs: []
   type: TYPE_NORMAL
+  zh: 在安装新覆盖层后启动SLAPD时，出现以下警告信息并不少见：
 - en: '[PRE63]'
+  id: totrans-469
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: What does this message mean? And is the problem serious?
+  id: totrans-470
   prefs: []
   type: TYPE_NORMAL
+  zh: 这条信息是什么意思？问题严重吗？
 - en: This warning message can be ignored when configuring OpenLDAP with a `slapd.conf`
     file. It is simply a notice that the configuration options for this overlay cannot
     be changed once the server starts. But this is, of course, how all directives
     in the `slapd.conf` file work.
+  id: totrans-471
   prefs: []
   type: TYPE_NORMAL
+  zh: 在使用`slapd.conf`文件配置OpenLDAP时，可以忽略此警告信息。这只是一个通知，表示一旦服务器启动后，无法更改此覆盖层的配置选项。但当然，所有在`slapd.conf`文件中的指令都是如此。
 - en: This warning message applies only to installations that load their configuration
     into the directory as an LDIF file, and then manage their configuration inside
     of the directory server (using the `cn=Config` record). This feature is fairly
     new, and since it does not support all of the OpenLDAP features (such as many
     overlays), it is not the recommended configuration for most clients.
+  id: totrans-472
   prefs: []
   type: TYPE_NORMAL
+  zh: 该警告信息仅适用于将配置加载到目录作为LDIF文件并在目录服务器内管理配置（使用`cn=Config`记录）的安装。这一功能比较新，并且由于不支持OpenLDAP的所有特性（如许多覆盖层），因此它不是大多数客户端推荐的配置。
 - en: The Uniqueness Overlay
+  id: totrans-473
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 唯一性覆盖层
 - en: The last overlay that we will examine in this section is the uniqueness overlay.
     The uniqueness overlay enforces uniqueness for a configurable set of attributes
     in the directory. It prevents attributes in different records from containing
@@ -2310,161 +3319,236 @@
     system. By default, SLAPD only enforces uniqueness when it comes to DNs—no two
     DNs may be the same. But other attribute values are unchecked. Using the uniqueness
     overlay, we can specify which attributes we want SLAPD to ensure uniqueness for.
+  id: totrans-474
   prefs: []
   type: TYPE_NORMAL
+  zh: 本节中我们将要检查的最后一个覆盖层是唯一性覆盖层。唯一性覆盖层强制执行目录中特定属性集的唯一性。它防止不同记录中的属性包含相同的值。例如，当处理`uid`属性时，这是我们所期望的，因为显然我们不希望系统中多个用户拥有相同的UID。默认情况下，SLAPD只强制执行DN的唯一性——没有两个DN可以相同。但其他属性值则不受检查。通过使用唯一性覆盖层，我们可以指定希望SLAPD强制唯一性的属性。
 - en: 'The first step in configuring the uniqueness overlay is to load the module:'
+  id: totrans-475
   prefs: []
   type: TYPE_NORMAL
+  zh: 配置唯一性覆盖层的第一步是加载该模块：
 - en: '[PRE64]'
+  id: totrans-476
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: In the *Basics* section of `slapd.conf`, we add one more `moduleload` directive.
     The module we want to load is named `unique`.
+  id: totrans-477
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`slapd.conf`的*基本设置*部分，我们添加了一个`moduleload`指令。我们希望加载的模块名为`unique`。
 - en: 'Next we want to add this overlay, along with a few specific directives, to
     the relevant database sections:'
+  id: totrans-478
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，我们希望将此覆盖层和一些特定的指令添加到相关的数据库部分：
 - en: '[PRE65]'
+  id: totrans-479
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: This is a very basic configuration for the uniqueness overlay. The `unique_base`
     directive indicates which parts of the directory information tree we want to enforce
     uniqueness in. For our exercise we want to enforce uniqueness across our entire
     directory tree, `dc=example,dc=com`.
+  id: totrans-480
   prefs: []
   type: TYPE_NORMAL
+  zh: 这是唯一性覆盖层的非常基础的配置。`unique_base`指令指明了我们希望在其中强制实施唯一性的目录信息树的部分。对于我们的练习，我们希望在整个目录树`dc=example,dc=com`中强制实施唯一性。
 - en: The `unique_attributes` directive takes a whitespace-separated list of attributes
     that the uniqueness overlay will enforce uniqueness constraints. In this example
     we just want to enforce uniqueness on the UID attribute.
+  id: totrans-481
   prefs: []
   type: TYPE_NORMAL
+  zh: '`unique_attributes`指令接受一个以空格分隔的属性列表，唯一性覆盖层将在这些属性上强制执行唯一性约束。在此示例中，我们只希望在UID属性上强制执行唯一性。'
 - en: Note
+  id: totrans-482
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 备注
 - en: The behavior of the uniqueness overlay is expected to change in the next version
     of OpenLDAP (version 2.4). In particular, it will support multiple bases inside
     a single database.
+  id: totrans-483
   prefs: []
   type: TYPE_NORMAL
+  zh: 唯一性叠加层的行为预计将在下一个版本的 OpenLDAP（版本 2.4）中发生变化。特别是，它将支持在单个数据库中使用多个基。
 - en: Thus, according to our configuration, no two UID values for any records in the
     `dc=example,dc=com` directory information tree should be identical.
+  id: totrans-484
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，根据我们的配置，`dc=example,dc=com` 目录信息树中任何记录的 UID 值都不应该相同。
 - en: Now let's see how this overlay works in practice.
+  id: totrans-485
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在让我们看看这个叠加层在实际中的表现。
 - en: 'In the discussion of the RefInt overlay, we created the following record:'
+  id: totrans-486
   prefs: []
   type: TYPE_NORMAL
+  zh: 在讨论 RefInt 叠加层时，我们创建了以下记录：
 - en: '[PRE66]'
+  id: totrans-487
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: 'Note that this record has the UID `marcus`, even though this attribute is not
     used in the DN. Now let''s try to add the following record:'
+  id: totrans-488
   prefs: []
   type: TYPE_NORMAL
+  zh: 请注意，这个记录的 UID 是 `marcus`，即使该属性在 DN 中没有被使用。现在让我们尝试添加以下记录：
 - en: '[PRE67]'
+  id: totrans-489
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: This record also uses the UID `marcus`. Without the uniqueness overlay, SLAPD
     would allow both records to have the same UID. This, of course, will cause problems
     for applications that assume that a Unique ID is really unique—only zero or one
     results will be returned for a search on the UID attribute.
+  id: totrans-490
   prefs: []
   type: TYPE_NORMAL
+  zh: 该记录也使用了 UID `marcus`。如果没有唯一性叠加层，SLAPD 会允许这两个记录拥有相同的 UID。当然，这会导致假设唯一 ID 确实是唯一的应用程序出现问题——对
+    UID 属性进行搜索时只会返回零个或一个结果。
 - en: 'But with the uniqueness overlay, as we have configured it, SLAPD will prevent
     clients from adding a UID value that matches an existing UID value. The uniqueness
     overlay does this by checking the attributes in `add`, `modify`, or `modrdn` operations.
     If we try to add the given record for `uid=marcus`, we get an error:'
+  id: totrans-491
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，使用我们配置的唯一性叠加层，SLAPD 将阻止客户端添加与现有 UID 值匹配的 UID 值。唯一性叠加层通过检查 `add`、`modify`
+    或 `modrdn` 操作中的属性来实现这一点。如果我们尝试为 `uid=marcus` 添加记录，会收到一个错误：
 - en: '[PRE68]'
+  id: totrans-492
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: SLAPD sends back a **Constraint violation** error because the uniqueness overlay
     will not allow a duplicate UID attribute value. To work around this, we would
     have to either delete the extra UID attribute from the `uid=cicero` record or
     use a different UID for Marcus Aurelius's record.
+  id: totrans-493
   prefs: []
   type: TYPE_NORMAL
+  zh: SLAPD 返回 **约束违反** 错误，因为唯一性叠加层不允许重复的 UID 属性值。为了解决这个问题，我们必须删除 `uid=cicero` 记录中的额外
+    UID 属性，或者为 Marcus Aurelius 的记录使用一个不同的 UID。
 - en: 'The example configuration we have just seen represents the most typical use
     of the uniqueness overlay. There are two additional uniqueness directives that
     provide more complex configurations:'
+  id: totrans-494
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们刚才看到的示例配置代表了唯一性叠加层最典型的使用方式。还有两个额外的唯一性指令可以提供更复杂的配置：
 - en: The first is the `unique_ignore` directive. Typically, this is used *instead*
     of `unique_attributes`.
+  id: totrans-495
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一个是 `unique_ignore` 指令。通常情况下，这是 *替代* `unique_attributes` 使用的。
 - en: Tip
+  id: totrans-496
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 提示
 - en: 'While you can use both `unique_attributes` and `unique_ignore`, it is not recommended
     because it can cause unexpected behavior. See the man page for more detail: `man`
     `slapo-unique`.'
+  id: totrans-497
   prefs: []
   type: TYPE_NORMAL
+  zh: 虽然你可以同时使用 `unique_attributes` 和 `unique_ignore`，但不推荐这样做，因为这可能会导致意外的行为。有关更多详细信息，请参阅手册页：`man`
+    `slapo-unique`。
 - en: The `unique_ignore` directive takes a whitespace-separated list of attributes
     that *should* *not* be tested for uniqueness. There are attributes, such as `ou`,
     `sn`, and `objectclass`, that are likely to be legitimately used more than once
     in a directory. For example, it is perfectly possible for multiple people in an
     organization to have the same surname, and thus have identical `sn` attribute
     values.
+  id: totrans-498
   prefs: []
   type: TYPE_NORMAL
+  zh: '`unique_ignore` 指令接受一个由空格分隔的属性列表，这些属性 *不应该* 被测试是否唯一。某些属性，如 `ou`、`sn` 和 `objectclass`，可能会在目录中合法地被多次使用。例如，组织中多个员工可能有相同的姓氏，因此具有相同的
+    `sn` 属性值是完全可能的。'
 - en: 'But when `unique_attributes` is not specified, then by default all *non-operational*
     *attributes* are assumed to require uniqueness. Consider this example configuration:'
+  id: totrans-499
   prefs: []
   type: TYPE_NORMAL
+  zh: 但是，当没有指定 `unique_attributes` 时，默认情况下所有 *非操作性* *属性* 都会被假定为需要唯一性。请考虑这个示例配置：
 - en: '[PRE69]'
+  id: totrans-500
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: According to this configuration, all of the attribute values in the directory
     information tree except `objectclass`, `sn`, `ou`, and `description` will be required
     to have unique values. Obviously, this configuration is far more restrictive than
     our first example and it should be used with care.
+  id: totrans-501
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据这个配置，目录信息树中除了 `objectclass`、`sn`、`ou` 和 `description` 外，所有属性值都必须具有唯一值。显然，这个配置比我们第一个示例更为严格，使用时需要小心。
 - en: Note
+  id: totrans-502
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Operational parameters—those intended for internal SLAPD use—are not automatically
     added to the uniqueness list under any circumstances. Doing so might cause hard-to-debug
     errors that would prevent SLAPD from functioning properly.
+  id: totrans-503
   prefs: []
   type: TYPE_NORMAL
+  zh: 操作参数——那些用于内部SLAPD的参数——在任何情况下都不会自动添加到唯一性列表中。这样做可能会导致难以调试的错误，从而阻止SLAPD正常工作。
 - en: Finally, there is one additional directive for the unique overlay. The `unique_strict`
     directive, which takes no parameters, can be used to turn on "strict" uniqueness
     enforcement.
+  id: totrans-504
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，关于唯一性覆盖层，还有一个额外的指令。`unique_strict`指令不带参数，可用于开启“严格”的唯一性强制。
 - en: By default, the uniqueness overlay allows multiple attributes to have empty
     (null) values. For example, if we enforce uniqueness on the `uid` attribute, SLAPD
     would still allow multiple records to have a UID attribute with an empty value.
     But this is not always desirable. Under some circumstances, it might be necessary
     to ensure that no more than one attribute has an empty value. The `unique_strict`
     directive is used for this purpose.
+  id: totrans-505
   prefs: []
   type: TYPE_NORMAL
+  zh: 默认情况下，唯一性覆盖层允许多个属性具有空（null）值。例如，如果我们强制执行`uid`属性的唯一性，SLAPD仍然允许多个记录具有空值的UID属性。但这并不总是可取的。在某些情况下，可能需要确保只有一个属性具有空值。`unique_strict`指令用于此目的。
 - en: When the `unique_strict` directive is present, the uniqueness overlay will not
     allow a client to set an attribute value to empty (null) if another instance of
     the same attribute already exists and already has an empty value.
+  id: totrans-506
   prefs: []
   type: TYPE_NORMAL
+  zh: 当`unique_strict`指令存在时，如果相同属性的另一个实例已经存在且其值为空（null），唯一性覆盖层将不允许客户端将该属性值设置为空。
 - en: At this point, you should have a good idea of how to use overlays. We have looked
     at three different overlays but in the coming chapters we will look at several
     more.
+  id: totrans-507
   prefs: []
   type: TYPE_NORMAL
+  zh: 到此为止，你应该对如何使用覆盖层有了一个较好的了解。我们已经看过了三种不同的覆盖层，但在接下来的章节中，我们将研究更多的覆盖层。
 - en: Summary
+  id: totrans-508
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: The focus of this chapter has been on advanced configuration of the SLAPD server.
     We began by taking a second look at the `slapd.conf` file. Then we added an additional
     database to our directory server, supporting a second directory information tree.
@@ -2472,15 +3556,22 @@
     in the `slapd.conf` file, and also tuning the Berkeley DB's `DB_CONFIG` file.
     In the last section we looked at SLAPD's overlay engine, touring three specific
     overlays.
+  id: totrans-509
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章的重点是SLAPD服务器的高级配置。我们从重新审视`slapd.conf`文件开始。然后，我们向目录服务器添加了一个额外的数据库，支持第二个目录信息树。从那里，我们探讨了使用`slapd.conf`文件中的指令来提升SLAPD性能的方法，还调优了Berkeley
+    DB的`DB_CONFIG`文件。在最后一部分，我们研究了SLAPD的覆盖层引擎，介绍了三种特定的覆盖层。
 - en: By now you should feel comfortable working with the `slapd.conf` file as well
     as using overlays.
+  id: totrans-510
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，你应该已经能够舒适地使用`slapd.conf`文件，并且掌握覆盖层的使用。
 - en: In the next chapter we will examine LDAP schemas, adding a few schemas for new
     overlays, and then creating our own schema. Later, in Chapter 7, we will expand
     upon some of the themes in this chapter when we look at the ways to configure
     multiple OpenLDAP servers to work together.
+  id: totrans-511
   prefs: []
   type: TYPE_NORMAL
+  zh: 在下一章，我们将研究LDAP模式，添加一些新的覆盖层的模式，然后创建我们自己的模式。稍后，在第7章中，我们将在讨论如何配置多个OpenLDAP服务器协同工作时，扩展本章中的一些主题。
