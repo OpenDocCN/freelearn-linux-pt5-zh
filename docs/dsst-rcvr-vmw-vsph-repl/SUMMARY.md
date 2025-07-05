@@ -1,0 +1,7 @@
++   [VMware vSphere 灾难恢复指南](README.md)
++   [前言](dsst-rcvr-vmw-vsph-repl_0.md)
++   [第一章：安装和配置 vCenter 站点恢复管理器（SRM）5.5](dsst-rcvr-vmw-vsph-repl_1.md)
++   [第二章：创建保护组和恢复计划](dsst-rcvr-vmw-vsph-repl_2.md)
++   [第三章：测试和执行故障切换与故障恢复](dsst-rcvr-vmw-vsph-repl_3.md)
++   [第四章：部署 vSphere 复制 5.5](dsst-rcvr-vmw-vsph-repl_4.md)
++   [第五章：配置和使用 vSphere 复制 5.5](dsst-rcvr-vmw-vsph-repl_5.md)

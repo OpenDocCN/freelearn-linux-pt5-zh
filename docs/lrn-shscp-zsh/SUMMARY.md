@@ -1,0 +1,8 @@
++   [ZSH 脚本编程学习指南](README.md)
++   [前言](lrn-shscp-zsh_0.md)
++   [第一章. 入门](lrn-shscp-zsh_1.md)
++   [第二章：别名与历史](lrn-shscp-zsh_2.md)
++   [第三章：高级编辑](lrn-shscp-zsh_3.md)
++   [第四章 Globbing](lrn-shscp-zsh_4.md)
++   [第五章：补全](lrn-shscp-zsh_5.md)
++   [第六章：提示与技巧](lrn-shscp-zsh_6.md)
