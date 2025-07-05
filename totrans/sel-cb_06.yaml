@@ -1,77 +1,111 @@
 - en: Chapter 6. Setting Up Separate Roles
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第6章：设置独立角色
 - en: 'In this chapter, we will cover the following topics:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将介绍以下主题：
 - en: Managing SELinux users
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 管理 SELinux 用户
 - en: Mapping Linux users to SELinux users
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 将 Linux 用户映射到 SELinux 用户
 - en: Running commands in a specified role with sudo
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 sudo 在指定角色中运行命令
 - en: Running commands in a specified role with runcon
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用 runcon 在指定角色中运行命令
 - en: Switching roles
+  id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 切换角色
 - en: Creating a new role
+  id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建新角色
 - en: Initial role based on entry
+  id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 基于条目的初始角色
 - en: Defining role transitions
+  id: totrans-9
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 定义角色过渡
 - en: Looking into access privileges
+  id: totrans-10
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 查看访问权限
 - en: Introduction
+  id: totrans-11
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 介绍
 - en: Roles provide a flexible, manageable approach to grant multiple users the proper
     rights. Instead of assigning privileges to individual users, roles are created
     to which privileges are granted. Users are then granted the role and inherit the
     privileges associated with this role.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 角色提供了一种灵活且可管理的方式来授予多个用户适当的权限。与其将权限分配给单个用户，不如创建角色并将权限授予这些角色。然后，用户被授予该角色并继承与该角色相关联的权限。
 - en: In SELinux, roles are used to grant access to domains. An application domain
     that is used to manage certificates on a system is assigned to one or more roles,
     thus allowing users with that role to possibly transition into that application
     domain. If the user role does not have this privilege, then the necessary permissions
     to manage certificates through that application domain are not accessible for
     the user.
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 SELinux 中，角色用于授予访问域的权限。用于管理系统证书的应用程序域被分配给一个或多个角色，从而允许具有该角色的用户可能会过渡到该应用程序域。如果用户角色没有此权限，则无法通过该应用程序域访问管理证书所需的权限。
 - en: 'The following diagram shows the relation between Linux logins (regular Linux
     accounts), SELinux users, SELinux roles, and SELinux domains:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下图示显示了 Linux 登录（普通 Linux 帐户）、SELinux 用户、SELinux 角色和 SELinux 域之间的关系：
 - en: '![Introduction](img/9669OS_06_01.jpg)'
+  id: totrans-15
   prefs: []
   type: TYPE_IMG
+  zh: '![Introduction](img/9669OS_06_01.jpg)'
 - en: To assign roles to users, Linux accounts are first mapped to an SELinux user.
     An SELinux user defines which roles are accessible (as users can have multiple
     roles assigned) as well as which security clearance the user can have at most
     (although lower security clearances can be assigned to users individually as well).
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了将角色分配给用户，首先将 Linux 帐户映射到 SELinux 用户。一个 SELinux 用户定义了哪些角色是可访问的（因为用户可以分配多个角色），以及该用户最多可以拥有的安全权限（尽管较低的安全权限也可以单独分配给用户）。
 - en: On systems where SELinux is primarily meant to confine network-facing services
     and not the users, this chapter will have little value. All users on these systems
     are mapped to the `unconfined_u` SELinux user, which has a default user domain
@@ -79,173 +113,258 @@
     When this is applicable, most distributions call the SELinux policy store **targeted**
     to reflect that the confinement is targeting specific applications and not the
     entire system.
+  id: totrans-17
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 SELinux 主要用于限制面向网络的服务而非用户的系统中，本章的内容价值较小。这些系统上的所有用户都映射到`unconfined_u` SELinux
+    用户，具有默认的用户域`unconfined_t`，并且几乎不受限制——因此，称之为 unconfined。当这种情况适用时，大多数发行版将 SELinux
+    策略存储称为 **targeted**，以反映限制目标是特定应用程序，而不是整个系统。
 - en: Managing SELinux users
+  id: totrans-18
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 管理 SELinux 用户
 - en: In order to grant a Linux login the right set of roles, we first need to create
     an SELinux user that has just those roles assigned. Existing SELinux users can
     be modified easily, and if an SELinux user was added previously, it can be removed
     from the system as well.
+  id: totrans-19
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了授予 Linux 登录正确的角色，我们首先需要创建一个具有这些角色的 SELinux 用户。现有的 SELinux 用户可以轻松修改，如果之前已添加
+    SELinux 用户，也可以将其从系统中移除。
 - en: How to do it…
+  id: totrans-20
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Managing SELinux users is done as follows:'
+  id: totrans-21
   prefs: []
   type: TYPE_NORMAL
+  zh: SELinux 用户管理如下进行：
 - en: 'Use `semanage user` to list the currently available SELinux users:'
+  id: totrans-22
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用`semanage user`列出当前可用的 SELinux 用户：
 - en: '[PRE0]'
+  id: totrans-23
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'If no SELinux user exists yet, with the right set of roles, create it with
     `semanage user`. For instance, to create a database administration SELinux user,
     run the following command:'
+  id: totrans-24
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果尚未存在 SELinux 用户，在正确的角色设置下，可以使用`semanage user`创建它。例如，要创建一个数据库管理 SELinux 用户，运行以下命令：
 - en: '[PRE1]'
+  id: totrans-25
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'Existing users can be modified as follows:'
+  id: totrans-26
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现有用户可以按如下方式进行修改：
 - en: '[PRE2]'
+  id: totrans-27
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'An SELinux user can also be removed from the system:'
+  id: totrans-28
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 也可以将 SELinux 用户从系统中删除：
 - en: '[PRE3]'
+  id: totrans-29
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: How it works…
+  id: totrans-30
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: When an SELinux user is created, SELinux will update its configuration files
     at `/etc/selinux/` to include support for this SELinux user. It is a general best
     practice to name SELinux users after their functional purpose, so a **database
     administrator** (**DBA**) is called `dbadm_u`, whereas a website administrator
     is called `webadm_u`.
+  id: totrans-31
   prefs: []
   type: TYPE_NORMAL
+  zh: 当创建一个 SELinux 用户时，SELinux 会更新其 `/etc/selinux/` 下的配置文件，以支持该 SELinux 用户。按照功能命名
+    SELinux 用户是一个常见的最佳实践，因此，**数据库管理员**（**DBA**）被命名为 `dbadm_u`，而网站管理员则被命名为 `webadm_u`。
 - en: 'The set of roles that are available to the administrator can be obtained using
     `seinfo`:'
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以使用 `seinfo` 获取管理员可用的角色集：
 - en: '[PRE4]'
+  id: totrans-33
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: Existing SELinux users can be modified. However, it is important that logged-in
     users are logged out (and perhaps temporarily locked) from the system during the
     change. Otherwise, the SELinux policy could suddenly mark their session as having
     an invalid context and interrupt those users in their operations.
+  id: totrans-34
   prefs: []
   type: TYPE_NORMAL
+  zh: 现有的 SELinux 用户可以被修改。然而，重要的是在修改过程中，已登录的用户必须退出（并可能暂时被锁定）系统。否则，SELinux 策略可能会突然标记他们的会话为无效上下文，并中断这些用户的操作。
 - en: When an SELinux user is removed from the system, it is also important that all
     the remaining files that have this SELinux user in their context are relabeled.
     Otherwise, these files (and other resources) are labeled with an invalid context,
     making the files and resources inaccessible to others.
+  id: totrans-35
   prefs: []
   type: TYPE_NORMAL
+  zh: 当一个 SELinux 用户从系统中删除时，还必须重新标记所有剩余文件，这些文件的上下文中包含该 SELinux 用户。否则，这些文件（以及其他资源）会被标记为无效上下文，使得其他人无法访问这些文件和资源。
 - en: Once an SELinux user is created, it is ready to be assigned to one or more Linux
     users.
+  id: totrans-36
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦创建了 SELinux 用户，它就准备好分配给一个或多个 Linux 用户。
 - en: There's more...
+  id: totrans-37
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 还有更多……
 - en: 'With SELinux users, MLS settings can be provided as well. For instance, to
     set a specific security clearance, the following command is used:'
+  id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用 SELinux 用户时，也可以提供 MLS 设置。例如，要设置特定的安全权限，可以使用以下命令：
 - en: '[PRE5]'
+  id: totrans-39
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: For an SELinux user, this is the upper limit of the security clearance that
     a users' context can be in. When we assign users to an SELinux user, it is possible
     to force a lower security clearance individually so that there is no need to create
     separate SELinux users for every difference in security clearance.
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于 SELinux 用户，这是用户上下文所能拥有的最高安全权限。当我们将用户分配给 SELinux 用户时，可以强制单独设置较低的安全权限，这样就无需为每个不同的安全权限创建单独的
+    SELinux 用户。
 - en: Mapping Linux users to SELinux users
+  id: totrans-41
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 将 Linux 用户映射到 SELinux 用户
 - en: With the SELinux users available, we can now map Linux users to SELinux users.
     This will ensure that the users, when logged in to the system, are assigned a
     default context aligned with this SELinux user.
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 有了可用的 SELinux 用户后，我们现在可以将 Linux 用户映射到 SELinux 用户。这将确保用户在登录系统时，会被分配与该 SELinux
+    用户一致的默认上下文。
 - en: How to do it…
+  id: totrans-43
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'In order to map Linux users to SELinux users, the following steps can be taken:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了将 Linux 用户映射到 SELinux 用户，可以执行以下步骤：
 - en: 'List the existing mappings with `semanage login`:'
+  id: totrans-45
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 使用 `semanage login` 列出现有的映射：
 - en: '[PRE6]'
+  id: totrans-46
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'For an individual user account, map the account to an SELinux user with `semanage
     login`:'
+  id: totrans-47
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 对于单个用户账户，通过 `semanage login` 将该账户映射到 SELinux 用户：
 - en: '[PRE7]'
+  id: totrans-48
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'It is also possible to assign a group of users to an SELinux user through their
     primary Linux group. For instance, if a `dba` group exists, it can be assigned
     to an SELinux user as follows:'
+  id: totrans-49
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 也可以通过主 Linux 组将一组用户分配给一个 SELinux 用户。例如，如果存在 `dba` 组，可以通过以下方式将其分配给一个 SELinux
+    用户：
 - en: '[PRE8]'
+  id: totrans-50
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'Mappings can be modified easily:'
+  id: totrans-51
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 映射可以轻松修改：
 - en: '[PRE9]'
+  id: totrans-52
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'If a mapping is no longer needed, it can be removed as well:'
+  id: totrans-53
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果某个映射不再需要，也可以将其删除：
 - en: '[PRE10]'
+  id: totrans-54
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: How it works…
+  id: totrans-55
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: The `semanage login` application manages the `seusers` file in `/etc/selinux/`.
     This file is used by SELinux's `pam_selinux.so` authentication library that is
     called when a user logs in to a system. Upon invocation, SELinux will check the
@@ -253,8 +372,12 @@
     then perform an SELinux context switch so that the rest of the login process (including
     the shell or graphical environment that is launched) will have the right SELinux
     context assigned to it.
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: '`semanage login` 应用程序管理 `/etc/selinux/` 下的 `seusers` 文件。此文件由 SELinux 的 `pam_selinux.so`
+    认证库使用，在用户登录系统时会被调用。调用时，SELinux 会检查 `seusers` 文件，以查看 Linux 账户映射到哪个 SELinux 用户。然后，SELinux
+    会执行一个 SELinux 上下文切换，使得后续的登录过程（包括启动的 shell 或图形环境）会被分配正确的 SELinux 上下文。'
 - en: 'Creating login mappings does not influence the existing sessions, so if a user
     is already logged in, it is wise to have the user log out first. Also, any files
     created by the user in the past might have a wrong SELinux user associated with
@@ -264,15 +387,21 @@
     feature in SELinux is enabled, then these files will not be accessible anymore
     by the user. In this case, the administrator will need to relabel the files forcefully
     (which includes resetting the SELinux user):'
+  id: totrans-57
   prefs: []
   type: TYPE_NORMAL
+  zh: 创建登录映射不会影响现有的会话，因此如果用户已经登录，最好先让用户注销。此外，用户过去创建的任何文件可能会关联错误的SELinux用户。如果SELinux中的用户基础访问控制功能启用，则这些文件将不再被该用户访问。在这种情况下，管理员需要强制重新标记这些文件（包括重置SELinux用户）：
 - en: '[PRE11]'
+  id: totrans-58
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: In case of both user mappings and group-based mappings, the first mapping that
     is mentioned in the `seusers` file that matches a particular login is used.
+  id: totrans-59
   prefs: []
   type: TYPE_NORMAL
+  zh: 在用户映射和基于组的映射中，`seusers`文件中第一个提到的匹配特定登录的映射将被使用。
 - en: When a user logs in and no mapping matches the login itself (either through
     a direct match against a Linux account name or through a group membership), then
     SELinux will look at the login mapping for the `__default__` user. This is a special
@@ -280,403 +409,578 @@
     user is usually mapped to the `unconfined_u` SELinux user. On systems without
     unconfined users, `__default__` usually maps to the (unprivileged) `user_u` SELinux
     user.
+  id: totrans-60
   prefs: []
   type: TYPE_NORMAL
+  zh: 当用户登录并且没有映射与该登录本身匹配时（无论是直接匹配Linux帐户名称还是通过组成员身份），SELinux将查看`__default__`用户的登录映射。这是一个特殊规则，充当回退规则。在具有无约束用户的系统上，`__default__`用户通常映射到`unconfined_u`
+    SELinux用户。在没有无约束用户的系统上，`__default__`通常映射到（无特权的）`user_u` SELinux用户。
 - en: Running commands in a specified role with sudo
+  id: totrans-61
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用sudo在指定角色下运行命令
 - en: When a user has been assigned multiple roles, they usually work with their primary
     role (such as `staff_r`) and only selectively execute commands with the other
     role. This can be accomplished through the `sudo` command, as these commands usually
     also require a different Linux user (which can be `root` or the `postgresql` account
     for DBA tasks on the PostgreSQL database server).
+  id: totrans-62
   prefs: []
   type: TYPE_NORMAL
+  zh: 当一个用户被分配多个角色时，他们通常会使用其主要角色（例如`staff_r`），并仅有选择性地执行其他角色的命令。这可以通过`sudo`命令来完成，因为这些命令通常还需要不同的Linux用户（可以是`root`或用于PostgreSQL数据库服务器上的DBA任务的`postgresql`帐户）。
 - en: How to do it…
+  id: totrans-63
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'In order to configure `sudo` to perform the right role and type transition,
     execute the following steps:'
+  id: totrans-64
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了配置`sudo`以执行正确的角色和类型转换，请执行以下步骤：
 - en: 'Open up the `sudoers` file through `visudo`:'
+  id: totrans-65
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过`visudo`打开`sudoers`文件：
 - en: '[PRE12]'
+  id: totrans-66
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Define the commands that the user(s) are allowed to execute. For instance,
     to allow all users in the `dba` group to call `initdb` in the `dbadm_r` role,
     define the commands as follows:'
+  id: totrans-67
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 定义用户（们）可以执行的命令。例如，要允许`dba`组中的所有用户在`dbadm_r`角色中调用`initdb`，可以按如下方式定义命令：
 - en: '[PRE13]'
+  id: totrans-68
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: 'The users in the `dba` group can now call `initdb`, and `sudo` will automatically
     switch to the `dbadm_r` role and the `dbadm_t` user domain when `initdb` is called:'
+  id: totrans-69
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，`dba`组中的用户可以调用`initdb`，并且当调用`initdb`时，`sudo`会自动切换到`dbadm_r`角色和`dbadm_t`用户域：
 - en: '[PRE14]'
+  id: totrans-70
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: How it works…
+  id: totrans-71
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: The regular user domains that users run with are, by default, not that privileged.
     Although it is possible to extend the privileges of the role and user domains
     directly, the best segregation is provided through different roles. Such an approach
     allows unprivileged user domains, such as `staff_t`, to be used by multiple, different
     organizational roles (and thus, SELinux users).
+  id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 用户运行的常规用户域默认情况下没有那么高的特权。尽管可以直接扩展角色和用户域的特权，但通过不同角色提供最佳的隔离性。这样的方式允许无特权的用户域（例如`staff_t`）被多个不同的组织角色（因此，也可以是SELinux用户）使用。
 - en: Once a privileged command needs to be executed, users will need to switch their
     active role. If this is only needed for a small set of commands, which also require
     switching the Linux user itself (such as switching to the `postgres` runtime account),
     then privilege delegation tools such as `sudo` are often used.
+  id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦需要执行特权命令，用户将需要切换其活动角色。如果这仅仅是需要执行一小部分命令，并且这些命令还需要切换Linux用户（例如切换到`postgres`运行时帐户），那么通常使用`sudo`等权限委托工具。
 - en: 'The `sudo` command is an SELinux-aware application that can be configured to
     assist in switching the SELinux context as well. This can be done through the
     command line directly if the user wants:'
+  id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: '`sudo`命令是一个支持SELinux的应用程序，可以配置为协助切换SELinux上下文。如果用户愿意，也可以直接通过命令行完成：'
 - en: '[PRE15]'
+  id: totrans-75
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: However, most administrators will want to configure this in the `sudoers` file.
     This is more user friendly as the end user does not need to continuously pass
     the role and type parts of the context in which commands need to be executed.
+  id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 然而，大多数管理员会希望在`sudoers`文件中配置此项。这种方式对用户更加友好，因为最终用户不需要不断地传递角色和类型部分的上下文信息来执行命令。
 - en: 'Of course, this requires that the SELinux user that is calling `sudo` has the
     privilege to run commands in the `dbadm_r` role. If not, then even if the `sudoers`
     file mentions that the user can execute the command, the transition (and thus,
     the command) will fail, as shown in the following command:'
+  id: totrans-77
   prefs: []
   type: TYPE_NORMAL
+  zh: 当然，这要求调用`sudo`的SELinux用户具备在`dbadm_r`角色中运行命令的权限。如果没有，那么即使`sudoers`文件中提到用户可以执行该命令，转换（因此，命令）仍然会失败，如下所示：
 - en: '[PRE16]'
+  id: totrans-78
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: See also
+  id: totrans-79
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 另见
 - en: 'For more information on `sudo` and the `sudoers` file, check out their associated
     manual pages:'
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 欲了解有关`sudo`和`sudoers`文件的更多信息，请查阅相关的手册页：
 - en: '[PRE17]'
+  id: totrans-81
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: The main project site for the `sudo` application is at [https://www.sudo.ws](https://www.sudo.ws).
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: '`sudo`应用程序的主要项目网站位于[https://www.sudo.ws](https://www.sudo.ws)。'
 - en: Running commands in a specified role with runcon
+  id: totrans-83
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用`runcon`在指定角色下运行命令
 - en: Using `sudo` is not mandatory. SELinux also provides a command called `runcon`
     that allows users to run a command in a different context. Of course, SELinux
     restrictions still apply—the user must have the proper privileges to execute commands
     with a different context.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用`sudo`并非强制性的。SELinux还提供了一个名为`runcon`的命令，允许用户在不同的上下文中运行命令。当然，SELinux的限制仍然适用——用户必须具备在不同上下文中执行命令的适当权限。
 - en: How to do it…
+  id: totrans-85
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Running a command using a specified role and type is done by completing the
     following steps:'
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用指定的角色和类型运行命令通过完成以下步骤来实现：
 - en: 'Identify the domain in which the command should run, usually by checking the
     executables'' context and searching for the `entrypoint` definition:'
+  id: totrans-87
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确定命令应该在哪个域中运行，通常通过检查可执行文件的上下文并搜索`entrypoint`定义来完成：
 - en: '[PRE18]'
+  id: totrans-88
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'Call the command, passing along the role and target type:'
+  id: totrans-89
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 调用命令，传递角色和目标类型：
 - en: '[PRE19]'
+  id: totrans-90
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: How it works…
+  id: totrans-91
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: 'The `runcon` application tells SELinux that the invocation of the command should
     result in a type and role transition towards the specified type (`auditctl_t`)
     and role (`secadm_r`). SELinux will perform multiple checks and validations before
     this will actually succeed. These checks are as follows:'
+  id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: '`runcon`应用程序告诉SELinux，命令的调用应该导致类型和角色转换，转向指定的类型（`auditctl_t`）和角色（`secadm_r`）。在实际成功之前，SELinux会进行多个检查和验证。这些检查如下：'
 - en: Does the current user have the right to execute `auditctl` (execute rights on
     `auditctl_exec_t`)?
+  id: totrans-93
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 当前用户是否有权执行`auditctl`（在`auditctl_exec_t`上具有执行权限）？
 - en: Is a role switch from the current role (say `staff_r`) to the new role (`secadm_r`)
     allowed?
+  id: totrans-94
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 是否允许从当前角色（比如`staff_r`）切换到新角色（`secadm_r`）？
 - en: Is there a policy in place that allows transition from the current type (say
     `staff_t`) to the selected type (`auditctl_t`)?
+  id: totrans-95
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 是否有策略允许从当前类型（比如`staff_t`）转换到所选类型（`auditctl_t`）？
 - en: Is `auditctl_t` a valid target domain if the executed file is `auditctl_exec_t`
     (which is the `entrypoint` check)?
+  id: totrans-96
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 如果执行的文件是`auditctl_exec_t`（即`entrypoint`检查），`auditctl_t`是否是一个有效的目标域？
 - en: Is the target context (such as `staff_u:secadm_r:auditctl_t`) a valid context
     (which implies that the current SELinux user has access to the given role)?
+  id: totrans-97
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 目标上下文（如`staff_u:secadm_r:auditctl_t`）是否是一个有效的上下文（这意味着当前SELinux用户对给定的角色有访问权限）？
 - en: The `runcon` application can be used when no Linux user transition needs to
     occur (although this doesn't exclude the use of `sudo`). In the example of `auditctl`,
     this means that the regular access controls on Linux still apply—if the current
     user does not have the rights to access the files used by `auditctl`, then using
     `runcon` will not suffice.
+  id: totrans-98
   prefs: []
   type: TYPE_NORMAL
+  zh: 当不需要发生Linux用户转换时，可以使用`runcon`应用程序（尽管这并不排除使用`sudo`）。以`auditctl`为例，这意味着Linux上的常规访问控制仍然适用——如果当前用户没有访问`auditctl`所用文件的权限，那么仅使用`runcon`是无法成功的。
 - en: Switching roles
+  id: totrans-99
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 切换角色
 - en: When a role transition is needed for more than just a couple of commands, it
     is necessary to open a shell with the new role. This will ensure that the entire
     session is now running with the new role assigned to it. Every activity performed
     from within this session will then run with the target role.
+  id: totrans-100
   prefs: []
   type: TYPE_NORMAL
+  zh: 当角色转换需要不仅仅是几个命令时，就需要打开一个带有新角色的shell。这样可以确保整个会话都以分配的新角色运行。从该会话中执行的每个活动都会使用目标角色。
 - en: How to do it…
+  id: totrans-101
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'Switching roles with `sudo` or `newrole` is done as follows:'
+  id: totrans-102
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用`sudo`或`newrole`切换角色的步骤如下：
 - en: 'Switching a role can be done using `sudo -i` or `sudo -s` if allowed by the
     `sudoers` file. If the `ROLE` and `TYPE` attributes are set, then the target shell
     will have the proper context assigned:'
+  id: totrans-103
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如果`sudoers`文件允许，可以通过`sudo -i`或`sudo -s`来切换角色。如果设置了`ROLE`和`TYPE`属性，那么目标shell将会有正确的上下文分配：
 - en: '[PRE20]'
+  id: totrans-104
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'Switching roles can also be done using `newrole`:'
+  id: totrans-105
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 也可以使用`newrole`来切换角色：
 - en: '[PRE21]'
+  id: totrans-106
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: How it works…
+  id: totrans-107
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: Getting a shell after switching roles is not all that different from executing
     commands. However, the SELinux policy might not allow running shells and regular
     binaries in the target domain. For instance, a user who is allowed the `puppetca_t`
     domain through some role will not be able to run a shell in this domain, as `puppetca_t`
     is not allowed to be used through a shell—it is a domain for a particular set
     of commands.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 切换角色后获取一个shell与执行命令没有太大区别。然而，SELinux策略可能不允许在目标域中运行shell和常规二进制文件。例如，允许通过某个角色使用`puppetca_t`域的用户将无法在该域中运行shell，因为`puppetca_t`不允许通过shell使用——它是一个特定命令集的域。
 - en: Most user roles have a default user domain associated with them. The default
     user domain for a `dbadm_r` role is `dbadm_t`; the default domain for a `webadm_r`
     role is `webadm_t`. These user domains do have the privileges to be used through
     a shell.
+  id: totrans-109
   prefs: []
   type: TYPE_NORMAL
+  zh: 大多数用户角色都有一个默认的用户域。`dbadm_r`角色的默认用户域是`dbadm_t`；`webadm_r`角色的默认用户域是`webadm_t`。这些用户域具有通过shell使用的权限。
 - en: The `newrole` command only requires the target role, as it will check the default
     type of a role (which is documented in the `default_type` file inside `/etc/selinux/mcs/contexts/`)
     and use this as the target type.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: '`newrole`命令只需要目标角色，因为它会检查角色的默认类型（该类型在`/etc/selinux/mcs/contexts/`内的`default_type`文件中有文档说明），并将其作为目标类型。'
 - en: Creating a new role
+  id: totrans-111
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建新角色
 - en: Roles are part of SELinux policies. In order to create a new role, it isn't
     possible to just invoke a few `semanage` commands. Instead, an SELinux policy
     module will need to be created.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 角色是SELinux策略的一部分。为了创建新角色，不能仅仅执行一些`semanage`命令。相反，需要创建一个SELinux策略模块。
 - en: How to do it…
+  id: totrans-113
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'The SELinux policy needs to be updated in order to create a new role. The following
     steps can be used to do just that:'
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了创建一个新角色，需要更新SELinux策略。可以使用以下步骤来完成此任务：
 - en: Create a new policy module named after the role to be created, such as `pgsqladm`
     (for a PostgreSQL administration role).
+  id: totrans-115
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 创建一个新的策略模块，以角色名称命名，如`pgsqladm`（用于PostgreSQL管理员角色）。
 - en: 'In the policy module, call the `userdom_login_user_template` interface:'
+  id: totrans-116
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在策略模块中，调用`userdom_login_user_template`接口：
 - en: '[PRE22]'
+  id: totrans-117
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'Assign the proper privileges to the `pgsqladm_r` role and `pgsqladm_t` type:'
+  id: totrans-118
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 为`pgsqladm_r`角色和`pgsqladm_t`类型分配适当的权限：
 - en: '[PRE23]'
+  id: totrans-119
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'Edit the `default_type` file in `/etc/selinux/mcs/contexts/` to make `pgsqladm_t`
     the default type for the `pgsqladm_r` role:'
+  id: totrans-120
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`/etc/selinux/mcs/contexts/`中的`default_type`文件，将`pgsqladm_t`设置为`pgsqladm_r`角色的默认类型：
 - en: '[PRE24]'
+  id: totrans-121
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'Edit the `default_contexts` file in `/etc/selinux/mcs/contexts/` to inform
     the system to which types a transition has to be made when a user switch is triggered
     by an application. For instance, for a local login session, the following code
     can be used for this purpose:'
+  id: totrans-122
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`/etc/selinux/mcs/contexts/`中的`default_contexts`文件，告知系统当应用程序触发用户切换时，应该转换到哪些类型。例如，对于本地登录会话，可以使用以下代码来实现这一目的：
 - en: '[PRE25]'
+  id: totrans-123
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'Now, build and load the policy, and verify that the new role is available:'
+  id: totrans-124
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，构建并加载策略，并验证新角色是否可用：
 - en: '[PRE26]'
+  id: totrans-125
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: How it works…
+  id: totrans-126
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: Creating new roles for an SELinux system requires changes on multiple levels.
     Updating the SELinux policy is just one of these.
+  id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 为SELinux系统创建新角色需要在多个层面上进行更改。更新SELinux策略只是其中之一。
 - en: Defining a role in the policy
+  id: totrans-128
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 在策略中定义角色
 - en: 'The first step is to create a new role and user domain through the SELinux
     policy. There are a couple of templates available in the reference policy to easily
     build new roles. The relation between these templates is visualized in the following
     diagram:'
+  id: totrans-129
   prefs: []
   type: TYPE_NORMAL
+  zh: 第一步是通过 SELinux 策略创建一个新的角色和用户域。在参考策略中有一些模板，可以轻松地构建新的角色。这些模板之间的关系可以通过以下图示表示：
 - en: '![Defining a role in the policy](img/9669OS_06_02.jpg)'
+  id: totrans-130
   prefs: []
   type: TYPE_IMG
+  zh: '![定义策略中的角色](img/9669OS_06_02.jpg)'
 - en: 'The various blocks in the diagram represent the following templates:'
+  id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 图中的各个模块表示以下模板：
 - en: In `userdom_base_user_template`, the basic rules and privileges for roles and
     user domains are documented, regardless of their future use. If a role needs to
     be declared with an absolute minimum of privileges, the use of this template is
     preferred.
+  id: totrans-132
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在 `userdom_base_user_template` 中，记录了角色和用户域的基本规则和权限，无论其未来的用途如何。如果需要声明一个具有最小权限的角色，建议使用此模板。
 - en: Inside `userdom_login_user_template`, `userdom_base_user_template` is called
     and extended with privileges related to interactive logins. When a role is created
     that is meant to be logged on directly (without the need to call `newrole` or
     `sudo`), then this interface is needed.
+  id: totrans-133
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在 `userdom_login_user_template` 中，调用了 `userdom_base_user_template` 并扩展了与交互式登录相关的权限。当创建一个角色时，目标是直接登录（无需调用
+    `newrole` 或 `sudo`），此接口是必需的。
 - en: Within `userdom_restricted_user_template`, the `userdom_login_user_template`
     interface is called, but the user domain is also associated with the `unpriv_userdomain`
     attribute, meant for end user domains that have little security impact on the
     system.
+  id: totrans-134
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在 `userdom_restricted_user_template` 中，调用了 `userdom_login_user_template` 接口，但该用户域还与
+    `unpriv_userdomain` 属性相关联，该属性旨在为对系统安全性影响较小的最终用户域提供服务。
 - en: The `userdom_common_user_template` interface adds privileges and rules that
     are common for both unprivileged and privileged roles.
+  id: totrans-135
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`userdom_common_user_template` 接口添加了适用于特权和非特权角色的共同权限和规则。'
 - en: The `userdom_unpriv_user_template` interface calls both `userdom_common_user_template`
     and `userdom_restricted_user_template` and is meant to declare unprivileged roles
     and user domains with interactive logon and general system access.
+  id: totrans-136
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`userdom_unpriv_user_template` 接口同时调用了 `userdom_common_user_template` 和 `userdom_restricted_user_template`，用于声明具有交互式登录和一般系统访问权限的非特权角色和用户域。'
 - en: The `userdom_admin_user_template` interface calls both `userdom_common_user_template`
     and `userdom_login_user_template`, and creates a role and user domain that is
     meant to be used for administrative purposes.
+  id: totrans-137
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`userdom_admin_user_template` 接口同时调用了 `userdom_common_user_template` 和 `userdom_login_user_template`，并创建了一个用于行政管理目的的角色和用户域。'
 - en: Whenever such an appropriate interface is called, the proper role and type is
     created and can be used in the remainder of the policy module.
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 每当调用此类适当的接口时，就会创建合适的角色和类型，并可以在其余的策略模块中使用。
 - en: Extending the role privileges
+  id: totrans-139
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 扩展角色权限
 - en: In the example, we assigned PostgreSQL administrative rights to the `pgsqladm_t`
     user domain and allowed the `pgsqladm_r` role the proper PostgreSQL domains (if
     any).
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 在示例中，我们将 PostgreSQL 管理权限分配给 `pgsqladm_t` 用户域，并允许 `pgsqladm_r` 角色使用适当的 PostgreSQL
+    域（如果有的话）。
 - en: 'The reference policy tends to provide two types of interfaces that can be assigned
     to new roles:'
+  id: totrans-141
   prefs: []
   type: TYPE_NORMAL
+  zh: 参考策略通常提供两种类型的接口，可以分配给新角色：
 - en: Administrative roles, whose interface name usually ends with `_admin`
+  id: totrans-142
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 管理角色，其接口名称通常以 `_admin` 结尾
 - en: End user roles, whose interface name usually ends with `_role` or `_run`
+  id: totrans-143
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 最终用户角色，其接口名称通常以 `_role` 或 `_run` 结尾
 - en: Administrative roles allow for rights on all resources related to a particular
     domain. In case of the `postgresql_admin` interface, the role and user domain
     (which are passed on to the interface) are allowed to send signals to the PostgreSQL
     services, execute the `init` script (to launch or shut down the service), and
     manage the various resources of the domain (such as the database files, configuration
     files, and logs).
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 管理角色允许访问与特定域相关的所有资源。在 `postgresql_admin` 接口的情况下，角色和用户域（通过接口传递）可以向 PostgreSQL
+    服务发送信号，执行 `init` 脚本（启动或关闭服务），并管理域的各种资源（如数据库文件、配置文件和日志）。
 - en: Services almost always have an `_admin` interface. These are called after the
     domain, such as `puppet_admin` for Puppet administration and `samba_admin` for
     Samba administration. Sometimes, an SELinux policy module has multiple administrative
@@ -684,8 +988,12 @@
     `logging_admin_audit` and `logging_admin_syslog` interfaces, as both auditing
     and system logging are provided by the same SELinux policy module, but the administration
     of these two services can be segregated.
+  id: totrans-145
   prefs: []
   type: TYPE_NORMAL
+  zh: 服务几乎总是有一个 `_admin` 接口。这些接口的命名通常以域名为后缀，例如用于 Puppet 管理的 `puppet_admin` 和用于 Samba
+    管理的 `samba_admin`。有时，当涉及不同的域时，SELinux 策略模块可能有多个管理接口。例如，`logging_admin_audit` 和
+    `logging_admin_syslog` 接口，虽然它们都由同一个 SELinux 策略模块提供，但审计和系统日志服务的管理可以是分开的。
 - en: End user roles allow the user to execute client applications or interact with
     services. Such interfaces, such as `puppet_run_puppetca` (which allows a user
     domain to run the `puppetca` application and transition to it) and `openvpn_run`
@@ -695,8 +1003,12 @@
     side—being able to launch VPN services does not mean that the user can manipulate
     routing tables as they see fit, even though the VPN service domain (`openvpn_t`)
     can.
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 最终用户角色允许用户执行客户端应用程序或与服务交互。类似于 `puppet_run_puppetca`（允许用户域运行 `puppetca` 应用程序并过渡到它）和
+    `openvpn_run`（允许用户运行 OpenVPN 服务）这样的接口，虽然它们在某种程度上可能具有管理性质，但仍需验证接口的内容。然而，大多数情况下，这是由应用程序端控制的，而不是基础设施端——能够启动
+    VPN 服务并不意味着用户可以随意操作路由表，即使 VPN 服务域（`openvpn_t`）有这个权限。
 - en: It is important to review the interfaces before blindly granting them to new
     roles and users. In case of PostgreSQL, the `postgresql_role` role, for instance,
     does not allow the user to interact with the PostgreSQL service; instead, the
@@ -704,21 +1016,32 @@
     provides additional access controls in PostgreSQL based on SELinux policies. When
     users are assigned the `postgresql_role` role, they are granted basic privileges
     inside a PostgreSQL environment.
+  id: totrans-147
   prefs: []
   type: TYPE_NORMAL
+  zh: 在盲目授予新角色和用户这些接口之前，审查接口是非常重要的。例如，在 PostgreSQL 中，`postgresql_role` 角色并不允许用户与 PostgreSQL
+    服务交互；该接口用于支持 SEPostgreSQL（启用 SELinux 的 PostgreSQL），它基于 SELinux 策略为 PostgreSQL
+    提供额外的访问控制。当用户被分配 `postgresql_role` 角色时，他们将被授予 PostgreSQL 环境中的基本权限。
 - en: To allow users to interact with PostgreSQL, the `postgresql_stream_connect`
     and `postgresql_tcp_connect` interfaces can be used.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了允许用户与 PostgreSQL 交互，可以使用 `postgresql_stream_connect` 和 `postgresql_tcp_connect`
+    接口。
 - en: Default types and default contexts
+  id: totrans-149
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 默认类型和默认上下文
 - en: The `default_types` file informs SELinux what the default type is if no context
     is specified otherwise, and it is used by commands such as `newrole` to know what
     the default type is for a user.
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: '`default_types` 文件告诉 SELinux 如果没有指定上下文时默认的类型是什么，它被 `newrole` 等命令使用，以确定用户的默认类型。'
 - en: 'The `default_contexts` file (which can be overridden through SELinux user-specific
     files in the `users/` subdirectory) informs the SELinux libraries and subsystem
     what specific SELinux type to transition to when a user and role switch has occurred
@@ -727,11 +1050,18 @@
     to run in a different SELinux role and SELinux type. The following `default_contexts`
     configuration snippet would have the jobs of a user (whose role is `pgsqladm_r`)
     run as `cronjob_t` (rather than `pgsqladm_t`):'
+  id: totrans-151
   prefs: []
   type: TYPE_NORMAL
+  zh: '`default_contexts` 文件（可以通过 `users/` 子目录下的 SELinux 用户特定文件进行覆盖）通知 SELinux 库和子系统在用户和角色切换后，应该切换到什么特定的
+    SELinux 类型。例如，`cron` 守护进程运行在 `system_r:crond_t` 上下文中，但当它执行用户的 `cron` 作业时，这些作业本身需要在不同的
+    SELinux 角色和类型下运行。以下 `default_contexts` 配置片段会使用户（其角色为 `pgsqladm_r`）的作业以 `cronjob_t`
+    类型（而不是 `pgsqladm_t`）运行：'
 - en: '[PRE27]'
+  id: totrans-152
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: These files are generated as part of the base policy. Sadly, there are no `default_types.local`
     or `default_contexts.local` files that can be used to provide system-specific
     changes. As a result, updates on the base SELinux policy might overwrite these
@@ -740,252 +1070,362 @@
     altered by system updates; instead, the system administrator is informed that
     an update on these files might be needed, keeping the manual changes made by the
     administrator in the past.
+  id: totrans-153
   prefs: []
   type: TYPE_NORMAL
+  zh: 这些文件作为基础策略的一部分生成。遗憾的是，没有可以用于提供特定系统更改的`default_types.local`或`default_contexts.local`文件。因此，基础SELinux策略的更新可能会覆盖这些文件，具体取决于Linux发行版如何处理这些文件。如果这些文件被视为配置文件（例如Gentoo
+    Linux），那么它们不会被系统更新修改；相反，系统管理员会被通知这些文件可能需要更新，保留管理员之前手动所做的更改。
 - en: Initial role based on entry
+  id: totrans-154
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 基于入口的初始角色
 - en: 'Users will often have multiple roles associated with them. Depending on how
     they interact with the system, a different initial role (and a user domain) might
     be needed. Consider a user who interacts with a system locally (through the console),
     remotely through SSH (for administrative purposes), and through FTP (as an end
     user), as depicted in the following diagram:'
+  id: totrans-155
   prefs: []
   type: TYPE_NORMAL
+  zh: 用户通常会有多个角色与之关联。根据他们与系统的交互方式，可能需要不同的初始角色（和用户域）。假设一个用户本地通过控制台、通过SSH远程（用于管理目的）以及通过FTP（作为最终用户）与系统交互，如下图所示：
 - en: '![Initial role based on entry](img/9669OS_06_03.jpg)'
+  id: totrans-156
   prefs: []
   type: TYPE_IMG
+  zh: '![基于入口的初始角色](img/9669OS_06_03.jpg)'
 - en: We want to make sure that the default role in which the user session starts
     on the system depends on the entry point on the system. Direct console logon can
     be in the administrative role, `sysadm_r`, whereas remote logon is first in the
     `staff_r` role (to ensure a stolen SSH key cannot be used to perform administrative
     tasks on the system without knowing the users' system password). The use of the
     FTP server should result in an unprivileged role, `ftp_shell_r`.
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们希望确保用户会话在系统上启动时的默认角色取决于系统的入口点。直接控制台登录可以在管理角色`sysadm_r`中进行，而远程登录则首先进入`staff_r`角色（以确保被窃取的SSH密钥不能在不知道用户系统密码的情况下用于执行系统管理任务）。使用FTP服务器时，应该使用非特权角色`ftp_shell_r`。
 - en: Note
+  id: totrans-158
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: The `ftp_shell_r` role is a nondefault role and will not be available by default.
     Using SELinux with an FTP server in this setup requires that the FTP server is
     either SELinux aware (and supports context transitions) or uses PAM for its authentication
     rather than internal user accounts.
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: '`ftp_shell_r`角色是一个非默认角色，默认情况下不可用。在这种设置中使用SELinux与FTP服务器时，要求FTP服务器要么支持SELinux（并支持上下文转换），要么使用PAM进行身份验证，而不是使用内部用户帐户。'
 - en: How to do it…
+  id: totrans-160
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'To configure the role to be used when a user logs on or starts a session, execute
     the following steps:'
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 要配置用户登录或开始会话时使用的角色，请执行以下步骤：
 - en: 'First of all, make sure that the user is assigned the various roles:'
+  id: totrans-162
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 首先，确保用户被分配了各种角色：
 - en: '[PRE28]'
+  id: totrans-163
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'Edit the `default_contexts` file by reordering the contexts, making sure that
     the right role is always mentioned before the others (or that the others are not
     mentioned at all):'
+  id: totrans-164
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 编辑`default_contexts`文件，通过重新排序上下文，确保正确的角色总是排在其他角色之前（或者其他角色根本不被提及）：
 - en: '[PRE29]'
+  id: totrans-165
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Check whether the domains have support for specific Booleans that explicitly
     enable or disable transitioning into particular domains. For instance, consider
     the SSH daemon:'
+  id: totrans-166
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 检查域是否支持特定的布尔值，明确启用或禁用过渡到特定的域。例如，考虑SSH守护进程：
 - en: '[PRE30]'
+  id: totrans-167
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: How it works…
+  id: totrans-168
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: 'When applications call PAM to set up the user context, the PAM configuration
     will invoke methods provided by the `pam_selinux.so` file. These methods will
     check the `default_contexts` file to see what the context should be for a user.
     When `pam_selinux.so` is loaded through a daemon in the `system_r:sshd_t` context,
     for instance, then the lines for that particular daemon are interpreted:'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 当应用程序调用PAM设置用户上下文时，PAM配置将调用由`pam_selinux.so`文件提供的方法。这些方法将检查`default_contexts`文件，查看应该为用户设置什么上下文。例如，当`pam_selinux.so`通过`system_r:sshd_t`上下文在守护进程中加载时，特定守护进程的行会被解释：
 - en: '[PRE31]'
+  id: totrans-170
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: For the given user, the set of supported roles is obtained. In our case, this
     is `staff_r sysadm_r ftp_shell_r`. The entries in the `default_contexts` file
     are then looked at one by one, and the first role that is mentioned in the `default_contexts`
     file, that is also an allowed role for the user, will be used.
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于给定的用户，获取支持的角色集合。在我们的例子中，这是`staff_r sysadm_r ftp_shell_r`。然后逐一查看`default_contexts`文件中的条目，文件中提到的第一个，也是用户允许的角色，将被使用。
 - en: In the given example, as `user_r` is not an allowed role, `staff_r` is the next
     one on the list. This role is allowed, so when the user logs on through SSH, then
     its default role will be the `staff_r` role (and its associated user domain will
     be `staff_t`).
+  id: totrans-172
   prefs: []
   type: TYPE_NORMAL
+  zh: 在给定的示例中，由于`user_r`不是允许的角色，`staff_r`是列表中的下一个角色。此角色是允许的，因此当用户通过SSH登录时，其默认角色将是`staff_r`角色（其关联的用户域将是`staff_t`）。
 - en: 'Some domains are also configured to allow or disallow direct logins into administrative
     roles. The SSH policy, for instance, uses an SELinux Boolean called `ssh_sysadm_login`,
     which allows transitioning into any user (`ssh_sysadm_login=on`) or only to unprivileged
     users (`ssh_sysadm_login=off`), specified policy-wise as follows:'
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 一些域也被配置为允许或禁止直接登录到管理角色。例如，SSH策略使用一个名为`ssh_sysadm_login`的SELinux布尔值，该值允许过渡到任何用户（`ssh_sysadm_login=on`）或仅限于无特权用户（`ssh_sysadm_login=off`），策略方式如下所示：
 - en: '[PRE32]'
+  id: totrans-174
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: A similar approach can easily be built into custom policies. Note that the use
     of `userdom_spec_domtrans_unpriv_users` will only allow using the daemon for roles
     and types created through `userdom_unpriv_user_template`, as this interface assigns
     the `unpriv_userdomain` attribute that is used by the `userdom_spec_domtrans_unpriv_users`
     interface.
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 类似的方法可以很容易地构建到自定义策略中。请注意，使用`userdom_spec_domtrans_unpriv_users`只允许使用通过`userdom_unpriv_user_template`创建的守护进程角色和类型，因为此接口分配了`unpriv_userdomain`属性，该属性由`userdom_spec_domtrans_unpriv_users`接口使用。
 - en: Defining role transitions
+  id: totrans-176
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 定义角色转换
 - en: It is possible to have SELinux automatically switch roles when a certain application
     is executed. The usual checks still apply (such as if the role is a valid one
     for the user, does the current user domain have execute rights, and many more),
     but then, there is no longer a need to call `runcon` or `sudo` to switch the role.
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 也可以让SELinux在执行某个特定应用时自动切换角色。通常的检查仍然适用（例如角色是否是用户有效的角色，当前用户域是否有执行权限，等等），但之后就不再需要调用`runcon`或`sudo`来切换角色。
 - en: How to do it…
+  id: totrans-178
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何做到这一点…
 - en: 'Role transitions can be configured as follows:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 角色转换可以如下配置：
 - en: 'Identify the executable type on which a role transition has to occur:'
+  id: totrans-180
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 确定需要发生角色转换的可执行文件类型：
 - en: '[PRE33]'
+  id: totrans-181
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'In the SELinux policy, create an interface that includes the role transitions:'
+  id: totrans-182
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在SELinux策略中，创建一个包含角色转换的接口：
 - en: '[PRE34]'
+  id: totrans-183
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'Assign the newly created interface to the user:'
+  id: totrans-184
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 将新创建的接口分配给用户：
 - en: '[PRE35]'
+  id: totrans-185
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: How it works…
+  id: totrans-186
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的…
 - en: 'The first rule that is activated is a role-allow rule. Such a rule tells SELinux
     what role switch is allowed and in which direction. The set of allowed role switches
     can be queried using `sesearch`:'
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 被激活的第一条规则是角色允许规则。这样的规则告诉SELinux哪些角色切换是允许的，以及切换的方向。允许的角色切换集合可以使用`sesearch`查询：
 - en: '[PRE36]'
+  id: totrans-188
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: 'Consider the following role-allow rule(s) for the `puppetadm_r` role:'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 考虑以下`puppetadm_r`角色的角色允许规则：
 - en: '[PRE37]'
+  id: totrans-190
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: In this case, *only* the `staff_r` role is allowed to switch to the `puppetadm_r`
     role. Switching from the `puppetadm_r` role back to the `staff_r` role is not
     allowed.
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这种情况下，*只有* `staff_r`角色被允许切换到`puppetadm_r`角色。不能从`puppetadm_r`角色切换回`staff_r`角色。
 - en: The second rule tells SELinux that if a `puppetca_exec_t` labeled file is executed
     by the selected role (`staff_r`, in our case), then the role should switch to
     `puppetadm_r`. Of course, this is only done when the SELinux user is allowed the
     target role.
+  id: totrans-192
   prefs: []
   type: TYPE_NORMAL
+  zh: 第二条规则告诉SELinux，如果一个标记为`puppetca_exec_t`的文件由选定角色（在我们的例子中是`staff_r`）执行，那么该角色应该切换到`puppetadm_r`。当然，只有当SELinux用户被允许目标角色时，才会进行此操作。
 - en: The third rule will perform a domain transition from `staff_t` to `puppetca_t`
     if `staff_t` executes a `puppetca_exec_t` labeled file.
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 第三条规则将在`staff_t`执行标记为`puppetca_exec_t`的文件时执行从`staff_t`到`puppetca_t`的域转换。
 - en: It should be noted though that a forced role transition (that is, through the
     SELinux policy) is not a preferred method in the majority of cases, as it doesn't
     provide any flexibility to the administrator. If this is implemented, then using
     multiple roles is more difficult as some domains are hardcoded to a particular
     role.
+  id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 需要注意的是，在大多数情况下，强制角色转换（即通过 SELinux 策略）并不是首选方法，因为它不会为管理员提供任何灵活性。如果实现了这种方法，那么使用多个角色就会变得更加困难，因为一些域被硬编码为特定角色。
 - en: Looking into access privileges
+  id: totrans-195
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 查看访问权限
 - en: To finish off, let's look at how to verify access privileges granted to users.
     Specifying roles and privileges allows users to do their job, but from a security
     point of view, it is also important to verify if (and which) users can manipulate
     certain resources. Auditors will want to have an overview of who is able to, say,
     manipulate SELinux policies or read private keys.
+  id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，让我们来看一下如何验证分配给用户的访问权限。指定角色和权限使用户能够完成工作，但从安全角度来看，验证哪些用户能够操作某些资源也是非常重要的。审计员将希望了解谁能够，例如，操作
+    SELinux 策略或读取私钥。
 - en: How to do it…
+  id: totrans-197
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'To properly investigate access rights, the following approach can help in identifying
     users (and processes) that have the permissions we want to be informed about:'
+  id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 要正确调查访问权限，以下方法可以帮助识别拥有我们希望了解的权限的用户（和进程）：
 - en: Verify file permissions that are not related to SELinux.
+  id: totrans-199
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证与 SELinux 无关的文件权限。
 - en: Verify direct access to the resource (such as read rights on private keys).
+  id: totrans-200
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 验证对资源的直接访问（例如读取私钥的权限）。
 - en: Look at who (users or applications) has the right to manipulate the SELinux
     policy.
+  id: totrans-201
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查看谁（用户或应用程序）有权操作 SELinux 策略。
 - en: Check users and domains that are granted direct access to filesystems and raw
     devices.
+  id: totrans-202
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 检查被授予直接访问文件系统和原始设备的用户和域。
 - en: See when memory can be accessed directly.
+  id: totrans-203
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 查看何时可以直接访问内存。
 - en: Review who can update authentication files.
+  id: totrans-204
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 审查谁可以更新认证文件。
 - en: Analyze who can boot the system.
+  id: totrans-205
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 分析谁可以启动系统。
 - en: How it works…
+  id: totrans-206
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 它是如何工作的……
 - en: Reviewing access is a lengthy process. It isn't sufficient to just look into
     file ownership (user and group) and look at the permissions of the file to find
     out who is actually able to read or modify the file (assuming that the privilege
@@ -993,104 +1433,153 @@
     the `sudoers` file or the `sudo` configuration in an LDAP server) need to be checked
     as well, together with the `setuid` application access, backup file access (when
     read access is to be examined), and more.
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 审查访问权限是一个漫长的过程。仅查看文件所有权（用户和组）以及文件的权限来找出谁实际上能够读取或修改文件（假设我们关注的是文件访问权限）是不够的。还需要检查权限委派工具，如
+    `sudo`（通过 `sudoers` 文件或 LDAP 服务器中的 `sudo` 配置），以及 `setuid` 应用程序访问、备份文件访问（当需要检查读取访问时）等。
 - en: With the mandatory access controls that SELinux provides, checking the policy
     for access rights is an important part of such an evaluation. The `sesearch` application
     can assist in this quest.
+  id: totrans-208
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过 SELinux 提供的强制访问控制，检查访问权限的策略是这种评估的重要组成部分。`sesearch` 应用程序可以帮助完成这项任务。
 - en: Direct access inspection
+  id: totrans-209
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 直接访问检查
 - en: To check direct access, we need to query both the access rights (such as write
     privileges on the resource) as well as relabeling rights. After all, a domain
     that is allowed to change the SELinux context of a file to another resource can
     theoretically switch the context, modify the file, and reset the context.
+  id: totrans-210
   prefs: []
   type: TYPE_NORMAL
+  zh: 要检查直接访问权限，我们需要查询访问权限（如对资源的写权限）以及重新标记权限。毕竟，允许更改文件 SELinux 上下文的域理论上可以切换上下文、修改文件并重置上下文。
 - en: '[PRE38]'
+  id: totrans-211
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'This code shows not only the user domains that have the privileges, but also
     the application domains. In a review of permissions, it is necessary to also validate
     who can access and manipulate processes that run in these domains. This can be
     done by checking the transition permission:'
+  id: totrans-212
   prefs: []
   type: TYPE_NORMAL
+  zh: 这段代码不仅显示了拥有权限的用户域，还显示了应用程序域。在权限审查中，必须验证谁可以访问和操作在这些域中运行的进程。这可以通过检查转换权限来完成：
 - en: '[PRE39]'
+  id: totrans-213
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: For each of the domains, studying who can manipulate these processes is a time-consuming
     process and requires intimate knowledge of the application(s) that run in the
     given domain. For instance, the `restorecond` daemon will only reset file contexts
     to the context known by the SELinux tools (so, modifying the context temporarily
     is not possible through `restorecond`) and only on those locations that are configured
     in the `restorecond` configuration file.
+  id: totrans-214
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于每个领域，研究谁可以操控这些过程是一个耗时的过程，并且需要对给定领域中运行的应用程序有深入的了解。例如，`restorecond` 守护进程仅会将文件上下文重置为
+    SELinux 工具已知的上下文（因此，无法通过 `restorecond` 临时修改上下文），并且仅限于 `restorecond` 配置文件中配置的位置。
 - en: Policy manipulation
+  id: totrans-215
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 策略操控
 - en: 'Checking the SELinux policy isn''t sufficient as the policy can be manipulated
     as well. Loading a new policy is governed through, among various other privileges,
     the `load_policy` permission:'
+  id: totrans-216
   prefs: []
   type: TYPE_NORMAL
+  zh: 检查 SELinux 策略是不够的，因为策略也可能被操控。加载新策略由多种权限控制，其中包括 `load_policy` 权限：
 - en: '[PRE40]'
+  id: totrans-217
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: Similarly, the access towards the selected domains (and the `load_policy_t`
     domain in particular) needs to be verified.
+  id: totrans-218
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样，访问选定域（特别是 `load_policy_t` 域）也需要进行验证。
 - en: As can be seen from the output, manipulating the SELinux policy can also be
     controlled through an SELinux Boolean called `secure_mode_policyload`. When this
     Boolean is enabled, loading a new policy is no longer possible. If this Boolean
     is enabled and persisted, then even rebooting a system will not help unless the
     system is booted in the permissive mode.
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
+  zh: 如输出所示，操控 SELinux 策略也可以通过一个叫做 `secure_mode_policyload` 的 SELinux 布尔值进行控制。当该布尔值启用时，加载新策略将不再可能。如果启用并保持该布尔值，即使重启系统也无法解决，除非系统以宽容模式启动。
 - en: 'Similarly, checking who can put the system in the permissive mode can be verified
     as well:'
+  id: totrans-220
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样，检查谁可以将系统置于宽容模式也可以进行验证：
 - en: '[PRE41]'
+  id: totrans-221
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: This is governed through the same SELinux Boolean though.
+  id: totrans-222
   prefs: []
   type: TYPE_NORMAL
+  zh: 这一点也由相同的 SELinux 布尔值进行控制。
 - en: Another way to manipulate the SELinux policy would be to boot the system in
     the permissive mode or even with SELinux disabled. This means that reviewing access
     to the boot files is also important (the `boot_t` type).
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一种操控 SELinux 策略的方式是将系统以宽容模式启动，甚至禁用 SELinux。这意味着审查启动文件的访问权限也非常重要（如 `boot_t`
+    类型）。
 - en: Indirect access
+  id: totrans-224
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 间接访问
 - en: It is also possible to access resources indirectly, for instance, by manipulating
     the raw devices (such as disk devices or memory). Access to device files is already
     quite privileged on Linux systems. With SELinux, additional controls might be
     put in place.
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 也可以通过间接方式访问资源，例如，通过操控原始设备（如磁盘设备或内存）。在 Linux 系统上，访问设备文件本身已经是相当特权的操作。使用 SELinux
+    后，可能会添加额外的控制措施。
 - en: Disk devices are usually labeled as `fixed_disk_device_t`. Access to these files
     should only be granted to application domains, although some privileged user domains
     might be able to relabel such device nodes or manipulate application domains to
     perform actions not granted to the regular user.
+  id: totrans-226
   prefs: []
   type: TYPE_NORMAL
+  zh: 磁盘设备通常被标记为 `fixed_disk_device_t`。这些文件的访问应该仅限于应用程序域，尽管一些特权用户域可能能够重新标记这些设备节点或操控应用程序域以执行普通用户无法执行的操作。
 - en: '[PRE42]'
+  id: totrans-227
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: Users who are able to manipulate files related to system authentication can
     grant themselves different user roles, for instance, by logging on to the system
     as a different user (who does have the rights needed). This includes access to
     `/etc/pam.d/` (usually labeled as `etc_t`) or the authentication libraries themselves
     in `/lib/security/` (usually labeled as `lib_t`).
+  id: totrans-228
   prefs: []
   type: TYPE_NORMAL
+  zh: 能够操控与系统认证相关的文件的用户，可以通过登录系统并作为不同的用户（该用户拥有所需权限）来授予自己不同的用户角色。这包括访问 `/etc/pam.d/`（通常标记为
+    `etc_t`）或认证库本身（通常标记为 `lib_t`）。
