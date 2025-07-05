@@ -3,6 +3,7 @@
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: '*第4章*：编写字符设备驱动程序'
 - en: Unix-based systems expose hardware to user space by means of special files,
     all created in the `/dev` directory upon device registration with the system.
     Programs willing to access a given device must locate its corresponding device
@@ -13,6 +14,7 @@
   id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 基于Unix的系统通过特殊文件将硬件暴露给用户空间，这些文件在设备注册到系统后会在`/dev`目录下创建。愿意访问某个设备的程序必须在`/dev`中找到相应的设备文件，并在其上执行适当的系统调用，该系统调用将被重定向到与该特殊文件相关联的底层设备的驱动程序。尽管系统调用的重定向是由操作系统完成的，但支持哪些系统调用取决于设备类型和驱动程序的实现。
 - en: On the topic of types of devices, there are many of them from a hardware point
     of view, which are, however, grouped into two families of special device files
     in `/dev` – these are **block devices** and **character devices**. They are differentiated
@@ -27,47 +29,56 @@
   id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 关于设备类型，硬件角度上有很多种，但它们被归为`/dev`目录下的两类特殊设备文件——**块设备**和**字符设备**。它们通过访问方式、速度以及数据在它们与系统之间传输的方式来区分。通常，字符设备比较慢，数据传输是按字节顺序从用户应用程序中逐个字节传输的（一个字符接一个字符——因此得名）。这样的设备包括串行端口和输入设备（键盘、鼠标、触控板、视频设备等）。另一方面，块设备比较快，因为它们的访问频繁且数据以块为单位传输。这类设备本质上是存储设备（硬盘、光盘驱动器、固态硬盘等）。
 - en: In this chapter, we will focus on character devices and their drivers, their
     APIs, and their common data structures. We will introduce most of their concepts
     and write our first character device driver.
   id: totrans-3
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将重点讨论字符设备及其驱动程序、它们的API以及它们的常见数据结构。我们将介绍大部分概念并编写我们的第一个字符设备驱动程序。
 - en: 'We will cover the following topics in this chapter:'
   id: totrans-4
   prefs: []
   type: TYPE_NORMAL
+  zh: 本章将涵盖以下主题：
 - en: The concept of major and minor
   id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 主设备号和次设备号的概念
 - en: Character device data structure introduction
   id: totrans-6
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 字符设备数据结构介绍
 - en: Creating a device node
   id: totrans-7
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 创建设备节点
 - en: Implementing file operations
   id: totrans-8
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 实现文件操作
 - en: The concept of major and minor
   id: totrans-9
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 主设备号和次设备号的概念
 - en: 'Linux has always enforced device file identification by a unique identifier,
     composed of two parts, a `/dev`, character or block device files are recognizable
     by their types, which can be seen using the `ls -l` command:'
   id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: Linux一直通过一个唯一的标识符来强制执行设备文件的识别，该标识符由两部分组成，`/dev`，字符或块设备文件通过其类型来识别，可以通过`ls -l`命令查看：
 - en: '[PRE0]'
   id: totrans-11
   prefs: []
@@ -82,23 +93,27 @@
   id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 从前面的摘录中，第一列中，`c`标识字符设备文件，`b`标识块设备文件。在第五列和第六列中，我们可以看到主设备号和次设备号。主设备号要么标识设备类型，要么与驱动程序绑定。次设备号要么在驱动程序中本地标识设备，要么标识同类型的设备。这就解释了为什么前面的输出中有些设备文件具有相同的主设备号。
 - en: Now that we are done with the basic concepts of character devices in a Linux
     system, we can start exploring the kernel code, starting from introducing the
     main data structures.
   id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经掌握了Linux系统中字符设备的基本概念，我们可以开始探索内核代码，从介绍主要数据结构开始。
 - en: Character device data structure introduction
   id: totrans-14
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 字符设备数据结构介绍
 - en: 'A character device driver represents the most basic device driver in the kernel
     sources. Character devices are represented in the kernel as instances of `struct
     cdev`, declared in `include/linux/cdev.h`:'
   id: totrans-15
   prefs: []
   type: TYPE_NORMAL
+  zh: 字符设备驱动程序是内核源代码中最基本的设备驱动程序。字符设备在内核中以`struct cdev`实例的形式表示，该结构在`include/linux/cdev.h`中声明：
 - en: '[PRE1]'
   id: totrans-16
   prefs: []
@@ -292,11 +307,13 @@
   id: totrans-38
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经熟悉了文件操作回调，让我们深入了解内核的机制，学习文件如何处理，从而更好地理解字符设备背后的机制。
 - en: File representation in the kernel
   id: totrans-39
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 内核中的文件表示
 - en: Looking at the file operation table, at least one of the parameters of each
     operation is either the `struct inode` or `struct file` type. `struct inode` refers
     to a file on the disk. However, to refer an open file (associated with a file
@@ -304,10 +321,13 @@
   id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 查看文件操作表时，每个操作的至少一个参数要么是`struct inode`类型，要么是`struct file`类型。`struct inode`表示磁盘上的一个文件。但是，要引用一个打开的文件（与进程中的文件描述符相关联），则使用`struct
+    file`结构。
 - en: 'The following is the declaration of an `inode` structure:'
   id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是`inode`结构的声明：
 - en: '[PRE3]'
   id: totrans-42
   prefs: []
@@ -319,6 +339,8 @@
   id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 该结构体中最重要的字段是`union`，特别是`i_cdev`元素，当底层文件是字符设备时会设置此元素。这使得在`struct inode`和`struct
+    cdev`之间来回切换成为可能。
 - en: 'On the other hand, `struct file` is a filesystem data structure holding information
     about a file (its type, character, block, pipe, and so on), most of which is only
     relevant to the OS. The `struct file` structure (defined in `include/linux/fs.h`)
@@ -326,6 +348,8 @@
   id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一方面，`struct file`是一个文件系统数据结构，保存有关文件的信息（如文件类型、字符、块、管道等），其中大多数信息仅与操作系统相关。`struct
+    file`结构（定义在`include/linux/fs.h`中）具有以下定义：
 - en: '[PRE4]'
   id: totrans-45
   prefs: []
@@ -341,22 +365,27 @@
   id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上述数据结构中，`f_path`表示文件在文件系统中的实际路径，`f_inode`是指向此打开文件的底层`inode`。这使得通过`f_inode`元素在`struct
+    file`和底层`cdev`之间来回切换成为可能。`f_op`表示文件操作表。由于`struct file`表示一个打开的文件描述符，它追踪其打开实例中的当前读写位置。这是通过`f_pos`元素完成的，`f_pos`是当前的读写位置。
 - en: Creating a device node
   id: totrans-47
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建设备节点
 - en: The creation of a device node makes it visible to users and allows users to
     interact with the underlying device. Linux requires intermediate steps before
     the device node is created and the following section discusses these steps.
   id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 设备节点的创建使其对用户可见，并允许用户与底层设备进行交互。Linux在创建设备节点之前需要经过一些中间步骤，接下来的部分将讨论这些步骤。
 - en: Device identification
   id: totrans-49
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 设备标识
 - en: To precisely identify devices, their identifiers must be unique. Although identifiers
     can be dynamically allocated, most drivers still use static identifiers for compatibility
     reasons. Whatever the allocation method, the Linux kernel stores file device numbers
@@ -366,12 +395,14 @@
   id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了精确标识设备，它们的标识符必须是唯一的。虽然标识符可以动态分配，但大多数驱动程序仍然使用静态标识符以兼容为主。不论分配方式如何，Linux内核会将文件设备号存储在`dev_t`类型的元素中，它是一个32位无符号整数，其中前`12`位表示主设备号，剩余的`20`位表示次设备号。
 - en: 'All of this is stated in `include/linux/kdev_t.h`, which contains several macros,
     including those that, given a `dev_t` type variable, can return either a minor
     or a major number:'
   id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有这些内容都在`include/linux/kdev_t.h`中声明，该文件包含了多个宏，其中一些宏可以根据给定的`dev_t`类型变量，返回设备的次设备号或主设备号：
 - en: '[PRE5]'
   id: totrans-52
   prefs: []
@@ -385,11 +416,13 @@
   id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后的宏接受一个次设备号和主设备号，返回一个`dev_t`类型的标识符，内核使用这个标识符来存储设备标识符。前面的摘录也描述了如何通过位移构建`字符设备`标识符。到此为止，我们可以深入到代码中，使用内核提供的API来进行代码分配。
 - en: Registration and deregistration of character device numbers
   id: totrans-54
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 字符设备号的注册与注销
 - en: 'There are two ways to deal with device numbers – **registration** (the static
     method) and **allocation** (the dynamic method). Registration, also called **static
     allocation**, is only useful if you know in advance which major number you want
@@ -469,6 +502,7 @@
   id: totrans-63
   prefs: []
   type: TYPE_NORMAL
+  zh: 字符设备的注册是通过指定设备标识符（`dev_t`类型）来进行的。在本章中，我们将使用动态分配，使用`alloc_chrdev_region()`。标识符分配后，必须使用`cdev_init()`和`cdev_add()`分别初始化字符设备并将其添加到系统中。以下是它们的原型：
 - en: '[PRE8]'
   id: totrans-64
   prefs: []
@@ -483,11 +517,13 @@
   id: totrans-65
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`cdev_init()`中，`cdev`是要初始化的结构体，`fops`是该设备的`file_operations`实例，使其准备好添加到系统中。在`cdev_add()`中，`p`是设备的`cdev`结构体，`dev`是该设备负责的第一个设备号（动态获取），`count`是与该设备对应的连续次设备号的数量。成功时，`cdev_add()`返回`0`，否则返回负错误代码。
 - en: 'The respective reverse operation of `cdev_add()` is `cdev_del()`, which removes
     the character device from the system and has the following prototype:'
   id: totrans-66
   prefs: []
   type: TYPE_NORMAL
+  zh: '`cdev_add()`的相应反向操作是`cdev_del()`，它将字符设备从系统中移除，具有以下原型：'
 - en: '[PRE9]'
   id: totrans-67
   prefs: []
@@ -499,6 +535,7 @@
   id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这一步，设备已成为系统的一部分，但尚未物理存在。换句话说，它尚未在`/dev`中可见。为了创建节点，必须使用`device_create()`，它具有以下原型：
 - en: '[PRE10]'
   id: totrans-69
   prefs: []
@@ -512,27 +549,35 @@
   id: totrans-70
   prefs: []
   type: TYPE_NORMAL
+  zh: 该方法创建一个设备并将其注册到Sysfs中。在其参数中，`class`是指向`struct class`的指针，表示该设备应注册到的类，`parent`是指向该新设备父设备`struct
+    device`的指针（如果有的话），`devt`是要添加的字符设备的设备号，`drvdata`是要添加到设备的回调数据。
 - en: Important Note
   id: totrans-71
   prefs: []
   type: TYPE_NORMAL
+  zh: 重要提示
 - en: 'In case of multiple minors, the `device_create()` and `device_destroy()` APIs
     can be put in a `for` loop, and the `<device name format>` string can be appended
     with the loop counter, as follows:'
   id: totrans-72
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果有多个次设备，`device_create()`和`device_destroy()` API可以放入一个`for`循环中，并且`<device name
+    format>`字符串可以与循环计数器一起拼接，如下所示：
 - en: '`device_create(class, NULL, MKDEV(MAJOR(first_devt), MINOR(first_devt) + i),
     NULL, "mynull%d", i);`'
   id: totrans-73
   prefs: []
   type: TYPE_NORMAL
+  zh: '`device_create(class, NULL, MKDEV(MAJOR(first_devt), MINOR(first_devt) + i),
+    NULL, "mynull%d", i);`'
 - en: 'Because a device needs an existing class before being created, you must either
     create a class or use an existing one. For now, we will create a class, and to
     do that, we need to use the `class_create()` function, declared as the following:'
   id: totrans-74
   prefs: []
   type: TYPE_NORMAL
+  zh: 因为设备在创建之前需要一个现有的类，你必须创建一个类或者使用一个已存在的类。现在，我们将创建一个类，为此，我们需要使用`class_create()`函数，声明如下：
 - en: '[PRE11]'
   id: totrans-75
   prefs: []
@@ -543,6 +588,7 @@
   id: totrans-76
   prefs: []
   type: TYPE_NORMAL
+  zh: 之后，该类将在`/sys/class`中可见，我们可以使用该类创建设备。以下是一个粗略的示例：
 - en: '[PRE12]'
   id: totrans-77
   prefs: []
@@ -555,6 +601,7 @@
   id: totrans-78
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`device_create()`将为每个设备创建一个节点——`/dev/eep-mem0`、`/dev/eep-mem1`，依此类推，我们的类由`eep_class`表示。此外，设备还可以在`/sys/class/eep-class`下查看。与此同时，反向操作如下所示：
 - en: '[PRE13]'
   id: totrans-79
   prefs: []
@@ -567,17 +614,20 @@
   id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，`device_destroy()`将从`/dev`中删除设备节点，`cdev_del()`将使系统忘记这个字符设备，`class_unregister()`和`class_destroy()`将注销并从系统中移除类，最后，`unregister_chrdev_region()`将释放我们的设备号。
 - en: Now that we are familiar with all the prerequisites about character devices,
     we can start implementing a file operation, which allows users to interact with
     the underlying device.
   id: totrans-81
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在我们已经熟悉了关于字符设备的所有前提知识，接下来可以开始实现一个文件操作，让用户能够与底层设备交互。
 - en: Implementing file operations
   id: totrans-82
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 实现文件操作
 - en: After introducing file operations in the previous section, it is time to implement
     those to enhance the driver capabilities and expose the device's methods to user
     space (by means of system calls, of course). Each of these methods has its particularities,
@@ -585,11 +635,13 @@
   id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上一节介绍了文件操作之后，是时候实现这些操作来增强驱动程序功能，并通过系统调用将设备的方法暴露给用户空间。每个方法都有其特定的特点，我们将在本节中重点介绍。
 - en: Exchanging data between the kernel space and user space
   id: totrans-84
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 在内核空间和用户空间之间交换数据
 - en: As we have seen while introducing the file operation table, the `read` and `write`
     methods are used to exchange data with the underlying device. Both being system
     calls means that data will originate from or be in destination to user space.
@@ -603,12 +655,14 @@
   id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们在介绍文件操作表时所看到的，`read`和`write`方法用于与底层设备交换数据。它们都是系统调用，这意味着数据将从用户空间传输到内核空间，或从内核空间传输到用户空间。在查看`read`和`write`方法原型时，第一个引起我们注意的是`__user`的使用。它是**Sparse**（一个用于帮助内核检查潜在编码错误的语义检查工具）用来提醒开发者他们即将不正确地使用一个不可信的指针（或者在当前虚拟地址映射中可能无效的指针），开发者不应解引用该指针，而应该使用专门的内核函数来访问指针指向的内存。
 - en: 'This leads us to two principal functions that allow us to exchange data between
     a kernel and user space, `copy_from_user()` and `copy_to_user()`, which copy a
     buffer from user space to kernel space and vice versa, respectively:'
   id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 这引出了两个主要函数，它们允许我们在内核空间和用户空间之间交换数据：`copy_from_user()`和`copy_to_user()`，分别用于将缓冲区从用户空间复制到内核空间，以及从内核空间复制到用户空间：
 - en: '[PRE14]'
   id: totrans-87
   prefs: []
@@ -623,11 +677,13 @@
   id: totrans-88
   prefs: []
   type: TYPE_NORMAL
+  zh: 在这两种情况下，前缀为`__user`的指针指向用户空间（不可信）内存。`n`表示要复制的字节数，既可以是从用户空间到内核空间，也可以是从内核空间到用户空间。`from`表示源地址，`to`是目标地址。每个操作都会返回无法复制的字节数（如果有的话），如果成功则返回`0`。需要注意的是，这些例程可能会休眠，因为它们在用户上下文中运行，不需要在原子上下文中调用。
 - en: Implementing the open file operation
   id: totrans-89
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 实现打开文件操作
 - en: 'The `open` file operation is the backend of the open system call. One usually
     uses this method to perform device and data structure initializations, after which
     it should return `0` on success, or a negative error code if something went wrong.
@@ -635,6 +691,7 @@
   id: totrans-90
   prefs: []
   type: TYPE_NORMAL
+  zh: '`open`文件操作是`open`系统调用的后端。通常使用此方法进行设备和数据结构初始化，初始化后如果成功应返回`0`，如果发生错误则返回一个负的错误码。`open`文件操作的原型定义如下：'
 - en: '[PRE15]'
   id: totrans-91
   prefs: []
@@ -646,11 +703,13 @@
   id: totrans-92
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果没有实现，设备打开将始终成功，但驱动程序不会意识到这一点。如果设备不需要特殊的初始化，这通常不会成为问题。
 - en: Per-device data
   id: totrans-93
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 每个设备的数据
 - en: As we have seen in file operation prototypes, there is almost always a `struct
     file` argument. `struct file` has an element free of use, that is `private_data`.
     `file->private_data`, if set, will be available to other system calls invoked
@@ -660,6 +719,7 @@
   id: totrans-94
   prefs: []
   type: TYPE_NORMAL
+  zh: 正如我们在文件操作原型中看到的，几乎总是有一个`struct file`参数。`struct file`有一个空闲使用的元素，即`private_data`。如果设置了`file->private_data`，它将在对相同文件描述符调用的其他系统调用中可用。你可以在文件描述符的生命周期内使用这个字段。在`open`方法中设置这个字段是一个好习惯，因为它总是任何文件上的第一个系统调用。
 - en: 'The following is our data structure:'
   id: totrans-95
   prefs: []
@@ -836,15 +896,18 @@
   id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 在数据被读取并处理后，可能需要将处理结果写回文件。由于我们从写操作开始，接下来我们可能想到的是`read`操作，如下节所示。
 - en: Implementing the read file operation
   id: totrans-124
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 实现读取文件操作
 - en: 'The `read` method has the following prototype:'
   id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: '`read`方法具有以下原型：'
 - en: '[PRE25]'
   id: totrans-126
   prefs: []
@@ -855,33 +918,39 @@
   id: totrans-127
   prefs: []
   type: TYPE_NORMAL
+  zh: 此操作是`read()`系统调用的后端。它的参数如下所示：
 - en: '`*buf` is the buffer we receive from user space.'
   id: totrans-128
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`*buf`是我们从用户空间接收的缓冲区。'
 - en: '`count` is the size of the requested transfer (the size of the user buffer).'
   id: totrans-129
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`count`是请求的传输大小（用户缓冲区的大小）。'
 - en: '`*pos` indicates the start position from which data should be read in the file.'
   id: totrans-130
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`*pos`表示数据应从文件中读取的起始位置。'
 - en: It must return the size of the data that has been successfully read. This size
     can be less than `count` though (for example, when reaching the end of the file
     before reaching the `count` requested by the user).
   id: totrans-131
   prefs: []
   type: TYPE_NORMAL
+  zh: 它必须返回成功读取的数据大小。尽管这个大小可能小于`count`（例如，在到达文件末尾之前，未达到用户请求的`count`）。
 - en: 'Implementing the read operation looks like the write one, since some sanity
     checks need to be performed. First, you can prevent reading beyond the file size
     and return an end-of-file response:'
   id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 实现读取操作看起来与写操作类似，因为需要执行一些健全性检查。首先，您可以防止读取超出文件大小，并返回文件结束响应：
 - en: '[PRE26]'
   id: totrans-133
   prefs: []
@@ -892,6 +961,7 @@
   id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，您应该确保读取的字节数不能超过文件大小，并可以适当调整`count`：
 - en: '[PRE27]'
   id: totrans-135
   prefs: []
@@ -904,6 +974,7 @@
   id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 接下来，您可以找到开始读取的位置，然后将数据复制到用户空间的缓冲区中，并在失败时返回错误，然后根据读取的字节数更新文件的当前位置信息，并返回复制的字节数：
 - en: '[PRE28]'
   id: totrans-137
   prefs: []
@@ -914,6 +985,7 @@
   id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是一个驱动程序`read()`文件操作的示例，旨在概述这里可以做的事情：
 - en: '[PRE29]'
   id: totrans-139
   prefs: []
@@ -926,16 +998,19 @@
   id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 尽管读取和写入数据会移动光标位置，但有一种操作的主要目的是在不接触数据的情况下仅移动光标位置。此操作有助于通过将光标移到所需位置，从任何地方开始读写数据。
 - en: Implementing the llseek file operation
   id: totrans-141
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 实现`llseek`文件操作
 - en: 'The `llseek` file operation is the kernel backend for the `lseek()` system
     call, used to move the cursor position within a file. Its prototype looks as follows:'
   id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: '`llseek`文件操作是`lseek()`系统调用的内核后端，用于在文件中移动光标位置。它的原型如下所示：'
 - en: '[PRE30]'
   id: totrans-143
   prefs: []
@@ -946,17 +1021,20 @@
   id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 此回调必须返回文件中的新位置。以下是其参数的定义：
 - en: '`loff_t` is an offset, relative to the current file position, which defines
     how much of it will be changed.'
   id: totrans-145
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`loff_t`是一个偏移量，相对于当前文件位置，定义了要更改的位置。'
 - en: '`whence` defines where to seek from. The possible values are as follows:'
   id: totrans-146
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`whence`定义了从哪里开始定位。可能的值如下：'
 - en: '`SEEK_SET`: To put the cursor to a position relative from the beginning of
     the file'
   id: totrans-147
@@ -964,24 +1042,28 @@
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`SEEK_SET`：将光标定位到相对于文件开头的位置'
 - en: '`SEEK_CUR`: To put the cursor to a position relative to the current file position'
   id: totrans-148
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`SEEK_CUR`：将光标定位到相对于当前文件位置的位置'
 - en: '`SEEK_END`: To adjust the cursor to a position relative to the end of the file'
   id: totrans-149
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`SEEK_END`：将光标定位到相对于文件末尾的位置'
 - en: 'When implementing this operation, it is a good practice to use the `switch`
     statement to check every possible `whence` case, since they are limited, and adjust
     the new position accordingly:'
   id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 在实现此操作时，使用`switch`语句检查每个可能的`whence`情况是一种良好的实践，因为它们是有限的，并相应地调整新位置：
 - en: '[PRE31]'
   id: totrans-151
   prefs: []
@@ -993,6 +1075,7 @@
   id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的内核后端摘录之后，以下是一个用户程序的示例，该程序将依次读取并定位到文件中。底层驱动程序随后将执行`llseek()`文件操作入口：
 - en: '[PRE32]'
   id: totrans-153
   prefs: []
@@ -1002,6 +1085,7 @@
   id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 该代码产生以下输出：
 - en: '[PRE33]'
   id: totrans-155
   prefs: []
@@ -1014,11 +1098,13 @@
   id: totrans-156
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本节中，我们通过示例解释了寻址的概念，展示了相对寻址和绝对寻址是如何工作的。现在我们已经完成了数据操作的部分，可以转到下一个操作，感知字符设备中数据的可读性或可写性。
 - en: The poll method
   id: totrans-157
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: '`poll`方法'
 - en: 'The `poll` method is the backend of both the `poll()` and `select()` system
     calls. These system calls are used to passively (by sleeping, without wasting
     CPU cycles) sense the readability/writability in a file. To support these system
@@ -1026,6 +1112,7 @@
   id: totrans-158
   prefs: []
   type: TYPE_NORMAL
+  zh: '`poll`方法是`poll()`和`select()`系统调用的后端。这些系统调用用于被动地（通过休眠，避免浪费CPU周期）感知文件的可读性/可写性。为了支持这些系统调用，驱动程序必须实现`poll`，其原型如下：'
 - en: '[PRE34]'
   id: totrans-159
   prefs: []
@@ -1037,6 +1124,7 @@
   id: totrans-160
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个方法实现的核心函数是`poll_wait()`，定义在`<linux/poll.h>`中，这是你必须在驱动程序代码中包含的头文件。它的声明如下：
 - en: '[PRE35]'
   id: totrans-161
   prefs: []
@@ -1060,6 +1148,8 @@
   id: totrans-162
   prefs: []
   type: TYPE_NORMAL
+  zh: '`poll_wait()`将与`struct file`结构相关联的设备（作为第一个参数传递）添加到可以唤醒进程的设备列表中（根据在第三个参数`struct
+    poll_table`结构中注册的事件），并将进程置于由第二个参数`struct wait_queue_head_t`结构表示的等待队列中。用户进程可以调用`poll()`、`select()`或`epoll()`系统调用，将一组文件添加到等待列表中，以便了解相关设备的就绪情况。然后，内核会调用与每个设备文件关联的驱动程序的`poll`方法。每个驱动程序的`poll`方法应该调用`poll_wait()`，以便注册需要通知的事件，并将该进程休眠，直到其中一个事件发生，并将该驱动程序注册为能够唤醒该进程的设备。通常的做法是根据`select()`（或`poll()`）系统调用支持的事件类型为每个事件类型使用一个等待队列（一个用于可读性，另一个用于可写性，必要时还可以为异常使用一个）。'
 - en: The return value of the (`*poll`) file operation must have `POLLIN | POLLRDNORM`
     set if there is data to read, `POLLOUT | POLLWRNORM` if the device is writable,
     and `0` if there is no new data and the device is not yet writable. In the following
@@ -1070,12 +1160,14 @@
   id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果有数据可读，则（`*poll`）文件操作的返回值必须设置`POLLIN | POLLRDNORM`；如果设备是可写的，则设置`POLLOUT | POLLWRNORM`；如果没有新数据且设备尚不可写，则返回`0`。在以下示例中，我们假设设备支持阻塞的读写。当然，你也可以只实现其中一个。如果驱动程序没有定义此方法，设备将被视为始终可读和可写，`poll()`或`select()`系统调用将立即返回。
 - en: 'Implementing the poll operation may require adapting the read or write file
     operations in a way that, on write, readers are notified of the readability, and
     on read, writers are notified of the writability:'
   id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 实现`poll`操作可能需要调整读写文件操作方式，在写入时通知读者数据可读，在读取时通知写者数据可写：
 - en: '[PRE36]'
   id: totrans-165
   prefs: []
@@ -1091,6 +1183,7 @@
   id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码片段中，我们实现了`poll`操作，当设备不可写或不可读时，进程会被挂起。然而，当这些状态发生变化时，没有通知机制。因此，`write`操作（或任何使数据可用的操作，如IRQ）必须通知在可读等待队列中挂起的进程；同样，`read`操作（或任何使设备准备好可写的操作）必须通知在可写等待队列中挂起的进程。以下是一个示例：
 - en: '[PRE37]'
   id: totrans-167
   prefs: []
@@ -1107,11 +1200,13 @@
   id: totrans-168
   prefs: []
   type: TYPE_NORMAL
+  zh: 更精确地说，你可以通过驱动程序的`write()`方法通知可读事件，这意味着写入的数据可以被读取，或者通过IRQ处理程序通知可读事件，这意味着外部设备发送了一些可以读取的数据。另一方面，你可以通过驱动程序的`read()`方法通知可写事件，这意味着缓冲区为空并且可以重新填充，或者通过IRQ处理程序通知可写事件，这意味着设备已完成数据发送操作并准备再次接受数据。不要忘记在状态改变时将标志重置为`false`。
 - en: 'The following is an excerpt of code that uses `select()` on a given character
     device in order to sense data availability:'
   id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下是使用`select()`在给定字符设备上检测数据可用性的代码片段：
 - en: '[PRE38]'
   id: totrans-170
   prefs: []
@@ -1123,16 +1218,19 @@
   id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码示例中，我们使用了不带超时的`select()`，这种方式意味着我们将只在“读取”事件发生时得到通知。从那一行开始，进程会被挂起，直到它收到注册的事件通知。
 - en: The ioctl method
   id: totrans-172
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: ioctl方法
 - en: 'A typical Linux system contains around 350 `-ENOTTY` error to any `ioctl()`
     system call. The following is its prototype:'
   id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 一个典型的Linux系统包含大约350个`-ENOTTY`错误，这些错误会发生在任何`ioctl()`系统调用中。以下是其原型：
 - en: '[PRE39]'
   id: totrans-174
   prefs: []
@@ -1151,6 +1249,7 @@
   id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的原型中，`f`是指向文件描述符的指针，表示已打开的设备实例，`cmd`是ioctl命令，`arg`是一个用户参数，可以是任何用户内存的地址，驱动程序可以在其上调用`copy_to_user()`或`copy_from_user()`。为了简洁起见，并出于显而易见的原因，IOCTL命令需要由一个唯一的编号来标识，这个编号应该在系统中唯一。IOCTL编号的唯一性可以防止我们将正确的命令发送到错误的设备，或者将错误的参数传递给正确的命令（因为IOCTL编号重复）。Linux提供了四个辅助宏来创建IOCTL标识符，具体取决于是否有数据传输以及传输的方向。它们各自的原型如下：
 - en: '[PRE40]'
   id: totrans-176
   prefs: []
@@ -1160,11 +1259,13 @@
   id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 它们的描述如下：
 - en: '`_IO`: The IOCTL command does not need data transfer.'
   id: totrans-178
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`_IO`：IOCTL命令不需要数据传输。'
 - en: '`_IOR`: This means that we''re creating an IOCTL command number for passing
     information from the kernel to user space (which is reading data). The driver
     will be allowed to return the `sizeof(TYPE)` bytes to the user without this return
@@ -1173,48 +1274,58 @@
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`_IOR`：这意味着我们正在创建一个IOCTL命令编号，用于将信息从内核传递到用户空间（即读取数据）。驱动程序将允许返回`sizeof(TYPE)`字节给用户，而不会将这个返回值视为错误。'
 - en: '`_IOW`: This is the same as `_IOR`, but the user sends data to the driver this
     time.'
   id: totrans-180
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`_IOW`：这与`_IOR`相同，但这次是用户向驱动程序发送数据。'
 - en: '`_IOWR`: The IOCTL command needs both write and read parameters.'
   id: totrans-181
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`_IOWR`：IOCTL命令需要同时提供写入和读取参数。'
 - en: 'What their parameters mean (in the order they are passed) is described here:'
   id: totrans-182
   prefs: []
   type: TYPE_NORMAL
+  zh: 它们的参数含义（按传递顺序）在此处进行了描述：
 - en: A number coded on 8 bits (`0` to `255`), called the **magic number**.
   id: totrans-183
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个由 8 位编码的数字（`0` 到 `255`），称为**魔术数字**。
 - en: A sequence number or command ID, also on 8 bits.
   id: totrans-184
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个序列号或命令 ID，大小也是 8 位。
 - en: A data type, if any, that will inform the kernel about the size to be copied.
     This could be the name of a structure or a data type.
   id: totrans-185
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 一个数据类型（如果有的话），它将告诉内核要复制的大小。这可以是一个结构体或数据类型的名称。
 - en: This is well documented in `Documentation/ioctl/ioctl-decoding.txt` in the kernel
     sources, and existing IOCTL commands are listed in `Documentation/ioctl/ioctl-number.txt`,
     a good place to start when you need to create your own IOCTL commands.
   id: totrans-186
   prefs: []
   type: TYPE_NORMAL
+  zh: 这在内核源代码的`Documentation/ioctl/ioctl-decoding.txt`中有很好的文档记录，现有的 IOCTL 命令列在`Documentation/ioctl/ioctl-number.txt`中，这是创建你自己
+    IOCTL 命令时的一个好起点。
 - en: Generating an IOCTL number (a command)
   id: totrans-187
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 生成一个 IOCTL 数字（一个命令）
 - en: 'It is recommended to generate your own IOCTL numbers in a dedicated header
     file, since this header should be available in user space as well. In other words,
     you should handle the duplication (by means of symbolic links, for example) of
@@ -1224,6 +1335,8 @@
   id: totrans-188
   prefs: []
   type: TYPE_NORMAL
+  zh: 建议在专用的头文件中生成你自己的 IOCTL 数字，因为这个头文件也应该在用户空间中可用。换句话说，你应该处理 IOCTL 头文件的重复（例如通过符号链接），确保内核中有一个，用户空间中也有一个，这样用户应用程序可以包含它。现在让我们在一个实际示例中生成一些
+    IOCTL 数字，并称这个头文件为`eep_ioctl.h`：
 - en: '[PRE41]'
   id: totrans-189
   prefs: []
@@ -1236,6 +1349,7 @@
   id: totrans-190
   prefs: []
   type: TYPE_NORMAL
+  zh: 在定义命令之后，头文件需要包含在最终代码中。此外，由于它们都是唯一且有限的，使用`switch ... case`语句处理每个命令，并在调用未定义的`ioctl`命令时返回`-ENOTTY`错误代码是一个好习惯。以下是一个示例：
 - en: '[PRE42]'
   id: totrans-191
   prefs: []
@@ -1248,17 +1362,20 @@
   id: totrans-192
   prefs: []
   type: TYPE_NORMAL
+  zh: 内核和用户空间都必须包含包含 IOCTL 命令的头文件。因此，在前面摘录的第一行中，我们包含了`eep_ioctl.h`，这是定义我们 IOCTL 命令的头文件。
 - en: If you think your IOCTL command will need more than one argument, you should
     gather those arguments in a structure and just pass a pointer to the structure
     to `ioctl`.
   id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 如果你认为你的 IOCTL 命令需要多个参数，你应该将这些参数收集到一个结构体中，并只需将结构体的指针传递给`ioctl`。
 - en: 'Now, from the user space, you must use the same `ioctl` header as in the driver''s
     code:'
   id: totrans-194
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，从用户空间，你必须使用与驱动代码中相同的`ioctl`头文件：
 - en: '[PRE43]'
   id: totrans-195
   prefs: []
@@ -1271,11 +1388,13 @@
   id: totrans-196
   prefs: []
   type: TYPE_NORMAL
+  zh: 在前面的代码中，我们展示了如何从用户空间使用内核的 IOCTL 命令。也就是说，在本节中，我们学习了如何实现字符设备的`ioctl`回调，以及如何在内核和用户空间之间交换数据。
 - en: Summary
   id: totrans-197
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 总结
 - en: In this chapter, we have demystified character devices, and we have seen how
     to let users interact with our driver through device files. We learned how to
     expose file operations to user space and control their behavior from within the
@@ -1283,9 +1402,11 @@
   id: totrans-198
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们已经解开了字符设备的神秘面纱，并且我们已经看到如何通过设备文件让用户与我们的驱动程序进行交互。我们学会了如何将文件操作暴露给用户空间，并在内核中控制它们的行为。我们甚至走得更远，现在你甚至能够实现多设备支持。
 - en: The next chapter is a bit more hardware-oriented, as it deals with the device
     tree, a mechanism that allows hardware devices present on the system to be declared
     to the kernel. See you in the next chapter.
   id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 下一章将更侧重于硬件，因为它涉及设备树，这是一种机制，允许系统中的硬件设备向内核声明。下章见。
