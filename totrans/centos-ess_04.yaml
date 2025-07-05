@@ -1,480 +1,715 @@
 - en: Chapter 4. Managing Clusters
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第4章 集群管理
 - en: In this chapter, we will cover how to setup and manage a local CoreOS cluster
     on a personal computer. You will learn how to bootstrap a three-peer cluster,
     customize it via the `cloud-config` file, and schedule a fleet unit in the cluster.
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将介绍如何在个人计算机上设置和管理本地CoreOS集群。你将学习如何引导一个三节点集群，通过`cloud-config`文件自定义它，并在集群中调度一个fleet单元。
 - en: 'In this chapter, we will cover the following topics:'
+  id: totrans-2
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将涵盖以下主题：
 - en: Bootstrapping a local cluster
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 引导一个本地集群
 - en: Customizing a cluster via the`cloud-config` file
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 通过`cloud-config`文件自定义集群
 - en: Scheduling a `fleet` unit in the cluster
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在集群中调度一个`fleet`单元
 - en: You are going to learn how to setup a simple three-node cluster on your personal
     computer.
+  id: totrans-6
   prefs: []
   type: TYPE_NORMAL
+  zh: 你将学习如何在个人计算机上设置一个简单的三节点集群。
 - en: Determining the optimal etcd cluster size
+  id: totrans-7
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 确定最佳的etcd集群大小
 - en: The most efficient cluster size is between three and nine peers. For larger
     clusters, `etcd` will select a subset of instances to participate in order to
     keep it efficient.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 最有效的集群大小是在三到九个节点之间。对于更大的集群，`etcd`将选择一部分实例参与，以保持集群的高效性。
 - en: The bigger the cluster, the slower the writing to the cluster becomes, as all
     of the data needs to be replicated around the cluster peers. To have a cluster
     well-optimized, it needs to be based on an odd number of peers. It must have a
     quorum of at least of three peers and prevent a split-brain in the event of network
     partition.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: 集群越大，写入集群的速度越慢，因为所有数据都需要在集群的节点之间进行复制。为了优化集群，它需要基于奇数个节点构建。集群必须至少有三个节点的法定人数，并在发生网络分区时防止出现脑裂。
 - en: In our case, we are going to set up a three-peer `etcd` cluster. To build a
     highly available cluster on the cloud (GCE, AWS, Azure, and so on), you should
     use multiple availability zones in order to decrease the effect of failure in
     a single domain.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 在我们的案例中，我们将设置一个三节点的`etcd`集群。为了在云上（如GCE、AWS、Azure等）构建一个高可用的集群，你应该使用多个可用区，以减少单个域故障的影响。
 - en: In a general cluster, peers are not recommended to be used for anything except
     for running an `etcd` cluster. But for testing our cluster setup, it will be fine
     to deploy some `fleet` units there.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: 在一般的集群中，不建议将节点用于除运行`etcd`集群外的任何其他用途。但为了测试我们的集群设置，将一些`fleet`单元部署在那里是可以的。
 - en: In later chapters, you will learn how to properly set up clusters to be used
     for production.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 在后续章节中，你将学习如何正确设置集群，以便用于生产环境。
 - en: Bootstrapping a local cluster
+  id: totrans-13
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 引导一个本地集群
 - en: As discussed earlier, we will be installing a three-peer `etcd` cluster on our
     computer.
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 如前所述，我们将在计算机上安装一个三节点的`etcd`集群。
 - en: Cloning the coreos-vagrant project
+  id: totrans-15
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 克隆coreos-vagrant项目
 - en: 'Let''s clone the project and get it running. Follow these steps:'
+  id: totrans-16
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们克隆项目并让它运行。请按照以下步骤操作：
 - en: 'In your terminal or command prompt, type this:'
+  id: totrans-17
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在终端或命令提示符中，输入以下内容：
 - en: '[PRE0]'
+  id: totrans-18
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'Now we need to adjust some settings. Edit `config.rb` and change the file''s
     top part to this example:'
+  id: totrans-19
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在我们需要调整一些设置。编辑`config.rb`并将文件的顶部部分更改为以下示例：
 - en: '[PRE1]'
+  id: totrans-20
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: Note
+  id: totrans-21
   prefs:
   - PREF_IND
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 注意
 - en: Alternatively, you can use the example code of this chapter, which will be kept
     up to date with changes in the coreos-vagrant GitHub repository.
+  id: totrans-22
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 或者，你也可以使用本章中的示例代码，这些代码会随着coreos-vagrant GitHub仓库中的更改而保持更新。
 - en: 'What we did here is as follows:'
+  id: totrans-23
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 我们在这里做的操作如下：
 - en: We set the cluster to three instances
+  id: totrans-24
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 我们将集群设置为三实例
 - en: Discovery token is automatically replaced on each `vagrant up` command
+  id: totrans-25
   prefs:
   - PREF_IND
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 每次执行`vagrant up`命令时，发现令牌会自动替换。
 - en: 'Next, we need to edit the user data file:'
+  id: totrans-26
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 接下来，我们需要编辑用户数据文件：
 - en: 'Change the `"#discovery: https://discovery.etcd.io/<token>"` line to this:'
+  id: totrans-27
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: '将`"#discovery: https://discovery.etcd.io/<token>"`这一行改为如下：'
 - en: '[PRE2]'
+  id: totrans-28
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: So, when we boot our vagrant-based cluster the next time, we will have three
     CoreOS `etcd` peers running and connected to the same cluster via the discovery
     token provided through "`https://discovery.etcd.io/<token>`".
+  id: totrans-29
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 所以，当我们下次启动基于Vagrant的集群时，我们将会有三个CoreOS `etcd`节点在同一个集群中运行，并通过"`https://discovery.etcd.io/<token>`"提供的发现令牌连接。
 - en: 'Let''s now fire up our new cluster using the following command:'
+  id: totrans-30
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在使用以下命令启动我们的新集群：
 - en: '[PRE3]'
+  id: totrans-31
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'We should see something like this in our terminal:'
+  id: totrans-32
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 我们应该在终端中看到如下内容：
 - en: '![Cloning the coreos-vagrant project](img/image00121.jpeg)'
+  id: totrans-33
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![克隆coreos-vagrant项目](img/image00121.jpeg)'
 - en: Hold on! There's more output!
+  id: totrans-34
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 等一下！还有更多输出！
 - en: '![Cloning the coreos-vagrant project](img/image00122.jpeg)'
+  id: totrans-35
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![克隆coreos-vagrant项目](img/image00122.jpeg)'
 - en: The cluster should be up and running now.
+  id: totrans-36
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 现在集群应该已经启动并运行了。
 - en: 'To check the status of the cluster, type the following command:'
+  id: totrans-37
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 要检查集群的状态，输入以下命令：
 - en: '[PRE4]'
+  id: totrans-38
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'You should see something like what is shown in the following screenshot:'
+  id: totrans-39
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你应该能看到如下截图所示的内容：
 - en: '![Cloning the coreos-vagrant project](img/image00123.jpeg)'
+  id: totrans-40
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![克隆 coreos-vagrant 项目](img/image00123.jpeg)'
 - en: 'Now it''s time to test our new CoreOS cluster. We need to run `ssh` for one
     of our peers and check the `fleet` machines. This can be done by the following
     command:'
+  id: totrans-41
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在是时候测试我们的新CoreOS集群了。我们需要通过`ssh`连接到其中一台节点，并检查`fleet`机器。可以通过以下命令来完成：
 - en: '[PRE5]'
+  id: totrans-42
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'We should see something like what is shown in the following screenshot:'
+  id: totrans-43
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们应该能看到如下截图所示的内容：
 - en: '![Cloning the coreos-vagrant project](img/image00124.jpeg)'
+  id: totrans-44
   prefs: []
   type: TYPE_IMG
+  zh: '![克隆 coreos-vagrant 项目](img/image00124.jpeg)'
 - en: 'Excellent! We have got our first CoreOS cluster set, as we see all the three
     machines up and running. Now, let''s try to set a key in `etcd` with which we
     can check on another machine later on. Type in the following command:'
+  id: totrans-45
   prefs: []
   type: TYPE_NORMAL
+  zh: 太棒了！我们已经设置好了第一个CoreOS集群，看到三台机器都已启动并运行。现在，让我们尝试在`etcd`中设置一个键，以便稍后在另一台机器上检查。输入以下命令：
 - en: '[PRE6]'
+  id: totrans-46
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'You will see the following output:'
+  id: totrans-47
   prefs: []
   type: TYPE_NORMAL
+  zh: 你将看到如下输出：
 - en: '[PRE7]'
+  id: totrans-48
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'Press *Ctrl*+*D* to exit and type the following command to get to VM host''s
     console:'
+  id: totrans-49
   prefs: []
   type: TYPE_NORMAL
+  zh: 按下 *Ctrl*+*D* 退出，并输入以下命令进入虚拟机主机的控制台：
 - en: '[PRE8]'
+  id: totrans-50
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'Let''s verify that we can see our new `etcd` key there too:'
+  id: totrans-51
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们验证一下，我们是否也能看到新的`etcd`键：
 - en: '[PRE9]'
+  id: totrans-52
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: Brilliant! Our `etcd` cluster is working just fine.
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 太棒了！我们的`etcd`集群运作得很好。
 - en: Exit from the `core-02` machine by pressing *Ctrl*+*D*.
+  id: totrans-54
   prefs: []
   type: TYPE_NORMAL
+  zh: 按下 *Ctrl*+*D* 从`core-02`机器退出。
 - en: Customizing a cluster via the cloud-config file
+  id: totrans-55
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 通过 cloud-config 文件定制集群
 - en: 'Let''s make some changes to the `cloud-config` file and push it into the cluster
     machines:'
+  id: totrans-56
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们对`cloud-config`文件进行一些更改，并将其推送到集群机器中：
 - en: 'In the user data file (`cloud-config` file for Vagrant-based CoreOS), below
     the text block `fleet` make changes:'
+  id: totrans-57
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 在用户数据文件（针对基于Vagrant的CoreOS的`cloud-config`文件）中，在`fleet`文本块下进行更改：
 - en: '[PRE10]'
+  id: totrans-58
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Add a new line:'
+  id: totrans-59
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 添加一行：
 - en: '[PRE11]'
+  id: totrans-60
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'So, it will look like this:'
+  id: totrans-61
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 所以，它看起来像这样：
 - en: '[PRE12]'
+  id: totrans-62
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Let''s add a `test.txt` file to the `/home/core` folder via `cloud-config`
     too. At the end of the user data file, add this code:'
+  id: totrans-63
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 让我们也通过`cloud-config`将一个`test.txt`文件添加到`/home/core`文件夹。在用户数据文件的末尾，添加以下代码：
 - en: '[PRE13]'
+  id: totrans-64
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: This will add a new file in the`/home/core` folder on each cluster machine.
+  id: totrans-65
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 这将在每台集群机器的`/home/core`文件夹中添加一个新文件。
 - en: 'To get our changes implemented which we did previously, run the following commands:'
+  id: totrans-66
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 为了实施我们之前所做的更改，请运行以下命令：
 - en: '[PRE14]'
+  id: totrans-67
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'You will see the following result:'
+  id: totrans-68
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你将看到以下结果：
 - en: '![Customizing a cluster via the cloud-config file](img/image00125.jpeg)'
+  id: totrans-69
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![通过cloud-config文件定制集群](img/image00125.jpeg)'
 - en: 'Then, run this command:'
+  id: totrans-70
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 然后，运行以下命令：
 - en: '[PRE15]'
+  id: totrans-71
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: The first command provisionally updated user data file on all three VMs, and
     the second reloaded them.
+  id: totrans-72
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 第一条命令临时更新了所有三台虚拟机上的用户数据文件，第二条命令重新加载了这些文件。
 - en: 'To `ssh` to one of the VMs, enter this code:'
+  id: totrans-73
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 要通过`ssh`连接到其中一台虚拟机，输入以下代码：
 - en: '[PRE16]'
+  id: totrans-74
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'To check the content of the `test.txt` file, use this line:'
+  id: totrans-75
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 要查看`test.txt`文件的内容，请使用以下命令：
 - en: '[PRE17]'
+  id: totrans-76
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'You should see output as follows:'
+  id: totrans-77
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你应该会看到如下输出：
 - en: '[PRE18]'
+  id: totrans-78
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: As you can see, we have added some files to all cluster machines via the `cloud-config`
     file.
+  id: totrans-79
   prefs: []
   type: TYPE_NORMAL
+  zh: 如你所见，我们通过`cloud-config`文件在所有集群机器上添加了一些文件。
 - en: 'Let''s check one more change that we have done in that file using the following
     command:'
+  id: totrans-80
   prefs: []
   type: TYPE_NORMAL
+  zh: 让我们使用以下命令检查一下我们在该文件中做的另一个更改：
 - en: '[PRE19]'
+  id: totrans-81
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: 'You will see something like this:'
+  id: totrans-82
   prefs: []
   type: TYPE_NORMAL
+  zh: 你将看到类似这样的内容：
 - en: '![Customizing a cluster via the cloud-config file](img/image00126.jpeg)'
+  id: totrans-83
   prefs: []
   type: TYPE_IMG
+  zh: '![通过cloud-config文件定制集群](img/image00126.jpeg)'
 - en: Thus, you can see that we have some metadata assigned to cluster machines via
     the `cloud-init` file.
+  id: totrans-84
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，你可以看到我们通过`cloud-init`文件为集群机器分配了一些元数据。
 - en: Scheduling a fleet unit in the cluster
+  id: totrans-85
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 在集群中调度一个fleet单元
 - en: Now, for the fun part, we will schedule a `fleet` unit in the cluster.
+  id: totrans-86
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，进入有趣的部分，我们将调度一个`fleet`单元到集群中。
 - en: 'Let''s log in to the `core-03` machine:'
+  id: totrans-87
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 让我们登录到`core-03`机器：
 - en: '[PRE20]'
+  id: totrans-88
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'Create a new `fleet` unit called `hello-cluster.service` by copying and pasting
     this line:'
+  id: totrans-89
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 通过复制并粘贴这一行，创建一个新的`fleet`单元`hello-cluster.service`：
 - en: '[PRE21]'
+  id: totrans-90
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'Let''s schedule the `hello-cluster.service` job for the cluster:'
+  id: totrans-91
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 让我们为集群调度`hello-cluster.service`任务：
 - en: '[PRE22]'
+  id: totrans-92
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'You should see output as follows:'
+  id: totrans-93
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你应该会看到如下输出：
 - en: '[PRE23]'
+  id: totrans-94
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: We can see that `hello-cluster.service` was scheduled to be run on the `172.17.8.103`
     machine because that machine first responded to the `fleetctl` command.
+  id: totrans-95
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 我们可以看到，`hello-cluster.service`被调度到`172.17.8.103`机器上运行，因为该机器是第一个响应`fleetctl`命令的。
 - en: 'In later chapters, you will learn how to specifically schedule jobs to a particular
     machine. Now let''s check out the real-time `hello-cluster.service` log:'
+  id: totrans-96
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 在后续章节中，你将学习如何将任务具体调度到某一台机器。现在让我们查看`hello-cluster.service`的实时日志：
 - en: '[PRE24]'
+  id: totrans-97
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'You will see something like this:'
+  id: totrans-98
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 你会看到类似这样的内容：
 - en: '![Scheduling a fleet unit in the cluster](img/image00127.jpeg)'
+  id: totrans-99
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![在集群中调度一个 fleet 单位](img/image00127.jpeg)'
 - en: 'To exit from the VM and reload the cluster, type the following command:'
+  id: totrans-100
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 退出虚拟机并重新加载集群，请输入以下命令：
 - en: '[PRE25]'
+  id: totrans-101
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'Now, `ssh` again back to any machine:'
+  id: totrans-102
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 现在，再次`ssh`回任何一台机器：
 - en: '[PRE26]'
+  id: totrans-103
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'Then run this command:'
+  id: totrans-104
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 然后运行此命令：
 - en: '[PRE27]'
+  id: totrans-105
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'The following output will be seen:'
+  id: totrans-106
   prefs:
   - PREF_IND
   type: TYPE_NORMAL
+  zh: 将看到以下输出：
 - en: '![Scheduling a fleet unit in the cluster](img/image00128.jpeg)'
+  id: totrans-107
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![在集群中调度一个 fleet 单位](img/image00128.jpeg)'
 - en: 'As you can see, `hello-cluster.service` got scheduled on another machine; in
     our case, it is `core-01`. Suppose we `ssh` to it:'
+  id: totrans-108
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 如您所见，`hello-cluster.service` 已在另一台机器上调度；在我们的案例中，它是 `core-01`。假设我们`ssh`到它：
 - en: '[PRE28]'
+  id: totrans-109
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'Then, we run the following command there. As a result, we will see the real-time
     log again:'
+  id: totrans-110
   prefs:
   - PREF_OL
   type: TYPE_NORMAL
+  zh: 然后，在那里运行以下命令。结果，我们将再次看到实时日志：
 - en: '[PRE29]'
+  id: totrans-111
   prefs:
   - PREF_IND
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: '![Scheduling a fleet unit in the cluster](img/image00129.jpeg)'
+  id: totrans-112
   prefs:
   - PREF_IND
   type: TYPE_IMG
+  zh: '![在集群中调度一个 fleet 单位](img/image00129.jpeg)'
 - en: References
+  id: totrans-113
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 参考文献
 - en: You can read more about how to use cloud-config at [https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/).You
     can find out more about Vagrant at [https://docs.vagrantup.com](https://docs.vagrantup.com).If
     you have any issues or questions about Vagrant, you can subscribe to the Vagrant
     Google group at [https://groups.google.com/forum/#!forum/vagrant-up](https://groups.google.com/forum/#!forum/vagrant-up).
+  id: totrans-114
   prefs: []
   type: TYPE_NORMAL
+  zh: 您可以在[https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/)了解有关如何使用cloud-config的更多信息。您可以在[https://docs.vagrantup.com](https://docs.vagrantup.com)找到更多关于Vagrant的信息。如果您对Vagrant有任何问题或疑问，可以订阅Vagrant
+    Google小组[https://groups.google.com/forum/#!forum/vagrant-up](https://groups.google.com/forum/#!forum/vagrant-up)。
 - en: Summary
+  id: totrans-115
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 摘要
 - en: In this chapter,you learned how to set up aCoreOS cluster, customize it via
     cloud-config, schedule `fleet` service units to the cluster, and check the `fleet`
     unit in the cluster status and log.In the next chapter,you will learn how to perform
     local and cloud development setups.
+  id: totrans-116
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，您学习了如何设置CoreOS集群，通过cloud-config进行自定义配置，将`fleet`服务单位调度到集群，并检查集群状态和日志中的`fleet`单位。在下一章中，您将学习如何进行本地和云开发设置。
