@@ -1,31 +1,45 @@
 - en: Chapter 4. Zones
+  id: totrans-0
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 第四章. Zones
 - en: 'In this chapter, we will cover the following recipes:'
+  id: totrans-1
   prefs: []
   type: TYPE_NORMAL
+  zh: 在本章中，我们将涵盖以下内容：
 - en: Creating, administering, and using a virtual network in a zone
+  id: totrans-2
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 在 zone 中创建、管理和使用虚拟网络
 - en: Managing a zone using the resource manager
+  id: totrans-3
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 使用资源管理器管理 zone
 - en: Implementing a flow control
+  id: totrans-4
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 实现流量控制
 - en: Working with migrations from physical Oracle Solaris 10 hosts to Oracle Solaris
     11 Zones
+  id: totrans-5
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 从物理 Oracle Solaris 10 主机迁移到 Oracle Solaris 11 Zones
 - en: Introduction
+  id: totrans-6
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 介绍
 - en: Oracle Solaris 11 Zones is a great framework that virtualizes and consolidates
     a system environment where there are many applications and physical machines running
     Oracle Solaris. Using a rough comparison, Oracle Solaris 11 zone is similar to
@@ -33,8 +47,12 @@
     but presents some important differences such as not allowing either to perform
     a hardware emulation or run any other kind of operating system except Oracle Solaris
     11 or prior Oracle Solaris versions.
+  id: totrans-7
   prefs: []
   type: TYPE_NORMAL
+  zh: Oracle Solaris 11 Zones 是一个出色的框架，它虚拟化并整合了一个系统环境，在该环境中有许多应用程序和物理机器运行 Oracle Solaris。用一个粗略的比较，Oracle
+    Solaris 11 zone 类似于 VMware ESX、Linux LXC 和 FreeBSD Jails 提供的其他虚拟化选项，但它具有一些重要的不同之处，例如不允许执行硬件仿真或运行除
+    Oracle Solaris 11 或之前版本的 Oracle Solaris 之外的任何其他操作系统。
 - en: In Oracle Solaris Zones, the fundamental idea is to create different small operating
     system installations (children) inside the main operating system (parent) by sharing
     or dividing (using the resource manager) the existing resources between these
@@ -43,16 +61,23 @@
     lesser overhead than previously quoted solutions. Using the Oracle Solaris 11
     terms, the parent is the global zone and children are non-global zones, as we'll
     see later.
+  id: totrans-8
   prefs: []
   type: TYPE_NORMAL
+  zh: 在 Oracle Solaris Zones 中，基本的概念是通过共享或划分（使用资源管理器）现有资源，在主操作系统（父操作系统）内部创建不同的小型操作系统安装（子操作系统）。每个安装将有自己的
+    init 文件和进程，尽管它与父操作系统共享内核，从而导致比之前提到的解决方案更少的开销。使用 Oracle Solaris 11 的术语，父操作系统是全球
+    zone，子操作系统是非全球 zone，正如我们稍后将看到的。
 - en: Oracle Solaris zone offers application isolation, additional tiers of security,
     and reduced power requirements. This concern with security is necessary in order
     to prevent an application running inside a zone from crashing other applications
     in other zones. This is the reason why a non-global zone does not view other non-global
     zones, can contain additional software packages, and has a different product database
     that controls its own installed software.
+  id: totrans-9
   prefs: []
   type: TYPE_NORMAL
+  zh: Oracle Solaris zone 提供了应用程序隔离、额外的安全层和降低的功耗要求。这种对安全性的关注是必要的，以防止在一个 zone 内运行的应用程序崩溃其他
+    zone 中的应用程序。这也是非全球 zone 无法查看其他非全球 zone、可以包含额外软件包并具有独立产品数据库来控制其自身安装软件的原因。
 - en: Going into details of the previously mentioned features, zones make it possible
     for many applications to share host resources, therefore decreasing the cost of
     a deployment. This resource management allows us to assign specific resources
@@ -62,15 +87,22 @@
     Solaris scheduler class **fair share scheduler** (**FSS**) in order to impose
     control over the CPU (using shares) and memory (using the `rcapd` daemon that
     limits the amount of physical memory) in a non-global zone.
+  id: totrans-10
   prefs: []
   type: TYPE_NORMAL
+  zh: 进一步讨论前面提到的特点，zone 使得多个应用程序能够共享主机资源，从而降低部署成本。这种资源管理允许我们为非全球 zone 分配特定资源，以创建资源消耗的限制（例如
+    CPU 和内存），并控制进程、任务或项目使用多少资源。此外，这种资源控制利用了 Oracle Solaris 调度器类 **公平共享调度器**（**FSS**），以对
+    CPU（使用共享）和内存（使用 `rcapd` 守护进程限制物理内存量）进行控制。
 - en: Zone was introduced in Oracle Solaris Version 10, and it can be classified as
     the global zone (the physical machine installation that was presented as a parent
     previously) and non-global zone (informally named as *local zone* or just *zone*,
     which was presented as a child) where any application can be installed and administered
     and the right resource configuration can be performed.
+  id: totrans-11
   prefs: []
   type: TYPE_NORMAL
+  zh: Zone 在 Oracle Solaris 版本 10 中引入，可以分为全球 zone（物理机器安装，即之前提到的父操作系统）和非全球 zone（非正式称为
+    *本地 zone* 或简单地称为 *zone*，即之前提到的子操作系统），在这些 zone 中可以安装和管理应用程序，并进行正确的资源配置。
 - en: The global zone (the parent zone) is a bootable zone that comes directly from
     the physical hardware, and it makes it possible to configure, install, administer,
     and remove non-global zones (children zones), given that it is also the only zone
@@ -78,8 +110,11 @@
     same operating system as the global zone, but Oracle Solaris 11 provides another
     zone type, named **branded zone**, which makes it feasible to create and install
     a non-global zone that runs Oracle Solaris 10, for example.
+  id: totrans-12
   prefs: []
   type: TYPE_NORMAL
+  zh: 全球区域（父区域）是一个可启动的区域，直接来自物理硬件，它使得配置、安装、管理和删除非全球区域（子区域）成为可能，因为它也是唯一了解所有现有区域的区域。通常，非全球区域运行与全球区域相同的操作系统，但
+    Oracle Solaris 11 提供了另一种区域类型，称为**品牌化区域**，它使得创建和安装一个运行 Oracle Solaris 10 的非全球区域成为可能。
 - en: 'Briefly, during a non-global zone installation, it''s requested to provide
     as input the directory where the zone will be installed, the network interface,
     and network information such as IP address and network mask. Additionally, it
@@ -87,52 +122,76 @@
     in the non-global zone. There are two options: shared-IP (used when the network
     interface is shared with the global zone) and exclusive-IP (used when the network
     interface is dedicated to the non-global zone).'
+  id: totrans-13
   prefs: []
   type: TYPE_NORMAL
+  zh: 简而言之，在安装非全球区域时，需要提供输入目录以指定区域安装位置、网络接口以及如 IP 地址和网络掩码等网络信息。此外，还需要指定在非全球区域中与网络接口一起使用的
+    IP 类型。共有两种选择：共享 IP（当网络接口与全球区域共享时使用）和专用 IP（当网络接口专用于非全球区域时使用）。
 - en: 'Once the zone configuration is complete, the next step is to install the zone
     and administer it. It is advisable to know that non-global zones can have the
     following zone states:'
+  id: totrans-14
   prefs: []
   type: TYPE_NORMAL
+  zh: 一旦区域配置完成，下一步就是安装并管理该区域。需要了解的是，非全球区域可以有以下区域状态：
 - en: '**undefined**: This denotes whether the zone configuration is incomplete or
     deleted'
+  id: totrans-15
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**undefined**：表示区域配置是否未完成或已删除'
 - en: '**incomplete**: This denotes that the zone installation was aborted in between'
+  id: totrans-16
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**incomplete**：表示区域安装在中途被中止'
 - en: '**configured**: This denotes whether the zone configuration is complete'
+  id: totrans-17
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**configured**：表示区域配置是否完成'
 - en: '**installed**: This denotes that the zone packages and operating system were
     installed'
+  id: totrans-18
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**installed**：表示区域包和操作系统已安装'
 - en: '**ready**: This denotes the almost-running zone with an associated zone ID'
+  id: totrans-19
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**ready**：表示几乎可以运行的区域，并带有相关的区域 ID'
 - en: '**running**: This denotes that everything is working and getting executed'
+  id: totrans-20
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**running**：表示一切正常，正在执行中'
 - en: '**down**: This denotes that the zone is halted'
+  id: totrans-21
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '**down**：表示区域已停止'
 - en: Honestly, on a daily basis, the more typical states are `configured`, `installed`,
     `running`, and `down`. The remaining states are transient states and we rarely
     have to be concerned about them.
+  id: totrans-22
   prefs: []
   type: TYPE_NORMAL
+  zh: 说实话，日常工作中更常见的状态是`configured`、`installed`、`running`和`down`。其他状态都是临时状态，我们很少需要关心它们。
 - en: Therefore, the sequence of states is `undefined` | `configured` | `incomplete`
     | `installed` | `ready` | `running` | `down`.
+  id: totrans-23
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，状态的顺序是`undefined` | `configured` | `incomplete` | `installed` | `ready` |
+    `running` | `down`。
 - en: There are professionals who usually ask me, "What are the differences between
     Oracle Solaris 11 and Oracle Solaris 10?" Truly, there are some relevant differences.
     Now, the `var` directory is a separated filesystem, the default zone brand is
@@ -148,15 +207,21 @@
     flow control can be enforced and specific link properties can be configured to
     increase the bandwidth control and efficiency as well, which makes it possible
     to share a network resource across different VNICs.
+  id: totrans-24
   prefs: []
   type: TYPE_NORMAL
+  zh: 通常有专业人士问我：“Oracle Solaris 11和Oracle Solaris 10之间有什么区别？”确实存在一些相关差异。现在，`var`目录是一个独立的文件系统，默认区域品牌是Solaris（之前是native），不再存在稀疏区域的概念，而默认文件系统是ZFS，并使用IPS作为包管理器。然而，在Oracle
+    Solaris 11中最重要的区域差异是引入了网络虚拟化，它允许我们使用至少一个网络接口——**虚拟网络接口** (**VNICs**)——和虚拟交换机的概念来控制网络区域资源。例如，一台物理机器可以在全局区域中运行Oracle
+    Solaris 11，并且有五个非全局区域（z1、z2、z3、z4和z5），每个区域都有一个专用的VNIC连接到一个虚拟交换机（`etherstub`），最后一个连接到真实网络接口卡。此外，可以强制执行网络流控制，并配置特定的链路属性以增加带宽控制和效率，从而可以在不同的VNICs之间共享网络资源。
 - en: The possible network flow can be created on a per-VNIC basis with specific attributes,
     isolating and classifying similar packets and with associated bound resources.
     Possible flow attributes include `maxbw` (which defines the bandwidth of the flow)
     and priority (which defines the packet priority in a flow as low, medium, and
     high).
+  id: totrans-25
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以根据每个VNIC创建可能的网络流，并具有特定的属性，隔离和分类类似的数据包，并带有相关联的绑定资源。可能的流属性包括`maxbw`（定义流的带宽）和优先级（定义流中数据包的优先级为低、中和高）。
 - en: 'All resource controls mentioned so far (CPU, memory, and network) are disabled
     by default, and they are controlled by two resource services: the default resource
     pool service (`svc:/system/pools:default`) and dynamic resource pool service (`svc:/system/pools/dynamic:default`).
@@ -164,308 +229,465 @@
     creation and the resource management behavior, as it is used by a daemon named
     `poold` that controls the entire allocation controls and limits after associating
     the created pool with a non-global zone.'
+  id: totrans-26
   prefs: []
   type: TYPE_NORMAL
+  zh: 所有提到的资源控制（CPU、内存和网络）默认情况下都是禁用的，并由两个资源服务控制：默认资源池服务（`svc:/system/pools:default`）和动态资源池服务（`svc:/system/pools/dynamic:default`）。名为`pooladm.conf`的配置文件位于`etc`目录下，帮助我们定义池的创建和资源管理行为，它由一个名为`poold`的守护程序控制整个分配控制和限制，在将创建的池与非全局区域关联后。
 - en: Now, we are ready to learn about the next recipes on Oracle Solaris 11 Zones.
+  id: totrans-27
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们准备学习关于Oracle Solaris 11区域的下一个配方。
 - en: Creating, administering, and using a virtual network in a zone
+  id: totrans-28
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 创建、管理和使用区域内的虚拟网络
 - en: 'I love this recipe because here, we are going to use the main feature of zones
     in Oracle Solaris 11 virtual networks. Concisely, we are going to create and configure
     the following scenario:'
+  id: totrans-29
   prefs: []
   type: TYPE_NORMAL
+  zh: 我喜欢这个配方，因为在这里，我们将使用Oracle Solaris 11虚拟网络区域的主要功能。简而言之，我们将创建和配置以下场景：
 - en: '`zone1` | `vnic1` (`192.168.1.51`) | `vswitch1` (`etherstub`) | `net0` (`192.168.1.144`)'
+  id: totrans-30
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`zone1` | `vnic1` (`192.168.1.51`) | `vswitch1` (`etherstub`) | `net0` (`192.168.1.144`)'
 - en: '`zone2` | `vnic2` (`192.168.1.52`) | `vswitch1` (`etherstub`) | `net0` (`192.168.1.144`)'
+  id: totrans-31
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`zone2` | `vnic2` (`192.168.1.52`) | `vswitch1` (`etherstub`) | `net0` (`192.168.1.144`)'
 - en: 'Each zone connects to its respective **virtual network interface** (**VNIC**),
     and both VNICs go to the same `etherstub` (a kind of a virtual switch). Because
     of this, `etherstub` requires a virtual interface (`vnic0`). Finally, `etherstub`
     connects to a real interface (`net0`). The zonepath property for each zone and
     other properties are as follows:'
+  id: totrans-32
   prefs: []
   type: TYPE_NORMAL
+  zh: 每个区域连接到其相应的**虚拟网络接口** (**VNIC**)，两个VNIC都连接到同一个`etherstub`（一种虚拟交换机）。因此，`etherstub`需要一个虚拟接口（`vnic0`）。最后，`etherstub`连接到一个真实接口（`net0`）。每个区域的`zonepath`属性和其他属性如下：
 - en: 'zonepath zone1: `/myzones/zone1`'
+  id: totrans-33
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'zonepath zone1: `/myzones/zone1`'
 - en: 'zonepath zone2: `/myzones/zone2`'
+  id: totrans-34
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 'zonepath zone2: `/myzones/zone2`'
 - en: 'IP type: exclusive-IP'
+  id: totrans-35
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: IP类型：专用IP
 - en: Getting ready
+  id: totrans-36
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备就绪
 - en: 'This recipe requires a virtual machine (VirtualBox or VMware) that runs Oracle
     Solaris 11, with 4 GB (minimum) or 8 GB RAM (recommended), an extra disk with
     80 GB, and a processor with two or more cores configured for this virtual machine,
     as shown in the following screenshot that was extracted from my VirtualBox environment:'
+  id: totrans-37
   prefs: []
   type: TYPE_NORMAL
+  zh: 本教程需要一台运行Oracle Solaris 11的虚拟机（VirtualBox或VMware），至少需要4 GB的内存（推荐8 GB），一个额外的80
+    GB磁盘，以及为该虚拟机配置的双核或更多核心的处理器，以下截图是从我的VirtualBox环境中提取的：
 - en: '![Getting ready](img/00022.jpeg)'
+  id: totrans-38
   prefs: []
   type: TYPE_IMG
+  zh: '![准备就绪](img/00022.jpeg)'
 - en: How to do it…
+  id: totrans-39
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'To start the procedure, we have to gather all current and relevant information
     about the system by running the following command:'
+  id: totrans-40
   prefs: []
   type: TYPE_NORMAL
+  zh: 要开始此过程，我们需要通过执行以下命令收集所有当前和相关的系统信息：
 - en: '[PRE0]'
+  id: totrans-41
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE0]'
 - en: 'The system has two network interfaces (`net0` and `net1`), but only `net0`
     will be considered. Additionally, the pool (`myzones`) has almost 80 GB free space
     (you can create the myzones pool using `zpool create myzones <disk>`), and there
     is no filesystem under it. Then, the first step is to create the pool and one
     filesystem for each zone (`zone1` and `zone2`) by running the following commands:'
+  id: totrans-42
   prefs: []
   type: TYPE_NORMAL
+  zh: 系统有两个网络接口（`net0`和`net1`），但只会考虑`net0`。此外，池（`myzones`）有大约80 GB的可用空间（你可以使用`zpool
+    create myzones <磁盘>`创建myzones池），并且没有文件系统。然后，第一步是创建池并为每个zone（`zone1`和`zone2`）创建一个文件系统，执行以下命令：
 - en: '[PRE1]'
+  id: totrans-43
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE1]'
 - en: 'The storage requirements have been met and now, the next important part of
     this recipe is to prepare all network infrastructures. To accomplish this task,
     it will be necessary to create `etherstub` (`vswitch1`) and three VNICs: `vnic0`
     (`etherstub`), `vnic1` (`zone1`), and `vnic2` (`zone2`). Moreover, we have to
     connect all VNICs into `etherstub` (`vswitch1`). All these tasks are accomplished
     by executing the following commands:'
+  id: totrans-44
   prefs: []
   type: TYPE_NORMAL
+  zh: 存储需求已满足，接下来，本教程的关键部分是准备所有网络基础设施。为此，必须创建`etherstub`（`vswitch1`）和三个VNIC：`vnic0`（`etherstub`），`vnic1`（`zone1`），以及`vnic2`（`zone2`）。此外，我们需要将所有VNIC连接到`etherstub`（`vswitch1`）。所有这些任务都可以通过执行以下命令完成：
 - en: '[PRE2]'
+  id: totrans-45
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE2]'
 - en: 'Now, it''s time to create the first zone (`zone1`) using `ip-type=exclusive`
     (this is the default value) and `vnic1` as a physical network interface:'
+  id: totrans-46
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，是时候创建第一个zone（`zone1`），使用`ip-type=exclusive`（这是默认值）并将`vnic1`作为物理网络接口：
 - en: '[PRE3]'
+  id: totrans-47
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE3]'
 - en: 'To configure `zone2`, almost the same steps (the zone info details were omitted)
     need to be followed by running the following command:'
+  id: totrans-48
   prefs: []
   type: TYPE_NORMAL
+  zh: 要配置`zone2`，需要执行几乎相同的步骤（省略了zone信息的详细内容），执行以下命令：
 - en: '[PRE4]'
+  id: totrans-49
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE4]'
 - en: 'To list the recently configured zones, execute the following command:'
+  id: totrans-50
   prefs: []
   type: TYPE_NORMAL
+  zh: 要列出最近配置的zone，执行以下命令：
 - en: '[PRE5]'
+  id: totrans-51
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE5]'
 - en: 'According to the previous recipe, during the first login that happens soon
     after installing the zone, it is required to provide interactively the system
     configuration information through eleven screens. To automate and make this simpler,
     it is feasible to create a system configuration file for each zone and provide
     it during each zone installation. To accomplish this task, some information will
     be asked from it:'
+  id: totrans-52
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据之前的教程，在安装zone后第一次登录时，需要通过11个屏幕交互式地提供系统配置信息。为了自动化并简化此过程，可以为每个zone创建一个系统配置文件，并在每次安装zone时提供它。为完成此任务，需要从中获取一些信息：
 - en: 'For `zone1`, the information is as follows:'
+  id: totrans-53
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于`zone1`，信息如下：
 - en: 'Computer name: `zone1`'
+  id: totrans-54
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 计算机名称：`zone1`
 - en: 'Ethernet network configuration: `Manually`'
+  id: totrans-55
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 以太网网络配置：`手动`
 - en: 'Network interface: `vnic1`'
+  id: totrans-56
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 网络接口：`vnic1`
 - en: 'IP address: `192.168.1.51`'
+  id: totrans-57
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: IP地址：`192.168.1.51`
 - en: 'DNS: `Do not configure DNS`'
+  id: totrans-58
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: DNS：`不配置DNS`
 - en: 'Alternate name server: `None`'
+  id: totrans-59
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 备用名称服务器：`无`
 - en: 'Time zone: `(your time zone)`'
+  id: totrans-60
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 时区：`(你的时区)`
 - en: 'Date and time: `(your current date and time)`'
+  id: totrans-61
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 日期和时间：`(当前日期和时间)`
 - en: 'Root password: `(your choice)`'
+  id: totrans-62
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 根密码：`(你的选择)`
 - en: 'Your real name: `Alexandre Borges`'
+  id: totrans-63
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 你的真实姓名：`Alexandre Borges`
 - en: 'Username: `aborges1`'
+  id: totrans-64
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 用户名：`aborges1`
 - en: 'Password: `hacker123!`'
+  id: totrans-65
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 密码：`hacker123!`
 - en: 'E-mail: `anonymous@oracle.com`'
+  id: totrans-66
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 电子邮件：`anonymous@oracle.com`
 - en: 'Internet access method: `No proxy`'
+  id: totrans-67
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 互联网访问方式：`无代理`
 - en: 'For `zone2`, the information is as follows:'
+  id: totrans-68
   prefs: []
   type: TYPE_NORMAL
+  zh: 对于`zone2`，信息如下：
 - en: 'Computer name: `zone2`'
+  id: totrans-69
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 计算机名称：`zone2`
 - en: 'Ethernet network configuration: `Manually`'
+  id: totrans-70
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 以太网网络配置：`手动`
 - en: 'Network interface: `vnic2`'
+  id: totrans-71
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 网络接口：`vnic2`
 - en: 'IP address: `192.168.1.52`'
+  id: totrans-72
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: IP地址：`192.168.1.52`
 - en: 'DNS: `Do not configure DNS`'
+  id: totrans-73
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: DNS：`不配置DNS`
 - en: 'Alternate name server: `None`'
+  id: totrans-74
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 备用名称服务器：`无`
 - en: 'Time zone: `(your time zone)`'
+  id: totrans-75
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 时区：`(你的时区)`
 - en: 'Date and time: `(your current date and time)`'
+  id: totrans-76
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 日期和时间：`(当前日期和时间)`
 - en: 'Root password: `(your choice)`'
+  id: totrans-77
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 根密码：`(你的选择)`
 - en: 'Your real name: `Alexandre Borges`'
+  id: totrans-78
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 你的真实姓名：`Alexandre Borges`
 - en: 'Username: `aborges2`'
+  id: totrans-79
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 用户名：`aborges2`
 - en: 'Password: `hacker123!`'
+  id: totrans-80
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 密码：`hacker123!`
 - en: 'E-mail: `anonymous@oracle.com`'
+  id: totrans-81
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 电子邮件：`anonymous@oracle.com`
 - en: 'Internet access method: `No proxy`'
+  id: totrans-82
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: 网络访问方式：`No proxy`
 - en: 'Create a directory that will hold the zone profiles as follows:'
+  id: totrans-83
   prefs: []
   type: TYPE_NORMAL
+  zh: 创建一个目录来存放区域配置文件，方法如下：
 - en: '[PRE6]'
+  id: totrans-84
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE6]'
 - en: 'Create a profile to `zone1` by executing the following command:'
+  id: totrans-85
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过执行以下命令为 `zone1` 创建配置文件：
 - en: '[PRE7]'
+  id: totrans-86
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE7]'
 - en: 'By using the almost the same command, create a profile to `zone2` by running
     the following command:'
+  id: totrans-87
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用几乎相同的命令，通过执行以下命令为 `zone2` 创建一个配置文件：
 - en: '[PRE8]'
+  id: totrans-88
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE8]'
 - en: 'To visualize the system configuration content, execute the following command:'
+  id: totrans-89
   prefs: []
   type: TYPE_NORMAL
+  zh: 要可视化系统配置内容，请执行以下命令：
 - en: '[PRE9]'
+  id: totrans-90
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE9]'
 - en: 'Now, it is time to install `zone1` and `zone2` using their respective system
     configuration files, as configured previously. Therefore, to perform this task,
     we''ll be using our local repository (as learned in [Chapter 1](part0015_split_000.html#page
     "Chapter 1. IPS and Boot Environments"), *IPS and Boot Environments*) and executing
     the following command:'
+  id: totrans-91
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，是时候使用之前配置的系统配置文件安装 `zone1` 和 `zone2` 了。因此，为了执行此任务，我们将使用本地仓库（如在[第1章](part0015_split_000.html#page
+    "Chapter 1. IPS and Boot Environments")，*IPS 和启动环境*中所学）并执行以下命令：
 - en: '[PRE10]'
+  id: totrans-92
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE10]'
 - en: 'Initiate both zones by running the following command:'
+  id: totrans-93
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过执行以下命令启动这两个区域：
 - en: '[PRE11]'
+  id: totrans-94
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE11]'
 - en: 'It is appropriate to check the network information before logging into zones
     by executing the following command:'
+  id: totrans-95
   prefs: []
   type: TYPE_NORMAL
+  zh: 在登录到区域之前，检查网络信息是很合适的，可以通过执行以下命令来实现：
 - en: '[PRE12]'
+  id: totrans-96
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE12]'
 - en: 'Now, we can log into the zones and test them by running the following command:'
+  id: totrans-97
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们可以登录到区域并通过执行以下命令进行测试：
 - en: '[PRE13]'
+  id: totrans-98
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE13]'
 - en: Everything is working. Zones are simply amazing!
+  id: totrans-99
   prefs: []
   type: TYPE_NORMAL
+  zh: 一切正常。区域真是太棒了！
 - en: An overview of the recipe
+  id: totrans-100
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 该教程概述
 - en: The great news from this recipe was that we configured a virtual switch (`etherstub`)
     and three virtual network interfaces. Afterwards, we used these objects to create
     two zones using the virtual network concept.
+  id: totrans-101
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个教程的好消息是我们配置了一个虚拟交换机（`etherstub`）和三个虚拟网络接口。之后，我们使用这些对象创建了两个区域，并应用了虚拟网络的概念。
 - en: Managing a zone using the resource manager
+  id: totrans-102
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 使用资源管理器管理区域
 - en: Installing and configuring Oracle Solaris 11 non-global zones is great, and
     as we have mentioned previously, it is a great technique that isolates and runs
     applications without disturbing other applications if anything goes wrong. Nonetheless,
@@ -474,8 +696,10 @@
     all resources (the processor and memory) for itself, leaving little or nothing
     for the other zones. Based on this situation, a solution named resource manager
     can be deployed to control how many resources are consumed for each zone.
+  id: totrans-103
   prefs: []
   type: TYPE_NORMAL
+  zh: 安装和配置 Oracle Solaris 11 非全球区域非常棒，正如我们之前提到的，它是一项出色的技术，可以在不干扰其他应用程序的情况下隔离并运行应用程序，如果出现问题，其他应用程序不受影响。然而，仍然存在一个问题。每个非全球区域都在全球区域中运行，仿佛它单独运行一样，但如果其中一个区域独占所有资源（处理器和内存），并且几乎不给其他区域留下任何资源，就会出现不方便的效果。基于这种情况，可以部署一个名为资源管理器的解决方案，以控制每个区域消耗多少资源。
 - en: Focusing on the resource manager (without thinking about zones), there are many
     forms that enforce resource control in Oracle Solaris 11\. For example, we can
     use a project (`/etc/project`), which is composed by tasks and each one of these
@@ -487,8 +711,12 @@
     (processors and memory) the processes bound to this project can use for themselves.
     Anyway, the existing project on Oracle Solaris 11 can be listed by running the
     `projects -l` command.
+  id: totrans-104
   prefs: []
   type: TYPE_NORMAL
+  zh: 集中关注资源管理器（不考虑区域），在 Oracle Solaris 11 中，有许多形式可以强制实施资源控制。例如，我们可以使用一个项目（`/etc/project`），该项目由任务组成，每个任务包含一个或多个进程。通过
+    `projadd` 命令可以创建一个新项目，可以通过 **服务管理工具**（**SMF**）或甚至在打开会话时使用 `newtask` 命令来创建新任务。启用资源管理器服务并将处理器和内存等资源分配给该项目，有助于为该项目绑定的进程设定一个上限，限制它们可以使用多少资源（处理器和内存）。无论如何，可以通过运行
+    `projects -l` 命令列出 Oracle Solaris 11 中现有的项目。
 - en: There are some methods that are available to associate resources with a project.
     The first way uses resource controls (the `rctladm` and `prctl` commands) to administer
     and view assigned controls to projects. The disadvantage of this method is that
@@ -497,8 +725,10 @@
     is that the administrator has to know exactly how many resources are used by the
     application to make a good resource project, because if insufficient resources
     are assigned to a project or application, it can stop working.
+  id: totrans-105
   prefs: []
   type: TYPE_NORMAL
+  zh: 有几种方法可以将资源与项目关联。第一种方法是使用资源控制（`rctladm`和`prctl`命令）来管理和查看分配给项目的控制。此方法的缺点是，它通过进程限制使用的资源，防止它们占用更多的处理器或内存（如果需要）。另一个相关且可能的问题是，管理员必须精确知道应用程序使用了多少资源，才能合理地分配资源，因为如果分配给项目或应用程序的资源不足，它可能会停止工作。
 - en: The second good way to control how many resources can be taken by an application
     is to use the **fair share scheduler** (**FSS**) class that helps us moderate
     the resource allocation (the processor time) according to the resource requirement.
@@ -512,8 +742,10 @@
     50 shares; and for project C, I assign 20 shares. In the end, the distribution
     of the time processor is that app A gets 30 percent, app B gets 50 percent, and
     app C gets 20 percent. This is simple, isn't it?
+  id: totrans-106
   prefs: []
   type: TYPE_NORMAL
+  zh: 控制应用程序能够使用多少资源的第二种有效方法是使用**公平共享调度器**（**FSS**）类，它帮助我们根据资源需求调节资源分配（处理器时间）。一个真实的优势是，如果某个应用程序没有使用分配的所有资源（处理器时间），其他应用程序可以使用该应用程序释放出来的空闲资源。因此，这种资源共享就像是一个动态资源控制系统，按照计划分配资源（应用程序分配了份额），并根据需求变化调整其分配。例如，当我个人使用FSS时，我会将可用的份额归一化为100点，以便于与百分比进行比较。对于项目A，我分配30个份额；对于项目B，我分配50个份额；对于项目C，我分配20个份额。最终，时间处理器的分配是：应用程序A得到30％，应用程序B得到50％，应用程序C得到20％。这很简单，不是吗？
 - en: The third way to deploy a resource manager is by using resource pools. Fundamentally,
     the idea is to assign resources to a resource group (or pool) and afterwards,
     to associate this pool with a project or application. Similar to what we have
@@ -531,339 +763,510 @@
     opportunity to free up resources that can be used by other applications or projects.
     Nonetheless, it is feasible to mix resource pools with FSS and projects and have
     an advantage by implementing the controlled environment.
+  id: totrans-107
   prefs: []
   type: TYPE_NORMAL
+  zh: 部署资源管理器的第三种方式是使用资源池。基本思想是将资源分配给资源组（或池），然后将该池与项目或应用程序关联。类似于我们为FSS解释的内容，处理器集（处理器组）通常分配给资源池，而资源池再分配给项目。资源池提供了更好的灵活性，因为它允许我们根据需求设置应用程序使用的处理器的最小和最大数量。例如，可以将一个到八个核心（或处理器）分配给项目，根据资源需求，使用更少或更多的处理器。此外，特定的处理器（或核心）可以专门分配给处理器集，若需要的话。使用资源池的一个小缺点是，处理器被限制在池内，即使有空闲资源（处理器），也不能被其他应用程序使用。就个人而言，我更喜欢管理和使用FSS，因为其灵活性和可重用性让你有机会释放资源，供其他应用程序或项目使用。尽管如此，将资源池与FSS和项目混合使用并实施受控环境，依然是可行的。
 - en: In the end, all of these techniques that control resources can be deployed in
     the zone context to limit the used resources by running applications, as we are
     going to learn in this recipe.
+  id: totrans-108
   prefs: []
   type: TYPE_NORMAL
+  zh: 最终，所有这些控制资源的技术都可以在区域上下文中部署，以通过运行的应用程序限制使用的资源，正如我们在这个方案中将要学习的那样。
 - en: Getting ready
+  id: totrans-109
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: This recipe requires a virtual machine (VirtualBox or VMware) running on a processor
     with two or more cores, with 8 GB RAM and an 80 GB hard disk. To make the following
     procedure easier, we will take zones that were used in the previous recipe, and
     then the reader can assume that this recipe is a simple continuation.
+  id: totrans-110
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个方案需要一台虚拟机（VirtualBox 或 VMware），其运行在具有两个或更多核心的处理器上，配备 8GB RAM 和 80GB硬盘。为了简化以下步骤，我们将使用在之前方案中使用的区域，读者可以认为这个方案是一个简单的延续。
 - en: How to do it…
+  id: totrans-111
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何进行…
 - en: Basically, this recipe is composed of two parts. In the first part, the resource
     pools are configured, and in the second part, the existing resource pools are
     bound to zones.
+  id: totrans-112
   prefs: []
   type: TYPE_NORMAL
+  zh: 基本上，这个方案由两部分组成。在第一部分，配置资源池；在第二部分，将现有资源池绑定到区域。
 - en: 'To begin, we have to gather information about the existing zones by running
     the following command:'
+  id: totrans-113
   prefs: []
   type: TYPE_NORMAL
+  zh: 首先，我们需要通过运行以下命令收集关于现有区域的信息：
 - en: '[PRE14]'
+  id: totrans-114
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE14]'
 - en: 'The resource pool services have probably been stopped. We can verify them by
     executing the following command:'
+  id: totrans-115
   prefs: []
   type: TYPE_NORMAL
+  zh: 资源池服务可能已经停止。我们可以通过执行以下命令来验证它们：
 - en: '[PRE15]'
+  id: totrans-116
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE15]'
 - en: 'Checking for dependencies from each service is done by executing the following
     command:'
+  id: totrans-117
   prefs: []
   type: TYPE_NORMAL
+  zh: 通过执行以下命令检查每个服务的依赖关系：
 - en: '[PRE16]'
+  id: totrans-118
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE16]'
 - en: 'As the `svc:/system/pools/dynamic:default` service depends on `svc:/system/pools:default`,
     it is recommended that you enable both of them by running the following commands:'
+  id: totrans-119
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于`svc:/system/pools/dynamic:default`服务依赖于`svc:/system/pools:default`，建议通过运行以下命令启用它们：
 - en: '[PRE17]'
+  id: totrans-120
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE17]'
 - en: 'When a resource pool control is enabled, a default pool (`pool_default`) and
     a default processor set (`default_pset`) including all resources from the system
     are created, as verified by executing the following command:'
+  id: totrans-121
   prefs: []
   type: TYPE_NORMAL
+  zh: 当启用资源池控制时，会创建一个默认池（`pool_default`）和一个默认处理器集（`default_pset`），包括系统中的所有资源，可以通过执行以下命令来验证：
 - en: '[PRE18]'
+  id: totrans-122
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE18]'
 - en: 'According to this output, there is a default pool (`pool_default`); the real
     processor has four cores (range 0 to 3), and all of them consist of a processor
     set (`pset`). However, this resource pool configuration is in the memory and is
     not persistent in the disk. Therefore, to save this into a configuration file,
     execute the following commands:'
+  id: totrans-123
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据此输出，存在一个默认池（`pool_default`）；真实处理器有四个核心（范围0到3），它们都组成了一个处理器集（`pset`）。然而，这个资源池配置只存在于内存中，并且不在磁盘上持久化。因此，要将其保存到配置文件中，请执行以下命令：
 - en: '[PRE19]'
+  id: totrans-124
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE19]'
 - en: From this point, the following steps create a processor set (`pset`) with two
     cores, create a pool, and associate the processor set with this pool. Later, this
     pool will be assigned to the zone configuration, which can be shown as the processor
     set | pool | zone.
+  id: totrans-125
   prefs: []
   type: TYPE_NORMAL
+  zh: 从这一点开始，以下步骤会创建一个包含两个核心的处理器集（`pset`），创建一个池，并将该处理器集与池关联。稍后，这个池将分配给区域配置，可以显示为：处理器集
+    | 池 | 区域。
 - en: 'Thus, to create a processor set (`first_pset`) with one core at minimum (`pset.min=1`)
     and two cores (`pset.max=2`) at maximum, execute the following commands:'
+  id: totrans-126
   prefs: []
   type: TYPE_NORMAL
+  zh: 因此，要创建一个包含一个核心最小（`pset.min=1`）和两个核心最大（`pset.max=2`）的处理器集（`first_pset`），请执行以下命令：
 - en: '[PRE20]'
+  id: totrans-127
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE20]'
 - en: 'Now, we can create a pool named `first_pool`, which initially has all resources
     (four core processors) bound to it, by running the following commands:'
+  id: totrans-128
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，我们可以创建一个名为`first_pool`的池，初始时将所有资源（四个核心处理器）绑定到该池中，方法是运行以下命令：
 - en: '[PRE21]'
+  id: totrans-129
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE21]'
 - en: 'Then, assign the `first_pool` pool to the `first_pset` processor set by executing
     the following commands:'
+  id: totrans-130
   prefs: []
   type: TYPE_NORMAL
+  zh: 然后，通过执行以下命令将`first_pool`池分配给`first_pset`处理器集：
 - en: '[PRE22]'
+  id: totrans-131
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE22]'
 - en: 'So far, everything has been working well. Now, we have to check whether this
     new pool already appears in the resource memory configuration by executing the
     following command:'
+  id: totrans-132
   prefs: []
   type: TYPE_NORMAL
+  zh: 到目前为止，一切正常。现在，我们需要通过执行以下命令检查新池是否已经出现在资源内存配置中：
 - en: '[PRE23]'
+  id: totrans-133
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE23]'
 - en: 'We have realized that the `first_pset` configuration is still not persistent
     in the pool configuration file. To validate (the -`n -c` option) and commit (the
     `-c` option) the new configuration, execute the following commands:'
+  id: totrans-134
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们已经意识到，`first_pset`配置仍未在池配置文件中持久化。要验证（`-n -c`选项）并提交（`-c`选项）新配置，请执行以下命令：
 - en: '[PRE24]'
+  id: totrans-135
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE24]'
 - en: 'Everything is ready. Nevertheless, it''s easy to verify that the configuration
     is active only in the memory (the kernel state) using the `-dc` option, but it
     isn''t saved in the resource pool configuration file (option `-c`) as follows:'
+  id: totrans-136
   prefs: []
   type: TYPE_NORMAL
+  zh: 一切准备就绪。不过，使用`-dc`选项可以很容易验证该配置仅在内存中（内核状态）是活动的，但它并没有保存在资源池配置文件中（选项`-c`），如下所示：
 - en: '[PRE25]'
+  id: totrans-137
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE25]'
 - en: 'To solve the problem of saving the resource pool configuration from the memory
     to disk, we can use the `-s` option by running the following command:'
+  id: totrans-138
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了解决将资源池配置从内存保存到磁盘的问题，我们可以通过运行以下命令使用`-s`选项：
 - en: '[PRE26]'
+  id: totrans-139
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE26]'
 - en: 'That is great! Listing the active resource pools is done by executing the `poolstat`
     command as follows:'
+  id: totrans-140
   prefs: []
   type: TYPE_NORMAL
+  zh: 太棒了！通过执行以下`poolstat`命令列出活动的资源池：
 - en: '[PRE27]'
+  id: totrans-141
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE27]'
 - en: 'Associating the recently created pool (`first_pool`) to non-global `zone1`
     is done by executing the following command:'
+  id: totrans-142
   prefs: []
   type: TYPE_NORMAL
+  zh: 将最近创建的池（`first_pool`）关联到非全局的`zone1`，可以通过执行以下命令来完成：
 - en: '[PRE28]'
+  id: totrans-143
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE28]'
 - en: 'It is impossible to activate the bound resource pool without rebooting `zone1`,
     so execute the following commands:'
+  id: totrans-144
   prefs: []
   type: TYPE_NORMAL
+  zh: 无法在不重启`zone1`的情况下激活绑定的资源池，因此执行以下命令：
 - en: '[PRE29]'
+  id: totrans-145
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE29]'
 - en: 'Now, it is time to log in to `zone1` and check whether the `first_pool` pool
     is active by running the following command:'
+  id: totrans-146
   prefs: []
   type: TYPE_NORMAL
+  zh: 现在，登录到`zone1`，并通过运行以下命令检查`first_pool`池是否已激活：
 - en: '[PRE30]'
+  id: totrans-147
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE30]'
 - en: Perfect! Two cores were associated with `zone1`, and any application running
     inside this zone can use these core processors.
+  id: totrans-148
   prefs: []
   type: TYPE_NORMAL
+  zh: 完美！两个核心已与`zone1`关联，任何在此区域内运行的应用程序都可以使用这些核心处理器。
 - en: To change the resource type focus, a very interesting method that limits the
     used memory is resource capping, which helps us limit the physical, swap, and
     locked memory.
+  id: totrans-149
   prefs: []
   type: TYPE_NORMAL
+  zh: 要改变资源类型的焦点，有一个非常有趣的方法是限制使用的内存，称为资源限制，这有助于我们限制物理内存、交换内存和锁定内存。
 - en: 'For example, using the same `zone1`, let''s change its configuration by executing
     the following commands:'
+  id: totrans-150
   prefs: []
   type: TYPE_NORMAL
+  zh: 例如，使用相同的`zone1`，通过执行以下命令来更改其配置：
 - en: '[PRE31]'
+  id: totrans-151
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE31]'
 - en: 'According to the previous output, the physical memory from `zone1` is limited
     to 1 GB, and the used swap space is restricted to 500 MB. Furthermore, there is
     a strange line for maximum swap:'
+  id: totrans-152
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据之前的输出，`zone1`的物理内存限制为1GB，已使用的交换空间限制为500MB。此外，还存在一个关于最大交换空间的奇怪行：
 - en: '[PRE32]'
+  id: totrans-153
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE32]'
 - en: 'The interpretation for this line is as follows:'
+  id: totrans-154
   prefs: []
   type: TYPE_NORMAL
+  zh: 该行的解释如下：
 - en: '`privileged`: This can be modified only by privileged users (root). Another
     possible value is `basic` (only the owner can modify it).'
+  id: totrans-155
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`privileged`：只有特权用户（root）才能修改。另一个可能的值是 `basic`（仅所有者可以修改）。'
 - en: '`deny`: This can deny any requested resource for an amount above the limit
     value (500 MB). The other possibilities would be `none` (no action is taken even
     if the requested resource is above the limit) and `signal`, in which a signal
     is sent when the threshold value is exceeded.'
+  id: totrans-156
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '`deny`：此设置可以拒绝任何超过限制值（500 MB）的资源请求。其他选项包括 `none`（即使请求的资源超过限制，也不采取任何行动）和 `signal`（当超过阈值时发送信号）。'
 - en: 'Resource capping is a service implemented by the `rcapd` daemon, and this service
     can be enabled by the following command:'
+  id: totrans-157
   prefs: []
   type: TYPE_NORMAL
+  zh: 资源限制是由 `rcapd` 守护进程实现的服务，可以通过以下命令启用此服务：
 - en: '[PRE33]'
+  id: totrans-158
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE33]'
 - en: 'Reboot `zone1` for memory capping to take effect. It would be feasible to enable
     the resource capping daemon without rebooting and starting the daemon now by running
     the following command:'
+  id: totrans-159
   prefs: []
   type: TYPE_NORMAL
+  zh: 重启 `zone1` 以使内存限制生效。现在可以通过运行以下命令启用资源限制守护进程，而无需重启：
 - en: '[PRE34]'
+  id: totrans-160
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE34]'
 - en: 'To monitor the action of the `rcap` daemon (`rcapd`), execute the following
     commands:'
+  id: totrans-161
   prefs: []
   type: TYPE_NORMAL
+  zh: 要监控 `rcap` 守护进程（`rcapd`）的操作，请执行以下命令：
 - en: '[PRE35]'
+  id: totrans-162
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE35]'
 - en: The used physical memory (RSS) is below the memory capping limit (1024 MB).
     If the physical memory is increased, its limit is 1024 MB. Nice!
+  id: totrans-163
   prefs: []
   type: TYPE_NORMAL
+  zh: 已使用的物理内存（RSS）低于内存限制值（1024 MB）。如果物理内存增加，则其限制为 1024 MB。好极了！
 - en: 'To make this example more attractive, some changes can be made. Let''s remove
     the `first_pool` resource pool (and any other existing pool) from `zone1`. Additionally,
     the `first_pool` pool will be deleted by the `pooladm -x` command. Obviously,
     the new pool configuration must be saved by the `pooladm -s` command. The following
     is the sequence:'
+  id: totrans-164
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了使这个示例更具吸引力，可以进行一些修改。我们从 `zone1` 中移除 `first_pool` 资源池（以及任何其他现有池）。另外，`first_pool`
+    池将通过 `pooladm -x` 命令被删除。显然，新的池配置必须通过 `pooladm -s` 命令保存。以下是步骤：
 - en: '[PRE36]'
+  id: totrans-165
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE36]'
 - en: Everything has returned to the default status, and from this point, `zone1`
     doesn't have a special associated pool. This permits us to focus on FSS from now
     on.
+  id: totrans-166
   prefs: []
   type: TYPE_NORMAL
+  zh: 一切已恢复到默认状态，从此以后，`zone1` 不再有特定关联的资源池。这使得我们可以从现在开始专注于 FSS。
 - en: 'The following command checks what the current default kernel scheduling class
     is:'
+  id: totrans-167
   prefs: []
   type: TYPE_NORMAL
+  zh: 以下命令检查当前的默认内核调度类是什么：
 - en: '[PRE37]'
+  id: totrans-168
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE37]'
 - en: 'There is no default scheduling class. If we want to use FSS, then it would
     be appropriate to configure it on the global zone because this setting will be
     inherited by all non-global zones. To configure the FSS as explained, execute
     the following command:'
+  id: totrans-169
   prefs: []
   type: TYPE_NORMAL
+  zh: 没有默认的调度类。如果我们想使用 FSS，那么最好在全局区域配置它，因为这个设置会被所有非全局区域继承。按照上述说明配置 FSS，执行以下命令：
 - en: '[PRE38]'
+  id: totrans-170
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE38]'
 - en: 'This setup only takes effect after a system is rebooted. After the system has
     been reinitiated, all processes will be classified as FSS. Nonetheless, to enforce
     it now without a reboot, execute the following command:'
+  id: totrans-171
   prefs: []
   type: TYPE_NORMAL
+  zh: 此设置仅在系统重启后生效。系统重新启动后，所有进程将被归类为 FSS。然而，如果不重启也要立即生效，请执行以下命令：
 - en: '[PRE39]'
+  id: totrans-172
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE39]'
 - en: 'Unfortunately, all current processes are still running under other scheduling
     classes and only new processes will take the FSS setting. This can be verified
     by running the following command:'
+  id: totrans-173
   prefs: []
   type: TYPE_NORMAL
+  zh: 不幸的是，所有当前进程仍然在其他调度类下运行，只有新进程会采用 FSS 设置。可以通过运行以下命令来验证这一点：
 - en: '[PRE40]'
+  id: totrans-174
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE40]'
 - en: 'Again, it''s unnecessary to wait for the next reboot. Therefore, all processes
     can be moved from their current scheduling classes to FSS by executing the following
     commands:'
+  id: totrans-175
   prefs: []
   type: TYPE_NORMAL
+  zh: 同样，也不需要等到下一次重启。因此，可以通过执行以下命令将所有进程从当前的调度类移动到 FSS：
 - en: '[PRE41]'
+  id: totrans-176
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE41]'
 - en: 'When FSS is set up as the default scheduling class in the global zone, all
     non-global zones automatically take this configuration. To verify this, run the
     following command:'
+  id: totrans-177
   prefs: []
   type: TYPE_NORMAL
+  zh: 当 FSS 设置为全局区域的默认调度类时，所有非全局区域都会自动采用此配置。验证此配置，请运行以下命令：
 - en: '[PRE42]'
+  id: totrans-178
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE42]'
 - en: 'We can realize that all main processes from `zone1` are under the FSS class.
     Anyway, it is recommended that the FSS class be explicitly configured in the non-global
     settings in order to prevent possible mistakes in the future. Therefore, execute
     the following command:'
+  id: totrans-179
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们可以意识到，`zone1` 中的所有主进程都处于 FSS 类中。无论如何，建议在非全局设置中显式配置 FSS 类，以防止将来可能的错误。因此，执行以下命令：
 - en: '[PRE43]'
+  id: totrans-180
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE43]'
 - en: 'Finally, it is the right moment to use the FSS class to configure some shares
     for each zone (`zone1` and `zone2`). This way, it is possible to share an amount
     (70 percent) from the CPU processing for `zone1` and the other amount (30 percent)
     from the CPU processing for `zone2`. The following is the procedure:'
+  id: totrans-181
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，现在是使用 FSS 类来为每个区域（`zone1` 和 `zone2`）配置共享资源的正确时机。这样，就可以将 CPU 处理的 70% 分配给 `zone1`，将剩余的
+    30% 分配给 `zone2`。以下是操作步骤：
 - en: '[PRE44]'
+  id: totrans-182
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE44]'
 - en: 'This is excellent! Shares were assigned to `zone1` (70 shares) and `zone2`
     (30 shares) using the `zonecfg` command in a persistent way. For both the zones
     to take effect, execute the following commands:'
+  id: totrans-183
   prefs: []
   type: TYPE_NORMAL
+  zh: 这太棒了！通过`zonecfg`命令，以持久的方式将共享分配给了`zone1`（70 个共享）和`zone2`（30 个共享）。要使这两个区域生效，请执行以下命令：
 - en: '[PRE45]'
+  id: totrans-184
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE45]'
 - en: 'The processor time can be followed and monitored using the following command:'
+  id: totrans-185
   prefs: []
   type: TYPE_NORMAL
+  zh: 可以通过以下命令跟踪和监控处理器的使用时间：
 - en: '[PRE46]'
+  id: totrans-186
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE46]'
 - en: 'Surprisingly, it is feasible to change the `zone.cpu-shares` attribute dynamically
     without rebooting zones but in a non-persistent way (all the changes are lost
     after a reboot) by running the following commands:'
+  id: totrans-187
   prefs: []
   type: TYPE_NORMAL
+  zh: 令人惊讶的是，能够动态地更改`zone.cpu-shares`属性，而无需重新启动区域，但这种更改是非持久性的（所有更改在重启后会丢失）。可以通过运行以下命令来完成：
 - en: '[PRE47]'
+  id: totrans-188
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE47]'
 - en: 'To collect information about the memory and CPU from both zones in an interval
     of 5 seconds, execute the following command:'
+  id: totrans-189
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了在 5 秒钟的间隔内收集来自两个区域的内存和 CPU 信息，请执行以下命令：
 - en: '[PRE48]'
+  id: totrans-190
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE48]'
 - en: 'Keeping up with our approach about the resource manager, there''s a zone resource,
     named `dedicated-cpu`, where it is possible to specify a subset of processors
     (or cores) to a non-global zone. For example, the following example shows us that
@@ -871,193 +1274,289 @@
     and this setting has an `importance` value equal to `8` when competing for resources
     against other zones or configurations. This smart setup creates a temporary pool
     including any necessary processor inside it. The following is the sequence:'
+  id: totrans-191
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据我们对资源管理器的讨论，存在一个名为`dedicated-cpu`的区域资源，在该资源中，可以为非全局区域指定一组处理器（或核心）。例如，以下示例向我们展示了`zone1`可以根据需求使用一个到四个处理器（`ncpus=1-4`），当与其他区域或配置竞争资源时，该设置的`importance`值为`8`。这个智能的设置会创建一个临时池，包含其中所需的处理器。以下是步骤：
 - en: '[PRE49]'
+  id: totrans-192
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE49]'
 - en: 'Amazing! To remove the `dedicated-cpu` resource from `zone1`, execute the following
     command:'
+  id: totrans-193
   prefs: []
   type: TYPE_NORMAL
+  zh: 真棒！要从 `zone1` 移除 `dedicated-cpu` 资源，请执行以下命令：
 - en: '[PRE50]'
+  id: totrans-194
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE50]'
 - en: 'Before continuing, we must reboot the zone by running the following command:'
+  id: totrans-195
   prefs: []
   type: TYPE_NORMAL
+  zh: 在继续之前，我们必须通过执行以下命令重新启动该区域：
 - en: '[PRE51]'
+  id: totrans-196
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE51]'
 - en: 'Another good technique to control zone resources is using the `capped-cpu`
     resource, which permits us to specify how big a percentage of a CPU the zone can
     use. The value to be specified means a percentage of CPUs, and this procedure
     can be performed by executing the following sequence:'
+  id: totrans-197
   prefs: []
   type: TYPE_NORMAL
+  zh: 另一种控制区域资源的好方法是使用`capped-cpu`资源，这允许我们指定区域可以使用 CPU 的百分比。要指定的值表示 CPU 的百分比，可以通过执行以下步骤来实现：
 - en: '[PRE52]'
+  id: totrans-198
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE52]'
 - en: 'According to the previous configuration, the `ncpus=2.5` attribute means 250
     percent of CPUs or 2.5 CPUs. To remove the recently added resource, execute the
     following command:'
+  id: totrans-199
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据先前的配置，`ncpus=2.5`属性意味着 250% 的 CPU 或 2.5 个 CPU。要移除最近添加的资源，请执行以下命令：
 - en: '[PRE53]'
+  id: totrans-200
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE53]'
 - en: 'After all the changes, we have to reboot the zone by executing the following
     command:'
+  id: totrans-201
   prefs: []
   type: TYPE_NORMAL
+  zh: 在所有更改之后，我们必须通过执行以下命令来重新启动该区域：
 - en: '[PRE54]'
+  id: totrans-202
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE54]'
 - en: 'This is outstanding! We have executed many trials with resource management,
     and all of them have worked! As `zone1` still has a resource capping (memory),
     it is time to remove it:'
+  id: totrans-203
   prefs: []
   type: TYPE_NORMAL
+  zh: 这真是太棒了！我们已经进行了许多资源管理的试验，所有的试验都成功了！由于`zone1`仍然存在资源限制（内存），现在是时候将其移除：
 - en: '[PRE55]'
+  id: totrans-204
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE55]'
 - en: 'Finally, the resource capping feature can be disabled by executing the following
     command:'
+  id: totrans-205
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，可以通过执行以下命令来禁用资源限制功能：
 - en: '[PRE56]'
+  id: totrans-206
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE56]'
 - en: 'Another way of disabling the resource capping feature would be to execute the
     following command:'
+  id: totrans-207
   prefs: []
   type: TYPE_NORMAL
+  zh: 禁用资源限制功能的另一种方法是执行以下命令：
 - en: '[PRE57]'
+  id: totrans-208
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE57]'
 - en: Perfect! Everything has returned to the initial setup.
+  id: totrans-209
   prefs: []
   type: TYPE_NORMAL
+  zh: 完美！一切已经恢复到最初的设置。
 - en: An overview of the recipe
+  id: totrans-210
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 配方概览
 - en: This section was very long, and we could learn lots of details about resource
     management controls and how to limit processors and the memory. In the next chapter,
     we are going to handle the network resource control.
+  id: totrans-211
   prefs: []
   type: TYPE_NORMAL
+  zh: 这一部分内容非常长，我们可以学习到很多关于资源管理控制的细节，以及如何限制处理器和内存。在下一章中，我们将讨论网络资源控制。
 - en: Implementing a flow control
+  id: totrans-212
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 实施流量控制
 - en: In the last subsection, we handled resource control on processors and memory.
     In Oracle Solaris 11, the network control has acquired importance and relevance,
     allowing us to set a network flow control based on TCP/IP services and ports.
     Read the next pages to learn a bit more.
+  id: totrans-213
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上一小节中，我们处理了处理器和内存的资源控制。在Oracle Solaris 11中，网络控制变得越来越重要和相关，使我们能够根据TCP/IP服务和端口设置网络流量控制。请继续阅读下一页了解更多信息。
 - en: Getting ready
+  id: totrans-214
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: This recipe requires a virtual machine (VMware or VirtualBox) that runs Oracle
     Solaris 11 on one processor, with 4 GB RAM and one physical network interface.
     To make our life simpler, we are going to reuse the same environment as the one
     in the previous recipes.
+  id: totrans-215
   prefs: []
   type: TYPE_NORMAL
+  zh: 本食谱要求一个运行Oracle Solaris 11的虚拟机（VMware或VirtualBox），配置为一个处理器，4 GB RAM和一个物理网络接口。为了简化操作，我们将重用与之前食谱相同的环境。
 - en: How to do it…
+  id: totrans-216
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作……
 - en: 'To be able to follow the steps in this section, you need to check the current
     environment setup. Therefore, it is possible to gather information about existing
     virtual interfaces, virtual switches, and network interfaces by running the following
     commands:'
+  id: totrans-217
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了能够遵循本节中的步骤，您需要检查当前的环境设置。因此，可以通过运行以下命令收集有关现有虚拟接口、虚拟交换机和网络接口的信息：
 - en: '[PRE58]'
+  id: totrans-218
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE58]'
 - en: 'As the existing virtual interfaces are currently assigned to non-global zones,
     create a new **virtual interface** (**VNIC**) and associate it with the `vswitch`
     virtual switch by executing the following commands:'
+  id: totrans-219
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于现有的虚拟接口当前分配给非全局区域，请创建一个新的**虚拟接口**（**VNIC**），并通过执行以下命令将其与`vswitch`虚拟交换机关联：
 - en: '[PRE59]'
+  id: totrans-220
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE59]'
 - en: 'Create two flow controls on `vnic5`: the first one controls the TCP flow in
     the port `80` and the second one controls UDP in the same port `80` by executing
     the following commands:'
+  id: totrans-221
   prefs: []
   type: TYPE_NORMAL
+  zh: 在`vnic5`上创建两个流量控制：第一个控制端口`80`的TCP流，第二个控制相同端口`80`的UDP流，通过执行以下命令：
 - en: '[PRE60]'
+  id: totrans-222
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE60]'
 - en: 'According to the previous output, we named the flow controls `http_tcp_1` and
     `http_udp_1`; both control the HTTP data and use TCP and UDP as the transport
     protocol, respectively. Therefore, it is appropriate to bind a new property to
     this HTTP flow to control the maximum possible bandwidth and limit it to 50 MBps.
     Thus, run the following commands:'
+  id: totrans-223
   prefs: []
   type: TYPE_NORMAL
+  zh: 根据之前的输出，我们将流量控制命名为`http_tcp_1`和`http_udp_1`；两者都控制HTTP数据，并分别使用TCP和UDP作为传输协议。因此，适合为此HTTP流绑定一个新属性，控制最大带宽并将其限制为50
+    MBps。为此，请执行以下命令：
 - en: '[PRE61]'
+  id: totrans-224
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE61]'
 - en: 'We have set the bandwidth limit for port `80` (TCP and UDP) to 50 MBps at maximum.
     A specific flow can be monitored in a two-second interval for the received packages
     (illustrated in our recipe) by executing the following command:'
+  id: totrans-225
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们已将端口`80`（TCP和UDP）的带宽限制设置为最大50 MBps。可以通过执行以下命令，在两秒的间隔内监控接收的包（如本食谱所示）：
 - en: '[PRE62]'
+  id: totrans-226
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE62]'
 - en: 'Additionally, it is recommended that you analyze a more complete view, including
     sent and received packets, by running the following command:'
+  id: totrans-227
   prefs: []
   type: TYPE_NORMAL
+  zh: 此外，建议您通过运行以下命令分析更完整的视图，包括发送和接收的包：
 - en: '[PRE63]'
+  id: totrans-228
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE63]'
 - en: 'Finally, to remove both flow controls from the system and the `vnic5` interface,
     execute the following command:'
+  id: totrans-229
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，要从系统和`vnic5`接口中移除这两个流量控制，请执行以下命令：
 - en: '[PRE64]'
+  id: totrans-230
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE64]'
 - en: An overview of the recipe
+  id: totrans-231
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 食谱概览
 - en: This recipe showed you how to implement, monitor, and unconfigure the flow over
     **virtual network interfaces** (**VNICs**), limiting the bandwidth to 50 MBps
     in port `80` for the TCP and UDP protocols.
+  id: totrans-232
   prefs: []
   type: TYPE_NORMAL
+  zh: 本食谱展示了如何在**虚拟网络接口**（**VNICs**）上实施、监控和取消配置流量，并将TCP和UDP协议在端口`80`上的带宽限制为50 MBps。
 - en: Working with migrations from physical Oracle Solaris 10 hosts to Oracle Solaris
     11 Zones
+  id: totrans-233
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 从物理Oracle Solaris 10主机迁移到Oracle Solaris 11 Zones
 - en: Two common questions arise when considering how to deploy Oracle Solaris 11\.
     First, what can we do with the previous Oracle Solaris 10 installation? Second
     (and worse), what is possible with Oracle Solaris 10 Zones?
+  id: totrans-234
   prefs: []
   type: TYPE_NORMAL
+  zh: 在考虑如何部署Oracle Solaris 11时，会出现两个常见问题。首先，我们该如何处理之前的Oracle Solaris 10安装？其次（更糟糕的是），Oracle
+    Solaris 10 Zones能做什么？
 - en: 'Happily, Oracle Solaris 11 provides an optimal solution for both cases: the
     **physical to virtual** (**P2V**) migration where a physical Oracle Solaris 10
     installation is migrated to Oracle Solaris 11 Zone and the **virtual to virtual**
     (**V2V**) migration where an Oracle Solaris 10 native zone is migrated to a Solaris
     10 branded zone on Oracle Solaris 11.'
+  id: totrans-235
   prefs: []
   type: TYPE_NORMAL
+  zh: 幸运的是，Oracle Solaris 11为这两种情况提供了最佳解决方案：**物理到虚拟**（**P2V**）迁移，将物理的Oracle Solaris
+    10安装迁移到Oracle Solaris 11 Zone，以及**虚拟到虚拟**（**V2V**）迁移，将Oracle Solaris 10本地区域迁移到Oracle
+    Solaris 11中的Solaris 10品牌区域。
 - en: Getting ready
+  id: totrans-236
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 准备工作
 - en: This recipe requires one virtual machine (VirtualBox or VMware) with Oracle
     Solaris 11 installed, 8 GB RAM, and enough free space on disk (about 10 GB). To
     make things easier, the pool myzone (from the previous recipe) will be used, and
@@ -1067,18 +1566,29 @@
     migration example. The installation of this Oracle Solaris 10 virtual machine
     will not be shown here. The Oracle Solaris 10 DVD for its installation and deployment
     can be downloaded from [http://www.oracle.com/technetwork/server-storage/solaris10/downloads/index.html?ssSourceSiteId=ocomau](http://www.oracle.com/technetwork/server-storage/solaris10/downloads/index.html?ssSourceSiteId=ocomau).
+  id: totrans-237
   prefs: []
   type: TYPE_NORMAL
+  zh: 本教程需要一台虚拟机（VirtualBox 或 VMware）并安装有 Oracle Solaris 11，8 GB 内存，以及足够的磁盘空间（大约 10
+    GB）。为了简化操作，将使用之前教程中的 myzone 池，如果您已删除它，应该使用 `zpool create myzone <disks>` 命令重新创建它。此外，必须有一台
+    Oracle Solaris 10 虚拟机（至少 2 GB 内存和一个至少 15 GB 的虚拟磁盘），用于本次迁移示例。本教程将不展示如何安装这台 Oracle
+    Solaris 10 虚拟机。您可以从 [http://www.oracle.com/technetwork/server-storage/solaris10/downloads/index.html?ssSourceSiteId=ocomau](http://www.oracle.com/technetwork/server-storage/solaris10/downloads/index.html?ssSourceSiteId=ocomau)
+    下载 Oracle Solaris 10 DVD，用于安装和部署。
 - en: Our task is to migrate a physical (global zone) Oracle Solaris 10 host (without
     any non-global zones inside) to an Oracle Solaris 11 zone. The steps to migrate
     an Oracle Solaris 10 native zone to an Oracle Solaris 11 brand10 zone are very
     similar, and they will not be shown.
+  id: totrans-238
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们的任务是将一个物理的（全局区域）Oracle Solaris 10 主机（没有任何非全局区域）迁移到 Oracle Solaris 11 区域。将一个
+    Oracle Solaris 10 原生区域迁移到 Oracle Solaris 11 品牌 10 区域的步骤非常相似，这里不再展示。
 - en: How to do it…
+  id: totrans-239
   prefs:
   - PREF_H2
   type: TYPE_NORMAL
+  zh: 如何操作…
 - en: 'To migrate a physical Oracle Solaris 10 (global zone) to Oracle Solaris 11
     Solaris 10 branded zone, it''s advisable to collect any information (the hostname,
     host ID, amount of memory, operating system version, available disks, and so on)
@@ -1086,155 +1596,241 @@
     time we see the `bash-3.2#` prompt, it will mean that we are working on Oracle
     Solaris 10\. The information can be collected by executing the following simple
     commands:'
+  id: totrans-240
   prefs: []
   type: TYPE_NORMAL
+  zh: 为了将一个物理的 Oracle Solaris 10（全局区域）迁移到 Oracle Solaris 11 的 Solaris 10 品牌区域，建议在执行迁移步骤之前收集关于
+    Oracle Solaris 10 的信息（例如主机名、主机 ID、内存大小、操作系统版本、可用磁盘等）。从现在开始，每次看到 `bash-3.2#` 提示符时，意味着我们正在处理
+    Oracle Solaris 10。这些信息可以通过执行以下简单命令收集：
 - en: '[PRE65]'
+  id: totrans-241
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE65]'
 - en: 'Now that we have already collected all the necessary information from the Oracle
     Solaris 10 virtual machine, the `zonep2vchk` command is executed to verify the
     P2V migration compatibility and whether this procedure is possible:'
+  id: totrans-242
   prefs: []
   type: TYPE_NORMAL
+  zh: 既然我们已经收集了所有来自 Oracle Solaris 10 虚拟机的必要信息，接下来执行 `zonep2vchk` 命令，以验证 P2V 迁移的兼容性以及此操作是否可行：
 - en: '[PRE66]'
+  id: totrans-243
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE66]'
 - en: 'There are no critical issues (it is recommended that you examine this report
     line by line) so we are able to proceed with the migration in order to create
     a zone configuration file by executing the following sequence of commands:'
+  id: totrans-244
   prefs: []
   type: TYPE_NORMAL
+  zh: 没有发现关键性问题（建议您逐行检查此报告），所以我们可以继续执行迁移操作，通过执行以下一系列命令来创建一个区域配置文件：
 - en: '[PRE67]'
+  id: totrans-245
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE67]'
 - en: 'From this previous file, some changes were made as shown in the following command
     lines (in bold and self-explanatory). The new migrating configuration file looks
     like the following output:'
+  id: totrans-246
   prefs: []
   type: TYPE_NORMAL
+  zh: 从这个文件中，进行了一些修改，具体变化请参见以下命令行（加粗部分，易于理解）。新的迁移配置文件看起来如下输出：
 - en: '[PRE68]'
+  id: totrans-247
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE68]'
 - en: 'Before continuing the procedure, we have to verify that there is only a global
     zone (our initial purpose is to migrate an Oracle Solaris 10 host without containing
     inside zones) by running the following command:'
+  id: totrans-248
   prefs: []
   type: TYPE_NORMAL
+  zh: 在继续操作之前，我们需要通过运行以下命令验证是否只有一个全局区域（我们的初衷是迁移一个没有包含内部区域的 Oracle Solaris 10 主机）：
 - en: '[PRE69]'
+  id: totrans-249
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE69]'
 - en: 'This is great! Now, it is time to create an image (`solaris10.flar`) from the
     original Oracle Solaris 10 global zone, excluding the directory where the image
     will be saved (`-x /migration`) in order to prevent a recursion effect by executing
     the following command:'
+  id: totrans-250
   prefs: []
   type: TYPE_NORMAL
+  zh: 很棒！现在，是时候从原始的 Oracle Solaris 10 全局区域创建一个镜像（`solaris10.flar`），并排除保存镜像的目录（`-x
+    /migration`），以防止递归效应，通过执行以下命令：
 - en: '[PRE70]'
+  id: totrans-251
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE70]'
 - en: 'After some time, check the created file by running the following command:'
+  id: totrans-252
   prefs: []
   type: TYPE_NORMAL
+  zh: 等待一段时间后，通过运行以下命令检查已创建的文件：
 - en: '[PRE71]'
+  id: totrans-253
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE71]'
 - en: 'This FLAR image will be used in the following steps from the Oracle Solaris
     11 machine, and it is important to share its directory by running the following
     commands:'
+  id: totrans-254
   prefs: []
   type: TYPE_NORMAL
+  zh: 这个 FLAR 镜像将在后续步骤中从 Oracle Solaris 11 机器中使用，且重要的是通过执行以下命令共享其目录：
 - en: '[PRE72]'
+  id: totrans-255
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE72]'
 - en: 'Switching to another machine (`solaris11-1`), which is running Oracle Solaris
     11, it is necessary to create a ZFS filesystem to migrate the Oracle Solaris 10
     installation into this filesystem as a non-global zone. Therefore, execute the
     following commands:'
+  id: totrans-256
   prefs: []
   type: TYPE_NORMAL
+  zh: 切换到另一台机器（`solaris11-1`），该机器运行的是 Oracle Solaris 11，需要创建一个 ZFS 文件系统，将 Oracle Solaris
+    10 安装迁移到该文件系统作为非全局区域。因此，请执行以下命令：
 - en: '[PRE73]'
+  id: totrans-257
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE73]'
 - en: 'As the `solaris10.flar` image is going to be accessed in order to transfer
     the Oracle Solaris 10 content from the Oracle Solaris 10 physical host, the connection
     to the NFS share (`/migration`) from the Oracle Solaris 11 host (`solaris11-1`)
     has to be verified by running the following command:'
+  id: totrans-258
   prefs: []
   type: TYPE_NORMAL
+  zh: 由于 `solaris10.flar` 镜像将被访问，以便将 Oracle Solaris 10 内容从 Oracle Solaris 10 物理主机传输过来，因此必须通过执行以下命令，验证从
+    Oracle Solaris 11 主机（`solaris11-1`）连接到 NFS 共享（`/migration`）：
 - en: '[PRE74]'
+  id: totrans-259
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE74]'
 - en: 'It is time to execute the migration steps. Mount the NFS share in `/mnt` by
     running the following commands:'
+  id: totrans-260
   prefs: []
   type: TYPE_NORMAL
+  zh: 是时候执行迁移步骤了。通过运行以下命令，将 NFS 共享挂载到 `/mnt`：
 - en: '[PRE75]'
+  id: totrans-261
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE75]'
 - en: 'Create the non-global zone in the Oracle Solaris 11 host (`solaris11-1`) using
     the saved Solaris 10 configuration file (`solaris10.cfg`) created in a previous
     step by running the following command:'
+  id: totrans-262
   prefs: []
   type: TYPE_NORMAL
+  zh: 使用之前步骤中创建的保存的 Solaris 10 配置文件（`solaris10.cfg`），在 Oracle Solaris 11 主机（`solaris11-1`）中创建非全局区域，命令如下：
 - en: '[PRE76]'
+  id: totrans-263
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE76]'
 - en: 'Finally, we install the zone using the `solaris10.flar` image by running the
     following command:'
+  id: totrans-264
   prefs: []
   type: TYPE_NORMAL
+  zh: 最后，我们通过运行以下命令，使用 `solaris10.flar` 镜像安装该区域：
 - en: '[PRE77]'
+  id: totrans-265
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE77]'
 - en: 'After the previous step, it is recommended that you verify whether the `solaris10`
     zone is installed and configured correctly by executing the following command:'
+  id: totrans-266
   prefs: []
   type: TYPE_NORMAL
+  zh: 在上一步之后，建议您通过执行以下命令验证 `solaris10` 区域是否已正确安装和配置：
 - en: '[PRE78]'
+  id: totrans-267
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE78]'
 - en: 'After booting the zone, check its status again by running the following command:'
+  id: totrans-268
   prefs: []
   type: TYPE_NORMAL
+  zh: 启动区域后，请再次运行以下命令检查其状态：
 - en: '[PRE79]'
+  id: totrans-269
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE79]'
 - en: 'Log in to the new zone and verify that it is an Oracle Solaris 10 installation,
     as follows:'
+  id: totrans-270
   prefs: []
   type: TYPE_NORMAL
+  zh: 登录到新区域并验证它是一个Oracle Solaris 10安装，如下所示：
 - en: '[PRE80]'
+  id: totrans-271
   prefs: []
   type: TYPE_PRE
+  zh: '[PRE80]'
 - en: This is amazing! We have migrated the Oracle Solaris 10 host to a solaris10
     branded zone in the Oracle Solaris 11 host.
+  id: totrans-272
   prefs: []
   type: TYPE_NORMAL
+  zh: 这真是太棒了！我们已经成功将 Oracle Solaris 10 主机迁移到 Oracle Solaris 11 主机中的 solaris10 品牌区域。
 - en: An overview of the recipe
+  id: totrans-273
   prefs:
   - PREF_H3
   type: TYPE_NORMAL
+  zh: 过程概述
 - en: Using no extra or external tools, we've learned how to migrate an Oracle Solaris
     10 physical host to a Oracle Solaris 11 non-global zone using the `zonep2vchk`,
     `flarcreate`, and `zonecfg` commands.
+  id: totrans-274
   prefs: []
   type: TYPE_NORMAL
+  zh: 我们没有使用额外或外部工具，学会了如何通过使用 `zonep2vchk`、`flarcreate` 和 `zonecfg` 命令将 Oracle Solaris
+    10 物理主机迁移到 Oracle Solaris 11 非全局区域。
 - en: References
+  id: totrans-275
   prefs:
   - PREF_H1
   type: TYPE_NORMAL
+  zh: 参考资料
 - en: '*Oracle Solaris SDN and* *Network Virtualization* at [http://www.oracle.com/technetwork/server-storage/solaris11/technologies/networkvirtualization-312278.html](http://www.oracle.com/technetwork/server-storage/solaris11/technologies/networkvirtualization-312278.html)'
+  id: totrans-276
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '*Oracle Solaris SDN 和* *网络虚拟化* 可参考 [http://www.oracle.com/technetwork/server-storage/solaris11/technologies/networkvirtualization-312278.html](http://www.oracle.com/technetwork/server-storage/solaris11/technologies/networkvirtualization-312278.html)'
 - en: '*Oracle Solaris 11.1 Administration: Oracle Solaris Zones, Oracle Solaris 10
     Zones, and Resource Management* ([http://docs.oracle.com/cd/E26502_01/html/E29024/toc.html](http://docs.oracle.com/cd/E26502_01/html/E29024/toc.html))
     at [http://docs.oracle.com/cd/E26502_01/html/E29024/z.conf.start-2.html#scrolltoc](http://docs.oracle.com/cd/E26502_01/html/E29024/z.conf.start-2.html#scrolltoc)'
+  id: totrans-277
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '*Oracle Solaris 11.1 管理：Oracle Solaris 区域、Oracle Solaris 10 区域及资源管理* （[http://docs.oracle.com/cd/E26502_01/html/E29024/toc.html](http://docs.oracle.com/cd/E26502_01/html/E29024/toc.html)）可参考
+    [http://docs.oracle.com/cd/E26502_01/html/E29024/z.conf.start-2.html#scrolltoc](http://docs.oracle.com/cd/E26502_01/html/E29024/z.conf.start-2.html#scrolltoc)'
 - en: '*Using Virtual Networks in Oracle Solaris 11.1* ([http://docs.oracle.com/cd/E26502_01/html/E28992/toc.html](http://docs.oracle.com/cd/E26502_01/html/E28992/toc.html))
     at [http://docs.oracle.com/cd/E26502_01/html/E28992/gdyss.html#scrolltoc](http://docs.oracle.com/cd/E26502_01/html/E28992/gdyss.html#scrolltoc)'
+  id: totrans-278
   prefs:
   - PREF_UL
   type: TYPE_NORMAL
+  zh: '*在 Oracle Solaris 11.1 中使用虚拟网络* （[http://docs.oracle.com/cd/E26502_01/html/E28992/toc.html](http://docs.oracle.com/cd/E26502_01/html/E28992/toc.html)）可参考
+    [http://docs.oracle.com/cd/E26502_01/html/E28992/gdyss.html#scrolltoc](http://docs.oracle.com/cd/E26502_01/html/E28992/gdyss.html#scrolltoc)'
